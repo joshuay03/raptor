@@ -1,0 +1,71 @@
+# Generated from lib/raptor/cli.rb with RBS::Inline
+
+module Raptor
+  # Command-line interface for the Raptor web server.
+  #
+  # CLI parses command-line arguments and starts the server cluster with the
+  # specified configuration options. It supports configuring the number of
+  # workers, threads, ractors, bind addresses, and various client timeout
+  # settings.
+  #
+  # @example Basic usage
+  #   cli = Raptor::CLI.new(["config.ru", "-t", "8", "-w", "4"])
+  #   cli.run
+  #
+  # @example With custom timeouts
+  #   cli = Raptor::CLI.new(["--first-data-timeout", "60", "--threads", "8"])
+  #   cli.run
+  class CLI
+    DEFAULT_WORKER_COUNT: untyped
+
+    DEFAULT_OPTIONS: untyped
+
+    @command: Symbol
+
+    @options: Hash[Symbol, untyped]
+
+    @parser: OptionParser
+
+    # Creates a new CLI instance and parses command-line arguments.
+    #
+    # Parses the provided command-line arguments and configures the server
+    # options accordingly. A rackup file can be provided as the first
+    # positional argument (defaults to config.ru).
+    #
+    # @param argv [Array<String>] command-line arguments to parse
+    # @return [void]
+    # @raise [OptionParser::ParseError] if invalid options are provided
+    #
+    # @example With rackup file
+    #   cli = CLI.new(["my_app.ru", "-w", "4"])
+    #
+    # @example With options only
+    #   cli = CLI.new(["-t", "8", "-r", "2"])
+    #
+    # @rbs (Array[String] argv) -> void
+    def initialize: (Array[String] argv) -> void
+
+    # Runs the requested command.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def run: () -> void
+
+    private
+
+    # Reads and prints the stats file.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def run_stats: () -> void
+
+    # Creates the OptionParser instance with all supported command-line options.
+    #
+    # @return [OptionParser] configured option parser
+    #
+    # @rbs () -> OptionParser
+    def create_parser: () -> OptionParser
+  end
+end

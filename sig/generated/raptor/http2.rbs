@@ -1,0 +1,145 @@
+# Generated from lib/raptor/http2.rb with RBS::Inline
+
+module Raptor
+  # Handles HTTP/2 request processing and Rack application integration.
+  #
+  # Http2 manages the HTTP/2 protocol lifecycle including frame processing,
+  # HPACK header compression, stream management, and response writing.
+  # It integrates with the same reactor, ractor pool, and thread pool
+  # pipeline used by HTTP/1.1 connections.
+  class Http2
+    FLAG_END_STREAM: ::Integer
+
+    FLAG_END_HEADERS: ::Integer
+
+    FLAG_ACK: ::Integer
+
+    FLAG_PRIORITY: ::Integer
+
+    SERVER_PROTOCOL: ::String
+
+    RACK_HEADER_PREFIX: ::String
+
+    HOP_BY_HOP_HEADERS: untyped
+
+    @server_port: Integer
+
+    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
+
+    # Creates a new Http2 handler.
+    #
+    # @param app [#call] the Rack application to dispatch requests to
+    # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @return [void]
+    #
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port) -> void
+
+    # Builds the initial server SETTINGS frame to send on connection establishment.
+    #
+    # @return [String] the encoded SETTINGS frame
+    #
+    # @rbs () -> String
+    def self.build_server_settings_frame: () -> String
+
+    # Processes HTTP/2 frames from the connection buffer.
+    #
+    # Parses frames, handles HPACK decoding, tracks stream state, and returns
+    # updated connection state along with any outgoing protocol frames and
+    # completed stream requests. Ractor-safe.
+    #
+    # @param data [Hash] the connection state including buffer and HPACK table
+    # @return [Hash] updated state with outgoing_frames and completed_requests
+    #
+    # @rbs (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
+    def self.process_frames: (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
+
+    # Builds a frozen result hash from the current processing state.
+    #
+    # @param data [Hash] original connection state
+    # @param buffer [String] remaining unparsed data
+    # @param hpack_table [Array] updated HPACK dynamic table
+    # @param streams [Hash] updated stream states
+    # @param outgoing_frames [Array<String>] frames to write to the socket
+    # @param completed_requests [Array<Hash>] fully received stream requests
+    # @param connection_window [Integer] current connection flow control window
+    # @param preface_received [Boolean] whether the connection preface has been received
+    # @return [Hash] frozen result hash
+    #
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received) -> Hash[Symbol, untyped]
+    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received) -> Hash[Symbol, untyped]
+
+    # Handles a parsed HTTP/2 request from the ractor pool.
+    #
+    # Writes outgoing protocol frames to the socket, updates reactor state,
+    # and dispatches completed stream requests to the thread pool.
+    #
+    # @param result [Hash] the parsed result from the ractor pool
+    # @param reactor [Reactor] the reactor managing the connection
+    # @param thread_pool [AtomicThreadPool] thread pool for Rack app dispatch
+    # @return [void]
+    #
+    # @rbs (Hash[Symbol, untyped] result, Reactor reactor, AtomicThreadPool thread_pool) -> void
+    def handle_parsed_request: (Hash[Symbol, untyped] result, Reactor reactor, AtomicThreadPool thread_pool) -> void
+
+    private
+
+    # Dispatches a completed stream request to the Rack app and writes
+    # the response back as HTTP/2 frames.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param headers [Array<Array(String, String)>] request headers
+    # @param body [String] request body
+    # @param remote_addr [String] the client IP address
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
+    def dispatch_stream_request: (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Array[[ String, String ]] headers, String body, remote_addr: String) -> void
+
+    # Writes a Rack response as HTTP/2 frames to the socket.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param status [Integer] HTTP status code
+    # @param headers [Hash] response headers from the Rack application
+    # @param body [Object] response body responding to each
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
+    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
+
+    # Writes a 500 error response as HTTP/2 frames.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id) -> void
+    def write_http2_error_response: (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id) -> void
+
+    # Builds a Rack environment hash from HTTP/2 headers and body.
+    #
+    # Translates HTTP/2 pseudo-headers into Rack-compatible environment keys
+    # and populates all required Rack env entries.
+    #
+    # @param headers [Array<Array(String, String)>] HTTP/2 header pairs
+    # @param body [String] the request body
+    # @param remote_addr [String] the client IP address
+    # @return [Hash] fully populated Rack environment hash
+    #
+    # @rbs (Array[[String, String]] headers, String body, remote_addr: String) -> Hash[String, untyped]
+    def build_rack_env: (Array[[ String, String ]] headers, String body, remote_addr: String) -> Hash[String, untyped]
+
+    # Populates SERVER_NAME and SERVER_PORT from the HTTP_HOST header.
+    #
+    # @param env [Hash] the Rack environment to populate
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped] env) -> void
+    def populate_server_name_and_port: (Hash[String, untyped] env) -> void
+  end
+end

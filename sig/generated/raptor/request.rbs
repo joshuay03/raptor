@@ -1,0 +1,477 @@
+# Generated from lib/raptor/request.rb with RBS::Inline
+
+module Raptor
+  # Handles HTTP request processing and Rack application integration.
+  #
+  # Request manages the HTTP parsing pipeline using Ractors and coordinates
+  # with the reactor for connection state management. It bridges between the
+  # low-level HTTP parsing and high-level Rack application interface, handling
+  # both incomplete requests (that need more data) and complete requests
+  # (ready for application processing).
+  class Request
+    BODY_BUFFER_THRESHOLD: untyped
+
+    FILE_CHUNK_SIZE: untyped
+
+    KEEPALIVE_BUFFER_SIZE: untyped
+
+    WRITE_TIMEOUT: ::Integer
+
+    KEEPALIVE_READ_TIMEOUT: ::Float
+
+    MAX_KEEPALIVE_REQUESTS: ::Integer
+
+    HTTP_SCHEME: ::String
+
+    HTTP_10: ::String
+
+    HTTP_11: ::String
+
+    STATUS_LINE_CACHE_10: untyped
+
+    STATUS_LINE_CACHE_11: untyped
+
+    STATUS_WITH_NO_ENTITY_BODY: untyped
+
+    ERROR_RESPONSE_500: ::String
+
+    CONNECTION_CLOSE: ::String
+
+    CONNECTION_KEEPALIVE: ::String
+
+    TRANSFER_ENCODING_CHUNKED: ::String
+
+    HTTP_CONNECTION: ::String
+
+    HTTP_TRANSFER_ENCODING: ::String
+
+    RACK_HEADER_PREFIX: ::String
+
+    RACK_HIJACKED: ::String
+
+    RACK_HIJACK_IO: ::String
+
+    ILLEGAL_HEADER_KEY_REGEX: ::Regexp
+
+    ILLEGAL_HEADER_VALUE_REGEX: ::Regexp
+
+    class Error < StandardError
+    end
+
+    class WriteError < Error
+      # @rbs () -> String
+      def message: () -> String
+    end
+
+    @server_port: Integer
+
+    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
+
+    # Creates a new Request handler.
+    #
+    # @param app [#call] the Rack application to dispatch complete requests to
+    # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @return [void]
+    #
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port) -> void
+
+    # Returns a Proc for HTTP parsing work in Ractor context.
+    #
+    # The returned Proc processes raw socket data through the appropriate
+    # HTTP parser and returns either a complete request state (ready for
+    # app processing) or incomplete request state (needs more data).
+    #
+    # @return [Proc] a Ractor-safe proc that accepts a state hash and returns an updated state hash
+    #
+    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+    def http_parser_worker: () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
+    # Handles a parsed HTTP request by either continuing parsing or dispatching to the Rack app.
+    #
+    # For incomplete requests, updates reactor state and re-registers for more I/O.
+    # For complete requests, removes from reactor, builds Rack env, and dispatches to thread pool.
+    #
+    # @param parsed_request [Hash] the parsed request state from the ractor pool
+    # @param reactor [Reactor] the reactor managing the client connection
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @return [void]
+    #
+    # @rbs (Hash[Symbol, untyped] parsed_request, Reactor reactor, AtomicThreadPool thread_pool) -> void
+    def handle_parsed_request: (Hash[Symbol, untyped] parsed_request, Reactor reactor, AtomicThreadPool thread_pool) -> void
+
+    private
+
+    # Processes a client connection by handling the current request and,
+    # if keep-alive, eagerly reading subsequent requests inline.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique client identifier
+    # @param env [Hash] partial env hash from the HTTP parser
+    # @param parse_data [Hash] metadata from the parsing pass
+    # @param body [String, nil] decoded request body
+    # @param reactor [Reactor] the reactor managing the client connection
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @param request_count [Integer] number of requests handled on this connection
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
+    def process_client: (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
+
+    # Builds the Rack env, calls the application, and writes the response.
+    # Returns true if the connection should be kept alive for further
+    # requests, false otherwise (including hijack and error cases).
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param env [Hash] partial env hash from the HTTP parser
+    # @param parse_data [Hash] metadata from the parsing pass
+    # @param body [String, nil] decoded request body
+    # @param request_count [Integer] number of requests handled on this connection
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @return [Boolean] true if the connection should be kept alive
+    #
+    # @rbs (TCPSocket socket, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Integer request_count, String remote_addr, String url_scheme) -> bool
+    def process_request: (TCPSocket socket, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Integer request_count, String remote_addr, String url_scheme) -> bool
+
+    # Attempts to read and process subsequent requests inline on a
+    # kept-alive connection. Blocks briefly for the next request to avoid
+    # a full reactor round-trip. Falls back to the reactor when no data
+    # arrives within the timeout, when the thread pool has queued work
+    # (deprioritization), or when the request is incomplete.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique client identifier
+    # @param reactor [Reactor] the reactor for fallback registration
+    # @param thread_pool [AtomicThreadPool] thread pool for deprioritization
+    # @param request_count [Integer] number of requests handled on this connection
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
+    def eager_keepalive: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
+
+    # Re-registers a socket with the reactor for further processing
+    # when an incomplete request is received during eager keep-alive.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique client identifier
+    # @param buffer [String] the partial request data already read
+    # @param env [Hash] partial env hash from the HTTP parser
+    # @param parse_data [Hash] metadata from the parsing pass
+    # @param reactor [Reactor] the reactor to re-register with
+    # @param request_count [Integer] number of requests handled on this connection
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme) -> void
+    def fallback_to_reactor: (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme) -> void
+
+    # Builds a Rack environment hash from parsed HTTP request data.
+    #
+    # Populates all required Rack env keys including rack.* keys, REMOTE_ADDR,
+    # SERVER_NAME, SERVER_PORT, and hijack support.
+    #
+    # @param env [Hash] partial env hash from the HTTP parser
+    # @param parse_data [Hash] metadata from the parsing pass, including content_length
+    # @param body [String, nil] decoded request body, or nil if no body
+    # @param socket [TCPSocket] the client socket, used for hijack support
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @return [Hash] fully populated Rack environment hash
+    #
+    # @rbs (Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, TCPSocket socket, ?remote_addr: String, ?url_scheme: String) -> Hash[String, untyped]
+    def build_rack_env: (Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, TCPSocket socket, ?remote_addr: String, ?url_scheme: String) -> Hash[String, untyped]
+
+    # Determines whether the connection should be kept alive after the response.
+    #
+    # Returns false if the request limit has been reached. For HTTP/1.1, keep-alive
+    # is the default unless the client sent Connection: close. For HTTP/1.0,
+    # keep-alive must be explicitly requested.
+    #
+    # @param env [Hash] the Rack environment
+    # @param request_count [Integer] number of requests handled on this connection
+    # @return [Boolean] true if the connection should be kept alive
+    #
+    # @rbs (Hash[String, untyped] env, Integer request_count) -> bool
+    def keep_alive?: (Hash[String, untyped] env, Integer request_count) -> bool
+
+    # Sends an HTTP 103 Early Hints response to the client.
+    #
+    # Skips any hints with illegal header keys or values. No-ops if hints is empty.
+    #
+    # @param socket [TCPSocket] the client socket to write to
+    # @param hints [Hash] header name to value (or array of values) pairs
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Hash[String, String | Array[String]] hints) -> void
+    def send_early_hints: (TCPSocket socket, Hash[String, String | Array[String]] hints) -> void
+
+    # Writes a complete HTTP response to the socket.
+    #
+    # Handles header normalization, validation, connection management, TCP corking,
+    # and dispatches to the appropriate body write strategy.
+    #
+    # @param socket [TCPSocket] the client socket to write to
+    # @param env [Hash] the Rack environment
+    # @param status [Integer] HTTP status code
+    # @param headers [Hash] response headers from the Rack application
+    # @param body [Object] response body (array, enumerable, file, or callable)
+    # @param keep_alive [Boolean] whether to send a keep-alive connection header
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Hash[String, untyped] env, Integer status, Hash[String, String | Array[String]] headers, untyped body, ?keep_alive: bool) -> void
+    def write_response: (TCPSocket socket, Hash[String, untyped] env, Integer status, Hash[String, String | Array[String]] headers, untyped body, ?keep_alive: bool) -> void
+
+    # Validates that the status code is a valid integer.
+    #
+    # @param status [Object] the status value to validate
+    # @return [void]
+    # @raise [TypeError] if status is not an Integer
+    # @raise [ArgumentError] if status is less than 100
+    #
+    # @rbs (Integer status) -> void
+    def validate_status: (Integer status) -> void
+
+    # Normalizes response headers by downcasing keys and filtering invalid entries.
+    #
+    # Removes headers with illegal keys, rack.* prefixed headers, and "status" headers.
+    # Raises if headers is not a Hash or contains non-String keys.
+    #
+    # @param headers [Hash] raw headers from the Rack application
+    # @return [Hash] normalized headers with lowercased string keys
+    # @raise [TypeError] if headers is not a Hash or a key is not a String
+    #
+    # @rbs (Hash[String, String | Array[String]] headers) -> Hash[String, String | Array[String]]
+    def normalize_headers: (Hash[String, String | Array[String]] headers) -> Hash[String, String | Array[String]]
+
+    # Validates that headers are appropriate for the given status code.
+    #
+    # Raises if content-type or content-length are present for status codes
+    # that must not have an entity body (204, 304, 1xx).
+    #
+    # @param headers [Hash] normalized response headers
+    # @param status [Integer] HTTP status code
+    # @return [void]
+    # @raise [ArgumentError] if a forbidden header is present for the status
+    #
+    # @rbs (Hash[String, String | Array[String]] headers, Integer status) -> void
+    def validate_headers: (Hash[String, String | Array[String]] headers, Integer status) -> void
+
+    # Builds the HTTP status line string.
+    #
+    # @param http_version [String] "HTTP/1.1" or "HTTP/1.0"
+    # @param status [Integer] HTTP status code
+    # @return [String] the status line including trailing CRLF
+    #
+    # @rbs (String http_version, Integer status) -> String
+    def build_status_line: (String http_version, Integer status) -> String
+
+    # Writes response headers and delegates body writing to the hijack callback.
+    #
+    # Uncorks the socket before calling the hijack so the app has full control
+    # of the raw connection.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param response [String] the status line accumulated so far
+    # @param headers [Hash] normalized response headers
+    # @param response_hijack [Proc] callable that receives the socket and writes the body
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, ^(TCPSocket) -> void response_hijack) -> void
+    def write_hijacked_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, ^(TCPSocket) -> void response_hijack) -> void
+
+    # Writes a response with no entity body.
+    #
+    # Used for HEAD requests and status codes that must not carry a body
+    # (204, 304, 1xx). Adds a zero content-length for non-no-body statuses
+    # that did not supply one.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param response [String] the status line accumulated so far
+    # @param headers [Hash] normalized response headers
+    # @param status [Integer] HTTP status code
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, Integer status) -> void
+    def write_no_body_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, Integer status) -> void
+
+    # Writes a complete response with a body.
+    #
+    # Selects the appropriate write strategy based on body type: callable (streaming),
+    # file (zero-copy), array, or generic enumerable. Automatically determines
+    # content-length where possible, falling back to chunked transfer encoding
+    # for HTTP/1.1 when the length cannot be determined upfront.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param response [String] the status line accumulated so far
+    # @param headers [Hash] normalized response headers
+    # @param body [Object] the response body
+    # @param http_version [String] "HTTP/1.1" or "HTTP/1.0"
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
+    def write_full_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
+
+    # Calculates content length from an array or file body without consuming it.
+    #
+    # Returns nil for enumerable bodies whose length cannot be determined upfront.
+    #
+    # @param body [Object] the response body
+    # @return [Integer, nil] the byte length, or nil if it cannot be determined
+    #
+    # @rbs (untyped body) -> Integer?
+    def calculate_content_length: (untyped body) -> Integer?
+
+    # Writes a file body to the socket.
+    #
+    # Uses zero-copy IO.copy_stream for large files, direct buffering for small ones,
+    # and chunked encoding when required.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param response [String] headers already serialized, to be written before the body
+    # @param path [String] filesystem path of the file to send
+    # @param content_length [Integer, nil] pre-calculated file size
+    # @param use_chunked [Boolean] whether to use chunked transfer encoding
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, String response, String path, Integer? content_length, bool use_chunked) -> void
+    def write_file_body: (TCPSocket socket, String response, String path, Integer? content_length, bool use_chunked) -> void
+
+    # Writes an array body to the socket.
+    #
+    # Dispatches to the single-chunk or multi-chunk path based on array length.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param response [String] headers already serialized, to be written before the body
+    # @param body_array [Array<String>] the response body chunks
+    # @param use_chunked [Boolean] whether to use chunked transfer encoding
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
+    def write_array_body: (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
+
+    # Writes a single-element array body, optionally buffering it with the headers.
+    #
+    # Small bodies are concatenated with the headers into one write to reduce
+    # system call overhead.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param response [String] headers already serialized, to be written before the body
+    # @param chunk [String] the single body chunk
+    # @param use_chunked [Boolean] whether to use chunked transfer encoding
+    # @return [void]
+    # @raise [TypeError] if the chunk is not a String
+    #
+    # @rbs (TCPSocket socket, String response, String chunk, bool use_chunked) -> void
+    def write_single_chunk: (TCPSocket socket, String response, String chunk, bool use_chunked) -> void
+
+    # Writes a multi-element array body to the socket.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param response [String] headers already serialized, to be written before the body
+    # @param body_array [Array<String>] the response body chunks
+    # @param use_chunked [Boolean] whether to use chunked transfer encoding
+    # @return [void]
+    # @raise [TypeError] if any chunk is not a String
+    #
+    # @rbs (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
+    def write_multiple_chunks: (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
+
+    # Writes a generic enumerable body to the socket.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param response [String] headers already serialized, to be written before the body
+    # @param body [Object] any object responding to each
+    # @param use_chunked [Boolean] whether to use chunked transfer encoding
+    # @return [void]
+    # @raise [TypeError] if any yielded chunk is not a String
+    #
+    # @rbs (TCPSocket socket, String response, untyped body, bool use_chunked) -> void
+    def write_enumerable_body: (TCPSocket socket, String response, untyped body, bool use_chunked) -> void
+
+    # Returns true if the header key contains characters illegal in HTTP headers.
+    #
+    # @param key [String] the header key to check
+    # @return [Boolean] true if the key is illegal
+    #
+    # @rbs (String key) -> bool
+    def illegal_header_key?: (String key) -> bool
+
+    # Returns true if the header value contains characters illegal in HTTP headers.
+    #
+    # @param value [String] the header value to check
+    # @return [Boolean] true if the value is illegal
+    #
+    # @rbs (String value) -> bool
+    def illegal_header_value?: (String value) -> bool
+
+    # Formats a headers hash into an HTTP header string.
+    #
+    # Skips entries with illegal keys or values. Array values are written
+    # as separate header lines.
+    #
+    # @param headers [Hash] normalized response headers
+    # @return [String] formatted header lines, each ending with CRLF
+    #
+    # @rbs (Hash[String, String | Array[String]] headers) -> String
+    def format_headers: (Hash[String, String | Array[String]] headers) -> String
+
+    # Calls all rack.response_finished callbacks registered in the environment.
+    #
+    # Callbacks are called in reverse registration order. Individual callback
+    # failures are rescued so all callbacks are always attempted.
+    #
+    # @param env [Hash, nil] the Rack environment
+    # @param status [Integer, nil] the response status code
+    # @param headers [Hash, nil] the response headers
+    # @param error [Exception, nil] any error raised during processing, or nil on success
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped] env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
+    def call_response_finished: (Hash[String, untyped] env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
+
+    # Writes a string to the socket, retrying on partial writes and flow control blocks.
+    #
+    # Uses write_nonblock with a 5-second writable timeout to avoid blocking the
+    # thread indefinitely on slow clients.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param string [String] the data to write
+    # @return [void]
+    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, String string) -> void
+    def socket_write: (TCPSocket socket, String string) -> void
+
+    # Enables TCP_CORK on the socket to batch outgoing packets into fewer segments.
+    #
+    # Only applies to TCP sockets. No-op on non-TCP sockets.
+    # Available on Linux only; this method is not defined on other platforms.
+    #
+    # @param socket [TCPSocket] the socket to cork
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket) -> void
+    def cork_socket: (TCPSocket socket) -> void
+
+    # Disables TCP_CORK on the socket, flushing any buffered packets.
+    #
+    # Only applies to TCP sockets. No-op on non-TCP sockets.
+    # Available on Linux only; this method is not defined on other platforms.
+    #
+    # @param socket [TCPSocket] the socket to uncork
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket) -> void
+    def uncork_socket: (TCPSocket socket) -> void
+
+    def cork_socket: (untyped socket) -> untyped
+
+    def uncork_socket: (untyped socket) -> untyped
+  end
+end

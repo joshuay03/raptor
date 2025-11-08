@@ -1,0 +1,162 @@
+# Generated from lib/raptor/binder.rb with RBS::Inline
+
+module Raptor
+  # Manages binding to network addresses and creating listening sockets.
+  #
+  # Binder handles parsing URI bind specifications, creating TCP, Unix, and SSL
+  # server sockets, and managing socket options for optimal performance. It
+  # supports binding to multiple addresses simultaneously.
+  #
+  # @example TCP binding
+  #   binder = Binder.new(["tcp://0.0.0.0:3000", "tcp://[::1]:3000"])
+  #   puts binder.addresses #=> ["0.0.0.0:3000", "[::1]:3000"]
+  #   binder.close
+  #
+  # @example Unix socket binding
+  #   binder = Binder.new(["unix:///tmp/raptor.sock"])
+  #   puts binder.addresses #=> ["/tmp/raptor.sock"]
+  #   binder.close
+  #
+  # @example SSL binding
+  #   binder = Binder.new(["ssl://0.0.0.0:443?cert=/path/to.crt&key=/path/to.key"])
+  #   puts binder.addresses #=> ["ssl://0.0.0.0:443"]
+  #   binder.close
+  #
+  # @example Localhost binding
+  #   binder = Binder.new(["tcp://localhost:8080"])
+  #   # Binds to both IPv4 and IPv6 loopback addresses
+  class Binder
+    SOCKET_BACKLOG: ::Integer
+
+    class UnknownBindSchemeError < TypeError
+      # @rbs (String scheme) -> void
+      def initialize: (String scheme) -> void
+    end
+
+    # Wraps a TCPServer with an SSL context for accepting SSL connections.
+    #
+    # Holds both the underlying TCP server and the SSL context together so
+    # the server thread can accept a TCP connection and then perform the SSL
+    # handshake in a single coordinated step.
+    class SslListener < Data
+      attr_reader tcp_server(): untyped
+
+      attr_reader ssl_context(): untyped
+
+      def self.new: (untyped tcp_server, untyped ssl_context) -> instance
+                  | (tcp_server: untyped, ssl_context: untyped) -> instance
+
+      def self.members: () -> [ :tcp_server, :ssl_context ]
+
+      def members: () -> [ :tcp_server, :ssl_context ]
+    end
+
+    @bind_uris: Array[String]
+
+    @listeners: Array[TCPServer | UNIXServer | SslListener]
+
+    # Array of listening sockets.
+    #
+    # @return [Array<TCPServer, UNIXServer, SslListener>] the server sockets
+    attr_reader listeners: untyped
+
+    # Creates a new Binder with the specified bind URIs.
+    #
+    # Parses the provided bind URIs and creates listening sockets for each one.
+    # Supports tcp://, unix://, and ssl:// schemes. Localhost is expanded to
+    # all available loopback addresses (both IPv4 and IPv6).
+    #
+    # @param bind_uris [Array<String>] array of URI strings to bind to
+    # @return [void]
+    # @raise [UnknownBindSchemeError] if a URI has an unsupported scheme
+    #
+    # @example
+    #   binder = Binder.new(["tcp://0.0.0.0:3000", "unix:///tmp/raptor.sock"])
+    #
+    # @rbs (Array[String] bind_uris) -> void
+    def initialize: (Array[String] bind_uris) -> void
+
+    # Returns the bound addresses as strings.
+    #
+    # TCP listeners are returned as "host:port", Unix listeners as the socket
+    # path, and SSL listeners as "ssl://host:port".
+    #
+    # @return [Array<String>] address strings for each bound listener
+    #
+    # @example
+    #   binder.addresses #=> ["127.0.0.1:3000", "/tmp/raptor.sock", "ssl://0.0.0.0:443"]
+    #
+    # @rbs () -> Array[String]
+    def addresses: () -> Array[String]
+
+    # Returns the port number of the first TCP or SSL listener.
+    #
+    # Used to populate SERVER_PORT in the Rack environment. Returns 0
+    # if no TCP or SSL listener is configured (e.g., Unix socket only).
+    #
+    # @return [Integer] the port number, or 0 if no TCP listener exists
+    #
+    # @rbs () -> Integer
+    def server_port: () -> Integer
+
+    # Closes all listening sockets.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def close: () -> void
+
+    private
+
+    # Parses bind URIs and creates listening sockets.
+    #
+    # @return [void]
+    # @raise [UnknownBindSchemeError] if a URI scheme is not supported
+    #
+    # @rbs () -> void
+    def parse: () -> void
+
+    # Creates TCP server sockets for the given host and port.
+    #
+    # @param host [String, nil] hostname or IP address to bind to
+    # @param port [Integer, nil] port number to bind to
+    # @return [Array<TCPServer>] array containing the created TCP server socket(s)
+    #
+    # @rbs (String? host, Integer? port) -> Array[TCPServer]
+    def create_tcp_listeners: (String? host, Integer? port) -> Array[TCPServer]
+
+    # Creates a Unix domain server socket at the given path.
+    #
+    # Removes stale socket files left by crashed processes (when the socket
+    # is not currently in use). Registers an at_exit hook to clean up the
+    # socket file on normal process exit.
+    #
+    # @param path [String] filesystem path for the Unix socket
+    # @return [Array<UNIXServer>] array containing the created Unix server socket
+    # @raise [RuntimeError] if the socket path is already in active use
+    #
+    # @rbs (String path) -> Array[UNIXServer]
+    def create_unix_listeners: (String path) -> Array[UNIXServer]
+
+    # Creates SSL server sockets for the given host, port, and SSL parameters.
+    #
+    # Wraps each TCP listener with an SSL context to produce SslListener objects.
+    # The ssl_params hash must include "cert" and "key" entries pointing to the
+    # certificate and private key files respectively.
+    #
+    # @param host [String, nil] hostname or IP address to bind to
+    # @param port [Integer, nil] port number to bind to
+    # @param ssl_params [Hash<String, String>] SSL options ("cert" and "key" paths)
+    # @return [Array<SslListener>] array containing the created SSL listener(s)
+    #
+    # @rbs (String? host, Integer? port, Hash[String, String] ssl_params) -> Array[SslListener]
+    def create_ssl_listeners: (String? host, Integer? port, Hash[String, String] ssl_params) -> Array[SslListener]
+
+    # Returns all available loopback IP addresses.
+    #
+    # @return [Array<String>] unique loopback addresses (IPv4 and IPv6)
+    #
+    # @rbs () -> Array[String]
+    def loopback_addresses: () -> Array[String]
+  end
+end

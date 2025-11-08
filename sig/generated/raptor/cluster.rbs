@@ -1,0 +1,171 @@
+# Generated from lib/raptor/cluster.rb with RBS::Inline
+
+module Raptor
+  # Multi-process web server cluster with advanced concurrency architecture.
+  #
+  # Cluster manages multiple worker processes, each running a complete server
+  # stack including a reactor thread, server thread, ractor pool for HTTP
+  # parsing, and thread pool for application processing. It handles process
+  # forking, signal management, graceful shutdown, and automatic worker
+  # restart when a worker process unexpectedly exits.
+  #
+  # The architecture provides horizontal scaling through processes while
+  # maintaining efficient I/O and CPU utilization within each process through
+  # the combination of NIO reactors, ractor-based parsing, and thread pools.
+  #
+  # Flow per worker process:
+  # 1. Server continuously accepts connections but skips acceptance when backlog is high
+  # 2. Reactor manages I/O multiplexing and provides backlog metrics for load control
+  # 3. Ractor pool handles CPU-intensive HTTP parsing in parallel
+  # 4. Thread pool processes Rack applications and handles response writing
+  # 5. Natural load balancing occurs through backpressure-based acceptance control
+  #
+  # @example Basic usage
+  #   options = {
+  #     threads: 8, ractors: 2, workers: 4,
+  #     binds: ["tcp://0.0.0.0:3000"],
+  #     rackup: "config.ru",
+  #     client: { first_data_timeout: 30, chunk_data_timeout: 10 }
+  #   }
+  #   Cluster.run(options)
+  class Cluster
+    # Convenience method to create and run a cluster with the given options.
+    #
+    # @param options [Hash] cluster configuration options
+    # @return [void]
+    #
+    # @rbs (Hash[Symbol, untyped] options) -> void
+    def self.run: (Hash[Symbol, untyped] options) -> void
+
+    @stats_file: String?
+
+    @stats: Stats
+
+    @workers: Hash[Integer, Integer]
+
+    @shutdown: bool
+
+    @app: untyped
+
+    @server_port: Integer
+
+    @binder: Binder
+
+    @client_options: Hash[Symbol, Integer]
+
+    @worker_count: Integer
+
+    @ractor_count: Integer
+
+    @thread_count: Integer
+
+    # Creates a new Cluster with the specified configuration.
+    #
+    # Initializes the cluster with thread, ractor, and worker counts,
+    # sets up network binding, loads the Rack application, and prepares
+    # for multi-process operation.
+    #
+    # @param options [Hash] cluster configuration options
+    # @option options [Integer] :threads number of threads per worker process
+    # @option options [Integer] :ractors number of ractors per worker process
+    # @option options [Integer] :workers number of worker processes
+    # @option options [Array<String>] :binds array of bind URIs
+    # @option options [String] :rackup path to Rack configuration file
+    # @option options [Hash] :client client timeout configuration
+    # @return [void]
+    #
+    # @rbs (Hash[Symbol, untyped] options) -> void
+    def initialize: (Hash[Symbol, untyped] options) -> void
+
+    # Starts the multi-process cluster and manages worker processes.
+    #
+    # Forks the configured number of worker processes and monitors them,
+    # automatically restarting any that exit unexpectedly. Handles graceful
+    # shutdown via INT or TERM signals, and stats logging via USR1.
+    #
+    # Each worker process includes:
+    # - 1 server thread (continuously accepts connections with backpressure control)
+    # - 1 reactor thread (I/O multiplexing, timeout handling, backlog monitoring)
+    # - N ractor workers (parallel HTTP parsing)
+    # - 1 ractor collector thread (coordinates parsing results)
+    # - M worker threads (Rack application processing and response writing)
+    # - 1 stats thread (writes per-worker metrics to shared memory every second)
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def run: () -> void
+
+    # Returns stats for all worker processes.
+    #
+    # @return [Array<Hash>] array of per-worker stat hashes, each containing
+    #   :pid, :requests, :backlog, :started_at, :last_checkin, and :booted
+    #
+    # @rbs () -> Array[Hash[Symbol, untyped]]
+    def stats: () -> Array[Hash[Symbol, untyped]]
+
+    private
+
+    # Forks a new worker process and registers it at the given index.
+    #
+    # @param index [Integer] slot index for this worker in the stats region
+    # @return [void]
+    #
+    # @rbs (Integer index) -> void
+    def spawn_worker: (Integer index) -> void
+
+    # Runs the full server stack inside a worker process.
+    #
+    # Sets up and coordinates the reactor, server, ractor pool, thread pool,
+    # and stats thread, running until a shutdown signal is received or a
+    # critical component fails.
+    #
+    # @param index [Integer] slot index for this worker in the stats region
+    # @return [void]
+    #
+    # @rbs (Integer index) -> void
+    def run_worker: (Integer index) -> void
+
+    # Returns a human-readable description of how a process exited.
+    #
+    # @param status [Process::Status] the exit status of the process
+    # @return [String] a description of the exit reason
+    #
+    # @rbs (Process::Status status) -> String
+    def exit_description: (Process::Status status) -> String
+
+    # Initiates graceful shutdown of the cluster.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def shutdown: () -> void
+
+    # Logs cluster initialization details including architecture and bind addresses.
+    #
+    # Outputs a hierarchical view of the cluster configuration showing
+    # the master process, worker processes, and per-process thread/ractor
+    # allocation along with listening addresses.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def log_initialization: () -> void
+
+    # Logs current stats for all workers to stdout.
+    #
+    # Triggered by SIGUSR1 in the master process.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def log_stats: () -> void
+
+    # Writes the stats file on a 1-second interval until shutdown.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def write_stats_file_loop: () -> void
+  end
+end

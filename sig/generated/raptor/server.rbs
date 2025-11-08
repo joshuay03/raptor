@@ -1,0 +1,88 @@
+# Generated from lib/raptor/server.rb with RBS::Inline
+
+module Raptor
+  # High-performance HTTP server that accepts connections and dispatches them.
+  #
+  # Server manages the main accept loop, handling incoming client connections from
+  # bound sockets. It uses IO.select for efficient polling and implements automatic
+  # load balancing by checking reactor backlog before accepting connections,
+  # providing natural backpressure based on system capacity.
+  #
+  # Supports TCP, Unix domain, and SSL listeners transparently. TCP_NODELAY is
+  # applied only to TCP sockets, and SSL handshakes are performed synchronously
+  # before handing the connection to the reactor.
+  #
+  # For SSL connections, ALPN negotiation determines the protocol. HTTP/2
+  # connections are added to the reactor with initial SETTINGS and processed
+  # through the same ractor pool pipeline as HTTP/1.1 connections.
+  #
+  # @example
+  #   binder = Binder.new(["tcp://0.0.0.0:3000"])
+  #   reactor = Reactor.new(thread_pool, ractor_pool, client_options: {})
+  #   server = Server.new(binder, reactor, thread_pool)
+  #   server.run
+  #   # ... later
+  #   server.shutdown
+  class Server
+    HTTP_SCHEME: ::String
+
+    HTTPS_SCHEME: ::String
+
+    H2_PROTOCOL: ::String
+
+    @binder: Binder
+
+    @reactor: Reactor
+
+    @thread_pool: AtomicThreadPool
+
+    @running: AtomicBoolean
+
+    # Creates a new Server instance.
+    #
+    # @param binder [Binder] the binder managing listening sockets
+    # @param reactor [Reactor] the reactor for handling client connections
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @return [void]
+    #
+    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool) -> void
+    def initialize: (Binder binder, Reactor reactor, AtomicThreadPool thread_pool) -> void
+
+    # Starts the server's main accept loop in a new thread.
+    #
+    # The accept loop polls listening sockets for ready connections and accepts
+    # them when system capacity allows. It checks reactor backlog before accepting
+    # to prevent overload. This provides natural load balancing across multiple
+    # worker processes through backpressure control.
+    #
+    # @return [Thread] the thread running the accept loop
+    #
+    # @rbs () -> Thread
+    def run: () -> Thread
+
+    # Gracefully shuts down the server.
+    #
+    # Stops accepting new connections and closes all listening sockets.
+    # The server thread will exit after handling any in-flight accept operations.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def shutdown: () -> void
+
+    private
+
+    # Accepts a connection from the given listener and dispatches it.
+    #
+    # For SSL connections with h2 negotiated via ALPN, the server sends
+    # initial SETTINGS and adds the connection to the reactor as an HTTP/2
+    # connection. All other connections follow the HTTP/1.1 path.
+    #
+    # @param listener [TCPServer, UNIXServer, Binder::SslListener] the ready listener
+    # @param reactor [Reactor] the reactor to dispatch connections to
+    # @return [void]
+    #
+    # @rbs (TCPServer | UNIXServer | Binder::SslListener listener, Reactor reactor) -> void
+    def accept_connection: (TCPServer | UNIXServer | Binder::SslListener listener, Reactor reactor) -> void
+  end
+end
