@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>
+  Class: Raptor::Stats
+  
+    &mdash; Documentation by YARD 0.9.43
+  
+</title>
+
+  <link rel="stylesheet" href="../css/style.css" type="text/css">
+
+  <link rel="stylesheet" href="../css/common.css" type="text/css">
+
+<script type="text/javascript">
+  pathId = "Raptor::Stats";
+  relpath = '../';
+</script>
+
+
+  <script type="text/javascript" charset="utf-8" src="../js/jquery.js"></script>
+
+  <script type="text/javascript" charset="utf-8" src="../js/app.js"></script>
+
+
+  </head>
+  <body>
+    <div id="main_progress" aria-hidden="true"></div>
+
+    <div class="nav_wrap">
+      <iframe id="nav" src="../class_list.html?1"></iframe>
+      <div id="resizer"></div>
+    </div>
+
+    <div id="main" tabindex="-1">
+      <div id="header">
+        <div id="menu">
+  
+    <a href="../_index.html">Index (S)</a> &raquo;
+    <span class='title'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span>
+     &raquo; 
+    <span class="title">Stats</span>
+  
+</div>
+
+        <div id="search">
+  
+    <a class="full_list_link" id="class_list_link"
+        href="../class_list.html">
+
+        <svg width="24" height="24">
+          <rect x="0" y="4" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="12" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="20" width="24" height="4" rx="1" ry="1"></rect>
+        </svg>
+    </a>
+  
+</div>
+        <div class="clear"></div>
+      </div>
+
+      <div id="content"><h1>Class: Raptor::Stats
+  
+  
+  
+</h1>
+<div class="box_info">
+  
+  <dl>
+    <dt>Inherits:</dt>
+    <dd>
+      <span class="inheritName">Object</span>
+      
+        <ul class="fullTree">
+          <li>Object</li>
+          
+            <li class="next">Raptor::Stats</li>
+          
+        </ul>
+        <a href="#" class="inheritanceTree">show all</a>
+      
+    </dd>
+  </dl>
+  
+
+  
+  
+  
+  
+  
+
+  
+
+  
+  <dl>
+    <dt>Defined in:</dt>
+    <dd>lib/raptor/stats.rb<span class="defines">,<br>
+  lib/sig/generated/raptor/stats.rbs,<br> sig/generated/raptor/stats.rbs</span>
+
+</dd>
+  </dl>
+  
+</div>
+
+<h2>Overview</h2><div class="docstring">
+  <div class="discussion">
+    <p>Shared memory store for per-worker process statistics.</p>
+<p>Stats uses an anonymous mmap (MAP_ANON | MAP_SHARED) created before
+forking so that worker processes can write their stats and the master
+process can read them without any pipes or signals. Each worker is
+assigned a fixed-size slot in the shared region.</p>
+<p>Binary layout per slot (native byte order):</p>
+<pre class="code ruby"><code class="ruby">pid           uint32    4 bytes
+requests      uint64    8 bytes
+backlog       uint32    4 bytes
+started_at    float64   8 bytes
+last_checkin  float64   8 bytes
+booted        uint8     1 byte
+                     33 bytes total</code></pre>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div>
+  
+    <h2>
+      Constant Summary
+      <small><a href="#" class="constants_summary_toggle">collapse</a></small>
+    </h2>
+
+    <dl class="constants">
+      
+        <dt id="SLOT_FORMAT-constant" class="">SLOT_FORMAT =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::String</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LQLddC</span><span class='tstring_end'>&quot;</span></span></pre></dd>
+      
+        <dt id="SLOT_SIZE-constant" class="">SLOT_SIZE =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Object</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='lbracket'>[</span><span class='int'>0</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='float'>0.0</span><span class='comma'>,</span> <span class='float'>0.0</span><span class='comma'>,</span> <span class='int'>0</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#SLOT_FORMAT-constant" title="Raptor::Stats::SLOT_FORMAT (constant)">SLOT_FORMAT</a></span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span></pre></dd>
+      
+    </dl>
+  
+
+
+
+
+
+
+
+  
+    <h2>
+      Instance Method Summary
+      <small><a href="#" class="summary_toggle">collapse</a></small>
+    </h2>
+
+    <ul class="summary">
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#all-instance_method" title="#all (instance method)">#<strong>all</strong>  &#x21d2; Array&lt;Hash&gt; </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Returns stats for all worker slots.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(num_workers)  &#x21d2; Stats </a>
+    
+
+    
+  </span>
+  
+  
+    <span class="note title constructor">constructor</span>
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Creates a new Stats instance backed by anonymous shared memory.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#read-instance_method" title="#read (instance method)">#<strong>read</strong>(index)  &#x21d2; Hash </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Reads stats for a worker slot from shared memory.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#unmap-instance_method" title="#unmap (instance method)">#<strong>unmap</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Releases the shared memory mapping.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#write-instance_method" title="#write (instance method)">#<strong>write</strong>(index, pid:, requests:, backlog:, started_at:, last_checkin:, booted:)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Writes stats for a worker slot into shared memory.</p></div></span>
+  
+</li>
+
+      
+    </ul>
+    
+  
+
+<div id="constructor_details" class="method_details_list">
+  <h2>Constructor Details</h2>
+  
+    <div class="method_details first">
+  <h3 class="signature first" id="initialize-instance_method">
+  
+    #<strong>initialize</strong>(num_workers)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Stats (class)">Stats</a></span></tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Creates a new Stats instance backed by anonymous shared memory.</p>
+<p>Allocates a MAP_ANON | MAP_SHARED mmap region large enough for
+num_workers slots. Must be called before forking so that all
+worker processes share the same backing memory.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>num_workers</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>number of worker slots to allocate</p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+40
+41
+42
+43</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 40</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_num_workers'>num_workers</span><span class='rparen'>)</span>
+  <span class='ivar'>@num_workers</span> <span class='op'>=</span> <span class='id identifier rubyid_num_workers'>num_workers</span>
+  <span class='ivar'>@mmap</span> <span class='op'>=</span> <span class='const'>Mmap</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='comma'>,</span> <span class='label'>length:</span> <span class='id identifier rubyid_num_workers'>num_workers</span> <span class='op'>*</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='comma'>,</span> <span class='label'>initialize:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>\0</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+  
+</div>
+
+
+  <div id="instance_method_details" class="method_details_list">
+    <h2>Instance Method Details</h2>
+
+    
+      <div class="method_details first">
+  <h3 class="signature first" id="all-instance_method">
+  
+    #<strong>all</strong>  &#x21d2; <tt>Array&lt;Hash&gt;</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Returns stats for all worker slots.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Array&lt;Hash&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>per-worker stat hashes with :pid, :requests, :backlog, :started_at, :last_checkin, and :booted</p></div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+67
+68
+69</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 67</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_all'>all</span>
+  <span class='lparen'>(</span><span class='int'>0</span><span class='op'>...</span><span class='ivar'>@num_workers</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_index'>index</span><span class='op'>|</span> <span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="read-instance_method">
+  
+    #<strong>read</strong>(index)  &#x21d2; <tt>Hash</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Reads stats for a worker slot from shared memory.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>index</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>slot index to read from</p></div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>stat hash with :pid, :requests, :backlog, :started_at, :last_checkin, and :booted</p></div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+88
+89
+90
+91
+92</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 88</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='ivar'>@mmap</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span> <span class='op'>*</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_requests'>requests</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span><span class='comma'>,</span> <span class='id identifier rubyid_started_at'>started_at</span><span class='comma'>,</span> <span class='id identifier rubyid_last_checkin'>last_checkin</span><span class='comma'>,</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='period'>.</span><span class='id identifier rubyid_unpack'>unpack</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#SLOT_FORMAT-constant" title="Raptor::Stats::SLOT_FORMAT (constant)">SLOT_FORMAT</a></span></span><span class='rparen'>)</span>
+  <span class='lbrace'>{</span> <span class='label'>pid:</span><span class='comma'>,</span> <span class='label'>requests:</span><span class='comma'>,</span> <span class='label'>backlog:</span><span class='comma'>,</span> <span class='label'>started_at:</span><span class='comma'>,</span> <span class='label'>last_checkin:</span><span class='comma'>,</span> <span class='label'>booted:</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>==</span> <span class='int'>1</span> <span class='rbrace'>}</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="unmap-instance_method">
+  
+    #<strong>unmap</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Releases the shared memory mapping.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+76
+77
+78</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 76</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_unmap'>unmap</span>
+  <span class='ivar'>@mmap</span><span class='period'>.</span><span class='id identifier rubyid_unmap'>unmap</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="write-instance_method">
+  
+    #<strong>write</strong>(index, pid:, requests:, backlog:, started_at:, last_checkin:, booted:)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Writes stats for a worker slot into shared memory.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>index</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>slot index to write into</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>pid</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>worker process ID</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>requests</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>total requests handled by this worker</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>backlog</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>current queue depth</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>started_at</span>
+      
+      
+        <span class='type'>(<tt>Float</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>process start time as a Unix timestamp</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>last_checkin</span>
+      
+      
+        <span class='type'>(<tt>Float</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>time of last stats write as a Unix timestamp</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>booted</span>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>whether the worker has finished starting</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>pid:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>requests:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>backlog:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>started_at:</span>
+      
+      
+        <span class='type'>(<tt>Float</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>last_checkin:</span>
+      
+      
+        <span class='type'>(<tt>Float</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>booted:</span>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+57
+58
+59
+60</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 57</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='label'>pid:</span><span class='comma'>,</span> <span class='label'>requests:</span><span class='comma'>,</span> <span class='label'>backlog:</span><span class='comma'>,</span> <span class='label'>started_at:</span><span class='comma'>,</span> <span class='label'>last_checkin:</span><span class='comma'>,</span> <span class='label'>booted:</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_requests'>requests</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span><span class='comma'>,</span> <span class='id identifier rubyid_started_at'>started_at</span><span class='comma'>,</span> <span class='id identifier rubyid_last_checkin'>last_checkin</span><span class='comma'>,</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>?</span> <span class='int'>1</span> <span class='op'>:</span> <span class='int'>0</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#SLOT_FORMAT-constant" title="Raptor::Stats::SLOT_FORMAT (constant)">SLOT_FORMAT</a></span></span><span class='rparen'>)</span>
+  <span class='ivar'>@mmap</span><span class='period'>.</span><span class='id identifier rubyid_semlock'>semlock</span> <span class='lbrace'>{</span> <span class='ivar'>@mmap</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span> <span class='op'>*</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span> <span class='rbrace'>}</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+  </div>
+
+</div>
+
+      <div id="footer">
+  Generated on Sat May 16 03:43:47 2026 by
+  <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
+  0.9.43 (ruby-4.0.4).
+</div>
+
+    </div>
+  </body>
+</html>

@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>
+  Class: Raptor::Http2Parser
+  
+    &mdash; Documentation by YARD 0.9.43
+  
+</title>
+
+  <link rel="stylesheet" href="../css/style.css" type="text/css">
+
+  <link rel="stylesheet" href="../css/common.css" type="text/css">
+
+<script type="text/javascript">
+  pathId = "Raptor::Http2Parser";
+  relpath = '../';
+</script>
+
+
+  <script type="text/javascript" charset="utf-8" src="../js/jquery.js"></script>
+
+  <script type="text/javascript" charset="utf-8" src="../js/app.js"></script>
+
+
+  </head>
+  <body>
+    <div id="main_progress" aria-hidden="true"></div>
+
+    <div class="nav_wrap">
+      <iframe id="nav" src="../class_list.html?1"></iframe>
+      <div id="resizer"></div>
+    </div>
+
+    <div id="main" tabindex="-1">
+      <div id="header">
+        <div id="menu">
+  
+    <a href="../_index.html">Index (H)</a> &raquo;
+    <span class='title'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span>
+     &raquo; 
+    <span class="title">Http2Parser</span>
+  
+</div>
+
+        <div id="search">
+  
+    <a class="full_list_link" id="class_list_link"
+        href="../class_list.html">
+
+        <svg width="24" height="24">
+          <rect x="0" y="4" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="12" width="24" height="4" rx="1" ry="1"></rect>
+          <rect x="0" y="20" width="24" height="4" rx="1" ry="1"></rect>
+        </svg>
+    </a>
+  
+</div>
+        <div class="clear"></div>
+      </div>
+
+      <div id="content"><h1>Class: Raptor::Http2Parser
+  
+  
+  
+</h1>
+<div class="box_info">
+  
+  <dl>
+    <dt>Inherits:</dt>
+    <dd>
+      <span class="inheritName">Object</span>
+      
+        <ul class="fullTree">
+          <li>Object</li>
+          
+            <li class="next">Raptor::Http2Parser</li>
+          
+        </ul>
+        <a href="#" class="inheritanceTree">show all</a>
+      
+    </dd>
+  </dl>
+  
+
+  
+  
+  
+  
+  
+
+  
+
+  
+  <dl>
+    <dt>Defined in:</dt>
+    <dd>ext/raptor_http2/raptor_http2.c
+</dd>
+  </dl>
+  
+</div>
+
+
+
+
+
+
+
+
+  
+    <h2>
+      Class Method Summary
+      <small><a href="#" class="summary_toggle">collapse</a></small>
+    </h2>
+
+    <ul class="summary">
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#connection_preface-class_method" title="connection_preface (class method)">.<strong>connection_preface</strong>  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+    </ul>
+    
+  
+    <h2>
+      Instance Method Summary
+      <small><a href="#" class="summary_toggle">collapse</a></small>
+    </h2>
+
+    <ul class="summary">
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#build_frame-instance_method" title="#build_frame (instance method)">#<strong>build_frame</strong>(type, flags, stream_id, payload)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#build_settings-instance_method" title="#build_settings (instance method)">#<strong>build_settings</strong>(settings)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#encode_headers-instance_method" title="#encode_headers (instance method)">#<strong>encode_headers</strong>(headers)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#parse_frame-instance_method" title="#parse_frame (instance method)">#<strong>parse_frame</strong>(buffer)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#parse_headers-instance_method" title="#parse_headers (instance method)">#<strong>parse_headers</strong>(header_block, dyn_table)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#parse_settings-instance_method" title="#parse_settings (instance method)">#<strong>parse_settings</strong>(payload)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#parse_window_update-instance_method" title="#parse_window_update (instance method)">#<strong>parse_window_update</strong>(payload)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+    </ul>
+    
+  
+
+
+
+  <div id="class_method_details" class="method_details_list">
+    <h2>Class Method Details</h2>
+
+    
+      <div class="method_details first">
+  <h3 class="signature first" id="connection_preface-class_method">
+  
+    .<strong>connection_preface</strong>  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+666
+667
+668
+669</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 666</span>
+
+static VALUE h2_connection_preface(VALUE self) {
+  (void)self;
+  return rb_str_new(HTTP2_CONNECTION_PREFACE, HTTP2_CONNECTION_PREFACE_LEN);
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+  </div>
+
+  <div id="instance_method_details" class="method_details_list">
+    <h2>Instance Method Details</h2>
+
+    
+      <div class="method_details first">
+  <h3 class="signature first" id="build_frame-instance_method">
+  
+    #<strong>build_frame</strong>(type, flags, stream_id, payload)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+626
+627
+628
+629
+630
+631
+632
+633
+634
+635
+636
+637
+638
+639
+640
+641
+642
+643
+644
+645
+646
+647
+648
+649
+650
+651
+652
+653
+654
+655
+656
+657
+658
+659
+660
+661
+662
+663
+664</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 626</span>
+
+static VALUE h2_build_frame(VALUE self, VALUE type, VALUE flags, VALUE stream_id, VALUE payload) {
+  (void)self;
+
+  uint8_t frame_type;
+  ID type_id = SYM2ID(type);
+
+  if (type_id == rb_intern(&quot;data&quot;))               frame_type = FRAME_DATA;
+  else if (type_id == rb_intern(&quot;headers&quot;))        frame_type = FRAME_HEADERS;
+  else if (type_id == rb_intern(&quot;priority&quot;))       frame_type = FRAME_PRIORITY;
+  else if (type_id == rb_intern(&quot;rst_stream&quot;))     frame_type = FRAME_RST_STREAM;
+  else if (type_id == rb_intern(&quot;settings&quot;))       frame_type = FRAME_SETTINGS;
+  else if (type_id == rb_intern(&quot;push_promise&quot;))   frame_type = FRAME_PUSH_PROMISE;
+  else if (type_id == rb_intern(&quot;ping&quot;))           frame_type = FRAME_PING;
+  else if (type_id == rb_intern(&quot;goaway&quot;))         frame_type = FRAME_GOAWAY;
+  else if (type_id == rb_intern(&quot;window_update&quot;))  frame_type = FRAME_WINDOW_UPDATE;
+  else if (type_id == rb_intern(&quot;continuation&quot;))   frame_type = FRAME_CONTINUATION;
+  else rb_raise(rb_eArgError, &quot;unknown frame type&quot;);
+
+  uint8_t frame_flags = (uint8_t)NUM2UINT(flags);
+  uint32_t sid = NUM2UINT(stream_id);
+
+  const char *payload_ptr = NIL_P(payload) ? &quot;&quot; : RSTRING_PTR(payload);
+  size_t payload_len = NIL_P(payload) ? 0 : RSTRING_LEN(payload);
+
+  uint8_t header[HTTP2_FRAME_HEADER_SIZE];
+  header[0] = (payload_len &gt;&gt; 16) &amp; 0xff;
+  header[1] = (payload_len &gt;&gt; 8) &amp; 0xff;
+  header[2] = payload_len &amp; 0xff;
+  header[3] = frame_type;
+  header[4] = frame_flags;
+  header[5] = (sid &gt;&gt; 24) &amp; 0x7f;
+  header[6] = (sid &gt;&gt; 16) &amp; 0xff;
+  header[7] = (sid &gt;&gt; 8) &amp; 0xff;
+  header[8] = sid &amp; 0xff;
+
+  VALUE result = rb_str_new((const char *)header, HTTP2_FRAME_HEADER_SIZE);
+  rb_str_buf_cat(result, payload_ptr, payload_len);
+  return result;
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="build_settings-instance_method">
+  
+    #<strong>build_settings</strong>(settings)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+707
+708
+709
+710
+711
+712
+713
+714
+715
+716
+717
+718
+719
+720
+721
+722
+723
+724
+725
+726
+727
+728
+729
+730
+731
+732
+733
+734
+735
+736
+737
+738
+739
+740</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 707</span>
+
+static VALUE h2_build_settings(VALUE self, VALUE settings) {
+  (void)self;
+  Check_Type(settings, T_HASH);
+
+  VALUE buf = rb_str_buf_new(36);
+  VALUE keys = rb_funcall(settings, rb_intern(&quot;keys&quot;), 0);
+
+  for (long i = 0; i &lt; RARRAY_LEN(keys); i++) {
+    VALUE key = rb_ary_entry(keys, i);
+    VALUE val = rb_hash_aref(settings, key);
+    ID key_id = SYM2ID(key);
+
+    uint16_t id;
+    if (key_id == rb_intern(&quot;header_table_size&quot;))           id = SETTINGS_HEADER_TABLE_SIZE;
+    else if (key_id == rb_intern(&quot;enable_push&quot;))            id = SETTINGS_ENABLE_PUSH;
+    else if (key_id == rb_intern(&quot;max_concurrent_streams&quot;)) id = SETTINGS_MAX_CONCURRENT_STREAMS;
+    else if (key_id == rb_intern(&quot;initial_window_size&quot;))    id = SETTINGS_INITIAL_WINDOW_SIZE;
+    else if (key_id == rb_intern(&quot;max_frame_size&quot;))         id = SETTINGS_MAX_FRAME_SIZE;
+    else if (key_id == rb_intern(&quot;max_header_list_size&quot;))   id = SETTINGS_MAX_HEADER_LIST_SIZE;
+    else continue;
+
+    uint32_t v = NUM2UINT(val);
+    uint8_t entry[6];
+    entry[0] = (id &gt;&gt; 8) &amp; 0xff;
+    entry[1] = id &amp; 0xff;
+    entry[2] = (v &gt;&gt; 24) &amp; 0xff;
+    entry[3] = (v &gt;&gt; 16) &amp; 0xff;
+    entry[4] = (v &gt;&gt; 8) &amp; 0xff;
+    entry[5] = v &amp; 0xff;
+    rb_str_buf_cat(buf, (const char *)entry, 6);
+  }
+
+  return buf;
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="encode_headers-instance_method">
+  
+    #<strong>encode_headers</strong>(headers)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+595
+596
+597
+598
+599</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 595</span>
+
+static VALUE h2_encode_headers(VALUE self, VALUE headers) {
+  (void)self;
+  Check_Type(headers, T_ARRAY);
+  return hpack_encode_header_block(headers);
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="parse_frame-instance_method">
+  
+    #<strong>parse_frame</strong>(buffer)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+601
+602
+603
+604
+605
+606
+607
+608
+609
+610
+611
+612
+613
+614
+615
+616
+617
+618
+619
+620
+621
+622
+623
+624</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 601</span>
+
+static VALUE h2_parse_frame(VALUE self, VALUE buffer) {
+  (void)self;
+  Check_Type(buffer, T_STRING);
+
+  const uint8_t *buf = (const uint8_t *)RSTRING_PTR(buffer);
+  size_t len = RSTRING_LEN(buffer);
+
+  if (len &lt; HTTP2_FRAME_HEADER_SIZE) return Qnil;
+
+  frame_header fh;
+  parse_frame_header(buf, &amp;fh);
+
+  size_t total = HTTP2_FRAME_HEADER_SIZE + fh.length;
+  if (len &lt; total) return Qnil;
+
+  VALUE frame = rb_hash_new();
+  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;type&quot;)),      frame_type_sym(fh.type));
+  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;length&quot;)),     UINT2NUM(fh.length));
+  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;flags&quot;)),      UINT2NUM(fh.flags));
+  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;stream_id&quot;)),  UINT2NUM(fh.stream_id));
+  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;payload&quot;)),    rb_str_new((const char *)(buf + HTTP2_FRAME_HEADER_SIZE), fh.length));
+
+  return rb_ary_new_from_args(2, frame, SIZET2NUM(total));
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="parse_headers-instance_method">
+  
+    #<strong>parse_headers</strong>(header_block, dyn_table)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+574
+575
+576
+577
+578
+579
+580
+581
+582
+583
+584
+585
+586
+587
+588
+589
+590
+591
+592
+593</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 574</span>
+
+static VALUE h2_parse_headers(VALUE self, VALUE header_block, VALUE dyn_table) {
+  raptor_h2_parser *parser;
+  TypedData_Get_Struct(self, raptor_h2_parser, &amp;h2_parser_type, parser);
+
+  Check_Type(header_block, T_STRING);
+  Check_Type(dyn_table, T_ARRAY);
+
+  const uint8_t *buf = (const uint8_t *)RSTRING_PTR(header_block);
+  size_t len = RSTRING_LEN(header_block);
+
+  VALUE headers = rb_ary_new();
+  VALUE table = rb_ary_dup(dyn_table);
+  long max_size = parser-&gt;max_table_size;
+
+  if (hpack_decode_header_block(buf, len, headers, &amp;table, &amp;max_size) &lt; 0)
+    rb_raise(eHttp2ParserError, &quot;HPACK header block decode error&quot;);
+
+  parser-&gt;max_table_size = max_size;
+  return rb_ary_new_from_args(2, headers, table);
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="parse_settings-instance_method">
+  
+    #<strong>parse_settings</strong>(payload)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+671
+672
+673
+674
+675
+676
+677
+678
+679
+680
+681
+682
+683
+684
+685
+686
+687
+688
+689
+690
+691
+692
+693
+694
+695
+696
+697
+698
+699
+700
+701
+702
+703
+704
+705</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 671</span>
+
+static VALUE h2_parse_settings(VALUE self, VALUE payload) {
+  (void)self;
+  Check_Type(payload, T_STRING);
+
+  const uint8_t *buf = (const uint8_t *)RSTRING_PTR(payload);
+  size_t len = RSTRING_LEN(payload);
+
+  if (len % 6 != 0)
+    rb_raise(eHttp2ParserError, &quot;invalid SETTINGS payload length&quot;);
+
+  VALUE settings = rb_hash_new();
+
+  for (size_t i = 0; i &lt; len; i += 6) {
+    uint16_t id = ((uint16_t)buf[i] &lt;&lt; 8) | buf[i + 1];
+    uint32_t val = ((uint32_t)buf[i + 2] &lt;&lt; 24) | ((uint32_t)buf[i + 3] &lt;&lt; 16) |
+                   ((uint32_t)buf[i + 4] &lt;&lt; 8) | buf[i + 5];
+
+    switch (id) {
+      case SETTINGS_HEADER_TABLE_SIZE:
+        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;header_table_size&quot;)), UINT2NUM(val));       break;
+      case SETTINGS_ENABLE_PUSH:
+        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;enable_push&quot;)), UINT2NUM(val));              break;
+      case SETTINGS_MAX_CONCURRENT_STREAMS:
+        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;max_concurrent_streams&quot;)), UINT2NUM(val));   break;
+      case SETTINGS_INITIAL_WINDOW_SIZE:
+        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;initial_window_size&quot;)), UINT2NUM(val));      break;
+      case SETTINGS_MAX_FRAME_SIZE:
+        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;max_frame_size&quot;)), UINT2NUM(val));           break;
+      case SETTINGS_MAX_HEADER_LIST_SIZE:
+        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;max_header_list_size&quot;)), UINT2NUM(val));     break;
+    }
+  }
+
+  return settings;
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="parse_window_update-instance_method">
+  
+    #<strong>parse_window_update</strong>(payload)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+742
+743
+744
+745
+746
+747
+748
+749
+750
+751
+752
+753
+754</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 742</span>
+
+static VALUE h2_parse_window_update(VALUE self, VALUE payload) {
+  (void)self;
+  Check_Type(payload, T_STRING);
+
+  if (RSTRING_LEN(payload) != 4)
+    rb_raise(eHttp2ParserError, &quot;invalid WINDOW_UPDATE payload length&quot;);
+
+  const uint8_t *buf = (const uint8_t *)RSTRING_PTR(payload);
+  uint32_t increment = ((uint32_t)(buf[0] &amp; 0x7f) &lt;&lt; 24) | ((uint32_t)buf[1] &lt;&lt; 16) |
+                       ((uint32_t)buf[2] &lt;&lt; 8) | buf[3];
+
+  return UINT2NUM(increment);
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+  </div>
+
+</div>
+
+      <div id="footer">
+  Generated on Sat May 16 03:43:48 2026 by
+  <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
+  0.9.43 (ruby-4.0.4).
+</div>
+
+    </div>
+  </body>
+</html>
