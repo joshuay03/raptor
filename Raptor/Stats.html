@@ -96,7 +96,9 @@
   
   <dl>
     <dt>Defined in:</dt>
-    <dd>lib/raptor/stats.rb
+    <dd>lib/raptor/stats.rb<span class="defines">,<br>
+  sig/generated/raptor/stats.rbs</span>
+
 </dd>
   </dl>
   
@@ -133,12 +135,56 @@ booted        uint8     1 byte
     <dl class="constants">
       
         <dt id="SLOT_FORMAT-constant" class="">SLOT_FORMAT =
-          
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::String</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
         </dt>
         <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LQLddC</span><span class='tstring_end'>&quot;</span></span></pre></dd>
       
         <dt id="SLOT_SIZE-constant" class="">SLOT_SIZE =
-          
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Object</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
         </dt>
         <dd><pre class="code"><span class='lbracket'>[</span><span class='int'>0</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='float'>0.0</span><span class='comma'>,</span> <span class='float'>0.0</span><span class='comma'>,</span> <span class='int'>0</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#SLOT_FORMAT-constant" title="Raptor::Stats::SLOT_FORMAT (constant)">SLOT_FORMAT</a></span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span></pre></dd>
       
@@ -184,7 +230,7 @@ booted        uint8     1 byte
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(num_workers)  &#x21d2; void </a>
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(num_workers)  &#x21d2; Stats </a>
     
 
     
@@ -201,6 +247,28 @@ booted        uint8     1 byte
 
   
     <span class="summary_desc"><div class='inline'><p>Creates a new Stats instance backed by anonymous shared memory.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#read-instance_method" title="#read (instance method)">#<strong>read</strong>(index)  &#x21d2; Hash </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Reads stats for a worker slot from shared memory.</p></div></span>
   
 </li>
 
@@ -259,7 +327,7 @@ booted        uint8     1 byte
     <div class="method_details first">
   <h3 class="signature first" id="initialize-instance_method">
   
-    #<strong>initialize</strong>(num_workers)  &#x21d2; <tt>void</tt> 
+    #<strong>initialize</strong>(num_workers)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Stats (class)">Stats</a></span></tt> 
   
 
   
@@ -374,6 +442,83 @@ worker processes share the same backing memory.</p>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_all'>all</span>
   <span class='lparen'>(</span><span class='int'>0</span><span class='op'>...</span><span class='ivar'>@num_workers</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_index'>index</span><span class='op'>|</span> <span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="read-instance_method">
+  
+    #<strong>read</strong>(index)  &#x21d2; <tt>Hash</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Reads stats for a worker slot from shared memory.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>index</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>slot index to read from</p></div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>stat hash with :pid, :requests, :backlog, :started_at, :last_checkin, and :booted</p></div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+88
+89
+90
+91
+92</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 88</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='ivar'>@mmap</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span> <span class='op'>*</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_requests'>requests</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span><span class='comma'>,</span> <span class='id identifier rubyid_started_at'>started_at</span><span class='comma'>,</span> <span class='id identifier rubyid_last_checkin'>last_checkin</span><span class='comma'>,</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='period'>.</span><span class='id identifier rubyid_unpack'>unpack</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#SLOT_FORMAT-constant" title="Raptor::Stats::SLOT_FORMAT (constant)">SLOT_FORMAT</a></span></span><span class='rparen'>)</span>
+  <span class='lbrace'>{</span> <span class='label'>pid:</span><span class='comma'>,</span> <span class='label'>requests:</span><span class='comma'>,</span> <span class='label'>backlog:</span><span class='comma'>,</span> <span class='label'>started_at:</span><span class='comma'>,</span> <span class='label'>last_checkin:</span><span class='comma'>,</span> <span class='label'>booted:</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>==</span> <span class='int'>1</span> <span class='rbrace'>}</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -536,6 +681,72 @@ worker processes share the same backing memory.</p>
       
     </li>
   
+    <li>
+      
+        <span class='name'>pid:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>requests:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>backlog:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>started_at:</span>
+      
+      
+        <span class='type'>(<tt>Float</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>last_checkin:</span>
+      
+      
+        <span class='type'>(<tt>Float</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>booted:</span>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+    </li>
+  
 </ul>
 
 
@@ -567,7 +778,7 @@ worker processes share the same backing memory.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat May 16 04:27:56 2026 by
+  Generated on Sat May 16 04:28:15 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.43 (ruby-4.0.4).
 </div>

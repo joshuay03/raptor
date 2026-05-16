@@ -96,7 +96,9 @@
   
   <dl>
     <dt>Defined in:</dt>
-    <dd>lib/raptor/cluster.rb
+    <dd>lib/raptor/cluster.rb<span class="defines">,<br>
+  sig/generated/raptor/cluster.rbs</span>
+
 </dd>
   </dl>
   
@@ -193,7 +195,29 @@ the combination of NIO reactors, ractor-based parsing, and thread pools.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(options)  &#x21d2; void </a>
+      <a href="#exit_description-instance_method" title="#exit_description (instance method)">#<strong>exit_description</strong>(status)  &#x21d2; String </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Returns a human-readable description of how a process exited.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(options)  &#x21d2; Cluster </a>
     
 
     
@@ -210,6 +234,50 @@ the combination of NIO reactors, ractor-based parsing, and thread pools.</p>
 
   
     <span class="summary_desc"><div class='inline'><p>Creates a new Cluster with the specified configuration.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#log_initialization-instance_method" title="#log_initialization (instance method)">#<strong>log_initialization</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Logs cluster initialization details including architecture and bind addresses.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#log_stats-instance_method" title="#log_stats (instance method)">#<strong>log_stats</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Logs current stats for all workers to stdout.</p></div></span>
   
 </li>
 
@@ -239,6 +307,72 @@ the combination of NIO reactors, ractor-based parsing, and thread pools.</p>
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#run_worker-instance_method" title="#run_worker (instance method)">#<strong>run_worker</strong>(index)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Runs the full server stack inside a worker process.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#shutdown-instance_method" title="#shutdown (instance method)">#<strong>shutdown</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Initiates graceful shutdown of the cluster.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#spawn_worker-instance_method" title="#spawn_worker (instance method)">#<strong>spawn_worker</strong>(index)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Forks a new worker process and registers it at the given index.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#stats-instance_method" title="#stats (instance method)">#<strong>stats</strong>  &#x21d2; Array&lt;Hash&gt; </a>
     
 
@@ -258,6 +392,28 @@ the combination of NIO reactors, ractor-based parsing, and thread pools.</p>
 </li>
 
       
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#write_stats_file_loop-instance_method" title="#write_stats_file_loop (instance method)">#<strong>write_stats_file_loop</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Writes the stats file on a 1-second interval until shutdown.</p></div></span>
+  
+</li>
+
+      
     </ul>
     
   
@@ -268,7 +424,7 @@ the combination of NIO reactors, ractor-based parsing, and thread pools.</p>
     <div class="method_details first">
   <h3 class="signature first" id="initialize-instance_method">
   
-    #<strong>initialize</strong>(options)  &#x21d2; <tt>void</tt> 
+    #<strong>initialize</strong>(options)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Cluster (class)">Cluster</a></span></tt> 
   
 
   
@@ -497,7 +653,206 @@ for multi-process operation.</p>
 
     
       <div class="method_details first">
-  <h3 class="signature first" id="run-instance_method">
+  <h3 class="signature first" id="exit_description-instance_method">
+  
+    #<strong>exit_description</strong>(status)  &#x21d2; <tt>String</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Returns a human-readable description of how a process exited.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>status</span>
+      
+      
+        <span class='type'>(<tt>Process::Status</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the exit status of the process</p></div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>String</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>a description of the exit reason</p></div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+281
+282
+283
+284
+285
+286
+287
+288
+289</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 281</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_exit_description'>exit_description</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
+  <span class='kw'>if</span> <span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_exited?'>exited?</span>
+    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>exited with code </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_exitstatus'>exitstatus</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>elsif</span> <span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_signaled?'>signaled?</span>
+    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>killed by SIG</span><span class='embexpr_beg'>#{</span><span class='const'>Signal</span><span class='period'>.</span><span class='id identifier rubyid_signame'>signame</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_termsig'>termsig</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>else</span>
+    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>exited</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="log_initialization-instance_method">
+  
+    #<strong>log_initialization</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Logs cluster initialization details including architecture and bind addresses.</p>
+<p>Outputs a hierarchical view of the cluster configuration showing
+the master process, worker processes, and per-process thread/ractor
+allocation along with listening addresses.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 311</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_log_initialization'>log_initialization</span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Raptor Cluster initializing:</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>├─ Version: </span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="../Raptor.html#VERSION-constant" title="Raptor::VERSION (constant)">VERSION</a></span></span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>├─ Ruby Version: </span><span class='embexpr_beg'>#{</span><span class='const'>RUBY_DESCRIPTION</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>├─ Master PID: </span><span class='embexpr_beg'>#{</span><span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>│  └─ </span><span class='embexpr_beg'>#{</span><span class='ivar'>@worker_count</span><span class='embexpr_end'>}</span><span class='tstring_content'> worker process</span><span class='embexpr_beg'>#{</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>es</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='ivar'>@worker_count</span> <span class='op'>&gt;</span> <span class='int'>1</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>│     ├─ 1 server thread</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>│     ├─ 1 reactor thread</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>│     ├─ </span><span class='embexpr_beg'>#{</span><span class='ivar'>@ractor_count</span><span class='embexpr_end'>}</span><span class='tstring_content'> pipeline ractor</span><span class='embexpr_beg'>#{</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>s</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='ivar'>@ractor_count</span> <span class='op'>&gt;</span> <span class='int'>1</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>│     ├─ 1 pipeline collector thread</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>│     ├─ </span><span class='embexpr_beg'>#{</span><span class='ivar'>@thread_count</span><span class='embexpr_end'>}</span><span class='tstring_content'> worker thread</span><span class='embexpr_beg'>#{</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>s</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='ivar'>@thread_count</span> <span class='op'>&gt;</span> <span class='int'>1</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>│     └─ 1 stats thread</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>└─ Listening on </span><span class='embexpr_beg'>#{</span><span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_addresses'>addresses</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>, </span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="log_stats-instance_method">
+  
+    #<strong>log_stats</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Logs current stats for all workers to stdout.</p>
+<p>Triggered by SIGUSR1 in the master process.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+333
+334
+335
+336
+337
+338
+339
+340</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 333</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_log_stats'>log_stats</span>
+  <span class='ivar'>@stats</span><span class='period'>.</span><span class='id identifier rubyid_all'>all</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_stat'>stat</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='op'>|</span>
+    <span class='id identifier rubyid_status'>status</span> <span class='op'>=</span> <span class='id identifier rubyid_stat'>stat</span><span class='lbracket'>[</span><span class='symbol'>:booted</span><span class='rbracket'>]</span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>booted</span><span class='tstring_end'>&quot;</span></span> <span class='op'>:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>starting</span><span class='tstring_end'>&quot;</span></span>
+    <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'>: pid=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_stat'>stat</span><span class='lbracket'>[</span><span class='symbol'>:pid</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, requests=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_stat'>stat</span><span class='lbracket'>[</span><span class='symbol'>:requests</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, </span><span class='tstring_end'>&quot;</span></span> \
+         <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>backlog=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_stat'>stat</span><span class='lbracket'>[</span><span class='symbol'>:backlog</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_status'>status</span><span class='embexpr_end'>}</span><span class='tstring_content'>, </span><span class='tstring_end'>&quot;</span></span> \
+         <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>last_checkin=</span><span class='embexpr_beg'>#{</span><span class='const'>Time</span><span class='period'>.</span><span class='id identifier rubyid_at'>at</span><span class='lparen'>(</span><span class='id identifier rubyid_stat'>stat</span><span class='lbracket'>[</span><span class='symbol'>:last_checkin</span><span class='rbracket'>]</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_strftime'>strftime</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>%H:%M:%S</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="run-instance_method">
   
     #<strong>run</strong>  &#x21d2; <tt>void</tt> 
   
@@ -624,6 +979,322 @@ shutdown via INT or TERM signals, and stats logging via USR1.</p>
 </div>
     
       <div class="method_details ">
+  <h3 class="signature " id="run_worker-instance_method">
+  
+    #<strong>run_worker</strong>(index)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Runs the full server stack inside a worker process.</p>
+<p>Sets up and coordinates the reactor, server, ractor pool, thread pool,
+and stats thread, running until a shutdown signal is received or a
+critical component fails.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>index</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>slot index for this worker in the stats region</p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 194</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_run_worker'>run_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_shutdown_requested'>shutdown_requested</span> <span class='op'>=</span> <span class='kw'>false</span>
+  <span class='id identifier rubyid_trap'>trap</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>INT</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_shutdown_requested'>shutdown_requested</span> <span class='op'>=</span> <span class='kw'>true</span> <span class='rbrace'>}</span>
+  <span class='id identifier rubyid_trap'>trap</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>TERM</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_shutdown_requested'>shutdown_requested</span> <span class='op'>=</span> <span class='kw'>true</span> <span class='rbrace'>}</span>
+
+  <span class='id identifier rubyid_started_at'>started_at</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_REALTIME</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_request_count'>request_count</span> <span class='op'>=</span> <span class='int'>0</span>
+
+  <span class='ivar'>@stats</span><span class='period'>.</span><span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span>
+    <span class='id identifier rubyid_index'>index</span><span class='comma'>,</span>
+    <span class='label'>pid:</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span>
+    <span class='label'>requests:</span> <span class='int'>0</span><span class='comma'>,</span>
+    <span class='label'>backlog:</span> <span class='int'>0</span><span class='comma'>,</span>
+    <span class='label'>started_at:</span><span class='comma'>,</span>
+    <span class='label'>last_checkin:</span> <span class='id identifier rubyid_started_at'>started_at</span><span class='comma'>,</span>
+    <span class='label'>booted:</span> <span class='kw'>false</span>
+  <span class='rparen'>)</span>
+
+  <span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='kw'>nil</span>
+
+  <span class='id identifier rubyid_counting_app'>counting_app</span> <span class='op'>=</span> <span class='tlambda'>-&gt;</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span> <span class='tlambeg'>{</span>
+    <span class='id identifier rubyid_request_count'>request_count</span> <span class='op'>+=</span> <span class='int'>1</span>
+    <span class='ivar'>@app</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
+  <span class='rbrace'>}</span>
+  <span class='id identifier rubyid_thread_pool'>thread_pool</span> <span class='op'>=</span> <span class='const'>AtomicThreadPool</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Raptor Workers</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>size:</span> <span class='ivar'>@thread_count</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_request'>request</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Request.html" title="Raptor::Request (class)">Request</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Request.html#initialize-instance_method" title="Raptor::Request#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span> <span class='ivar'>@server_port</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_http2'>http2</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2.html" title="Raptor::Http2 (class)">Http2</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http2.html#initialize-instance_method" title="Raptor::Http2#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span> <span class='ivar'>@server_port</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_ractor_pool'>ractor_pool</span> <span class='op'>=</span> <span class='const'>RactorPool</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span>
+    <span class='label'>name:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Raptor Pipeline Workers</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+    <span class='label'>size:</span> <span class='ivar'>@ractor_count</span><span class='comma'>,</span>
+    <span class='label'>worker:</span> <span class='id identifier rubyid_request'>request</span><span class='period'>.</span><span class='id identifier rubyid_http_parser_worker'>http_parser_worker</span>
+  <span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='op'>|</span>
+    <span class='kw'>if</span> <span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='lbracket'>[</span><span class='symbol'>:protocol</span><span class='rbracket'>]</span> <span class='op'>==</span> <span class='symbol'>:http2</span>
+      <span class='id identifier rubyid_http2'>http2</span><span class='period'>.</span><span class='id identifier rubyid_handle_parsed_result'>handle_parsed_result</span><span class='lparen'>(</span><span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
+    <span class='kw'>else</span>
+      <span class='id identifier rubyid_request'>request</span><span class='period'>.</span><span class='id identifier rubyid_handle_parsed_request'>handle_parsed_request</span><span class='lparen'>(</span><span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
+    <span class='kw'>end</span>
+  <span class='kw'>end</span>
+
+  <span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Reactor.html" title="Raptor::Reactor (class)">Reactor</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Reactor.html#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='label'>client_options:</span> <span class='ivar'>@client_options</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_reactor_thread'>reactor_thread</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
+
+  <span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Server.html#initialize-instance_method" title="Raptor::Server#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@binder</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_server_thread'>server_thread</span> <span class='op'>=</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
+
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>[</span><span class='embexpr_beg'>#{</span><span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>] Worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'> booted</span><span class='tstring_end'>&quot;</span></span>
+
+  <span class='id identifier rubyid_stats_thread'>stats_thread</span> <span class='op'>=</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span>
+    <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_current'>current</span><span class='period'>.</span><span class='id identifier rubyid_name'>name</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Raptor Stats</span><span class='tstring_end'>&quot;</span></span>
+
+    <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
+      <span class='ivar'>@stats</span><span class='period'>.</span><span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span>
+        <span class='id identifier rubyid_index'>index</span><span class='comma'>,</span>
+        <span class='label'>pid:</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span>
+        <span class='label'>requests:</span> <span class='id identifier rubyid_request_count'>request_count</span><span class='comma'>,</span>
+        <span class='label'>backlog:</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_backlog'>backlog</span><span class='comma'>,</span>
+        <span class='label'>started_at:</span><span class='comma'>,</span>
+        <span class='label'>last_checkin:</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_REALTIME</span><span class='rparen'>)</span><span class='comma'>,</span>
+        <span class='label'>booted:</span> <span class='kw'>true</span>
+      <span class='rparen'>)</span>
+      <span class='kw'>break</span> <span class='kw'>if</span> <span class='id identifier rubyid_shutdown_requested'>shutdown_requested</span>
+
+      <span class='id identifier rubyid_sleep'>sleep</span> <span class='int'>1</span>
+    <span class='kw'>end</span>
+  <span class='kw'>end</span>
+
+  <span class='kw'>until</span> <span class='id identifier rubyid_shutdown_requested'>shutdown_requested</span>
+    <span class='kw'>break</span> <span class='kw'>unless</span> <span class='id identifier rubyid_server_thread'>server_thread</span><span class='period'>.</span><span class='id identifier rubyid_alive?'>alive?</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_reactor_thread'>reactor_thread</span><span class='period'>.</span><span class='id identifier rubyid_alive?'>alive?</span>
+
+    <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_pass'>pass</span>
+  <span class='kw'>end</span>
+
+  <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='id identifier rubyid_server_thread'>server_thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
+  <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='id identifier rubyid_reactor_thread'>reactor_thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
+  <span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='id identifier rubyid_stats_thread'>stats_thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="shutdown-instance_method">
+  
+    #<strong>shutdown</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Initiates graceful shutdown of the cluster.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+296
+297
+298
+299
+300</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 296</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@shutdown</span>
+
+  <span class='ivar'>@shutdown</span> <span class='op'>=</span> <span class='kw'>true</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="spawn_worker-instance_method">
+  
+    #<strong>spawn_worker</strong>(index)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Forks a new worker process and registers it at the given index.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>index</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>slot index for this worker in the stats region</p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+179
+180
+181
+182</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 179</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_spawn_worker'>spawn_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_pid'>pid</span> <span class='op'>=</span> <span class='id identifier rubyid_fork'>fork</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_run_worker'>run_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+  <span class='ivar'>@workers</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_pid'>pid</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
   <h3 class="signature " id="stats-instance_method">
   
     #<strong>stats</strong>  &#x21d2; <tt>Array&lt;Hash&gt;</tt> 
@@ -679,12 +1350,63 @@ shutdown via INT or TERM signals, and stats logging via USR1.</p>
 </table>
 </div>
     
+      <div class="method_details ">
+  <h3 class="signature " id="write_stats_file_loop-instance_method">
+  
+    #<strong>write_stats_file_loop</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Writes the stats file on a 1-second interval until shutdown.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+347
+348
+349
+350
+351
+352
+353
+354
+355</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 347</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_write_stats_file_loop'>write_stats_file_loop</span>
+  <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
+    <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='ivar'>@stats_file</span><span class='comma'>,</span> <span class='const'>JSON</span><span class='period'>.</span><span class='id identifier rubyid_generate'>generate</span><span class='lparen'>(</span><span class='lbrace'>{</span> <span class='label'>master_pid:</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='label'>workers:</span> <span class='ivar'>@stats</span><span class='period'>.</span><span class='id identifier rubyid_all'>all</span> <span class='rbrace'>}</span><span class='rparen'>)</span><span class='rparen'>)</span>
+    <span class='kw'>break</span> <span class='kw'>if</span> <span class='ivar'>@shutdown</span>
+
+    <span class='id identifier rubyid_sleep'>sleep</span> <span class='int'>1</span>
+  <span class='kw'>end</span>
+<span class='kw'>rescue</span> <span class='const'>SystemCallError</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
   </div>
 
 </div>
 
       <div id="footer">
-  Generated on Sat May 16 04:27:56 2026 by
+  Generated on Sat May 16 04:28:15 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.43 (ruby-4.0.4).
 </div>
