@@ -122,7 +122,7 @@ settings.</p>
       
         <h5 class="example_title"><div class='inline'><p>Basic usage</p></div></h5>
       
-      <pre class="example code"><code><span class='id identifier rubyid_cli'>cli</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span><span class='op'>::</span><span class='const'>CLI</span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="#initialize-instance_method" title="Raptor::CLI#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config.ru</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-p</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>3000</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-w</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>4</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='rparen'>)</span>
+      <pre class="example code"><code><span class='id identifier rubyid_cli'>cli</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span><span class='op'>::</span><span class='const'>CLI</span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="#initialize-instance_method" title="Raptor::CLI#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config.ru</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-t</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>8</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-w</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>4</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='rparen'>)</span>
 <span class='id identifier rubyid_cli'>cli</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span></code></pre>
     
       
@@ -336,8 +336,8 @@ settings.</p>
   <div class="discussion">
     <p>Creates a new CLI instance and parses command-line arguments.</p>
 <p>Parses the provided command-line arguments and configures the server
-options accordingly. If a Rack configuration file is provided as the
-first positional argument, it will be used instead of the default.</p>
+options accordingly. A rackup file can be provided as the first
+positional argument (defaults to config.ru).</p>
 
   </div>
 </div>
@@ -347,9 +347,9 @@ first positional argument, it will be used instead of the default.</p>
     <h4 class="tag_title">Examples:</h4>
     
       
-        <h5 class="example_title"><div class='inline'><p>With config file</p></div></h5>
+        <h5 class="example_title"><div class='inline'><p>With rackup file</p></div></h5>
       
-      <pre class="example code"><code><span class='id identifier rubyid_cli'>cli</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="" title="Raptor::CLI (class)">CLI</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>my_app.ru</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-p</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>4000</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='rparen'>)</span></code></pre>
+      <pre class="example code"><code><span class='id identifier rubyid_cli'>cli</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="" title="Raptor::CLI (class)">CLI</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>my_app.ru</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-w</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>4</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='rparen'>)</span></code></pre>
     
       
         <h5 class="example_title"><div class='inline'><p>With options only</p></div></h5>
@@ -707,7 +707,7 @@ first positional argument, it will be used instead of the default.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat May 16 04:04:20 2026 by
+  Generated on Sat May 16 04:11:18 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.43 (ruby-4.0.4).
 </div>
