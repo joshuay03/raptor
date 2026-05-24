@@ -20,7 +20,7 @@ module Raptor
   class Request
     BODY_BUFFER_THRESHOLD = 256 * 1024
     FILE_CHUNK_SIZE = 64 * 1024
-    KEEPALIVE_BUFFER_SIZE = 64 * 1024
+    READ_BUFFER_SIZE = 64 * 1024
     WRITE_TIMEOUT = 5
     KEEPALIVE_READ_TIMEOUT = 0.001
     MAX_KEEPALIVE_REQUESTS = 100
@@ -59,6 +59,35 @@ module Raptor
       def message = "could not write response"
     end
 
+    # Decodes a chunked transfer-encoded body buffer.
+    #
+    # Returns the decoded bytes and a flag indicating whether the terminating
+    # zero-length chunk was found. The decoder stops at the first unparseable
+    # boundary (incomplete CRLF) or zero-length chunk.
+    #
+    # @param buffer [String] the raw body buffer to decode
+    # @return [Array(String, Boolean)] decoded body and completion flag
+    #
+    # @rbs (String buffer) -> [String, bool]
+    def self.decode_chunked(buffer)
+      decoded = String.new
+      offset = 0
+
+      while offset < buffer.bytesize
+        crlf = buffer.index("\r\n", offset)
+        return [decoded, false] unless crlf
+
+        chunk_size = buffer.byteslice(offset, crlf - offset).to_i(16)
+        return [decoded, true] if chunk_size == 0
+
+        offset = crlf + 2
+        decoded << buffer.byteslice(offset, chunk_size)
+        offset += chunk_size + 2
+      end
+
+      [decoded, false]
+    end
+
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
 
@@ -72,6 +101,73 @@ module Raptor
     def initialize(app, server_port)
       @app = app
       @server_port = server_port
+    end
+
+    # Eagerly reads and parses the first request on a freshly accepted
+    # connection on the server thread, dispatching directly to the thread pool
+    # when complete. Falls back to the reactor when more data is needed.
+    #
+    # @param socket [TCPSocket] the freshly accepted client socket
+    # @param id [Integer] unique client identifier
+    # @param reactor [Reactor] the reactor for fallback registration
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
+    def eager_accept(socket, id, reactor, thread_pool, remote_addr, url_scheme)
+      data = begin
+        socket.read_nonblock(READ_BUFFER_SIZE)
+      rescue IO::WaitReadable
+        reactor.add(
+          id: id,
+          socket: socket,
+          remote_addr: remote_addr,
+          url_scheme: url_scheme
+        )
+        return
+      rescue EOFError, IOError
+        socket.close rescue nil
+        return
+      end
+
+      buffer = String.new
+      buffer << data
+
+      while socket.respond_to?(:pending) && socket.pending > 0
+        buffer << socket.read_nonblock(socket.pending)
+      end
+
+      parser = HttpParser.new
+      env = {}
+      nread = parser.execute(env, buffer, 0)
+      parse_data = { parse_count: 1, content_length: parser.content_length }
+
+      body = nil
+      if !parser.finished?
+        fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
+        return
+      elsif parser.has_body?
+        body = buffer.byteslice(nread..-1) || ""
+
+        if env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
+          body, chunked_complete = Request.decode_chunked(body)
+          if chunked_complete
+            env.delete(HTTP_TRANSFER_ENCODING)
+          else
+            fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
+            return
+          end
+        elsif parser.content_length > body.bytesize
+          fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
+          return
+        end
+      end
+
+      thread_pool << proc do
+        process_client(socket, id, env, parse_data, body, reactor, thread_pool, 1, remote_addr, url_scheme)
+      end
     end
 
     # Returns a Proc for HTTP parsing work in Ractor context.
@@ -102,25 +198,7 @@ module Raptor
             body_buffer = data[:buffer].byteslice(nread..-1) || ""
 
             if env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
-              decoded_body = String.new
-              offset = 0
-              chunked_complete = false
-
-              while offset < body_buffer.bytesize
-                crlf = body_buffer.index("\r\n", offset)
-                break unless crlf
-
-                chunk_size = body_buffer.byteslice(offset, crlf - offset).to_i(16)
-
-                if chunk_size == 0
-                  chunked_complete = true
-                  break
-                end
-
-                offset = crlf + 2
-                decoded_body << body_buffer.byteslice(offset, chunk_size)
-                offset += chunk_size + 2
-              end
+              decoded_body, chunked_complete = Raptor::Request.decode_chunked(body_buffer)
 
               if chunked_complete
                 env.delete(HTTP_TRANSFER_ENCODING)
@@ -278,7 +356,7 @@ module Raptor
         end
 
         data = begin
-          socket.read_nonblock(KEEPALIVE_BUFFER_SIZE)
+          socket.read_nonblock(READ_BUFFER_SIZE)
         rescue IO::WaitReadable
           reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
           return
@@ -346,8 +424,12 @@ module Raptor
       end
     end
 
-    # Re-registers a socket with the reactor for further processing
-    # when an incomplete request is received during eager keep-alive.
+    # Re-registers a socket with the reactor for further processing when
+    # an incomplete request is received during eager accept or eager keep-alive.
+    #
+    # The persisted flag selects between persistent_data_timeout (for
+    # kept-alive connections awaiting the next request) and chunk_data_timeout
+    # (for fresh connections awaiting the rest of the first request).
     #
     # @param socket [TCPSocket] the client socket
     # @param id [Integer] unique client identifier
@@ -358,21 +440,23 @@ module Raptor
     # @param request_count [Integer] number of requests handled on this connection
     # @param remote_addr [String] client IP address
     # @param url_scheme [String] "http" or "https"
+    # @param persisted [Boolean] whether the connection has already completed at least one request
     # @return [void]
     #
-    # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme) -> void
-    def fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
+    # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
+    def fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme, persisted: true)
       reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
-      reactor.update_state(Ractor.make_shareable({
+      state = {
         id: id,
         buffer: buffer,
         env: env,
         request_count: request_count,
         parse_data: parse_data,
         remote_addr: remote_addr,
-        url_scheme: url_scheme,
-        persisted: true
-      }))
+        url_scheme: url_scheme
+      }
+      state[:persisted] = true if persisted
+      reactor.update_state(Ractor.make_shareable(state))
     end
 
     # Builds a Rack environment hash from parsed HTTP request data.

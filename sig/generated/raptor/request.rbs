@@ -13,7 +13,7 @@ module Raptor
 
     FILE_CHUNK_SIZE: untyped
 
-    KEEPALIVE_BUFFER_SIZE: untyped
+    READ_BUFFER_SIZE: untyped
 
     WRITE_TIMEOUT: ::Integer
 
@@ -63,6 +63,18 @@ module Raptor
       def message: () -> String
     end
 
+    # Decodes a chunked transfer-encoded body buffer.
+    #
+    # Returns the decoded bytes and a flag indicating whether the terminating
+    # zero-length chunk was found. The decoder stops at the first unparseable
+    # boundary (incomplete CRLF) or zero-length chunk.
+    #
+    # @param buffer [String] the raw body buffer to decode
+    # @return [Array(String, Boolean)] decoded body and completion flag
+    #
+    # @rbs (String buffer) -> [String, bool]
+    def self.decode_chunked: (String buffer) -> [ String, bool ]
+
     @server_port: Integer
 
     @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
@@ -75,6 +87,21 @@ module Raptor
     #
     # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port) -> void
     def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port) -> void
+
+    # Eagerly reads and parses the first request on a freshly accepted
+    # connection on the server thread, dispatching directly to the thread pool
+    # when complete. Falls back to the reactor when more data is needed.
+    #
+    # @param socket [TCPSocket] the freshly accepted client socket
+    # @param id [Integer] unique client identifier
+    # @param reactor [Reactor] the reactor for fallback registration
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
+    def eager_accept: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
 
     # Returns a Proc for HTTP parsing work in Ractor context.
     #
@@ -154,8 +181,12 @@ module Raptor
     # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
     def eager_keepalive: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
 
-    # Re-registers a socket with the reactor for further processing
-    # when an incomplete request is received during eager keep-alive.
+    # Re-registers a socket with the reactor for further processing when
+    # an incomplete request is received during eager accept or eager keep-alive.
+    #
+    # The persisted flag selects between persistent_data_timeout (for
+    # kept-alive connections awaiting the next request) and chunk_data_timeout
+    # (for fresh connections awaiting the rest of the first request).
     #
     # @param socket [TCPSocket] the client socket
     # @param id [Integer] unique client identifier
@@ -166,10 +197,11 @@ module Raptor
     # @param request_count [Integer] number of requests handled on this connection
     # @param remote_addr [String] client IP address
     # @param url_scheme [String] "http" or "https"
+    # @param persisted [Boolean] whether the connection has already completed at least one request
     # @return [void]
     #
-    # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme) -> void
-    def fallback_to_reactor: (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme) -> void
+    # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
+    def fallback_to_reactor: (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
 
     # Builds a Rack environment hash from parsed HTTP request data.
     #

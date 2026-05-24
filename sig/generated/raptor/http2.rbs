@@ -8,6 +8,31 @@ module Raptor
   # It integrates with the same reactor, ractor pool, and thread pool
   # pipeline used by HTTP/1.1 connections.
   class Http2
+    # Lock-free per-connection frame writer.
+    #
+    # Serializes concurrent socket writes from multiple stream workers
+    # without blocking any of them.
+    class Writer
+      IDLE: ::Symbol
+
+      @state: Atom
+
+      # Creates a new Writer.
+      #
+      # @rbs () -> void
+      def initialize: () -> void
+
+      # Writes frames to the socket, coordinating with concurrent writers
+      # so that exactly one thread is actively writing at any time.
+      #
+      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+      # @param frames [Array<String>] frame bytes to write in order
+      # @return [void]
+      #
+      # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String] frames) -> void
+      def write_frames: (OpenSSL::SSL::SSLSocket socket, Array[String] frames) -> void
+    end
+
     FLAG_END_STREAM: ::Integer
 
     FLAG_END_HEADERS: ::Integer
@@ -88,38 +113,38 @@ module Raptor
     # the response back as HTTP/2 frames.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param headers [Array<Array(String, String)>] request headers
     # @param body [String] request body
     # @param remote_addr [String] the client IP address
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
-    def dispatch_stream_request: (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Array[[ String, String ]] headers, String body, remote_addr: String) -> void
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
+    def dispatch_stream_request: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Array[[ String, String ]] headers, String body, remote_addr: String) -> void
 
     # Writes a Rack response as HTTP/2 frames to the socket.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param status [Integer] HTTP status code
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body responding to each
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
-    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
+    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
 
     # Writes a 500 error response as HTTP/2 frames.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id) -> void
-    def write_http2_error_response: (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id) -> void
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
+    def write_http2_error_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
 
     # Builds a Rack environment hash from HTTP/2 headers and body.
     #

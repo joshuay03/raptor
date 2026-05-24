@@ -75,7 +75,7 @@ module Raptor
     # @rbs @id_to_socket: Hash[Integer, TCPSocket]
     # @rbs @socket_to_state: Hash[TCPSocket, Hash[Symbol, untyped]]
     # @rbs @id_to_timeout: Hash[Integer, TimeoutClient]
-    # @rbs @id_to_mutex: Hash[Integer, Mutex]
+    # @rbs @id_to_writer: Hash[Integer, untyped]
 
     # Creates a new Reactor instance.
     #
@@ -100,7 +100,7 @@ module Raptor
       @id_to_socket = {}
       @socket_to_state = {}
       @id_to_timeout = {}
-      @id_to_mutex = {}
+      @id_to_writer = {}
     end
 
     # Starts the reactor's main event loop in a new thread.
@@ -162,12 +162,10 @@ module Raptor
     def add(state)
       socket = state[:socket]
       state.delete(:socket)
+      writer = state.delete(:writer)
       @id_to_socket[state[:id]] = socket
       @socket_to_state[socket] = state
-
-      if state[:protocol] == :http2
-        @id_to_mutex[state[:id]] = Mutex.new
-      end
+      @id_to_writer[state[:id]] = writer if writer
 
       read_and_queue_for_parse(socket, state)
     end
@@ -252,14 +250,16 @@ module Raptor
       @id_to_socket[id]
     end
 
-    # Returns the mutex for a given HTTP/2 connection.
+    # Returns the writer object associated with a given connection, if one
+    # was supplied when the connection was added. Used by protocol handlers
+    # that need to coordinate concurrent socket writes.
     #
     # @param id [Integer] unique client identifier
-    # @return [Mutex, nil] the mutex, if found
+    # @return [Object, nil] the writer, if found
     #
-    # @rbs (Integer id) -> Mutex?
-    def mutex_for(id)
-      @id_to_mutex[id]
+    # @rbs (Integer id) -> untyped?
+    def writer_for(id)
+      @id_to_writer[id]
     end
 
     # Updates connection state for an HTTP/2 connection after frame processing.
@@ -384,7 +384,7 @@ module Raptor
     def cleanup(socket)
       state = @socket_to_state.delete(socket)
       @id_to_socket.delete(state[:id])
-      @id_to_mutex.delete(state[:id])
+      @id_to_writer.delete(state[:id])
       socket.close
     end
 

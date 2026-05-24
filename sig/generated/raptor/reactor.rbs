@@ -55,7 +55,7 @@ module Raptor
 
     TIMEOUT_RESPONSE: ::String
 
-    @id_to_mutex: Hash[Integer, Mutex]
+    @id_to_writer: Hash[Integer, untyped]
 
     @id_to_timeout: Hash[Integer, TimeoutClient]
 
@@ -159,13 +159,15 @@ module Raptor
     # @rbs (Integer id) -> TCPSocket?
     def socket_for: (Integer id) -> TCPSocket?
 
-    # Returns the mutex for a given HTTP/2 connection.
+    # Returns the writer object associated with a given connection, if one
+    # was supplied when the connection was added. Used by protocol handlers
+    # that need to coordinate concurrent socket writes.
     #
     # @param id [Integer] unique client identifier
-    # @return [Mutex, nil] the mutex, if found
+    # @return [Object, nil] the writer, if found
     #
-    # @rbs (Integer id) -> Mutex?
-    def mutex_for: (Integer id) -> Mutex?
+    # @rbs (Integer id) -> untyped?
+    def writer_for: (Integer id) -> untyped?
 
     # Updates connection state for an HTTP/2 connection after frame processing.
     #

@@ -3,6 +3,7 @@
 
 require "stringio"
 
+require "atomic-ruby/atom"
 require "rack"
 
 require_relative "raptor_http2"
@@ -16,6 +17,63 @@ module Raptor
   # pipeline used by HTTP/1.1 connections.
   #
   class Http2
+    # Lock-free per-connection frame writer.
+    #
+    # Serializes concurrent socket writes from multiple stream workers
+    # without blocking any of them.
+    #
+    class Writer
+      IDLE = :idle
+
+      # @rbs @state: Atom
+
+      # Creates a new Writer.
+      #
+      # @rbs () -> void
+      def initialize
+        @state = Atom.new(IDLE)
+      end
+
+      # Writes frames to the socket, coordinating with concurrent writers
+      # so that exactly one thread is actively writing at any time.
+      #
+      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+      # @param frames [Array<String>] frame bytes to write in order
+      # @return [void]
+      #
+      # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String] frames) -> void
+      def write_frames(socket, frames)
+        return if frames.nil? || frames.empty?
+
+        claimed = false
+        @state.swap do |current|
+          if current.equal?(IDLE)
+            claimed = true
+            frames
+          else
+            claimed = false
+            current + frames
+          end
+        end
+
+        return unless claimed
+
+        loop do
+          pending = nil
+          @state.swap do |current|
+            pending = current
+            current.empty? ? IDLE : []
+          end
+
+          break if pending.empty?
+
+          pending.each do |frame|
+            socket.write(frame) rescue nil
+          end
+        end
+      end
+    end
+
     FLAG_END_STREAM = 0x1
     FLAG_END_HEADERS = 0x4
     FLAG_ACK = 0x1
@@ -215,13 +273,9 @@ module Raptor
       socket = reactor.socket_for(result[:id])
       return unless socket
 
-      mutex = reactor.mutex_for(result[:id])
+      writer = reactor.writer_for(result[:id])
 
-      if result[:outgoing_frames]&.any?
-        mutex.synchronize do
-          result[:outgoing_frames].each { |frame| socket.write(frame) rescue nil }
-        end
-      end
+      writer.write_frames(socket, result[:outgoing_frames])
 
       reactor.update_http2_state(result)
 
@@ -231,7 +285,7 @@ module Raptor
 
         thread_pool << proc do
           dispatch_stream_request(
-            socket, mutex, stream_id,
+            socket, writer, stream_id,
             request[:headers], request[:body],
             remote_addr: remote_addr
           )
@@ -245,21 +299,21 @@ module Raptor
     # the response back as HTTP/2 frames.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param headers [Array<Array(String, String)>] request headers
     # @param body [String] request body
     # @param remote_addr [String] the client IP address
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
-    def dispatch_stream_request(socket, mutex, stream_id, headers, body, remote_addr:)
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
+    def dispatch_stream_request(socket, writer, stream_id, headers, body, remote_addr:)
       env = build_rack_env(headers, body, remote_addr: remote_addr)
       status, response_headers, response_body = @app.call(env)
 
-      write_http2_response(socket, mutex, stream_id, status, response_headers, response_body)
+      write_http2_response(socket, writer, stream_id, status, response_headers, response_body)
     rescue
-      write_http2_error_response(socket, mutex, stream_id)
+      write_http2_error_response(socket, writer, stream_id)
       raise
     ensure
       response_body.close if response_body.respond_to?(:close)
@@ -268,15 +322,15 @@ module Raptor
     # Writes a Rack response as HTTP/2 frames to the socket.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param status [Integer] HTTP status code
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body responding to each
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
-    def write_http2_response(socket, mutex, stream_id, status, headers, body)
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
+    def write_http2_response(socket, writer, stream_id, status, headers, body)
       parser = Http2Parser.new
 
       header_pairs = [[":status", status.to_s]]
@@ -296,40 +350,38 @@ module Raptor
       body_chunks = []
       body.each { |chunk| body_chunks << chunk unless chunk.empty? }
 
-      mutex.synchronize do
-        if body_chunks.empty?
-          socket.write(parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers))
-        else
-          socket.write(parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers))
+      frames = []
+      if body_chunks.empty?
+        frames << parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers)
+      else
+        frames << parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)
 
-          body_chunks.each_with_index do |chunk, index|
-            last = index == body_chunks.size - 1
-            flags = last ? FLAG_END_STREAM : 0
-            socket.write(parser.build_frame(:data, flags, stream_id, chunk))
-          end
+        last_index = body_chunks.size - 1
+        body_chunks.each_with_index do |chunk, index|
+          flags = index == last_index ? FLAG_END_STREAM : 0
+          frames << parser.build_frame(:data, flags, stream_id, chunk)
         end
       end
-    rescue IOError, Errno::EPIPE
-      # Connection closed
+
+      writer.write_frames(socket, frames)
     end
 
     # Writes a 500 error response as HTTP/2 frames.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param mutex [Mutex] mutex for serializing writes to the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Mutex mutex, Integer stream_id) -> void
-    def write_http2_error_response(socket, mutex, stream_id)
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
+    def write_http2_error_response(socket, writer, stream_id)
       parser = Http2Parser.new
       encoded = parser.encode_headers([[":status", "500"]])
 
-      mutex.synchronize do
-        socket.write(parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded))
-      end
-    rescue IOError, Errno::EPIPE
-      # Connection closed
+      writer.write_frames(
+        socket,
+        [parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded)]
+      )
     end
 
     # Builds a Rack environment hash from HTTP/2 headers and body.

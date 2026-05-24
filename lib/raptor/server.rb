@@ -15,16 +15,19 @@ module Raptor
   #
   # Supports TCP, Unix domain, and SSL listeners transparently. TCP_NODELAY is
   # applied only to TCP sockets, and SSL handshakes are performed synchronously
-  # before handing the connection to the reactor.
+  # before the connection is dispatched.
   #
-  # For SSL connections, ALPN negotiation determines the protocol. HTTP/2
-  # connections are added to the reactor with initial SETTINGS and processed
-  # through the same ractor pool pipeline as HTTP/1.1 connections.
+  # For HTTP/1.1 connections the first request is parsed inline on the server
+  # thread and dispatched directly to the thread pool, falling back to the
+  # reactor only when more data is needed. For HTTP/2 connections (negotiated
+  # via ALPN) the server sends initial SETTINGS and registers the connection
+  # with the reactor for frame processing through the ractor pool.
   #
   # @example
   #   binder = Binder.new(["tcp://0.0.0.0:3000"])
   #   reactor = Reactor.new(thread_pool, ractor_pool, client_options: {})
-  #   server = Server.new(binder, reactor, thread_pool)
+  #   request = Request.new(app, 3000)
+  #   server = Server.new(binder, reactor, thread_pool, request)
   #   server.run
   #   # ... later
   #   server.shutdown
@@ -37,6 +40,7 @@ module Raptor
     # @rbs @binder: Binder
     # @rbs @reactor: Reactor
     # @rbs @thread_pool: AtomicThreadPool
+    # @rbs @request: Request
     # @rbs @running: AtomicBoolean
 
     # Creates a new Server instance.
@@ -44,13 +48,15 @@ module Raptor
     # @param binder [Binder] the binder managing listening sockets
     # @param reactor [Reactor] the reactor for handling client connections
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @param request [Request] the HTTP/1.1 request handler
     # @return [void]
     #
-    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool) -> void
-    def initialize(binder, reactor, thread_pool)
+    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Request request) -> void
+    def initialize(binder, reactor, thread_pool, request)
       @binder = binder
       @reactor = reactor
       @thread_pool = thread_pool
+      @request = request
       @running = AtomicBoolean.new(true)
     end
 
@@ -149,18 +155,21 @@ module Raptor
             socket: ssl_socket,
             remote_addr: remote_addr,
             url_scheme: HTTPS_SCHEME,
-            protocol: :http2
+            protocol: :http2,
+            writer: Http2::Writer.new
           )
 
           return
         end
       end
 
-      reactor.add(
-        id: client.object_id,
-        socket: client,
-        remote_addr: remote_addr,
-        url_scheme: url_scheme
+      @request.eager_accept(
+        client,
+        client.object_id,
+        reactor,
+        @thread_pool,
+        remote_addr,
+        url_scheme
       )
     end
   end
