@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 require "test_helper"
+
+require "tempfile"
+
 require "raptor/cli"
 
 module Raptor
@@ -28,6 +31,32 @@ module Raptor
       cli = CLI.new(["my_app.ru"])
 
       assert_equal "my_app.ru", options(cli)[:rackup]
+    end
+
+    def test_config_file_short_flag_layers_under_cli_args
+      with_config_file({ threads: 8, ractors: 4, workers: 2, client: { first_data_timeout: 60 } }) do |path|
+        cli = CLI.new(["-c", path, "-w", "16"])
+
+        assert_equal 8, options(cli)[:threads]
+        assert_equal 4, options(cli)[:ractors]
+        assert_equal 16, options(cli)[:workers]
+        assert_equal 60, options(cli)[:client][:first_data_timeout]
+        assert_equal 10, options(cli)[:client][:chunk_data_timeout]
+      end
+    end
+
+    def test_config_file_long_flag
+      with_config_file({ threads: 7 }) do |path|
+        cli = CLI.new(["--config", path])
+
+        assert_equal 7, options(cli)[:threads]
+      end
+    end
+
+    def test_config_file_must_return_hash
+      with_config_file(42) do |path|
+        assert_raises(ArgumentError) { CLI.new(["-c", path]) }
+      end
     end
 
     def test_bind_replaces_default_on_first_use
@@ -164,6 +193,15 @@ module Raptor
 
     def options(cli)
       cli.instance_variable_get(:@options)
+    end
+
+    def with_config_file(value)
+      file = Tempfile.new(["raptor_config", ".rb"])
+      file.write(value.inspect)
+      file.close
+      yield file.path
+    ensure
+      file.unlink if file
     end
   end
 end

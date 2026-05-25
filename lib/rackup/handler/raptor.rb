@@ -44,7 +44,8 @@ module Rackup
           "Port=PORT"   => "Port to listen on (default: #{DEFAULT_OPTIONS[:Port]})",
           "Threads=NUM" => "Number of threads per worker (default: 3)",
           "Ractors=NUM" => "Number of pipeline ractors per worker (default: 1)",
-          "Workers=NUM" => "Number of worker processes (default: nprocessors)"
+          "Workers=NUM" => "Number of worker processes (default: nprocessors)",
+          "Config=PATH" => "Load additional configuration from PATH"
         }
       end
 
@@ -67,19 +68,31 @@ module Rackup
           end
         end
 
-        host = options[:Host] || defaults[:Host]
-        port = options[:Port] || defaults[:Port]
-
         cli_defaults = ::Raptor::CLI::DEFAULT_OPTIONS
+        config = options[:Config] ? ::Raptor::CLI.load_config_file(options[:Config]) : {}
 
-        {
+        binds = if options[:Host] || options[:Port]
+          host = options[:Host] || defaults[:Host]
+          port = options[:Port] || defaults[:Port]
+          ["tcp://#{host}:#{port}"]
+        else
+          config[:binds] || ["tcp://#{defaults[:Host]}:#{defaults[:Port]}"]
+        end
+
+        result = {
           app: app,
-          binds: ["tcp://#{host}:#{port}"],
-          threads: (options[:Threads] || cli_defaults[:threads]).to_i,
-          ractors: (options[:Ractors] || cli_defaults[:ractors]).to_i,
-          workers: (options[:Workers] || Etc.nprocessors).to_i,
-          client: cli_defaults[:client]
+          binds: binds,
+          threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,
+          ractors: (options[:Ractors] || config[:ractors] || cli_defaults[:ractors]).to_i,
+          workers: (options[:Workers] || config[:workers] || Etc.nprocessors).to_i,
+          client: cli_defaults[:client].merge(config[:client] || {})
         }
+
+        [:rackup, :on_error, :stats_file, :pidfile].each do |key|
+          result[key] = config[key] if config.key?(key)
+        end
+
+        result
       end
       private_class_method :build_cluster_options
     end

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Load cluster options from a Ruby config file via `--config`
 - Replace workers one at a time on `SIGUSR2` (phased restart)
 - Invoke `:on_error` callback with `(env, exception)` when the Rack app raises
 - Spool request bodies larger than `--body-spool-threshold` to a tempfile

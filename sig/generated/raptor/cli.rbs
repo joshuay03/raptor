@@ -20,6 +20,19 @@ module Raptor
 
     DEFAULT_OPTIONS: untyped
 
+    # Loads a configuration file and returns the hash it evaluates to.
+    #
+    # The file is evaluated at the top level so constants like `Raptor::*` resolve
+    # the same as in a regular Ruby script. The final expression must be a Hash
+    # of cluster options (the same keys accepted by {Raptor::Cluster#initialize}).
+    #
+    # @param path [String] path to a Ruby file that evaluates to a Hash
+    # @return [Hash{Symbol => untyped}] cluster options
+    # @raise [ArgumentError] if the file does not evaluate to a Hash
+    #
+    # @rbs (String path) -> Hash[Symbol, untyped]
+    def self.load_config_file: (String path) -> Hash[Symbol, untyped]
+
     @command: Symbol
 
     @options: Hash[Symbol, untyped]
@@ -60,6 +73,30 @@ module Raptor
     #
     # @rbs () -> void
     def run_stats: () -> void
+
+    # Scans argv for a `-c`/`--config` flag and returns the configured path.
+    #
+    # The pre-scan runs before the main OptionParser pass so the config file
+    # can be applied as a base layer that CLI args then override. All four
+    # OptionParser-accepted forms (`-c PATH`, `-cPATH`, `--config PATH`,
+    # `--config=PATH`) are recognized.
+    #
+    # @param argv [Array<String>] command-line arguments to scan
+    # @return [String, nil] the config path, or nil if no flag was supplied
+    #
+    # @rbs (Array[String] argv) -> String?
+    def extract_config_path: (Array[String] argv) -> String?
+
+    # Loads a config file and merges it into `@options` over the defaults.
+    #
+    # Top-level keys replace defaults; the nested `:client` hash is merged
+    # key-by-key so a config file does not need to restate every client option.
+    #
+    # @param path [String, nil] path to the config file, or nil to no-op
+    # @return [void]
+    #
+    # @rbs (String? path) -> void
+    def apply_config_file: (String? path) -> void
 
     # Creates the OptionParser instance with all supported command-line options.
     #

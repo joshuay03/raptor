@@ -43,6 +43,24 @@ module Raptor
       pidfile: nil,
     }.freeze
 
+    # Loads a configuration file and returns the hash it evaluates to.
+    #
+    # The file is evaluated at the top level so constants like `Raptor::*` resolve
+    # the same as in a regular Ruby script. The final expression must be a Hash
+    # of cluster options (the same keys accepted by {Raptor::Cluster#initialize}).
+    #
+    # @param path [String] path to a Ruby file that evaluates to a Hash
+    # @return [Hash{Symbol => untyped}] cluster options
+    # @raise [ArgumentError] if the file does not evaluate to a Hash
+    #
+    # @rbs (String path) -> Hash[Symbol, untyped]
+    def self.load_config_file(path)
+      config = eval(File.read(path), TOPLEVEL_BINDING, path, 1)
+      raise ArgumentError, "Config file at #{path.inspect} must return a Hash, got #{config.class}" unless config.is_a?(Hash)
+
+      config
+    end
+
     # @rbs @command: Symbol
     # @rbs @options: Hash[Symbol, untyped]
     # @rbs @parser: OptionParser
@@ -73,6 +91,9 @@ module Raptor
       end
       @options = DEFAULT_OPTIONS.dup
       @options[:client] = @options[:client].dup
+
+      apply_config_file(extract_config_path(argv))
+
       @parser = create_parser
       @parser.parse!(argv)
 
@@ -114,6 +135,49 @@ module Raptor
       end
     end
 
+    # Scans argv for a `-c`/`--config` flag and returns the configured path.
+    #
+    # The pre-scan runs before the main OptionParser pass so the config file
+    # can be applied as a base layer that CLI args then override. All four
+    # OptionParser-accepted forms (`-c PATH`, `-cPATH`, `--config PATH`,
+    # `--config=PATH`) are recognized.
+    #
+    # @param argv [Array<String>] command-line arguments to scan
+    # @return [String, nil] the config path, or nil if no flag was supplied
+    #
+    # @rbs (Array[String] argv) -> String?
+    def extract_config_path(argv)
+      argv.each_with_index do |arg, i|
+        case arg
+        when "-c", "--config" then return argv[i + 1]
+        when /\A--config=(.*)\z/, /\A-c(.+)\z/ then return Regexp.last_match(1)
+        end
+      end
+      nil
+    end
+
+    # Loads a config file and merges it into `@options` over the defaults.
+    #
+    # Top-level keys replace defaults; the nested `:client` hash is merged
+    # key-by-key so a config file does not need to restate every client option.
+    #
+    # @param path [String, nil] path to the config file, or nil to no-op
+    # @return [void]
+    #
+    # @rbs (String? path) -> void
+    def apply_config_file(path)
+      return unless path
+
+      config = self.class.load_config_file(path)
+      config.each do |key, value|
+        if key == :client && value.is_a?(Hash)
+          @options[:client] = @options[:client].merge(value)
+        else
+          @options[key] = value
+        end
+      end
+    end
+
     # Creates the OptionParser instance with all supported command-line options.
     #
     # @return [OptionParser] configured option parser
@@ -122,6 +186,10 @@ module Raptor
     def create_parser
       OptionParser.new do |opts|
         opts.banner = "Usage: raptor [options] [rackup file]"
+
+        opts.on("-c", "--config PATH", String, "Load configuration from PATH") do
+          # Loaded in #initialize before parsing so CLI args can override config values
+        end
 
         opts.on("-b", "--bind URI", String, "Bind address (default: tcp://0.0.0.0:9292)") do |bind|
           if @options[:binds] == DEFAULT_OPTIONS[:binds]
