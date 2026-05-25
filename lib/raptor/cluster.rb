@@ -58,14 +58,15 @@ module Raptor
     # @rbs @ractor_count: Integer
     # @rbs @worker_count: Integer
     # @rbs @client_options: Hash[Symbol, Integer]
+    # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    # @rbs @stats_file: String?
+    # @rbs @pidfile: String?
     # @rbs @binder: Binder
     # @rbs @server_port: Integer
     # @rbs @app: untyped
     # @rbs @shutdown: bool
     # @rbs @workers: Hash[Integer, Integer]
     # @rbs @stats: Stats
-    # @rbs @stats_file: String?
-    # @rbs @pidfile: String?
 
     # Creates a new Cluster with the specified configuration.
     #
@@ -81,6 +82,7 @@ module Raptor
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client configuration
+    # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pidfile path to write the master PID to, or nil to disable
     # @return [void]
@@ -91,6 +93,9 @@ module Raptor
       @ractor_count = options[:ractors]
       @worker_count = options[:workers]
       @client_options = options[:client]
+      @on_error = options[:on_error]
+      @stats_file = options[:stats_file]
+      @pidfile = options[:pidfile]
 
       @binder = Binder.new(options[:binds])
       @server_port = @binder.server_port
@@ -100,8 +105,6 @@ module Raptor
       @shutdown = false
       @workers = {}
       @stats = Stats.new(@worker_count)
-      @stats_file = options[:stats_file]
-      @pidfile = options[:pidfile]
     end
 
     # Starts the multi-process cluster and manages worker processes.
@@ -224,8 +227,8 @@ module Raptor
         @app.call(env)
       }
       thread_pool = AtomicThreadPool.new(name: "Raptor Workers", size: @thread_count)
-      request = Request.new(counting_app, @server_port, client_options: @client_options)
-      http2 = Http2.new(counting_app, @server_port)
+      request = Request.new(counting_app, @server_port, client_options: @client_options, on_error: @on_error)
+      http2 = Http2.new(counting_app, @server_port, on_error: @on_error)
       ractor_pool = RactorPool.new(
         name: "Raptor Pipeline Workers",
         size: @ractor_count,

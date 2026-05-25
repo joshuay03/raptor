@@ -32,7 +32,6 @@ module Rackup
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:ractors], opts[:ractors]
         assert_equal Etc.nprocessors, opts[:workers]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:client], opts[:client]
-        assert_nil opts[:stats_file]
       end
 
       def test_passes_app_through

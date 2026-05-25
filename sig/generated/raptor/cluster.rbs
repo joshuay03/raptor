@@ -37,10 +37,6 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @pidfile: String?
-
-    @stats_file: String?
-
     @stats: Stats
 
     @workers: Hash[Integer, Integer]
@@ -52,6 +48,12 @@ module Raptor
     @server_port: Integer
 
     @binder: Binder
+
+    @pidfile: String?
+
+    @stats_file: String?
+
+    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
     @client_options: Hash[Symbol, Integer]
 
@@ -75,6 +77,7 @@ module Raptor
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client configuration
+    # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pidfile path to write the master PID to, or nil to disable
     # @return [void]

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Invoke `:on_error` callback with `(env, exception)` when the Rack app raises
 - Spool request bodies larger than `--body-spool-threshold` to a tempfile
 - Reject HTTP/1.1 requests larger than `--max-body-size` with a 413 response
 - Write pidfile via `--pidfile`

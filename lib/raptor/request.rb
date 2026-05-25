@@ -96,6 +96,7 @@ module Raptor
     # @rbs @server_port: Integer
     # @rbs @max_body_size: Integer?
     # @rbs @body_spool_threshold: Integer?
+    # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
     # Creates a new Request handler.
     #
@@ -104,14 +105,16 @@ module Raptor
     # @param client_options [Hash] client limits configuration
     # @option client_options [Integer, nil] :max_body_size maximum request body size in bytes
     # @option client_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
+    # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped]) -> void
-    def initialize(app, server_port, client_options: {})
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize(app, server_port, client_options: {}, on_error: nil)
       @app = app
       @server_port = server_port
       @max_body_size = client_options[:max_body_size]
       @body_spool_threshold = client_options[:body_spool_threshold]
+      @on_error = on_error
     end
 
     # Eagerly reads and parses the first request on a freshly accepted
@@ -357,7 +360,12 @@ module Raptor
         call_response_finished(rack_env, status, headers, error) if rack_env
         socket.write(INTERNAL_SERVER_ERROR_RESPONSE) rescue nil unless response_started || hijacked
         keep_alive = false
-        raise
+
+        if @on_error
+          @on_error.call(rack_env, error) rescue nil
+        else
+          raise
+        end
       ensure
         rack_input = rack_env && rack_env[Rack::RACK_INPUT]
         rack_input.close! rescue nil if rack_input.respond_to?(:close!)

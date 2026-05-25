@@ -85,17 +85,20 @@ module Raptor
 
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
+    # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
     # Creates a new Http2 handler.
     #
     # @param app [#call] the Rack application to dispatch requests to
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port) -> void
-    def initialize(app, server_port)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize(app, server_port, on_error: nil)
       @app = app
       @server_port = server_port
+      @on_error = on_error
     end
 
     # Builds the initial server SETTINGS frame to send on connection establishment.
@@ -312,9 +315,14 @@ module Raptor
       status, response_headers, response_body = @app.call(env)
 
       write_http2_response(socket, writer, stream_id, status, response_headers, response_body)
-    rescue
+    rescue => error
       write_http2_error_response(socket, writer, stream_id)
-      raise
+
+      if @on_error
+        @on_error.call(env, error) rescue nil
+      else
+        raise
+      end
     ensure
       response_body.close if response_body.respond_to?(:close)
     end

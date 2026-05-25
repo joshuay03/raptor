@@ -334,6 +334,27 @@ module Raptor
       end
     end
 
+    def test_on_error_callback_invoked_on_app_error
+      log_path = "/tmp/raptor_test_on_error_#{Process.pid}.log"
+      File.delete(log_path) rescue nil
+      @options[:on_error] = ->(env, error) { File.write(log_path, "#{env[Rack::PATH_INFO]}:#{error.class}") }
+
+      with_server("error_500.ru") do |uri|
+        Net::HTTP.get_response(uri)
+
+        Timeout.timeout(5) do
+          loop do
+            break if File.exist?(log_path)
+            sleep 0.1
+          end
+        end
+
+        assert_equal "/:RuntimeError", File.read(log_path)
+      end
+    ensure
+      File.delete(log_path) rescue nil
+    end
+
     def test_max_body_size_returns_413
       @options[:client] = @options[:client].merge(max_body_size: 5)
 

@@ -78,8 +78,7 @@ module Rackup
           threads: (options[:Threads] || cli_defaults[:threads]).to_i,
           ractors: (options[:Ractors] || cli_defaults[:ractors]).to_i,
           workers: (options[:Workers] || Etc.nprocessors).to_i,
-          client: cli_defaults[:client],
-          stats_file: nil
+          client: cli_defaults[:client]
         }
       end
       private_class_method :build_cluster_options
