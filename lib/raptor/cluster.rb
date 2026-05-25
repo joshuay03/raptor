@@ -80,7 +80,7 @@ module Raptor
     # @option options [Array<String>] :binds array of bind URIs
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
-    # @option options [Hash] :client client timeout configuration
+    # @option options [Hash] :client client configuration
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pidfile path to write the master PID to, or nil to disable
     # @return [void]
@@ -224,7 +224,7 @@ module Raptor
         @app.call(env)
       }
       thread_pool = AtomicThreadPool.new(name: "Raptor Workers", size: @thread_count)
-      request = Request.new(counting_app, @server_port)
+      request = Request.new(counting_app, @server_port, client_options: @client_options)
       http2 = Http2.new(counting_app, @server_port)
       ractor_pool = RactorPool.new(
         name: "Raptor Pipeline Workers",

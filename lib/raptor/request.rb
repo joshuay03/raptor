@@ -38,7 +38,8 @@ module Raptor
     end
 
     STATUS_WITH_NO_ENTITY_BODY = Set.new([204, 304, *100..199]).freeze
-    ERROR_RESPONSE_500 = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    CONTENT_TOO_LARGE_RESPONSE = "HTTP/1.1 413 Content Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 
     CONNECTION_CLOSE = "close"
     CONNECTION_KEEPALIVE = "keep-alive"
@@ -61,46 +62,52 @@ module Raptor
 
     # Decodes a chunked transfer-encoded body buffer.
     #
-    # Returns the decoded bytes and a flag indicating whether the terminating
-    # zero-length chunk was found. The decoder stops at the first unparseable
-    # boundary (incomplete CRLF) or zero-length chunk.
+    # Returns the decoded bytes and a state symbol: `:complete` when the
+    # terminating zero-length chunk was found, `:too_large` when the decoded
+    # size would exceed `max_size`, or `:incomplete` otherwise.
     #
     # @param buffer [String] the raw body buffer to decode
-    # @return [Array(String, Boolean)] decoded body and completion flag
+    # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited
+    # @return [Array(String, Symbol)] decoded body and completion state
     #
-    # @rbs (String buffer) -> [String, bool]
-    def self.decode_chunked(buffer)
+    # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
+    def self.decode_chunked(buffer, max_size = nil)
       decoded = String.new
       offset = 0
 
       while offset < buffer.bytesize
         crlf = buffer.index("\r\n", offset)
-        return [decoded, false] unless crlf
+        return [decoded, :incomplete] unless crlf
 
         chunk_size = buffer.byteslice(offset, crlf - offset).to_i(16)
-        return [decoded, true] if chunk_size == 0
+        return [decoded, :complete] if chunk_size == 0
+        return [decoded, :too_large] if max_size && decoded.bytesize + chunk_size > max_size
 
         offset = crlf + 2
         decoded << buffer.byteslice(offset, chunk_size)
         offset += chunk_size + 2
       end
 
-      [decoded, false]
+      [decoded, :incomplete]
     end
 
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
+    # @rbs @max_body_size: Integer?
 
     # Creates a new Request handler.
     #
     # @param app [#call] the Rack application to dispatch complete requests to
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @param client_options [Hash] client limits configuration
+    # @option client_options [Integer, nil] :max_body_size maximum request body size in bytes
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port) -> void
-    def initialize(app, server_port)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped]) -> void
+    def initialize(app, server_port, client_options: {})
       @app = app
       @server_port = server_port
+      @max_body_size = client_options[:max_body_size]
     end
 
     # Eagerly reads and parses the first request on a freshly accepted
@@ -149,12 +156,21 @@ module Raptor
         fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
         return
       elsif parser.has_body?
+        if @max_body_size && parser.content_length > @max_body_size
+          reject_oversized(socket)
+          return
+        end
+
         body = buffer.byteslice(nread..-1) || ""
 
         if env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
-          body, chunked_complete = Request.decode_chunked(body)
-          if chunked_complete
+          body, chunked_state = Request.decode_chunked(body, @max_body_size)
+          case chunked_state
+          when :complete
             env.delete(HTTP_TRANSFER_ENCODING)
+          when :too_large
+            reject_oversized(socket)
+            return
           else
             fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
             return
@@ -180,6 +196,8 @@ module Raptor
     #
     # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
     def http_parser_worker
+      max_body_size = @max_body_size
+
       proc do |data|
         next Raptor::Http2.process_frames(data) if data[:protocol] == :http2
 
@@ -197,12 +215,17 @@ module Raptor
           if parser.has_body?
             body_buffer = data[:buffer].byteslice(nread..-1) || ""
 
-            if env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
-              decoded_body, chunked_complete = Raptor::Request.decode_chunked(body_buffer)
+            if max_body_size && parser.content_length > max_body_size
+              data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
+            elsif env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
+              decoded_body, chunked_state = Raptor::Request.decode_chunked(body_buffer, max_body_size)
 
-              if chunked_complete
+              case chunked_state
+              when :complete
                 env.delete(HTTP_TRANSFER_ENCODING)
                 data.merge(env: env, body: decoded_body, parse_data: parse_data, complete: true)
+              when :too_large
+                data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
               else
                 data.merge(env: env, parse_data: parse_data)
               end
@@ -233,6 +256,12 @@ module Raptor
     #
     # @rbs (Hash[Symbol, untyped] parsed_request, Reactor reactor, AtomicThreadPool thread_pool) -> void
     def handle_parsed_request(parsed_request, reactor, thread_pool)
+      if parsed_request[:too_large]
+        socket = reactor.remove(parsed_request[:id])
+        reject_oversized(socket) if socket
+        return
+      end
+
       unless parsed_request[:complete]
         reactor.update_state(parsed_request)
       else
@@ -322,7 +351,7 @@ module Raptor
         keep_alive && !hijacked
       rescue => error
         call_response_finished(rack_env, status, headers, error) if rack_env
-        socket.write(ERROR_RESPONSE_500) rescue nil unless response_started || hijacked
+        socket.write(INTERNAL_SERVER_ERROR_RESPONSE) rescue nil unless response_started || hijacked
         keep_alive = false
         raise
       ensure
@@ -457,6 +486,18 @@ module Raptor
       }
       state[:persisted] = true if persisted
       reactor.update_state(Ractor.make_shareable(state))
+    end
+
+    # Writes a 413 response and closes the socket. Used when a request body
+    # exceeds the configured maximum size.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket) -> void
+    def reject_oversized(socket)
+      socket.write(CONTENT_TOO_LARGE_RESPONSE) rescue nil
+      socket.close rescue nil
     end
 
     # Builds a Rack environment hash from parsed HTTP request data.

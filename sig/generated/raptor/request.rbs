@@ -33,7 +33,9 @@ module Raptor
 
     STATUS_WITH_NO_ENTITY_BODY: untyped
 
-    ERROR_RESPONSE_500: ::String
+    INTERNAL_SERVER_ERROR_RESPONSE: ::String
+
+    CONTENT_TOO_LARGE_RESPONSE: ::String
 
     CONNECTION_CLOSE: ::String
 
@@ -65,15 +67,18 @@ module Raptor
 
     # Decodes a chunked transfer-encoded body buffer.
     #
-    # Returns the decoded bytes and a flag indicating whether the terminating
-    # zero-length chunk was found. The decoder stops at the first unparseable
-    # boundary (incomplete CRLF) or zero-length chunk.
+    # Returns the decoded bytes and a state symbol: `:complete` when the
+    # terminating zero-length chunk was found, `:too_large` when the decoded
+    # size would exceed `max_size`, or `:incomplete` otherwise.
     #
     # @param buffer [String] the raw body buffer to decode
-    # @return [Array(String, Boolean)] decoded body and completion flag
+    # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited
+    # @return [Array(String, Symbol)] decoded body and completion state
     #
-    # @rbs (String buffer) -> [String, bool]
-    def self.decode_chunked: (String buffer) -> [ String, bool ]
+    # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
+    def self.decode_chunked: (String buffer, ?Integer? max_size) -> [ String, Symbol ]
+
+    @max_body_size: Integer?
 
     @server_port: Integer
 
@@ -83,10 +88,12 @@ module Raptor
     #
     # @param app [#call] the Rack application to dispatch complete requests to
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @param client_options [Hash] client limits configuration
+    # @option client_options [Integer, nil] :max_body_size maximum request body size in bytes
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port) -> void
-    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port) -> void
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped]) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?client_options: Hash[Symbol, untyped]) -> void
 
     # Eagerly reads and parses the first request on a freshly accepted
     # connection on the server thread, dispatching directly to the thread pool
@@ -202,6 +209,15 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
     def fallback_to_reactor: (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
+
+    # Writes a 413 response and closes the socket. Used when a request body
+    # exceeds the configured maximum size.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket) -> void
+    def reject_oversized: (TCPSocket socket) -> void
 
     # Builds a Rack environment hash from parsed HTTP request data.
     #

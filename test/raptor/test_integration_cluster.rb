@@ -316,6 +316,16 @@ module Raptor
       end
     end
 
+    def test_max_body_size_returns_413
+      @options[:client] = @options[:client].merge(max_body_size: 5)
+
+      with_server("rack_input.ru") do |uri|
+        response = Net::HTTP.post(uri, "this body is well over five bytes")
+
+        assert_equal 413, response.code.to_i
+      end
+    end
+
     def test_unix_socket_binding
       socket_path = "/tmp/raptor_test_#{Process.pid}.sock"
       File.delete(socket_path) rescue nil

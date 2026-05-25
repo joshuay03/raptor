@@ -18,6 +18,7 @@ module Raptor
       assert_equal 30, options(cli)[:client][:first_data_timeout]
       assert_equal 10, options(cli)[:client][:chunk_data_timeout]
       assert_equal 65, options(cli)[:client][:persistent_data_timeout]
+      assert_nil options(cli)[:client][:max_body_size]
       assert_equal "tmp/raptor.json", options(cli)[:stats_file]
       assert_nil options(cli)[:pidfile]
     end
@@ -92,6 +93,12 @@ module Raptor
       cli = CLI.new(["--persistent-data-timeout", "120"])
 
       assert_equal 120, options(cli)[:client][:persistent_data_timeout]
+    end
+
+    def test_max_body_size
+      cli = CLI.new(["--max-body-size", "1048576"])
+
+      assert_equal 1048576, options(cli)[:client][:max_body_size]
     end
 
     def test_stats_file

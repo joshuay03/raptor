@@ -36,6 +36,7 @@ module Raptor
         first_data_timeout: 30,
         chunk_data_timeout: 10,
         persistent_data_timeout: 65,
+        max_body_size: nil,
       },
       stats_file: "tmp/raptor.json",
       pidfile: nil,
@@ -151,6 +152,10 @@ module Raptor
 
         opts.on("--persistent-data-timeout SECONDS", Integer, "Persistent data timeout in seconds (default: 65)") do |timeout|
           @options[:client][:persistent_data_timeout] = timeout
+        end
+
+        opts.on("--max-body-size BYTES", Integer, "Maximum request body size in bytes (default: unlimited)") do |bytes|
+          @options[:client][:max_body_size] = bytes
         end
 
         opts.on("--stats-file PATH", String, "Stats file path (default: tmp/raptor.json)") do |path|
