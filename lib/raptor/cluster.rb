@@ -67,6 +67,8 @@ module Raptor
     # @rbs @shutdown: bool
     # @rbs @workers: Hash[Integer, Integer]
     # @rbs @stats: Stats
+    # @rbs @phased_restart_requested: bool
+    # @rbs @phased_restarting: bool
 
     # Creates a new Cluster with the specified configuration.
     #
@@ -105,13 +107,16 @@ module Raptor
       @shutdown = false
       @workers = {}
       @stats = Stats.new(@worker_count)
+      @phased_restart_requested = false
+      @phased_restarting = false
     end
 
     # Starts the multi-process cluster and manages worker processes.
     #
     # Forks the configured number of worker processes and monitors them,
     # automatically restarting any that exit unexpectedly. Handles graceful
-    # shutdown via INT or TERM signals, and stats logging via USR1.
+    # shutdown via INT or TERM signals, stats logging via USR1, and phased
+    # restart via USR2.
     #
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
@@ -128,6 +133,7 @@ module Raptor
       trap("INT") { shutdown }
       trap("TERM") { shutdown }
       trap("USR1") { log_stats }
+      trap("USR2") { @phased_restart_requested = true }
 
       File.open(@pidfile, File::CREAT | File::EXCL | File::WRONLY) { |file| file.write(Process.pid.to_s) } if @pidfile
 
@@ -142,23 +148,11 @@ module Raptor
       end
 
       until @shutdown
-        begin
-          pid, status = Process.wait2(-1, Process::WNOHANG)
-        rescue Errno::ECHILD
-          break
-        end
+        break if reap_workers == :no_children
 
-        if pid
-          index = @workers.key(pid)
-          @workers.delete(index)
+        perform_phased_restart if @phased_restart_requested && !@phased_restarting
 
-          unless @shutdown
-            warn "[#{Process.pid}] Restarting worker #{index} (#{pid}), #{exit_description(status)}"
-            spawn_worker(index)
-          end
-        else
-          sleep 0.1
-        end
+        sleep 0.1
       end
 
       @workers.values.each { |pid| Process.kill("TERM", pid) rescue nil }
@@ -190,6 +184,66 @@ module Raptor
     def spawn_worker(index)
       pid = fork { run_worker(index) }
       @workers[index] = pid
+    end
+
+    # Reaps any worker processes that have exited, respawning each one
+    # unless the cluster is shutting down.
+    #
+    # @return [Symbol] :no_children when there are no remaining children, otherwise :reaped
+    #
+    # @rbs () -> Symbol
+    def reap_workers
+      loop do
+        pid, status = Process.wait2(-1, Process::WNOHANG)
+        return :reaped unless pid
+
+        index = @workers.key(pid)
+        @workers.delete(index)
+
+        unless @shutdown
+          warn "[#{Process.pid}] Restarting worker #{index} (#{pid}), #{exit_description(status)}"
+          spawn_worker(index)
+        end
+      end
+    rescue Errno::ECHILD
+      :no_children
+    end
+
+    # Replaces each worker process one at a time, waiting for the new
+    # worker to boot before moving on to the next. Triggered by SIGUSR2.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def perform_phased_restart
+      @phased_restart_requested = false
+      @phased_restarting = true
+      puts "[#{Process.pid}] Phased restart starting"
+
+      begin
+        @workers.keys.sort.each do |index|
+          return if @shutdown
+
+          target_pid = @workers[index]
+          next unless target_pid
+
+          Process.kill("TERM", target_pid) rescue nil
+
+          deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 60
+          until @shutdown
+            reap_workers
+            current = @workers[index]
+            break if current && current != target_pid && @stats.all[index][:booted]
+            break if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
+            sleep 0.1
+          end
+        end
+
+        puts "[#{Process.pid}] Phased restart complete"
+      ensure
+        @phased_restarting = false
+      end
     end
 
     # Runs the full server stack inside a worker process.

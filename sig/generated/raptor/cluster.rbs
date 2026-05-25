@@ -37,6 +37,10 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
+    @phased_restarting: bool
+
+    @phased_restart_requested: bool
+
     @stats: Stats
 
     @workers: Hash[Integer, Integer]
@@ -89,7 +93,8 @@ module Raptor
     #
     # Forks the configured number of worker processes and monitors them,
     # automatically restarting any that exit unexpectedly. Handles graceful
-    # shutdown via INT or TERM signals, and stats logging via USR1.
+    # shutdown via INT or TERM signals, stats logging via USR1, and phased
+    # restart via USR2.
     #
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
@@ -121,6 +126,22 @@ module Raptor
     #
     # @rbs (Integer index) -> void
     def spawn_worker: (Integer index) -> void
+
+    # Reaps any worker processes that have exited, respawning each one
+    # unless the cluster is shutting down.
+    #
+    # @return [Symbol] :no_children when there are no remaining children, otherwise :reaped
+    #
+    # @rbs () -> Symbol
+    def reap_workers: () -> Symbol
+
+    # Replaces each worker process one at a time, waiting for the new
+    # worker to boot before moving on to the next. Triggered by SIGUSR2.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def perform_phased_restart: () -> void
 
     # Runs the full server stack inside a worker process.
     #

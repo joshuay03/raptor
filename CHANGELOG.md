@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Replace workers one at a time on `SIGUSR2` (phased restart)
 - Invoke `:on_error` callback with `(env, exception)` when the Rack app raises
 - Spool request bodies larger than `--body-spool-threshold` to a tempfile
 - Reject HTTP/1.1 requests larger than `--max-body-size` with a 413 response

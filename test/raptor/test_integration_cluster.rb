@@ -501,6 +501,39 @@ module Raptor
       end
     end
 
+    def test_phased_restart_on_usr2_replaces_workers
+      @options[:workers] = 2
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      original_pids = `pgrep -P #{cluster_pid}`.strip.split.map(&:to_i).reject(&:zero?).sort
+      skip "could not find worker PIDs" if original_pids.empty?
+
+      Process.kill("USR2", cluster_pid)
+
+      current_pids = []
+      Timeout.timeout(30) do
+        loop do
+          current_pids = `pgrep -P #{cluster_pid}`.strip.split.map(&:to_i).reject(&:zero?).sort
+          break if current_pids.length == original_pids.length && (current_pids & original_pids).empty?
+
+          sleep 0.1
+        end
+      end
+
+      assert_equal original_pids.length, current_pids.length
+      assert_empty(current_pids & original_pids)
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+    end
+
     private
 
     def with_server(fixture = nil, **template_vars)
