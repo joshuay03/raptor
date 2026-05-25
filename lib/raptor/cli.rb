@@ -37,6 +37,7 @@ module Raptor
         chunk_data_timeout: 10,
         persistent_data_timeout: 65,
         max_body_size: nil,
+        body_spool_threshold: 1024 * 1024,
       },
       stats_file: "tmp/raptor.json",
       pidfile: nil,
@@ -156,6 +157,10 @@ module Raptor
 
         opts.on("--max-body-size BYTES", Integer, "Maximum request body size in bytes (default: unlimited)") do |bytes|
           @options[:client][:max_body_size] = bytes
+        end
+
+        opts.on("--body-spool-threshold BYTES", Integer, "Spool request bodies larger than this to a tempfile (default: #{1024 * 1024})") do |bytes|
+          @options[:client][:body_spool_threshold] = bytes
         end
 
         opts.on("--stats-file PATH", String, "Stats file path (default: tmp/raptor.json)") do |path|

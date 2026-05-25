@@ -78,6 +78,8 @@ module Raptor
     # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
     def self.decode_chunked: (String buffer, ?Integer? max_size) -> [ String, Symbol ]
 
+    @body_spool_threshold: Integer?
+
     @max_body_size: Integer?
 
     @server_port: Integer
@@ -90,6 +92,7 @@ module Raptor
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
     # @param client_options [Hash] client limits configuration
     # @option client_options [Integer, nil] :max_body_size maximum request body size in bytes
+    # @option client_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
     # @return [void]
     #
     # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped]) -> void
@@ -234,6 +237,16 @@ module Raptor
     #
     # @rbs (Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, TCPSocket socket, ?remote_addr: String, ?url_scheme: String) -> Hash[String, untyped]
     def build_rack_env: (Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, TCPSocket socket, ?remote_addr: String, ?url_scheme: String) -> Hash[String, untyped]
+
+    # Builds the `rack.input` IO object for the request body. Returns an
+    # in-memory StringIO for bodies up to the spool threshold, or a Tempfile
+    # for larger bodies to bound per-worker memory.
+    #
+    # @param body [String, nil] decoded request body
+    # @return [IO] an IO-like object positioned at the start of the body
+    #
+    # @rbs (String? body) -> IO
+    def build_rack_input: (String? body) -> IO
 
     # Determines whether the connection should be kept alive after the response.
     #

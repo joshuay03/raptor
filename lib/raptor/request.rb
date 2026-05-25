@@ -3,6 +3,7 @@
 
 require "socket"
 require "stringio"
+require "tempfile"
 
 require "rack"
 
@@ -94,6 +95,7 @@ module Raptor
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
     # @rbs @max_body_size: Integer?
+    # @rbs @body_spool_threshold: Integer?
 
     # Creates a new Request handler.
     #
@@ -101,6 +103,7 @@ module Raptor
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
     # @param client_options [Hash] client limits configuration
     # @option client_options [Integer, nil] :max_body_size maximum request body size in bytes
+    # @option client_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
     # @return [void]
     #
     # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped]) -> void
@@ -108,6 +111,7 @@ module Raptor
       @app = app
       @server_port = server_port
       @max_body_size = client_options[:max_body_size]
+      @body_spool_threshold = client_options[:body_spool_threshold]
     end
 
     # Eagerly reads and parses the first request on a freshly accepted
@@ -355,6 +359,9 @@ module Raptor
         keep_alive = false
         raise
       ensure
+        rack_input = rack_env && rack_env[Rack::RACK_INPUT]
+        rack_input.close! rescue nil if rack_input.respond_to?(:close!)
+
         unless hijacked || keep_alive
           socket.close rescue nil
         end
@@ -517,7 +524,7 @@ module Raptor
     def build_rack_env(env, parse_data, body, socket, remote_addr: "127.0.0.1", url_scheme: HTTP_SCHEME)
       env[Rack::RACK_VERSION] = Rack::VERSION
       env[Rack::RACK_URL_SCHEME] = url_scheme
-      env[Rack::RACK_INPUT] = (body ? StringIO.new(body) : StringIO.new).set_encoding(Encoding::ASCII_8BIT)
+      env[Rack::RACK_INPUT] = build_rack_input(body)
       env[Rack::RACK_ERRORS] = $stderr
       env[Rack::RACK_RESPONSE_FINISHED] = []
 
@@ -559,6 +566,26 @@ module Raptor
       end
 
       env
+    end
+
+    # Builds the `rack.input` IO object for the request body. Returns an
+    # in-memory StringIO for bodies up to the spool threshold, or a Tempfile
+    # for larger bodies to bound per-worker memory.
+    #
+    # @param body [String, nil] decoded request body
+    # @return [IO] an IO-like object positioned at the start of the body
+    #
+    # @rbs (String? body) -> IO
+    def build_rack_input(body)
+      if body && @body_spool_threshold && body.bytesize > @body_spool_threshold
+        tempfile = Tempfile.new("raptor-body")
+        tempfile.binmode
+        tempfile.write(body)
+        tempfile.rewind
+        tempfile
+      else
+        (body ? StringIO.new(body) : StringIO.new).set_encoding(Encoding::ASCII_8BIT)
+      end
     end
 
     # Determines whether the connection should be kept alive after the response.

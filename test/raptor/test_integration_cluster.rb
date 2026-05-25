@@ -90,6 +90,24 @@ module Raptor
       end
     end
 
+    def test_rack_input_uses_stringio_below_spool_threshold
+      with_server("rack_input_class.ru") do |uri|
+        response = Net::HTTP.post(uri, "small body")
+
+        assert_equal "StringIO", response.body
+      end
+    end
+
+    def test_rack_input_uses_tempfile_above_spool_threshold
+      @options[:client] = @options[:client].merge(body_spool_threshold: 4)
+
+      with_server("rack_input_class.ru") do |uri|
+        response = Net::HTTP.post(uri, "body larger than four bytes")
+
+        assert_equal "Tempfile", response.body
+      end
+    end
+
     def test_chunked_request_body_decoded
       with_server("rack_input.ru") do |uri|
         response = raw_request(uri, "POST / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n")

@@ -19,6 +19,7 @@ module Raptor
       assert_equal 10, options(cli)[:client][:chunk_data_timeout]
       assert_equal 65, options(cli)[:client][:persistent_data_timeout]
       assert_nil options(cli)[:client][:max_body_size]
+      assert_equal 1024 * 1024, options(cli)[:client][:body_spool_threshold]
       assert_equal "tmp/raptor.json", options(cli)[:stats_file]
       assert_nil options(cli)[:pidfile]
     end
@@ -99,6 +100,12 @@ module Raptor
       cli = CLI.new(["--max-body-size", "1048576"])
 
       assert_equal 1048576, options(cli)[:client][:max_body_size]
+    end
+
+    def test_body_spool_threshold
+      cli = CLI.new(["--body-spool-threshold", "4096"])
+
+      assert_equal 4096, options(cli)[:client][:body_spool_threshold]
     end
 
     def test_stats_file
