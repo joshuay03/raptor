@@ -60,8 +60,9 @@
       </div>
 
       <div id="content"><div id='filecontents'><h1 id="Raptor">Raptor</h1>
-<p>Raptor is a high-performance, multi-threaded, multi-process Ruby web server that leverages Ractors for parallel HTTP/1.1
-and HTTP/2 request processing, native C extensions for HTTP parsing and HPACK compression, and NIO for non-blocking I/O.</p>
+<p>Raptor is a high-performance, multi-threaded, multi-process Ruby Rack 3 web server that leverages Ractors for parallel
+HTTP/1.1 and HTTP/2 request processing, native C extensions for HTTP parsing and HPACK compression, and NIO for
+non-blocking I/O.</p>
 <h2 id="Installation">Installation</h2>
 <p>Install the gem and add to the application's Gemfile by executing:</p>
 <pre class="code bash"><code class="bash">bundle add raptor
@@ -96,6 +97,10 @@ Raptor Cluster initializing:
 </code></pre>
 <pre class="code ruby"><code class="ruby">&gt; curl localhost:9292
 Hello, World!%   
+</code></pre>
+<p>Also works with <code>rackup</code> and <code>rails server</code>:</p>
+<pre class="code ruby"><code class="ruby">&gt; bundle exec rackup -s raptor hello_world.ru
+&gt; bundle exec rails server -u raptor
 </code></pre>
 <h2 id="Benchmarks">Benchmarks</h2>
 <p>Raptor 0.1.0 vs Puma 8.0.1:</p>
@@ -143,7 +148,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun May 24 11:55:04 2026 by
+  Generated on Mon May 25 00:38:45 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.43 (ruby-4.0.5).
 </div>
