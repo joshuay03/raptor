@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-25
+
 - Load cluster options from a Ruby config file via `--config`
 - Replace workers one at a time on `SIGUSR2` (phased restart)
 - Invoke `:on_error` callback with `(env, exception)` when the Rack app raises
