@@ -66,9 +66,9 @@ Raptor 0.1.0 vs Puma 8.0.1:
 
 | Protocol              | Raptor       | Puma         |
 | --------------------- | ------------ | ------------ |
-| HTTP/1.1              | 17.5k req/s  | 20.8k req/s  |
-| HTTP/1.1 (keep-alive) | 61.2k req/s  | 45.4k req/s  |
-| HTTP/2                | 23.4k req/s  | N/A          |
+| HTTP/1.1              | 20.3k req/s  | 20.8k req/s  |
+| HTTP/1.1 (keep-alive) | 60.9k req/s  | 45.4k req/s  |
+| HTTP/2                | 22.9k req/s  | N/A          |
 
 > Ruby 4.0.4 +YJIT, macOS Apple Silicon. 4 workers, 3 threads, 12 concurrent connections.
 
