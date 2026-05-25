@@ -15,10 +15,11 @@ module Raptor
       assert_equal 1, options(cli)[:ractors]
       assert_equal CLI::DEFAULT_WORKER_COUNT, options(cli)[:workers]
       assert_equal "config.ru", options(cli)[:rackup]
-      assert_equal "tmp/raptor.json", options(cli)[:stats_file]
       assert_equal 30, options(cli)[:client][:first_data_timeout]
       assert_equal 10, options(cli)[:client][:chunk_data_timeout]
       assert_equal 65, options(cli)[:client][:persistent_data_timeout]
+      assert_equal "tmp/raptor.json", options(cli)[:stats_file]
+      assert_nil options(cli)[:pidfile]
     end
 
     def test_rackup_file_positional_argument
@@ -93,6 +94,18 @@ module Raptor
       assert_equal 120, options(cli)[:client][:persistent_data_timeout]
     end
 
+    def test_stats_file
+      cli = CLI.new(["--stats-file", "/tmp/custom.json"])
+
+      assert_equal "/tmp/custom.json", options(cli)[:stats_file]
+    end
+
+    def test_pidfile
+      cli = CLI.new(["--pidfile", "/tmp/raptor.pid"])
+
+      assert_equal "/tmp/raptor.pid", options(cli)[:pidfile]
+    end
+
     def test_multiple_options_together
       cli = CLI.new(["-t", "8", "-r", "2", "-w", "4", "app.ru"])
 
@@ -115,12 +128,6 @@ module Raptor
 
       assert_equal 5, options(cli1)[:client][:first_data_timeout]
       assert_equal 30, options(cli2)[:client][:first_data_timeout]
-    end
-
-    def test_stats_file_option
-      cli = CLI.new(["--stats-file", "/tmp/custom.json"])
-
-      assert_equal "/tmp/custom.json", options(cli)[:stats_file]
     end
 
     def test_stats_subcommand_sets_command

@@ -371,6 +371,27 @@ module Raptor
       File.delete(stats_path) rescue nil
     end
 
+    def test_pidfile_written_and_removed
+      pidfile_path = "/tmp/raptor_test_#{Process.pid}.pid"
+      File.delete(pidfile_path) rescue nil
+      @options[:pidfile] = pidfile_path
+
+      with_server do
+        Timeout.timeout(5) do
+          loop do
+            break if File.exist?(pidfile_path)
+            sleep 0.1
+          end
+        end
+
+        assert_match(/\A\d+\z/, File.read(pidfile_path))
+      end
+
+      assert !File.exist?(pidfile_path)
+    ensure
+      File.delete(pidfile_path) rescue nil
+    end
+
     def test_stats_populated_after_requests
       cluster = without_output { Cluster.new(@options) }
       cluster_pid = fork { without_output { cluster.run } }

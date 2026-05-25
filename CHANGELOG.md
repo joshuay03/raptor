@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Write pidfile via `--pidfile`
 - Set `SO_REUSEPORT` on TCP listeners where supported
 
 ## [0.2.0] - 2026-05-25

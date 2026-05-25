@@ -37,6 +37,8 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
+    @pidfile: String?
+
     @stats_file: String?
 
     @stats: Stats
@@ -73,6 +75,8 @@ module Raptor
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client timeout configuration
+    # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
+    # @option options [String, nil] :pidfile path to write the master PID to, or nil to disable
     # @return [void]
     #
     # @rbs (Hash[Symbol, untyped] options) -> void

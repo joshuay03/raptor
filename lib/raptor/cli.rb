@@ -32,12 +32,13 @@ module Raptor
       ractors: 1,
       workers: DEFAULT_WORKER_COUNT,
       rackup: "config.ru",
-      stats_file: "tmp/raptor.json",
       client: {
         first_data_timeout: 30,
         chunk_data_timeout: 10,
         persistent_data_timeout: 65,
       },
+      stats_file: "tmp/raptor.json",
+      pidfile: nil,
     }.freeze
 
     # @rbs @command: Symbol
@@ -154,6 +155,10 @@ module Raptor
 
         opts.on("--stats-file PATH", String, "Stats file path (default: tmp/raptor.json)") do |path|
           @options[:stats_file] = path
+        end
+
+        opts.on("--pidfile PATH", String, "Pidfile path (default: none)") do |path|
+          @options[:pidfile] = path
         end
 
         opts.on("--help", "Show this help") do
