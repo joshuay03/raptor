@@ -1,8 +1,8 @@
 # Raptor
 
-Raptor is a high-performance, multi-threaded, multi-process Ruby Rack 3 web server that leverages Ractors for parallel
-HTTP/1.1 and HTTP/2 request processing, native C extensions for HTTP parsing and HPACK compression, and NIO for
-non-blocking I/O.
+Raptor is a high-performance, preloading, multi-process, multi-threaded Ruby 4+ web server implementing Rack 3+,
+leveraging Ractors for parallel HTTP/1.1 and HTTP/2 request processing, native C extensions for HTTP parsing and HPACK
+compression, and NIO for non-blocking I/O.
 
 ## Installation
 
