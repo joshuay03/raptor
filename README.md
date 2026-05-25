@@ -31,9 +31,9 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 ```
 > bundle exec raptor -t 3 -w 4 hello_world.ru
 Raptor Cluster initializing:
-├─ Version: 0.1.0
+├─ Version: 0.2.0
 ├─ Ruby Version: ruby 4.0.4 (2026-05-12 revision b89eb1bcbf) +YJIT +PRISM [arm64-darwin23]
-├─ Master PID: 71052
+├─ Master PID: 31504
 │  └─ 4 worker processes
 │     ├─ 1 server thread
 │     ├─ 1 reactor thread
@@ -42,10 +42,10 @@ Raptor Cluster initializing:
 │     ├─ 3 worker threads
 │     └─ 1 stats thread
 └─ Listening on 0.0.0.0:9292
-[71054] Worker 0 booted
-[71055] Worker 1 booted
-[71056] Worker 2 booted
-[71057] Worker 3 booted
+[31506] Worker 0 booted
+[31507] Worker 1 booted
+[31508] Worker 2 booted
+[31509] Worker 3 booted
 ```
 
 ```
@@ -60,9 +60,9 @@ Also works with `rackup` and `rails server`:
 > bundle exec rails server -u raptor
 ```
 
-## Benchmarks
+## (Micro) Benchmarks
 
-Raptor 0.1.0 vs Puma 8.0.1:
+Raptor 0.2.0 vs Puma 8.0.1:
 
 | Protocol              | Raptor       | Puma         |
 | --------------------- | ------------ | ------------ |
