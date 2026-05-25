@@ -173,6 +173,7 @@ module Raptor
 
       tcp_server = TCPServer.new(host, port)
       tcp_server.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
+      tcp_server.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) if Socket.const_defined?(:SO_REUSEPORT)
       tcp_server.listen SOCKET_BACKLOG
 
       [tcp_server]

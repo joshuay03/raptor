@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Set `SO_REUSEPORT` on TCP listeners where supported
+
 ## [0.2.0] - 2026-05-25
 
 - Add Rack handler for booting via `rackup` or `rails server`
