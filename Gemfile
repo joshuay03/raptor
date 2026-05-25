@@ -10,6 +10,7 @@ gem "rake"
 gem "rake-compiler"
 
 gem "minitest"
+gem "rackup"
 gem "http-2"
 
 gem "rbs-inline"

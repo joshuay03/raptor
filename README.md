@@ -1,7 +1,8 @@
 # Raptor
 
-Raptor is a high-performance, multi-threaded, multi-process Ruby web server that leverages Ractors for parallel HTTP/1.1
-and HTTP/2 request processing, native C extensions for HTTP parsing and HPACK compression, and NIO for non-blocking I/O.
+Raptor is a high-performance, multi-threaded, multi-process Ruby Rack 3 web server that leverages Ractors for parallel
+HTTP/1.1 and HTTP/2 request processing, native C extensions for HTTP parsing and HPACK compression, and NIO for
+non-blocking I/O.
 
 ## Installation
 
@@ -50,6 +51,13 @@ Raptor Cluster initializing:
 ```
 > curl localhost:9292
 Hello, World!%   
+```
+
+Also works with `rackup` and `rails server`:
+
+```
+> bundle exec rackup -s raptor hello_world.ru
+> bundle exec rails server -u raptor
 ```
 
 ## Benchmarks

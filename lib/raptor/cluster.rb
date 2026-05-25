@@ -77,6 +77,7 @@ module Raptor
     # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :workers number of worker processes
     # @option options [Array<String>] :binds array of bind URIs
+    # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client timeout configuration
     # @return [void]
@@ -90,7 +91,7 @@ module Raptor
 
       @binder = Binder.new(options[:binds])
       @server_port = @binder.server_port
-      @app = Rack::Builder.parse_file(options[:rackup])
+      @app = options[:app] || Rack::Builder.parse_file(options[:rackup])
       log_initialization
 
       @shutdown = false

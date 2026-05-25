@@ -1,0 +1,40 @@
+# Generated from lib/rackup/handler/raptor.rb with RBS::Inline
+
+module Rackup
+  module Handler
+    # Rack handler for booting Raptor through Rackup, `rails server`, or any
+    # other host that follows the Rack handler protocol.
+    module Raptor
+      DEFAULT_OPTIONS: untyped
+
+      # Boots a Raptor cluster serving the given Rack application.
+      #
+      # @param app [#call] the Rack application to serve
+      # @param options [Hash] handler options provided by Rackup or the host
+      # @yield [cluster] the cluster instance, before it starts running
+      # @return [void]
+      #
+      # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, **untyped options) { (::Raptor::Cluster) -> void } -> void
+      def self.run: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, **untyped options) { (::Raptor::Cluster) -> void } -> void
+
+      # Returns the handler-specific options surfaced by `rackup --help`.
+      #
+      # @return [Hash{String => String}] option spec to description mapping
+      #
+      # @rbs () -> Hash[String, String]
+      def self.valid_options: () -> Hash[String, String]
+
+      # Builds a Raptor cluster options hash from Rack handler options.
+      #
+      # Options not explicitly supplied by the user (per the `:user_supplied_options`
+      # key) are treated as host-provided defaults.
+      #
+      # @param app [#call] the Rack application to serve
+      # @param options [Hash] handler options provided by Rackup or the host
+      # @return [Hash{Symbol => untyped}] cluster configuration
+      #
+      # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Hash[Symbol, untyped] options) -> Hash[Symbol, untyped]
+      def self.build_cluster_options: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Hash[Symbol, untyped] options) -> Hash[Symbol, untyped]
+    end
+  end
+end
