@@ -285,6 +285,50 @@ the combination of NIO reactors, ractor-based parsing, and thread pools.</p>
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#perform_phased_restart-instance_method" title="#perform_phased_restart (instance method)">#<strong>perform_phased_restart</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Replaces each worker process one at a time, waiting for the new worker to boot before moving on to the next.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#reap_workers-instance_method" title="#reap_workers (instance method)">#<strong>reap_workers</strong>  &#x21d2; Symbol </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Reaps any worker processes that have exited, respawning each one unless the cluster is shutting down.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#run-instance_method" title="#run (instance method)">#<strong>run</strong>  &#x21d2; void </a>
     
 
@@ -538,7 +582,40 @@ for multi-process operation.</p>
             
           </span>
           
-            &mdash; <div class='inline'><p>client timeout configuration</p></div>
+            &mdash; <div class='inline'><p>client configuration</p></div>
+          
+        </li>
+      
+        <li>
+          <span class="name">:on_error</span>
+          <span class="type">(<tt>#call</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>callback invoked with (env, exception) when the Rack app raises</p></div>
+          
+        </li>
+      
+        <li>
+          <span class="name">:stats_file</span>
+          <span class="type">(<tt>String</tt>, <tt>nil</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>path to write per-worker stats JSON, or nil to disable</p></div>
+          
+        </li>
+      
+        <li>
+          <span class="name">:pidfile</span>
+          <span class="type">(<tt>String</tt>, <tt>nil</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>path to write the master PID to, or nil to disable</p></div>
           
         </li>
       
@@ -871,6 +948,182 @@ allocation along with listening addresses.</p>
 </div>
     
       <div class="method_details ">
+  <h3 class="signature " id="perform_phased_restart-instance_method">
+  
+    #<strong>perform_phased_restart</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Replaces each worker process one at a time, waiting for the new
+worker to boot before moving on to the next. Triggered by SIGUSR2.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 218</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_perform_phased_restart'>perform_phased_restart</span>
+  <span class='ivar'>@phased_restart_requested</span> <span class='op'>=</span> <span class='kw'>false</span>
+  <span class='ivar'>@phased_restarting</span> <span class='op'>=</span> <span class='kw'>true</span>
+  <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>[</span><span class='embexpr_beg'>#{</span><span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>] Phased restart starting</span><span class='tstring_end'>&quot;</span></span>
+
+  <span class='kw'>begin</span>
+    <span class='ivar'>@workers</span><span class='period'>.</span><span class='id identifier rubyid_keys'>keys</span><span class='period'>.</span><span class='id identifier rubyid_sort'>sort</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_index'>index</span><span class='op'>|</span>
+      <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@shutdown</span>
+
+      <span class='id identifier rubyid_target_pid'>target_pid</span> <span class='op'>=</span> <span class='ivar'>@workers</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='rbracket'>]</span>
+      <span class='kw'>next</span> <span class='kw'>unless</span> <span class='id identifier rubyid_target_pid'>target_pid</span>
+
+      <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_kill'>kill</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>TERM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_target_pid'>target_pid</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
+
+      <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span> <span class='op'>+</span> <span class='int'>60</span>
+      <span class='kw'>until</span> <span class='ivar'>@shutdown</span>
+        <span class='id identifier rubyid_reap_workers'>reap_workers</span>
+        <span class='id identifier rubyid_current'>current</span> <span class='op'>=</span> <span class='ivar'>@workers</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='rbracket'>]</span>
+        <span class='kw'>break</span> <span class='kw'>if</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>!=</span> <span class='id identifier rubyid_target_pid'>target_pid</span> <span class='op'>&amp;&amp;</span> <span class='ivar'>@stats</span><span class='period'>.</span><span class='id identifier rubyid_all'>all</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='rbracket'>]</span><span class='lbracket'>[</span><span class='symbol'>:booted</span><span class='rbracket'>]</span>
+        <span class='kw'>break</span> <span class='kw'>if</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span> <span class='op'>&gt;</span> <span class='id identifier rubyid_deadline'>deadline</span>
+
+        <span class='id identifier rubyid_sleep'>sleep</span> <span class='float'>0.1</span>
+      <span class='kw'>end</span>
+    <span class='kw'>end</span>
+
+    <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>[</span><span class='embexpr_beg'>#{</span><span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>] Phased restart complete</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>ensure</span>
+    <span class='ivar'>@phased_restarting</span> <span class='op'>=</span> <span class='kw'>false</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="reap_workers-instance_method">
+  
+    #<strong>reap_workers</strong>  &#x21d2; <tt>Symbol</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Reaps any worker processes that have exited, respawning each one
+unless the cluster is shutting down.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Symbol</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>:no_children when there are no remaining children, otherwise :reaped</p></div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 195</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_reap_workers'>reap_workers</span>
+  <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
+    <span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_wait2'>wait2</span><span class='lparen'>(</span><span class='op'>-</span><span class='int'>1</span><span class='comma'>,</span> <span class='const'>Process</span><span class='op'>::</span><span class='const'>WNOHANG</span><span class='rparen'>)</span>
+    <span class='kw'>return</span> <span class='symbol'>:reaped</span> <span class='kw'>unless</span> <span class='id identifier rubyid_pid'>pid</span>
+
+    <span class='id identifier rubyid_index'>index</span> <span class='op'>=</span> <span class='ivar'>@workers</span><span class='period'>.</span><span class='id identifier rubyid_key'>key</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span>
+    <span class='ivar'>@workers</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
+
+    <span class='kw'>unless</span> <span class='ivar'>@shutdown</span>
+      <span class='id identifier rubyid_warn'>warn</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>[</span><span class='embexpr_beg'>#{</span><span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>] Restarting worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'> (</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>), </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_exit_description'>exit_description</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+      <span class='id identifier rubyid_spawn_worker'>spawn_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
+    <span class='kw'>end</span>
+  <span class='kw'>end</span>
+<span class='kw'>rescue</span> <span class='const'>Errno</span><span class='op'>::</span><span class='const'>ECHILD</span>
+  <span class='symbol'>:no_children</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
   <h3 class="signature " id="run-instance_method">
   
     #<strong>run</strong>  &#x21d2; <tt>void</tt> 
@@ -884,7 +1137,8 @@ allocation along with listening addresses.</p>
     <p class="note returns_void">This method returns an undefined value.</p><p>Starts the multi-process cluster and manages worker processes.</p>
 <p>Forks the configured number of worker processes and monitors them,
 automatically restarting any that exit unexpectedly. Handles graceful
-shutdown via INT or TERM signals, and stats logging via USR1.</p>
+shutdown via INT or TERM signals, stats logging via USR1, and phased
+restart via USR2.</p>
 <p>Each worker process includes:</p>
 <ul>
 <li>1 server thread (continuously accepts connections with backpressure control)</li>
@@ -1409,7 +1663,7 @@ critical component fails.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon May 25 08:45:42 2026 by
+  Generated on Mon May 25 09:18:03 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.43 (ruby-4.0.5).
 </div>
