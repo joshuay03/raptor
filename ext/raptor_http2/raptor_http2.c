@@ -457,6 +457,7 @@ static int hpack_decode_header_block(const uint8_t *buf, size_t len,
       /* dynamic table size update (RFC 7541 6.3) */
       uint64_t new_size;
       if (hpack_decode_int(buf, len, &pos, 5, &new_size) < 0) return -1;
+      if (new_size > HTTP2_DEFAULT_HEADER_TABLE_SIZE) return -1;
       *max_table_size = (long)new_size;
       *dyn_table = dynamic_table_evict(*dyn_table, *max_table_size);
 

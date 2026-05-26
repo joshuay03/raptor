@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reject HPACK dynamic table size updates larger than 4096 bytes
 - Reject malformed HTTP/1.1 requests with a 400 response
 - Rescue unexpected errors in the reactor and pipeline collector
 
