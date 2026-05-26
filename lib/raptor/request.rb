@@ -39,6 +39,7 @@ module Raptor
     end
 
     STATUS_WITH_NO_ENTITY_BODY = Set.new([204, 304, *100..199]).freeze
+    BAD_REQUEST_RESPONSE = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     CONTENT_TOO_LARGE_RESPONSE = "HTTP/1.1 413 Content Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 
@@ -155,7 +156,12 @@ module Raptor
 
       parser = HttpParser.new
       env = {}
-      nread = parser.execute(env, buffer, 0)
+      nread = begin
+        parser.execute(env, buffer, 0)
+      rescue HttpParserError
+        reject_malformed(socket)
+        return
+      end
       parse_data = { parse_count: 1, content_length: parser.content_length }
 
       body = nil
@@ -210,7 +216,11 @@ module Raptor
 
         parser = Raptor::HttpParser.new
         env = {}
-        nread = parser.execute(env, data[:buffer], 0)
+        nread = begin
+          parser.execute(env, data[:buffer], 0)
+        rescue Raptor::HttpParserError
+          next Ractor.make_shareable(data.merge(complete: true, malformed: true))
+        end
         parse_data = if data[:parse_data]
           data[:parse_data].dup
         else
@@ -266,6 +276,12 @@ module Raptor
       if parsed_request[:too_large]
         socket = reactor.remove(parsed_request[:id])
         reject_oversized(socket) if socket
+        return
+      end
+
+      if parsed_request[:malformed]
+        socket = reactor.remove(parsed_request[:id])
+        reject_malformed(socket) if socket
         return
       end
 
@@ -418,7 +434,12 @@ module Raptor
 
         parser = HttpParser.new
         env = {}
-        nread = parser.execute(env, buffer, 0)
+        nread = begin
+          parser.execute(env, buffer, 0)
+        rescue HttpParserError
+          reject_malformed(socket)
+          return
+        end
         parse_data = { parse_count: 1, content_length: parser.content_length }
 
         body = nil
@@ -512,6 +533,18 @@ module Raptor
     # @rbs (TCPSocket socket) -> void
     def reject_oversized(socket)
       socket.write(CONTENT_TOO_LARGE_RESPONSE) rescue nil
+      socket.close rescue nil
+    end
+
+    # Writes a 400 response and closes the socket. Used when the HTTP parser
+    # rejects the request line or headers.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket) -> void
+    def reject_malformed(socket)
+      socket.write(BAD_REQUEST_RESPONSE) rescue nil
       socket.close rescue nil
     end
 

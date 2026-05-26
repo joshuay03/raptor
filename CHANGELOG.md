@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reject malformed HTTP/1.1 requests with a 400 response
 - Rescue unexpected errors in the reactor and pipeline collector
 
 ## [0.3.0] - 2026-05-25

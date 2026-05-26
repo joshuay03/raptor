@@ -33,6 +33,8 @@ module Raptor
 
     STATUS_WITH_NO_ENTITY_BODY: untyped
 
+    BAD_REQUEST_RESPONSE: ::String
+
     INTERNAL_SERVER_ERROR_RESPONSE: ::String
 
     CONTENT_TOO_LARGE_RESPONSE: ::String
@@ -224,6 +226,15 @@ module Raptor
     #
     # @rbs (TCPSocket socket) -> void
     def reject_oversized: (TCPSocket socket) -> void
+
+    # Writes a 400 response and closes the socket. Used when the HTTP parser
+    # rejects the request line or headers.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket) -> void
+    def reject_malformed: (TCPSocket socket) -> void
 
     # Builds a Rack environment hash from parsed HTTP request data.
     #
