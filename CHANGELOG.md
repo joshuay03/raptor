@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Rescue unexpected errors in the reactor and pipeline collector
+
 ## [0.3.0] - 2026-05-25
 
 - Load cluster options from a Ruby config file via `--config`

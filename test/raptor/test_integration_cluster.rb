@@ -8,6 +8,7 @@ require "tempfile"
 require "timeout"
 require "uri"
 
+require "nio"
 require "raptor/cli"
 require "raptor/cluster"
 
@@ -534,6 +535,67 @@ module Raptor
       end
     end
 
+    def test_reactor_thread_survives_unexpected_error
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+
+      cluster_pid = fork do
+        NIO::Selector.prepend(Module.new do
+          define_method(:select) do |*args, &block|
+            Thread.current[:_test_select_count] = (Thread.current[:_test_select_count] || 0) + 1
+            raise "injected reactor failure" if Thread.current[:_test_select_count] == 1
+
+            super(*args, &block)
+          end
+        end)
+        without_output { cluster.run }
+      end
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      response = raw_split_request(server_port)
+
+      assert_match(/200 OK/, response)
+      assert_match(/Hello, World!/, response)
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+    end
+
+    def test_pipeline_collector_survives_handler_error
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+
+      cluster_pid = fork do
+        Raptor::Request.prepend(Module.new do
+          define_method(:handle_parsed_request) do |*args|
+            Thread.current[:_test_handle_count] = (Thread.current[:_test_handle_count] || 0) + 1
+            raise "injected collector failure" if Thread.current[:_test_handle_count] == 1
+
+            super(*args)
+          end
+        end)
+        without_output { cluster.run }
+      end
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      raw_split_request(server_port) rescue nil
+      response = raw_split_request(server_port)
+
+      assert_match(/200 OK/, response)
+      assert_match(/Hello, World!/, response)
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+    end
+
     private
 
     def with_server(fixture = nil, **template_vars)
@@ -625,6 +687,16 @@ module Raptor
       socket = UNIXSocket.new(socket_path)
       socket.write(request)
       socket.read
+    ensure
+      socket&.close
+    end
+
+    def raw_split_request(port)
+      socket = TCPSocket.new("127.0.0.1", port)
+      socket.write("GET / HT")
+      sleep 0.1
+      socket.write("TP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+      Timeout.timeout(5) { socket.read }
     ensure
       socket&.close
     end

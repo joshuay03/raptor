@@ -288,10 +288,15 @@ module Raptor
         size: @ractor_count,
         worker: request.http_parser_worker
       ) do |parsed_result|
-        if parsed_result[:protocol] == :http2
-          http2.handle_parsed_request(parsed_result, reactor, thread_pool)
-        else
-          request.handle_parsed_request(parsed_result, reactor, thread_pool)
+        begin
+          if parsed_result[:protocol] == :http2
+            http2.handle_parsed_request(parsed_result, reactor, thread_pool)
+          else
+            request.handle_parsed_request(parsed_result, reactor, thread_pool)
+          end
+        rescue => error
+          warn "#{Thread.current.name} rescued:"
+          warn error.full_message
         end
       end
 

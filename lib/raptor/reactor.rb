@@ -117,33 +117,38 @@ module Raptor
         Thread.current.name = self.class.name
 
         until @queue.closed? && @queue.empty?
-          timeout = @timeouts.min&.timeout(Process.clock_gettime(Process::CLOCK_MONOTONIC))
-          @selector.select(timeout) do |monitor|
-            wakeup!(monitor.value)
-          end
+          begin
+            timeout = @timeouts.min&.timeout(Process.clock_gettime(Process::CLOCK_MONOTONIC))
+            @selector.select(timeout) do |monitor|
+              wakeup!(monitor.value)
+            end
 
-          now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          expired = []
-          @timeouts.traverse do |to_client|
-            break unless to_client.timeout(now) == 0
+            now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            expired = []
+            @timeouts.traverse do |to_client|
+              break unless to_client.timeout(now) == 0
 
-            expired << to_client
-          end
+              expired << to_client
+            end
 
-          expired.each do |to_client|
-            @timeouts.delete!(to_client)
-            id = to_client.client_data[:id]
-            @id_to_timeout.delete(id)
-            socket = @id_to_socket[id]
-            next unless socket
+            expired.each do |to_client|
+              @timeouts.delete!(to_client)
+              id = to_client.client_data[:id]
+              @id_to_timeout.delete(id)
+              socket = @id_to_socket[id]
+              next unless socket
 
-            @selector.deregister(socket)
-            socket.write(TIMEOUT_RESPONSE) rescue nil
-            cleanup(socket)
-          end
+              @selector.deregister(socket)
+              socket.write(TIMEOUT_RESPONSE) rescue nil
+              cleanup(socket)
+            end
 
-          until @queue.empty?
-            register(@queue.pop)
+            until @queue.empty?
+              register(@queue.pop)
+            end
+          rescue => error
+            warn "#{Thread.current.name} rescued:"
+            warn error.full_message
           end
         end
 
