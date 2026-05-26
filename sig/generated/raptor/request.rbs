@@ -80,6 +80,19 @@ module Raptor
     # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
     def self.decode_chunked: (String buffer, ?Integer? max_size) -> [ String, Symbol ]
 
+    # Writes a string to the socket, retrying on partial writes and flow control blocks.
+    #
+    # Uses write_nonblock with `WRITE_TIMEOUT` to avoid blocking the thread
+    # indefinitely on slow clients.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param string [String] the data to write
+    # @return [void]
+    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, String string) -> void
+    def self.socket_write: (TCPSocket socket, String string) -> void
+
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
     @body_spool_threshold: Integer?
@@ -509,19 +522,6 @@ module Raptor
     #
     # @rbs (Hash[String, untyped] env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
     def call_response_finished: (Hash[String, untyped] env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
-
-    # Writes a string to the socket, retrying on partial writes and flow control blocks.
-    #
-    # Uses write_nonblock with a 5-second writable timeout to avoid blocking the
-    # thread indefinitely on slow clients.
-    #
-    # @param socket [TCPSocket] the socket to write to
-    # @param string [String] the data to write
-    # @return [void]
-    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
-    #
-    # @rbs (TCPSocket socket, String string) -> void
-    def socket_write: (TCPSocket socket, String string) -> void
 
     # Enables TCP_CORK on the socket to batch outgoing packets into fewer segments.
     #

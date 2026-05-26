@@ -6,6 +6,7 @@ require "stringio"
 require "atomic-ruby/atom"
 require "rack"
 
+require_relative "request"
 require_relative "raptor_http2"
 
 module Raptor
@@ -68,7 +69,7 @@ module Raptor
           break if pending.empty?
 
           pending.each do |frame|
-            socket.write(frame) rescue nil
+            Request.socket_write(socket, frame) rescue nil
           end
         end
       end

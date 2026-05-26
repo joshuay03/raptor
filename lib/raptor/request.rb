@@ -93,6 +93,33 @@ module Raptor
       [decoded, :incomplete]
     end
 
+    # Writes a string to the socket, retrying on partial writes and flow control blocks.
+    #
+    # Uses write_nonblock with `WRITE_TIMEOUT` to avoid blocking the thread
+    # indefinitely on slow clients.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param string [String] the data to write
+    # @return [void]
+    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, String string) -> void
+    def self.socket_write(socket, string)
+      bytes = 0
+      byte_size = string.bytesize
+
+      while bytes < byte_size
+        begin
+          bytes += socket.write_nonblock(bytes.zero? ? string : string.byteslice(bytes..-1))
+        rescue IO::WaitWritable
+          raise WriteError unless socket.wait_writable(WRITE_TIMEOUT)
+          retry
+        rescue IOError
+          raise WriteError
+        end
+      end
+    end
+
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
     # @rbs @max_body_size: Integer?
@@ -677,7 +704,7 @@ module Raptor
       end
       response << "\r\n"
 
-      socket_write(socket, response)
+      Request.socket_write(socket, response)
     end
 
     # Writes a complete HTTP response to the socket.
@@ -810,7 +837,7 @@ module Raptor
     def write_hijacked_response(socket, response, headers, response_hijack)
       response << format_headers(headers)
       response << "\r\n"
-      socket_write(socket, response)
+      Request.socket_write(socket, response)
       uncork_socket(socket)
       response_hijack.call(socket)
     end
@@ -835,7 +862,7 @@ module Raptor
 
       response << format_headers(headers)
       response << "\r\n"
-      socket_write(socket, response)
+      Request.socket_write(socket, response)
     end
 
     # Writes a complete response with a body.
@@ -857,7 +884,7 @@ module Raptor
       if body.respond_to?(:call)
         response << format_headers(headers)
         response << "\r\n"
-        socket_write(socket, response)
+        Request.socket_write(socket, response)
         uncork_socket(socket)
         body.call(socket)
         return
@@ -894,7 +921,7 @@ module Raptor
         raise TypeError, "body must respond to each, to_ary, or to_path"
       end
 
-      socket_write(socket, "0\r\n\r\n") if use_chunked
+      Request.socket_write(socket, "0\r\n\r\n") if use_chunked
     end
 
     # Calculates content length from an array or file body without consuming it.
@@ -934,15 +961,15 @@ module Raptor
     def write_file_body(socket, response, path, content_length, use_chunked)
       File.open(path, "rb") do |file|
         if use_chunked
-          socket_write(socket, response)
+          Request.socket_write(socket, response)
           while (chunk = file.read(FILE_CHUNK_SIZE))
-            socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+            Request.socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
           end
         elsif content_length && content_length < BODY_BUFFER_THRESHOLD
           response << file.read(content_length)
-          socket_write(socket, response)
+          Request.socket_write(socket, response)
         else
-          socket_write(socket, response)
+          Request.socket_write(socket, response)
           IO.copy_stream(file, socket)
         end
       end
@@ -985,12 +1012,12 @@ module Raptor
 
       if use_chunked
         response << "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n"
-        socket_write(socket, response)
+        Request.socket_write(socket, response)
       elsif chunk.bytesize < BODY_BUFFER_THRESHOLD
-        socket_write(socket, response << chunk)
+        Request.socket_write(socket, response << chunk)
       else
-        socket_write(socket, response)
-        socket_write(socket, chunk)
+        Request.socket_write(socket, response)
+        Request.socket_write(socket, chunk)
       end
     end
 
@@ -1006,13 +1033,13 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
     def write_multiple_chunks(socket, response, body_array, use_chunked)
       if use_chunked
-        socket_write(socket, response)
+        Request.socket_write(socket, response)
         body_array.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
           next if chunk.empty?
 
-          socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+          Request.socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
         end
       else
         body_array.each do |chunk|
@@ -1020,7 +1047,7 @@ module Raptor
 
           response << chunk
         end
-        socket_write(socket, response)
+        Request.socket_write(socket, response)
       end
     end
 
@@ -1036,13 +1063,13 @@ module Raptor
     # @rbs (TCPSocket socket, String response, untyped body, bool use_chunked) -> void
     def write_enumerable_body(socket, response, body, use_chunked)
       if use_chunked
-        socket_write(socket, response)
+        Request.socket_write(socket, response)
         body.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
           next if chunk.empty?
 
-          socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+          Request.socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
         end
       else
         body.each do |chunk|
@@ -1050,7 +1077,7 @@ module Raptor
 
           response << chunk
         end
-        socket_write(socket, response)
+        Request.socket_write(socket, response)
       end
     end
 
@@ -1120,33 +1147,6 @@ module Raptor
 
       env[Rack::RACK_RESPONSE_FINISHED].reverse_each do |callable|
         callable.call(env, status, headers, error) rescue nil
-      end
-    end
-
-    # Writes a string to the socket, retrying on partial writes and flow control blocks.
-    #
-    # Uses write_nonblock with a 5-second writable timeout to avoid blocking the
-    # thread indefinitely on slow clients.
-    #
-    # @param socket [TCPSocket] the socket to write to
-    # @param string [String] the data to write
-    # @return [void]
-    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
-    #
-    # @rbs (TCPSocket socket, String string) -> void
-    def socket_write(socket, string)
-      bytes = 0
-      byte_size = string.bytesize
-
-      while bytes < byte_size
-        begin
-          bytes += socket.write_nonblock(bytes.zero? ? string : string.byteslice(bytes..-1))
-        rescue IO::WaitWritable
-          raise WriteError unless socket.wait_writable(WRITE_TIMEOUT)
-          retry
-        rescue IOError
-          raise WriteError
-        end
       end
     end
 
