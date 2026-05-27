@@ -856,7 +856,7 @@ pipeline used by HTTP/1.1 connections.</p>
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
   <span class='id identifier rubyid_settings_payload'>settings_payload</span> <span class='op'>=</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_settings'>build_settings</span><span class='lparen'>(</span>
     <span class='label'>max_concurrent_streams:</span> <span class='int'>100</span><span class='comma'>,</span>
-    <span class='label'>initial_window_size:</span> <span class='int'>65_535</span>
+    <span class='label'>initial_window_size:</span> <span class='const'><span class='object_link'><a href="#DEFAULT_WINDOW_SIZE-constant" title="Raptor::Http2::DEFAULT_WINDOW_SIZE (constant)">DEFAULT_WINDOW_SIZE</a></span></span>
   <span class='rparen'>)</span>
   <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:settings</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_settings_payload'>settings_payload</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
@@ -1172,8 +1172,8 @@ completed stream requests. Ractor-safe.</p>
 
       <span class='kw'>if</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:payload</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span>
         <span class='id identifier rubyid_connection_window'>connection_window</span> <span class='op'>-=</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:payload</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span>
-        <span class='kw'>if</span> <span class='id identifier rubyid_connection_window'>connection_window</span> <span class='op'>&lt;</span> <span class='int'>32_768</span>
-          <span class='id identifier rubyid_increment'>increment</span> <span class='op'>=</span> <span class='int'>65_535</span> <span class='op'>-</span> <span class='id identifier rubyid_connection_window'>connection_window</span>
+        <span class='kw'>if</span> <span class='id identifier rubyid_connection_window'>connection_window</span> <span class='op'>&lt;</span> <span class='const'><span class='object_link'><a href="#DEFAULT_WINDOW_SIZE-constant" title="Raptor::Http2::DEFAULT_WINDOW_SIZE (constant)">DEFAULT_WINDOW_SIZE</a></span></span> <span class='op'>/</span> <span class='int'>2</span>
+          <span class='id identifier rubyid_increment'>increment</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#DEFAULT_WINDOW_SIZE-constant" title="Raptor::Http2::DEFAULT_WINDOW_SIZE (constant)">DEFAULT_WINDOW_SIZE</a></span></span> <span class='op'>-</span> <span class='id identifier rubyid_connection_window'>connection_window</span>
           <span class='id identifier rubyid_wu_payload'>wu_payload</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_increment'>increment</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>N</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
           <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:window_update</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_wu_payload'>wu_payload</span><span class='rparen'>)</span>
           <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:window_update</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_wu_payload'>wu_payload</span><span class='rparen'>)</span>
@@ -2243,7 +2243,7 @@ within the peer's per-stream and connection windows.</p>
 </div>
 
       <div id="footer">
-  Generated on Wed May 27 08:42:40 2026 by
+  Generated on Wed May 27 08:49:47 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
