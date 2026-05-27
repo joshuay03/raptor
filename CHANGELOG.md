@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Honour the peer's HTTP/2 flow-control windows when sending `DATA` frames
 - Assemble HEADERS across `CONTINUATION` frames
 - Validate HTTP/2 stream IDs and emit `GOAWAY` on protocol errors
 - Offload TLS handshakes to the thread pool to keep the server thread responsive

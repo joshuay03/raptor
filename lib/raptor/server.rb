@@ -178,7 +178,8 @@ module Raptor
           remote_addr: remote_addr,
           url_scheme: HTTPS_SCHEME,
           protocol: :http2,
-          writer: Http2::Writer.new
+          writer: Http2::Writer.new,
+          flow_control: Http2::FlowControl.new
         )
 
         return

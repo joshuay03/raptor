@@ -76,6 +76,7 @@ module Raptor
     # @rbs @socket_to_state: Hash[TCPSocket, Hash[Symbol, untyped]]
     # @rbs @id_to_timeout: Hash[Integer, TimeoutClient]
     # @rbs @id_to_writer: Hash[Integer, untyped]
+    # @rbs @id_to_flow_control: Hash[Integer, untyped]
 
     # Creates a new Reactor instance.
     #
@@ -101,6 +102,7 @@ module Raptor
       @socket_to_state = {}
       @id_to_timeout = {}
       @id_to_writer = {}
+      @id_to_flow_control = {}
     end
 
     # Starts the reactor's main event loop in a new thread.
@@ -168,9 +170,11 @@ module Raptor
       socket = state[:socket]
       state.delete(:socket)
       writer = state.delete(:writer)
+      flow_control = state.delete(:flow_control)
       @id_to_socket[state[:id]] = socket
       @socket_to_state[socket] = state
       @id_to_writer[state[:id]] = writer if writer
+      @id_to_flow_control[state[:id]] = flow_control if flow_control
 
       read_and_queue_for_parse(socket, state)
     end
@@ -267,6 +271,18 @@ module Raptor
       @id_to_writer[id]
     end
 
+    # Returns the flow controller associated with a given connection, if one
+    # was supplied when the connection was added. Used by HTTP/2 stream
+    # dispatchers to honour the peer's flow-control windows.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [Object, nil] the flow controller, if found
+    #
+    # @rbs (Integer id) -> untyped?
+    def flow_control_for(id)
+      @id_to_flow_control[id]
+    end
+
     # Updates connection state for an HTTP/2 connection after frame processing.
     #
     # Re-registers the socket with the selector for further reads and stores
@@ -301,6 +317,7 @@ module Raptor
 
       @socket_to_state.delete(socket)
       @id_to_writer.delete(id)
+      @id_to_flow_control.delete(id)
       socket.close rescue nil
     end
 
@@ -407,6 +424,7 @@ module Raptor
       state = @socket_to_state.delete(socket)
       @id_to_socket.delete(state[:id])
       @id_to_writer.delete(state[:id])
+      @id_to_flow_control.delete(state[:id])
       socket.close
     end
 

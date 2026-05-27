@@ -10,6 +10,36 @@ module Raptor
 
     GOAWAY_FRAME_TYPE = 0x7
 
+    def test_flow_control_acquire_caps_grant_at_max_frame_size
+      flow_control = Http2::FlowControl.new
+
+      assert_equal Http2::MAX_FRAME_SIZE, flow_control.acquire(1, 100_000)
+    end
+
+    def test_flow_control_acquire_blocks_until_stream_window_replenished
+      flow_control = Http2::FlowControl.new
+      drain_windows(flow_control, stream_id: 1)
+
+      blocked = Thread.new { flow_control.acquire(1, 100) }
+      sleep 0.05
+      assert blocked.alive?
+
+      flow_control.add_connection_window(40)
+      flow_control.add_stream_window(1, 40)
+
+      assert_equal 40, blocked.value
+    end
+
+    def test_flow_control_set_initial_stream_window_shifts_existing_streams
+      flow_control = Http2::FlowControl.new
+      flow_control.acquire(1, 100)
+      flow_control.set_initial_stream_window(Http2::DEFAULT_WINDOW_SIZE + 1000)
+
+      flow_control.add_connection_window(Http2::DEFAULT_WINDOW_SIZE)
+
+      assert_equal Http2::MAX_FRAME_SIZE, flow_control.acquire(1, Http2::DEFAULT_WINDOW_SIZE + 900)
+    end
+
     def test_process_frames_rejects_even_client_stream_id
       result = process_frames_with(headers_frame(stream_id: 2))
 
@@ -89,6 +119,26 @@ module Raptor
       assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
     end
 
+    def test_process_frames_extracts_window_updates
+      parser = Http2Parser.new
+      connection_update = parser.build_frame(:window_update, 0, 0, [1000].pack("N"))
+      stream_update = parser.build_frame(:window_update, 0, 5, [500].pack("N"))
+
+      result = process_frames_with(connection_update + stream_update)
+
+      assert_equal [[0, 1000], [5, 500]], result[:window_updates]
+    end
+
+    def test_process_frames_extracts_peer_initial_window_size_from_settings
+      parser = Http2Parser.new
+      settings_payload = parser.build_settings(initial_window_size: 32_768)
+      settings = parser.build_frame(:settings, 0, 0, settings_payload)
+
+      result = process_frames_with(settings)
+
+      assert_equal 32_768, result[:peer_initial_window_size]
+    end
+
     private
 
     def process_frames_with(frame_bytes)
@@ -113,6 +163,11 @@ module Raptor
 
       _last_stream_id, error_code = goaway.byteslice(9, 8).unpack("NN")
       error_code
+    end
+
+    def drain_windows(flow_control, stream_id:)
+      remaining = Http2::DEFAULT_WINDOW_SIZE
+      remaining -= flow_control.acquire(stream_id, remaining) while remaining > 0
     end
   end
 end

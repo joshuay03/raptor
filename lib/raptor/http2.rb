@@ -75,6 +75,153 @@ module Raptor
       end
     end
 
+    # Per-connection outbound flow-control accounting.
+    #
+    # Tracks the peer's connection-level and per-stream receive windows so
+    # outbound DATA frames respect RFC 7540 §5.2. Threads dispatching stream
+    # responses call `acquire` to reserve send capacity; threads applying
+    # inbound WINDOW_UPDATE or SETTINGS frames call the mutating methods to
+    # replenish it. State is held in a single `Atom` so updates use CAS.
+    #
+    class FlowControl
+      ACQUIRE_POLL_INTERVAL = 0.001
+
+      # @rbs @connection_window: Atom
+      # @rbs @stream_windows: Atom
+      # @rbs @initial_stream_window: Atom
+
+      # Creates a new FlowControl with the spec-default windows.
+      #
+      # @rbs () -> void
+      def initialize
+        @connection_window = Atom.new(DEFAULT_WINDOW_SIZE)
+        @stream_windows = Atom.new({})
+        @initial_stream_window = Atom.new(DEFAULT_WINDOW_SIZE)
+      end
+
+      # Reserves outbound capacity on the given stream, polling until at
+      # least one byte is available on both the connection and stream
+      # windows. The returned size is capped at `MAX_FRAME_SIZE`.
+      #
+      # When `end_stream` is true, `max_bytes` fits within the peer's
+      # initial stream window, and no per-stream override has been
+      # recorded, only the connection window is consulted. The stream
+      # closes on this frame, so its remaining send window will not be
+      # consulted again and need not be tracked.
+      #
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @param max_bytes [Integer] the largest size the caller would like to send
+      # @param end_stream [Boolean] true when this is the final frame on the stream
+      # @return [Integer] the number of bytes the caller may now send
+      #
+      # @rbs (Integer stream_id, Integer max_bytes, ?end_stream: bool) -> Integer
+      def acquire(stream_id, max_bytes, end_stream: false)
+        initial = @initial_stream_window.value
+        capped = max_bytes < MAX_FRAME_SIZE ? max_bytes : MAX_FRAME_SIZE
+
+        if end_stream && capped <= initial && !@stream_windows.value.key?(stream_id)
+          loop do
+            granted = 0
+            @connection_window.swap do |window|
+              granted = window > capped ? capped : window
+              granted > 0 ? window - granted : window
+            end
+            return granted if granted > 0
+
+            sleep ACQUIRE_POLL_INTERVAL
+          end
+        end
+
+        loop do
+          stream_window = @stream_windows.value[stream_id] || initial
+          capped_full = capped < stream_window ? capped : stream_window
+
+          granted = 0
+          if capped_full > 0
+            @connection_window.swap do |window|
+              granted = window > capped_full ? capped_full : window
+              granted > 0 ? window - granted : window
+            end
+          end
+
+          if granted > 0
+            @stream_windows.swap do |s|
+              current = s[stream_id] || initial
+              s.merge(stream_id => current - granted)
+            end
+            return granted
+          end
+
+          sleep ACQUIRE_POLL_INTERVAL
+        end
+      end
+
+      # Increments the connection-level send window. Called when the peer
+      # sends a WINDOW_UPDATE on stream 0.
+      #
+      # @param increment [Integer] the byte count to add
+      # @return [void]
+      #
+      # @rbs (Integer increment) -> void
+      def add_connection_window(increment)
+        @connection_window.swap { |window| window + increment }
+      end
+
+      # Increments the per-stream send window. Called when the peer sends
+      # a WINDOW_UPDATE on a specific stream.
+      #
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @param increment [Integer] the byte count to add
+      # @return [void]
+      #
+      # @rbs (Integer stream_id, Integer increment) -> void
+      def add_stream_window(stream_id, increment)
+        initial = @initial_stream_window.value
+        @stream_windows.swap do |s|
+          current = s[stream_id] || initial
+          s.merge(stream_id => current + increment)
+        end
+      end
+
+      # Updates the peer's `SETTINGS_INITIAL_WINDOW_SIZE`. Shifts every
+      # existing stream window by the delta as required by RFC 7540 §6.9.2.
+      #
+      # @param new_size [Integer] the peer's new initial window size
+      # @return [void]
+      #
+      # @rbs (Integer new_size) -> void
+      def set_initial_stream_window(new_size)
+        old = @initial_stream_window.value
+        @initial_stream_window.swap { new_size }
+        delta = new_size - old
+        return if delta.zero?
+
+        @stream_windows.swap do |s|
+          s.transform_values { |size| size + delta }
+        end
+      end
+
+      # Discards any per-stream tracking for the given stream. Called
+      # after a stream closes so `@stream_windows` does not grow without
+      # bound across the lifetime of a connection.
+      #
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @return [void]
+      #
+      # @rbs (Integer stream_id) -> void
+      def discard_stream(stream_id)
+        return unless @stream_windows.value.key?(stream_id)
+
+        @stream_windows.swap do |s|
+          next s unless s.key?(stream_id)
+
+          new = s.dup
+          new.delete(stream_id)
+          new
+        end
+      end
+    end
+
     FLAG_END_STREAM = 0x1
     FLAG_END_HEADERS = 0x4
     FLAG_ACK = 0x1
@@ -82,6 +229,9 @@ module Raptor
 
     ERROR_NO_ERROR = 0x0
     ERROR_PROTOCOL_ERROR = 0x1
+
+    DEFAULT_WINDOW_SIZE = 65_535
+    MAX_FRAME_SIZE = 16_384
 
     SERVER_PROTOCOL = "HTTP/2"
     RACK_HEADER_PREFIX = "rack."
@@ -114,7 +264,7 @@ module Raptor
       parser = Http2Parser.new
       settings_payload = parser.build_settings(
         max_concurrent_streams: 100,
-        initial_window_size: 65_535
+        initial_window_size: DEFAULT_WINDOW_SIZE
       )
       parser.build_frame(:settings, 0, 0, settings_payload)
     end
@@ -136,7 +286,9 @@ module Raptor
       streams = data[:http2_streams] ? data[:http2_streams].dup : {}
       outgoing_frames = []
       completed_requests = []
-      connection_window = data[:http2_window] || 65_535
+      window_updates = []
+      peer_initial_window_size = nil
+      connection_window = data[:http2_window] || DEFAULT_WINDOW_SIZE
       preface_received = data[:http2_preface_received] || false
       last_client_stream_id = data[:http2_last_client_stream_id] || 0
       pending_headers = data[:http2_pending_headers]
@@ -147,7 +299,7 @@ module Raptor
           buffer = buffer.byteslice(24..-1) || ""
           preface_received = true
         else
-          return build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, pending_headers, false)
+          return build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, false)
         end
       end
 
@@ -166,6 +318,8 @@ module Raptor
         case frame[:type]
         when :settings
           if (frame[:flags] & FLAG_ACK).zero?
+            parsed_settings = parser.parse_settings(frame[:payload])
+            peer_initial_window_size = parsed_settings[:initial_window_size] if parsed_settings.key?(:initial_window_size)
             outgoing_frames << parser.build_frame(:settings, FLAG_ACK, 0, nil)
           end
 
@@ -223,8 +377,8 @@ module Raptor
 
           if frame[:payload].bytesize.positive?
             connection_window -= frame[:payload].bytesize
-            if connection_window < 32_768
-              increment = 65_535 - connection_window
+            if connection_window < DEFAULT_WINDOW_SIZE / 2
+              increment = DEFAULT_WINDOW_SIZE - connection_window
               wu_payload = [increment].pack("N")
               outgoing_frames << parser.build_frame(:window_update, 0, 0, wu_payload)
               outgoing_frames << parser.build_frame(:window_update, 0, stream_id, wu_payload)
@@ -246,7 +400,8 @@ module Raptor
           end
 
         when :window_update
-          parser.parse_window_update(frame[:payload])
+          increment = parser.parse_window_update(frame[:payload])
+          window_updates << [frame[:stream_id], increment]
 
         when :ping
           if (frame[:flags] & FLAG_ACK).zero?
@@ -266,7 +421,7 @@ module Raptor
         outgoing_frames << parser.build_frame(:goaway, 0, 0, goaway_payload)
       end
 
-      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, pending_headers, !goaway_error.nil?)
+      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, !goaway_error.nil?)
     end
 
     # Merges a decoded header block into the stream's accumulated state,
@@ -308,6 +463,8 @@ module Raptor
     # @param streams [Hash] updated stream states
     # @param outgoing_frames [Array<String>] frames to write to the socket
     # @param completed_requests [Array<Hash>] fully received stream requests
+    # @param window_updates [Array<Array(Integer, Integer)>] inbound WINDOW_UPDATE pairs as [stream_id, increment]
+    # @param peer_initial_window_size [Integer, nil] new SETTINGS_INITIAL_WINDOW_SIZE announced by the peer
     # @param connection_window [Integer] current connection flow control window
     # @param preface_received [Boolean] whether the connection preface has been received
     # @param last_client_stream_id [Integer] highest client-initiated stream ID seen
@@ -315,9 +472,9 @@ module Raptor
     # @param close_connection [Boolean] whether the connection should be closed after writing outgoing frames
     # @return [Hash] frozen result hash
     #
-    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
-    def self.build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, pending_headers, close_connection)
-      Ractor.make_shareable({
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[[Integer, Integer]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
+    def self.build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, close_connection)
+      result = {
         id: data[:id],
         protocol: :http2,
         buffer: buffer || "",
@@ -332,7 +489,10 @@ module Raptor
         close_connection: close_connection,
         remote_addr: data[:remote_addr],
         url_scheme: data[:url_scheme]
-      })
+      }
+      result[:window_updates] = window_updates unless window_updates.empty?
+      result[:peer_initial_window_size] = peer_initial_window_size if peer_initial_window_size
+      Ractor.make_shareable(result)
     end
     private_class_method :build_result
 
@@ -352,6 +512,11 @@ module Raptor
       return unless socket
 
       writer = reactor.writer_for(result[:id])
+      flow_control = reactor.flow_control_for(result[:id])
+
+      if flow_control && (result[:window_updates] || result[:peer_initial_window_size])
+        apply_flow_control_updates(flow_control, result)
+      end
 
       writer.write_frames(socket, result[:outgoing_frames])
 
@@ -368,7 +533,7 @@ module Raptor
 
         thread_pool << proc do
           dispatch_stream_request(
-            socket, writer, stream_id,
+            socket, writer, flow_control, stream_id,
             request[:headers], request[:body],
             remote_addr: remote_addr
           )
@@ -378,23 +543,46 @@ module Raptor
 
     private
 
+    # Applies inbound flow-control updates from a parsed result to the
+    # connection's `FlowControl`.
+    #
+    # @param flow_control [FlowControl] the per-connection flow controller
+    # @param result [Hash] the parsed result from `process_frames`
+    # @return [void]
+    #
+    # @rbs (FlowControl flow_control, Hash[Symbol, untyped] result) -> void
+    def apply_flow_control_updates(flow_control, result)
+      result[:window_updates]&.each do |stream_id, increment|
+        if stream_id.zero?
+          flow_control.add_connection_window(increment)
+        else
+          flow_control.add_stream_window(stream_id, increment)
+        end
+      end
+
+      if (new_size = result[:peer_initial_window_size])
+        flow_control.set_initial_stream_window(new_size)
+      end
+    end
+
     # Dispatches a completed stream request to the Rack app and writes
     # the response back as HTTP/2 frames.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
     # @param writer [Writer] lock-free frame writer for the connection
+    # @param flow_control [FlowControl] per-connection outbound flow controller
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param headers [Array<Array(String, String)>] request headers
     # @param body [String] request body
     # @param remote_addr [String] the client IP address
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
-    def dispatch_stream_request(socket, writer, stream_id, headers, body, remote_addr:)
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
+    def dispatch_stream_request(socket, writer, flow_control, stream_id, headers, body, remote_addr:)
       env = build_rack_env(headers, body, remote_addr: remote_addr)
       status, response_headers, response_body = @app.call(env)
 
-      write_http2_response(socket, writer, stream_id, status, response_headers, response_body)
+      write_http2_response(socket, writer, flow_control, stream_id, status, response_headers, response_body)
     rescue => error
       write_http2_error_response(socket, writer, stream_id)
 
@@ -405,20 +593,25 @@ module Raptor
       end
     ensure
       response_body.close if response_body.respond_to?(:close)
+      flow_control.discard_stream(stream_id) if flow_control
     end
 
     # Writes a Rack response as HTTP/2 frames to the socket.
     #
+    # DATA frames are partitioned through `flow_control` so each write fits
+    # within the peer's per-stream and connection windows.
+    #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
     # @param writer [Writer] lock-free frame writer for the connection
+    # @param flow_control [FlowControl] per-connection outbound flow controller
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param status [Integer] HTTP status code
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body responding to each
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
-    def write_http2_response(socket, writer, stream_id, status, headers, body)
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
+    def write_http2_response(socket, writer, flow_control, stream_id, status, headers, body)
       parser = Http2Parser.new
 
       header_pairs = [[":status", status.to_s]]
@@ -438,16 +631,24 @@ module Raptor
       body_chunks = []
       body.each { |chunk| body_chunks << chunk unless chunk.empty? }
 
-      frames = []
       if body_chunks.empty?
-        frames << parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers)
-      else
-        frames << parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)
+        writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers)])
+        return
+      end
 
-        last_index = body_chunks.size - 1
-        body_chunks.each_with_index do |chunk, index|
-          flags = index == last_index ? FLAG_END_STREAM : 0
-          frames << parser.build_frame(:data, flags, stream_id, chunk)
+      frames = [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)]
+
+      last_chunk_index = body_chunks.size - 1
+      body_chunks.each_with_index do |chunk, chunk_index|
+        offset = 0
+        while offset < chunk.bytesize
+          remaining = chunk.bytesize - offset
+          last_frame = chunk_index == last_chunk_index && remaining <= MAX_FRAME_SIZE
+          granted = flow_control.acquire(stream_id, remaining, end_stream: last_frame)
+          slice = offset == 0 && granted == chunk.bytesize ? chunk : chunk.byteslice(offset, granted)
+          offset += granted
+          end_stream = chunk_index == last_chunk_index && offset == chunk.bytesize
+          frames << parser.build_frame(:data, end_stream ? FLAG_END_STREAM : 0, stream_id, slice)
         end
       end
 
