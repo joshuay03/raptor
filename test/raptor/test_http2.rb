@@ -41,6 +41,54 @@ module Raptor
       assert_equal 2, result[:completed_requests].size
     end
 
+    def test_process_frames_assembles_continuation_frames
+      parser = Http2Parser.new
+      encoded = parser.encode_headers([[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "x"]])
+      half = encoded.bytesize / 2
+      headers = parser.build_frame(:headers, Http2::FLAG_END_STREAM, 1, encoded.byteslice(0, half))
+      continuation = parser.build_frame(:continuation, Http2::FLAG_END_HEADERS, 1, encoded.byteslice(half..-1))
+
+      result = process_frames_with(headers + continuation)
+
+      refute result[:close_connection]
+      assert_equal 1, result[:completed_requests].size
+      assert_equal [":method", ":path", ":scheme", ":authority"], result[:completed_requests].first[:headers].map(&:first)
+    end
+
+    def test_process_frames_rejects_continuation_without_pending_headers
+      parser = Http2Parser.new
+      continuation = parser.build_frame(:continuation, Http2::FLAG_END_HEADERS, 1, "")
+
+      result = process_frames_with(continuation)
+
+      assert result[:close_connection]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
+    end
+
+    def test_process_frames_rejects_continuation_on_wrong_stream
+      parser = Http2Parser.new
+      encoded = parser.encode_headers([[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "x"]])
+      headers = parser.build_frame(:headers, 0, 1, encoded)
+      continuation = parser.build_frame(:continuation, Http2::FLAG_END_HEADERS, 3, "")
+
+      result = process_frames_with(headers + continuation)
+
+      assert result[:close_connection]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
+    end
+
+    def test_process_frames_rejects_data_while_expecting_continuation
+      parser = Http2Parser.new
+      encoded = parser.encode_headers([[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "x"]])
+      headers = parser.build_frame(:headers, 0, 1, encoded)
+      data = parser.build_frame(:data, Http2::FLAG_END_STREAM, 1, "body")
+
+      result = process_frames_with(headers + data)
+
+      assert result[:close_connection]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
+    end
+
     private
 
     def process_frames_with(frame_bytes)

@@ -139,6 +139,7 @@ module Raptor
       connection_window = data[:http2_window] || 65_535
       preface_received = data[:http2_preface_received] || false
       last_client_stream_id = data[:http2_last_client_stream_id] || 0
+      pending_headers = data[:http2_pending_headers]
       goaway_error = nil
 
       unless preface_received
@@ -146,7 +147,7 @@ module Raptor
           buffer = buffer.byteslice(24..-1) || ""
           preface_received = true
         else
-          return build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, false)
+          return build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, pending_headers, false)
         end
       end
 
@@ -156,6 +157,11 @@ module Raptor
 
         frame, consumed = parsed
         buffer = buffer.byteslice(consumed..-1) || ""
+
+        if pending_headers && frame[:type] != :continuation
+          goaway_error = ERROR_PROTOCOL_ERROR
+          break
+        end
 
         case frame[:type]
         when :settings
@@ -179,21 +185,28 @@ module Raptor
             header_payload = header_payload.byteslice(5..-1) || ""
           end
 
-          decoded_headers, hpack_table = parser.parse_headers(header_payload, hpack_table)
-          stream = streams[stream_id] || {}
-          stream = stream.merge(headers: decoded_headers)
+          end_stream = (frame[:flags] & FLAG_END_STREAM) != 0
 
-          if (frame[:flags] & FLAG_END_STREAM) != 0
-            stream = stream.merge(end_stream: true)
-            completed_requests << {
-              stream_id: stream_id,
-              headers: decoded_headers,
-              body: stream[:body] || ""
-            }
-
-            streams.delete(stream_id)
+          if (frame[:flags] & FLAG_END_HEADERS) != 0
+            decoded_headers, hpack_table = parser.parse_headers(header_payload, hpack_table)
+            streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, end_stream)
           else
-            streams[stream_id] = stream
+            pending_headers = { stream_id: stream_id, buffer: header_payload, end_stream: end_stream }
+          end
+
+        when :continuation
+          if pending_headers.nil? || frame[:stream_id] != pending_headers[:stream_id]
+            goaway_error = ERROR_PROTOCOL_ERROR
+            break
+          end
+
+          pending_headers = pending_headers.merge(buffer: pending_headers[:buffer] + frame[:payload])
+
+          if (frame[:flags] & FLAG_END_HEADERS) != 0
+            stream_id = pending_headers[:stream_id]
+            decoded_headers, hpack_table = parser.parse_headers(pending_headers[:buffer], hpack_table)
+            streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, pending_headers[:end_stream])
+            pending_headers = nil
           end
 
         when :data
@@ -253,8 +266,39 @@ module Raptor
         outgoing_frames << parser.build_frame(:goaway, 0, 0, goaway_payload)
       end
 
-      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, !goaway_error.nil?)
+      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, pending_headers, !goaway_error.nil?)
     end
+
+    # Merges a decoded header block into the stream's accumulated state,
+    # promoting the stream to `completed_requests` when END_STREAM is set.
+    #
+    # @param streams [Hash] current open-stream map
+    # @param completed_requests [Array<Hash>] accumulator of completed stream requests
+    # @param stream_id [Integer] the stream identifier
+    # @param decoded_headers [Array<Array(String, String)>] decoded header pairs
+    # @param end_stream [Boolean] whether the source frame had END_STREAM set
+    # @return [Array(Hash, Array<Hash>)] updated streams and completed_requests
+    #
+    # @rbs (Hash[Integer, Hash[Symbol, untyped]] streams, Array[Hash[Symbol, untyped]] completed_requests, Integer stream_id, Array[[String, String]] decoded_headers, bool end_stream) -> [Hash[Integer, Hash[Symbol, untyped]], Array[Hash[Symbol, untyped]]]
+    def self.finalize_headers(streams, completed_requests, stream_id, decoded_headers, end_stream)
+      stream = streams[stream_id] || {}
+      stream = stream.merge(headers: decoded_headers)
+
+      if end_stream
+        completed_requests << {
+          stream_id: stream_id,
+          headers: decoded_headers,
+          body: stream[:body] || ""
+        }
+
+        streams.delete(stream_id)
+      else
+        streams[stream_id] = stream
+      end
+
+      [streams, completed_requests]
+    end
+    private_class_method :finalize_headers
 
     # Builds a frozen result hash from the current processing state.
     #
@@ -267,11 +311,12 @@ module Raptor
     # @param connection_window [Integer] current connection flow control window
     # @param preface_received [Boolean] whether the connection preface has been received
     # @param last_client_stream_id [Integer] highest client-initiated stream ID seen
+    # @param pending_headers [Hash, nil] in-progress HEADERS+CONTINUATION assembly
     # @param close_connection [Boolean] whether the connection should be closed after writing outgoing frames
     # @return [Hash] frozen result hash
     #
-    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, bool close_connection) -> Hash[Symbol, untyped]
-    def self.build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, close_connection)
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
+    def self.build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, pending_headers, close_connection)
       Ractor.make_shareable({
         id: data[:id],
         protocol: :http2,
@@ -281,6 +326,7 @@ module Raptor
         http2_window: connection_window,
         http2_preface_received: preface_received,
         http2_last_client_stream_id: last_client_stream_id,
+        http2_pending_headers: pending_headers,
         outgoing_frames: outgoing_frames,
         completed_requests: completed_requests,
         close_connection: close_connection,

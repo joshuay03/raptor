@@ -86,6 +86,19 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
     def self.process_frames: (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
 
+    # Merges a decoded header block into the stream's accumulated state,
+    # promoting the stream to `completed_requests` when END_STREAM is set.
+    #
+    # @param streams [Hash] current open-stream map
+    # @param completed_requests [Array<Hash>] accumulator of completed stream requests
+    # @param stream_id [Integer] the stream identifier
+    # @param decoded_headers [Array<Array(String, String)>] decoded header pairs
+    # @param end_stream [Boolean] whether the source frame had END_STREAM set
+    # @return [Array(Hash, Array<Hash>)] updated streams and completed_requests
+    #
+    # @rbs (Hash[Integer, Hash[Symbol, untyped]] streams, Array[Hash[Symbol, untyped]] completed_requests, Integer stream_id, Array[[String, String]] decoded_headers, bool end_stream) -> [Hash[Integer, Hash[Symbol, untyped]], Array[Hash[Symbol, untyped]]]
+    def self.finalize_headers: (Hash[Integer, Hash[Symbol, untyped]] streams, Array[Hash[Symbol, untyped]] completed_requests, Integer stream_id, Array[[ String, String ]] decoded_headers, bool end_stream) -> [ Hash[Integer, Hash[Symbol, untyped]], Array[Hash[Symbol, untyped]] ]
+
     # Builds a frozen result hash from the current processing state.
     #
     # @param data [Hash] original connection state
@@ -97,11 +110,12 @@ module Raptor
     # @param connection_window [Integer] current connection flow control window
     # @param preface_received [Boolean] whether the connection preface has been received
     # @param last_client_stream_id [Integer] highest client-initiated stream ID seen
+    # @param pending_headers [Hash, nil] in-progress HEADERS+CONTINUATION assembly
     # @param close_connection [Boolean] whether the connection should be closed after writing outgoing frames
     # @return [Hash] frozen result hash
     #
-    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, bool close_connection) -> Hash[Symbol, untyped]
-    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, bool close_connection) -> Hash[Symbol, untyped]
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
+    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
 
     # Handles a parsed HTTP/2 request from the ractor pool.
     #
