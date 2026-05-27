@@ -20,6 +20,8 @@ module Raptor
 
     DEFAULT_OPTIONS: untyped
 
+    DEFAULT_CONFIG_PATHS: untyped
+
     # Loads a configuration file and returns the hash it evaluates to.
     #
     # The file is evaluated at the top level so constants like `Raptor::*` resolve
@@ -32,6 +34,18 @@ module Raptor
     #
     # @rbs (String path) -> Hash[Symbol, untyped]
     def self.load_config_file: (String path) -> Hash[Symbol, untyped]
+
+    # Returns the first existing path in {DEFAULT_CONFIG_PATHS} resolved
+    # against `root`, or nil if none exist.
+    #
+    # Used to pick up a project-local config file when no `-c`/`--config`
+    # flag was supplied.
+    #
+    # @param root [String] directory to resolve the default paths against
+    # @return [String, nil] the config path, or nil if no default file exists
+    #
+    # @rbs (?String root) -> String?
+    def self.default_config_path: (?String root) -> String?
 
     @command: Symbol
 

@@ -69,7 +69,8 @@ module Rackup
         end
 
         cli_defaults = ::Raptor::CLI::DEFAULT_OPTIONS
-        config = options[:Config] ? ::Raptor::CLI.load_config_file(options[:Config]) : {}
+        config_path = options[:Config] || ::Raptor::CLI.default_config_path
+        config = config_path ? ::Raptor::CLI.load_config_file(config_path) : {}
 
         binds = if options[:Host] || options[:Port]
           host = options[:Host] || defaults[:Host]

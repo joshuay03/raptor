@@ -3,6 +3,7 @@
 require "test_helper"
 
 require "tempfile"
+require "tmpdir"
 
 require "raptor/cli"
 
@@ -56,6 +57,31 @@ module Raptor
     def test_config_file_must_return_hash
       with_config_file(42) do |path|
         assert_raises(ArgumentError) { CLI.new(["-c", path]) }
+      end
+    end
+
+    def test_default_config_path_prefers_raptor_rb_over_config_raptor_rb
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "raptor.rb"), "{}")
+        Dir.mkdir(File.join(dir, "config"))
+        File.write(File.join(dir, "config", "raptor.rb"), "{}")
+
+        assert_equal "raptor.rb", CLI.default_config_path(dir)
+      end
+    end
+
+    def test_default_config_path_falls_back_to_config_raptor_rb
+      Dir.mktmpdir do |dir|
+        Dir.mkdir(File.join(dir, "config"))
+        File.write(File.join(dir, "config", "raptor.rb"), "{}")
+
+        assert_equal "config/raptor.rb", CLI.default_config_path(dir)
+      end
+    end
+
+    def test_default_config_path_returns_nil_when_no_default_exists
+      Dir.mktmpdir do |dir|
+        assert_nil CLI.default_config_path(dir)
       end
     end
 

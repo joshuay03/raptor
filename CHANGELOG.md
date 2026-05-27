@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Load `raptor.rb` or `config/raptor.rb` by default when no config path is supplied
 - Honour the peer's HTTP/2 flow-control windows when sending `DATA` frames
 - Assemble HEADERS across `CONTINUATION` frames
 - Validate HTTP/2 stream IDs and emit `GOAWAY` on protocol errors

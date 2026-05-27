@@ -43,6 +43,8 @@ module Raptor
       pidfile: nil,
     }.freeze
 
+    DEFAULT_CONFIG_PATHS = ["raptor.rb", "config/raptor.rb"].freeze
+
     # Loads a configuration file and returns the hash it evaluates to.
     #
     # The file is evaluated at the top level so constants like `Raptor::*` resolve
@@ -59,6 +61,20 @@ module Raptor
       raise ArgumentError, "Config file at #{path.inspect} must return a Hash, got #{config.class}" unless config.is_a?(Hash)
 
       config
+    end
+
+    # Returns the first existing path in {DEFAULT_CONFIG_PATHS} resolved
+    # against `root`, or nil if none exist.
+    #
+    # Used to pick up a project-local config file when no `-c`/`--config`
+    # flag was supplied.
+    #
+    # @param root [String] directory to resolve the default paths against
+    # @return [String, nil] the config path, or nil if no default file exists
+    #
+    # @rbs (?String root) -> String?
+    def self.default_config_path(root = Dir.pwd)
+      DEFAULT_CONFIG_PATHS.find { |path| File.exist?(File.join(root, path)) }
     end
 
     # @rbs @command: Symbol
@@ -92,7 +108,7 @@ module Raptor
       @options = DEFAULT_OPTIONS.dup
       @options[:client] = @options[:client].dup
 
-      apply_config_file(extract_config_path(argv))
+      apply_config_file(extract_config_path(argv) || self.class.default_config_path)
 
       @parser = create_parser
       @parser.parse!(argv)
