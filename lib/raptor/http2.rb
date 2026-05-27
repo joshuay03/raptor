@@ -80,6 +80,9 @@ module Raptor
     FLAG_ACK = 0x1
     FLAG_PRIORITY = 0x20
 
+    ERROR_NO_ERROR = 0x0
+    ERROR_PROTOCOL_ERROR = 0x1
+
     SERVER_PROTOCOL = "HTTP/2"
     RACK_HEADER_PREFIX = "rack."
     HOP_BY_HOP_HEADERS = Set.new(%w[connection transfer-encoding keep-alive upgrade proxy-connection]).freeze
@@ -135,13 +138,15 @@ module Raptor
       completed_requests = []
       connection_window = data[:http2_window] || 65_535
       preface_received = data[:http2_preface_received] || false
+      last_client_stream_id = data[:http2_last_client_stream_id] || 0
+      goaway_error = nil
 
       unless preface_received
         if buffer.bytesize >= 24 && buffer.byteslice(0, 24) == Http2Parser.connection_preface
           buffer = buffer.byteslice(24..-1) || ""
           preface_received = true
         else
-          return build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received)
+          return build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, false)
         end
       end
 
@@ -161,6 +166,14 @@ module Raptor
         when :headers
           stream_id = frame[:stream_id]
           header_payload = frame[:payload]
+
+          unless streams.key?(stream_id)
+            if stream_id.even? || stream_id <= last_client_stream_id
+              goaway_error = ERROR_PROTOCOL_ERROR
+              break
+            end
+            last_client_stream_id = stream_id
+          end
 
           if (frame[:flags] & FLAG_PRIORITY) != 0
             header_payload = header_payload.byteslice(5..-1) || ""
@@ -185,7 +198,13 @@ module Raptor
 
         when :data
           stream_id = frame[:stream_id]
-          stream = streams[stream_id] || {}
+
+          unless streams.key?(stream_id)
+            goaway_error = ERROR_PROTOCOL_ERROR
+            break
+          end
+
+          stream = streams[stream_id]
           existing_body = stream[:body] || ""
           stream = stream.merge(body: existing_body + frame[:payload])
 
@@ -229,7 +248,12 @@ module Raptor
         end
       end
 
-      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received)
+      if goaway_error
+        goaway_payload = [last_client_stream_id, goaway_error].pack("NN")
+        outgoing_frames << parser.build_frame(:goaway, 0, 0, goaway_payload)
+      end
+
+      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, !goaway_error.nil?)
     end
 
     # Builds a frozen result hash from the current processing state.
@@ -242,10 +266,12 @@ module Raptor
     # @param completed_requests [Array<Hash>] fully received stream requests
     # @param connection_window [Integer] current connection flow control window
     # @param preface_received [Boolean] whether the connection preface has been received
+    # @param last_client_stream_id [Integer] highest client-initiated stream ID seen
+    # @param close_connection [Boolean] whether the connection should be closed after writing outgoing frames
     # @return [Hash] frozen result hash
     #
-    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received) -> Hash[Symbol, untyped]
-    def self.build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received)
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, bool close_connection) -> Hash[Symbol, untyped]
+    def self.build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, connection_window, preface_received, last_client_stream_id, close_connection)
       Ractor.make_shareable({
         id: data[:id],
         protocol: :http2,
@@ -254,8 +280,10 @@ module Raptor
         http2_streams: streams,
         http2_window: connection_window,
         http2_preface_received: preface_received,
+        http2_last_client_stream_id: last_client_stream_id,
         outgoing_frames: outgoing_frames,
         completed_requests: completed_requests,
+        close_connection: close_connection,
         remote_addr: data[:remote_addr],
         url_scheme: data[:url_scheme]
       })
@@ -280,6 +308,11 @@ module Raptor
       writer = reactor.writer_for(result[:id])
 
       writer.write_frames(socket, result[:outgoing_frames])
+
+      if result[:close_connection]
+        reactor.close_connection(result[:id])
+        return
+      end
 
       reactor.update_http2_state(result)
 

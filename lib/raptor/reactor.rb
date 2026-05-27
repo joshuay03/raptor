@@ -287,6 +287,23 @@ module Raptor
       socket.close
     end
 
+    # Closes the socket for the given connection and drops all reactor state
+    # associated with it. Used to terminate HTTP/2 connections after sending
+    # a GOAWAY frame.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [void]
+    #
+    # @rbs (Integer id) -> void
+    def close_connection(id)
+      socket = @id_to_socket.delete(id)
+      return unless socket
+
+      @socket_to_state.delete(socket)
+      @id_to_writer.delete(id)
+      socket.close rescue nil
+    end
+
     # Initiates reactor shutdown.
     #
     # Closes the registration queue and wakes up the selector to begin

@@ -41,6 +41,10 @@ module Raptor
 
     FLAG_PRIORITY: ::Integer
 
+    ERROR_NO_ERROR: ::Integer
+
+    ERROR_PROTOCOL_ERROR: ::Integer
+
     SERVER_PROTOCOL: ::String
 
     RACK_HEADER_PREFIX: ::String
@@ -92,10 +96,12 @@ module Raptor
     # @param completed_requests [Array<Hash>] fully received stream requests
     # @param connection_window [Integer] current connection flow control window
     # @param preface_received [Boolean] whether the connection preface has been received
+    # @param last_client_stream_id [Integer] highest client-initiated stream ID seen
+    # @param close_connection [Boolean] whether the connection should be closed after writing outgoing frames
     # @return [Hash] frozen result hash
     #
-    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received) -> Hash[Symbol, untyped]
-    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received) -> Hash[Symbol, untyped]
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, bool close_connection) -> Hash[Symbol, untyped]
+    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Integer connection_window, bool preface_received, Integer last_client_stream_id, bool close_connection) -> Hash[Symbol, untyped]
 
     # Handles a parsed HTTP/2 request from the ractor pool.
     #

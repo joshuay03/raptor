@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Validate HTTP/2 stream IDs and emit `GOAWAY` on protocol errors
 - Offload TLS handshakes to the thread pool to keep the server thread responsive
 - Exit eager keep-alive loops on cluster shutdown
 - Apply the write timeout to HTTP/2 frame writes
