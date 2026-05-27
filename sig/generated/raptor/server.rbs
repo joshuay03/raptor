@@ -9,8 +9,8 @@ module Raptor
   # providing natural backpressure based on system capacity.
   #
   # Supports TCP, Unix domain, and SSL listeners transparently. TCP_NODELAY is
-  # applied only to TCP sockets, and SSL handshakes are performed synchronously
-  # before the connection is dispatched.
+  # applied only to TCP sockets, and SSL handshakes are offloaded to the thread
+  # pool so a slow client cannot block the server thread.
   #
   # For HTTP/1.1 connections the first request is parsed inline on the server
   # thread and dispatched directly to the thread pool, falling back to the
@@ -22,7 +22,7 @@ module Raptor
   #   binder = Binder.new(["tcp://0.0.0.0:3000"])
   #   reactor = Reactor.new(thread_pool, ractor_pool, client_options: {})
   #   request = Request.new(app, 3000)
-  #   server = Server.new(binder, reactor, thread_pool, request)
+  #   server = Server.new(binder, reactor, thread_pool, request, client_options: { first_data_timeout: 30 })
   #   server.run
   #   # ... later
   #   server.shutdown
@@ -33,15 +33,17 @@ module Raptor
 
     H2_PROTOCOL: ::String
 
-    @binder: Binder
+    @running: AtomicBoolean
 
-    @reactor: Reactor
-
-    @thread_pool: AtomicThreadPool
+    @client_options: Hash[Symbol, untyped]
 
     @request: Request
 
-    @running: AtomicBoolean
+    @thread_pool: AtomicThreadPool
+
+    @reactor: Reactor
+
+    @binder: Binder
 
     # Creates a new Server instance.
     #
@@ -49,10 +51,11 @@ module Raptor
     # @param reactor [Reactor] the reactor for handling client connections
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param request [Request] the HTTP/1.1 request handler
+    # @param client_options [Hash] client timeout configuration, used to bound TLS handshakes
     # @return [void]
     #
-    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Request request) -> void
-    def initialize: (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Request request) -> void
+    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Request request, client_options: Hash[Symbol, untyped]) -> void
+    def initialize: (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Request request, client_options: Hash[Symbol, untyped]) -> void
 
     # Starts the server's main accept loop in a new thread.
     #
@@ -80,9 +83,11 @@ module Raptor
 
     # Accepts a connection from the given listener and dispatches it.
     #
-    # For SSL connections with h2 negotiated via ALPN, the server sends
-    # initial SETTINGS and adds the connection to the reactor as an HTTP/2
-    # connection. All other connections follow the HTTP/1.1 path.
+    # For SSL listeners the TLS handshake is offloaded to the thread pool so
+    # a slow client cannot block the server thread. For SSL connections with
+    # h2 negotiated via ALPN, the server sends initial SETTINGS and adds the
+    # connection to the reactor as an HTTP/2 connection. All other connections
+    # follow the HTTP/1.1 path.
     #
     # @param listener [TCPServer, UNIXServer, Binder::SslListener] the ready listener
     # @param reactor [Reactor] the reactor to dispatch connections to
@@ -90,5 +95,39 @@ module Raptor
     #
     # @rbs (TCPServer | UNIXServer | Binder::SslListener listener, Reactor reactor) -> void
     def accept_connection: (TCPServer | UNIXServer | Binder::SslListener listener, Reactor reactor) -> void
+
+    # Performs the TLS handshake for an accepted SSL connection and dispatches
+    # it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
+    # `:first_data_timeout` so a slow client cannot pin a worker thread.
+    #
+    # @param listener [Binder::SslListener] the SSL listener that accepted the connection
+    # @param tcp_client [TCPSocket] the accepted TCP socket
+    # @param remote_addr [String] the client's IP address
+    # @param reactor [Reactor] the reactor to dispatch the connection to
+    # @return [void]
+    #
+    # @rbs (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr, Reactor reactor) -> void
+    def dispatch_ssl_connection: (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr, Reactor reactor) -> void
+
+    # Drives a non-blocking SSL handshake to completion, bounded by the
+    # configured first-data timeout. Returns true on success, false on
+    # timeout or SSL error.
+    #
+    # @param ssl_socket [OpenSSL::SSL::SSLSocket] the SSL socket to hand-shake
+    # @return [Boolean] true if the handshake completed
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket ssl_socket) -> bool
+    def perform_ssl_handshake: (OpenSSL::SSL::SSLSocket ssl_socket) -> bool
+
+    # Waits up to `deadline` for the socket to become ready for the next step
+    # of the SSL handshake. Closes the socket and returns false on timeout.
+    #
+    # @param ssl_socket [OpenSSL::SSL::SSLSocket] the SSL socket
+    # @param deadline [Float] absolute monotonic deadline
+    # @param direction [Symbol] either `:read` or `:write`
+    # @return [Boolean] true if the socket became ready before the deadline
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket ssl_socket, Float deadline, Symbol direction) -> bool
+    def wait_for_handshake: (OpenSSL::SSL::SSLSocket ssl_socket, Float deadline, Symbol direction) -> bool
   end
 end

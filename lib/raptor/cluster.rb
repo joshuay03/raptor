@@ -303,7 +303,7 @@ module Raptor
       reactor = Reactor.new(thread_pool, ractor_pool, client_options: @client_options)
       reactor_thread = reactor.run
 
-      server = Server.new(@binder, reactor, thread_pool, request)
+      server = Server.new(@binder, reactor, thread_pool, request, client_options: @client_options)
       server_thread = server.run
 
       puts "[#{Process.pid}] Worker #{index} booted"

@@ -97,6 +97,19 @@ module Raptor
       end
     end
 
+    def test_slow_ssl_handshake_does_not_block_other_connections
+      with_http2_server do |port|
+        slow_client = TCPSocket.new("127.0.0.1", port)
+
+        responses = Timeout.timeout(10) { http2_get(port, "/") }
+
+        assert_equal 1, responses.size
+        assert_equal "200", responses[0][:status]
+      ensure
+        slow_client&.close
+      end
+    end
+
     private
 
     def generate_test_certs

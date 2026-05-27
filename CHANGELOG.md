@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Offload TLS handshakes to the thread pool to keep the server thread responsive
 - Exit eager keep-alive loops on cluster shutdown
 - Apply the write timeout to HTTP/2 frame writes
 - Reject HPACK dynamic table size updates larger than 4096 bytes
