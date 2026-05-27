@@ -103,13 +103,13 @@ module Rackup
 
       def test_config_file_can_supply_on_error_and_paths
         with_config_source(<<~RUBY) do |path|
-          { on_error: ->(_env, _error) {}, stats_file: "tmp/c.json", pidfile: "tmp/c.pid" }
+          { on_error: ->(_env, _error) {}, stats_file: "tmp/c.json", pid_file: "tmp/c.pid" }
         RUBY
           opts = build(Config: path)
 
           assert_kind_of Proc, opts[:on_error]
           assert_equal "tmp/c.json", opts[:stats_file]
-          assert_equal "tmp/c.pid", opts[:pidfile]
+          assert_equal "tmp/c.pid", opts[:pid_file]
         end
       end
 

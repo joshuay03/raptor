@@ -470,25 +470,25 @@ module Raptor
       File.delete(stats_path) rescue nil
     end
 
-    def test_pidfile_written_and_removed
-      pidfile_path = "/tmp/raptor_test_#{Process.pid}.pid"
-      File.delete(pidfile_path) rescue nil
-      @options[:pidfile] = pidfile_path
+    def test_pid_file_written_and_removed
+      pid_file_path = "/tmp/raptor_test_#{Process.pid}.pid"
+      File.delete(pid_file_path) rescue nil
+      @options[:pid_file] = pid_file_path
 
       with_server do
         Timeout.timeout(5) do
           loop do
-            break if File.exist?(pidfile_path)
+            break if File.exist?(pid_file_path)
             sleep 0.1
           end
         end
 
-        assert_match(/\A\d+\z/, File.read(pidfile_path))
+        assert_match(/\A\d+\z/, File.read(pid_file_path))
       end
 
-      assert !File.exist?(pidfile_path)
+      assert !File.exist?(pid_file_path)
     ensure
-      File.delete(pidfile_path) rescue nil
+      File.delete(pid_file_path) rescue nil
     end
 
     def test_stats_populated_after_requests

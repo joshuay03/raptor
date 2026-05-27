@@ -60,7 +60,7 @@ module Raptor
     # @rbs @client_options: Hash[Symbol, Integer]
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @stats_file: String?
-    # @rbs @pidfile: String?
+    # @rbs @pid_file: String?
     # @rbs @binder: Binder
     # @rbs @server_port: Integer
     # @rbs @app: untyped
@@ -86,7 +86,7 @@ module Raptor
     # @option options [Hash] :client client configuration
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
-    # @option options [String, nil] :pidfile path to write the master PID to, or nil to disable
+    # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
     # @return [void]
     #
     # @rbs (Hash[Symbol, untyped] options) -> void
@@ -97,7 +97,7 @@ module Raptor
       @client_options = options[:client]
       @on_error = options[:on_error]
       @stats_file = options[:stats_file]
-      @pidfile = options[:pidfile]
+      @pid_file = options[:pid_file]
 
       @binder = Binder.new(options[:binds])
       @server_port = @binder.server_port
@@ -135,7 +135,7 @@ module Raptor
       trap("USR1") { log_stats }
       trap("USR2") { @phased_restart_requested = true }
 
-      File.open(@pidfile, File::CREAT | File::EXCL | File::WRONLY) { |file| file.write(Process.pid.to_s) } if @pidfile
+      File.open(@pid_file, File::CREAT | File::EXCL | File::WRONLY) { |file| file.write(Process.pid.to_s) } if @pid_file
 
       @worker_count.times { |index| spawn_worker(index) }
 
@@ -159,7 +159,7 @@ module Raptor
       @workers.values.each { |pid| Process.wait(pid) rescue nil }
       stats_file_thread&.join
       File.delete(@stats_file) rescue nil if @stats_file
-      File.delete(@pidfile) rescue nil if @pidfile
+      File.delete(@pid_file) rescue nil if @pid_file
       @stats.unmap
     end
 

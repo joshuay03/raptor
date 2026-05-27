@@ -89,7 +89,7 @@ module Rackup
           client: cli_defaults[:client].merge(config[:client] || {})
         }
 
-        [:rackup, :on_error, :stats_file, :pidfile].each do |key|
+        [:rackup, :on_error, :stats_file, :pid_file].each do |key|
           result[key] = config[key] if config.key?(key)
         end
 

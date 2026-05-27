@@ -40,7 +40,7 @@ module Raptor
         body_spool_threshold: 1024 * 1024,
       },
       stats_file: "tmp/raptor.json",
-      pidfile: nil,
+      pid_file: nil,
     }.freeze
 
     DEFAULT_CONFIG_PATHS = ["raptor.rb", "config/raptor.rb"].freeze
@@ -251,8 +251,8 @@ module Raptor
           @options[:stats_file] = path
         end
 
-        opts.on("--pidfile PATH", String, "Pidfile path (default: none)") do |path|
-          @options[:pidfile] = path
+        opts.on("--pid-file PATH", String, "PID file path (default: none)") do |path|
+          @options[:pid_file] = path
         end
 
         opts.on("--help", "Show this help") do

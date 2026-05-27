@@ -25,7 +25,7 @@ module Raptor
       assert_nil options(cli)[:client][:max_body_size]
       assert_equal 1024 * 1024, options(cli)[:client][:body_spool_threshold]
       assert_equal "tmp/raptor.json", options(cli)[:stats_file]
-      assert_nil options(cli)[:pidfile]
+      assert_nil options(cli)[:pid_file]
     end
 
     def test_rackup_file_positional_argument
@@ -169,10 +169,10 @@ module Raptor
       assert_equal "/tmp/custom.json", options(cli)[:stats_file]
     end
 
-    def test_pidfile
-      cli = CLI.new(["--pidfile", "/tmp/raptor.pid"])
+    def test_pid_file
+      cli = CLI.new(["--pid-file", "/tmp/raptor.pid"])
 
-      assert_equal "/tmp/raptor.pid", options(cli)[:pidfile]
+      assert_equal "/tmp/raptor.pid", options(cli)[:pid_file]
     end
 
     def test_multiple_options_together
