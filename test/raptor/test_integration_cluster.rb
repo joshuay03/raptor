@@ -584,6 +584,50 @@ module Raptor
       end
     end
 
+    def test_cluster_shuts_down_promptly_with_active_keepalive_pipeline
+      fixture_content = <<~RUBY
+        run proc { |_env| sleep 0.2; [200, { "content-type" => "text/plain" }, ["ok"]] }
+      RUBY
+      rackup_file = Tempfile.new(["config", ".ru"])
+      rackup_file.write(fixture_content)
+      rackup_file.close
+      @options[:rackup] = rackup_file.path
+
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      client_socket = TCPSocket.new("127.0.0.1", server_port)
+      client_socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+
+      client_thread = Thread.new do
+        loop do
+          client_socket.write("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+          response = String.new
+          response << client_socket.readpartial(1024) until response.include?("ok")
+        rescue
+          break
+        end
+      end
+
+      sleep 0.3
+
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      Process.kill("TERM", cluster_pid)
+      Process.wait(cluster_pid)
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+
+      client_thread.join
+
+      assert_operator elapsed, :<, 2
+    ensure
+      client_socket&.close
+      rackup_file&.unlink
+    end
+
     def test_reactor_thread_survives_unexpected_error
       cluster = without_output { Cluster.new(@options) }
       server_port = cluster.instance_variable_get(:@server_port)

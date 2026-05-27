@@ -5,6 +5,7 @@ require "socket"
 require "stringio"
 require "tempfile"
 
+require "atomic-ruby/atomic_boolean"
 require "rack"
 
 require_relative "raptor_http"
@@ -125,6 +126,7 @@ module Raptor
     # @rbs @max_body_size: Integer?
     # @rbs @body_spool_threshold: Integer?
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    # @rbs @running: AtomicBoolean
 
     # Creates a new Request handler.
     #
@@ -143,6 +145,17 @@ module Raptor
       @max_body_size = client_options[:max_body_size]
       @body_spool_threshold = client_options[:body_spool_threshold]
       @on_error = on_error
+      @running = AtomicBoolean.new(true)
+    end
+
+    # Signals eager keep-alive loops to stop processing further requests on
+    # their connections. In-flight requests complete normally.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def shutdown
+      @running.make_false
     end
 
     # Eagerly reads and parses the first request on a freshly accepted
@@ -437,6 +450,11 @@ module Raptor
     # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
     def eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme)
       loop do
+        unless @running.true?
+          socket.close rescue nil
+          return
+        end
+
         unless socket.wait_readable(KEEPALIVE_READ_TIMEOUT)
           reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
           return

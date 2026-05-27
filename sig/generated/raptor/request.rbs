@@ -93,6 +93,8 @@ module Raptor
     # @rbs (TCPSocket socket, String string) -> void
     def self.socket_write: (TCPSocket socket, String string) -> void
 
+    @running: AtomicBoolean
+
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
     @body_spool_threshold: Integer?
@@ -115,6 +117,14 @@ module Raptor
     #
     # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
     def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?client_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+
+    # Signals eager keep-alive loops to stop processing further requests on
+    # their connections. In-flight requests complete normally.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def shutdown: () -> void
 
     # Eagerly reads and parses the first request on a freshly accepted
     # connection on the server thread, dispatching directly to the thread pool

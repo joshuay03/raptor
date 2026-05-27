@@ -338,6 +338,7 @@ module Raptor
       reactor.shutdown
       reactor_thread.join
       ractor_pool.shutdown
+      request.shutdown
       thread_pool.shutdown
       stats_thread.join
     end

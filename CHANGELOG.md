@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Exit eager keep-alive loops on cluster shutdown
 - Apply the write timeout to HTTP/2 frame writes
 - Reject HPACK dynamic table size updates larger than 4096 bytes
 - Reject malformed HTTP/1.1 requests with a 400 response
