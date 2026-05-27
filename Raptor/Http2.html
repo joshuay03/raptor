@@ -6,7 +6,7 @@
 <title>
   Class: Raptor::Http2
   
-    &mdash; Documentation by YARD 0.9.43
+    &mdash; Documentation by YARD 0.9.44
   
 </title>
 
@@ -123,7 +123,7 @@ pipeline used by HTTP/1.1 connections.</p>
     
   
     
-      <strong class="classes">Classes:</strong> <span class='object_link'><a href="Http2/Writer.html" title="Raptor::Http2::Writer (class)">Writer</a></span>
+      <strong class="classes">Classes:</strong> <span class='object_link'><a href="Http2/FlowControl.html" title="Raptor::Http2::FlowControl (class)">FlowControl</a></span>, <span class='object_link'><a href="Http2/Writer.html" title="Raptor::Http2::Writer (class)">Writer</a></span>
     
   
 </p>
@@ -243,6 +243,114 @@ pipeline used by HTTP/1.1 connections.</p>
 </div>
         </dt>
         <dd><pre class="code"><span class='int'>0x20</span></pre></dd>
+      
+        <dt id="ERROR_NO_ERROR-constant" class="">ERROR_NO_ERROR =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='int'>0x0</span></pre></dd>
+      
+        <dt id="ERROR_PROTOCOL_ERROR-constant" class="">ERROR_PROTOCOL_ERROR =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='int'>0x1</span></pre></dd>
+      
+        <dt id="DEFAULT_WINDOW_SIZE-constant" class="">DEFAULT_WINDOW_SIZE =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='int'>65_535</span></pre></dd>
+      
+        <dt id="MAX_FRAME_SIZE-constant" class="">MAX_FRAME_SIZE =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='int'>16_384</span></pre></dd>
       
         <dt id="SERVER_PROTOCOL-constant" class="">SERVER_PROTOCOL =
           <div class="docstring">
@@ -399,6 +507,28 @@ pipeline used by HTTP/1.1 connections.</p>
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#apply_flow_control_updates-instance_method" title="#apply_flow_control_updates (instance method)">#<strong>apply_flow_control_updates</strong>(flow_control, result)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Applies inbound flow-control updates from a parsed result to the connection's <code>FlowControl</code>.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#build_rack_env-instance_method" title="#build_rack_env (instance method)">#<strong>build_rack_env</strong>(headers, body, remote_addr:)  &#x21d2; Hash </a>
     
 
@@ -421,7 +551,7 @@ pipeline used by HTTP/1.1 connections.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#dispatch_stream_request-instance_method" title="#dispatch_stream_request (instance method)">#<strong>dispatch_stream_request</strong>(socket, writer, stream_id, headers, body, remote_addr:)  &#x21d2; void </a>
+      <a href="#dispatch_stream_request-instance_method" title="#dispatch_stream_request (instance method)">#<strong>dispatch_stream_request</strong>(socket, writer, flow_control, stream_id, headers, body, remote_addr:)  &#x21d2; void </a>
     
 
     
@@ -533,7 +663,7 @@ pipeline used by HTTP/1.1 connections.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#write_http2_response-instance_method" title="#write_http2_response (instance method)">#<strong>write_http2_response</strong>(socket, writer, stream_id, status, headers, body)  &#x21d2; void </a>
+      <a href="#write_http2_response-instance_method" title="#write_http2_response (instance method)">#<strong>write_http2_response</strong>(socket, writer, flow_control, stream_id, status, headers, body)  &#x21d2; void </a>
     
 
     
@@ -644,14 +774,14 @@ pipeline used by HTTP/1.1 connections.</p>
       <pre class="lines">
 
 
-98
-99
-100
-101
-102</pre>
+198
+199
+200
+201
+202</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 98</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 198</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='id identifier rubyid_server_port'>server_port</span><span class='comma'>,</span> <span class='label'>on_error:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='ivar'>@app</span> <span class='op'>=</span> <span class='id identifier rubyid_app'>app</span>
@@ -710,17 +840,17 @@ pipeline used by HTTP/1.1 connections.</p>
       <pre class="lines">
 
 
-109
-110
-111
-112
-113
-114
-115
-116</pre>
+209
+210
+211
+212
+213
+214
+215
+216</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 109</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 209</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_build_server_settings_frame'>build_server_settings_frame</span>
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
@@ -796,114 +926,153 @@ completed stream requests. Ractor-safe.</p>
       <pre class="lines">
 
 
-128
-129
-130
-131
-132
-133
-134
-135
-136
-137
-138
-139
-140
-141
-142
-143
-144
-145
-146
-147
-148
-149
-150
-151
-152
-153
-154
-155
-156
-157
-158
-159
-160
-161
-162
-163
-164
-165
-166
-167
-168
-169
-170
-171
-172
-173
-174
-175
-176
-177
-178
-179
-180
-181
-182
-183
-184
-185
-186
-187
-188
-189
-190
-191
-192
-193
-194
-195
-196
-197
-198
-199
-200
-201
-202
-203
-204
-205
-206
-207
-208
-209
-210
-211
-212
-213
-214
-215
-216
-217
-218
-219
-220
-221
-222
-223
-224
-225
-226
-227
 228
 229
 230
 231
-232</pre>
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 128</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 228</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_process_frames'>process_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_data'>data</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
@@ -912,15 +1081,20 @@ completed stream requests. Ractor-safe.</p>
   <span class='id identifier rubyid_streams'>streams</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:http2_streams</span><span class='rbracket'>]</span> <span class='op'>?</span> <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:http2_streams</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span> <span class='op'>:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
   <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
   <span class='id identifier rubyid_completed_requests'>completed_requests</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
-  <span class='id identifier rubyid_connection_window'>connection_window</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:http2_window</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='int'>65_535</span>
+  <span class='id identifier rubyid_window_updates'>window_updates</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_peer_initial_window_size'>peer_initial_window_size</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='id identifier rubyid_connection_window'>connection_window</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:http2_window</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="#DEFAULT_WINDOW_SIZE-constant" title="Raptor::Http2::DEFAULT_WINDOW_SIZE (constant)">DEFAULT_WINDOW_SIZE</a></span></span>
   <span class='id identifier rubyid_preface_received'>preface_received</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:http2_preface_received</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='kw'>false</span>
+  <span class='id identifier rubyid_last_client_stream_id'>last_client_stream_id</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:http2_last_client_stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='int'>0</span>
+  <span class='id identifier rubyid_pending_headers'>pending_headers</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:http2_pending_headers</span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_goaway_error'>goaway_error</span> <span class='op'>=</span> <span class='kw'>nil</span>
 
   <span class='kw'>unless</span> <span class='id identifier rubyid_preface_received'>preface_received</span>
     <span class='kw'>if</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span> <span class='op'>&gt;=</span> <span class='int'>24</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='int'>0</span><span class='comma'>,</span> <span class='int'>24</span><span class='rparen'>)</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_connection_preface'><span class='object_link'><a href="Http2Parser.html#connection_preface-class_method" title="Raptor::Http2Parser.connection_preface (method)">connection_preface</a></span></span>
       <span class='id identifier rubyid_buffer'>buffer</span> <span class='op'>=</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='int'>24</span><span class='op'>..</span><span class='op'>-</span><span class='int'>1</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span>
       <span class='id identifier rubyid_preface_received'>preface_received</span> <span class='op'>=</span> <span class='kw'>true</span>
     <span class='kw'>else</span>
-      <span class='kw'>return</span> <span class='id identifier rubyid_build_result'>build_result</span><span class='lparen'>(</span><span class='id identifier rubyid_data'>data</span><span class='comma'>,</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span><span class='comma'>,</span> <span class='id identifier rubyid_streams'>streams</span><span class='comma'>,</span> <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span><span class='comma'>,</span> <span class='id identifier rubyid_completed_requests'>completed_requests</span><span class='comma'>,</span> <span class='id identifier rubyid_connection_window'>connection_window</span><span class='comma'>,</span> <span class='id identifier rubyid_preface_received'>preface_received</span><span class='rparen'>)</span>
+      <span class='kw'>return</span> <span class='id identifier rubyid_build_result'>build_result</span><span class='lparen'>(</span><span class='id identifier rubyid_data'>data</span><span class='comma'>,</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span><span class='comma'>,</span> <span class='id identifier rubyid_streams'>streams</span><span class='comma'>,</span> <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span><span class='comma'>,</span> <span class='id identifier rubyid_completed_requests'>completed_requests</span><span class='comma'>,</span> <span class='id identifier rubyid_window_updates'>window_updates</span><span class='comma'>,</span> <span class='id identifier rubyid_peer_initial_window_size'>peer_initial_window_size</span><span class='comma'>,</span> <span class='id identifier rubyid_connection_window'>connection_window</span><span class='comma'>,</span> <span class='id identifier rubyid_preface_received'>preface_received</span><span class='comma'>,</span> <span class='id identifier rubyid_last_client_stream_id'>last_client_stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='comma'>,</span> <span class='kw'>false</span><span class='rparen'>)</span>
     <span class='kw'>end</span>
   <span class='kw'>end</span>
 
@@ -931,9 +1105,16 @@ completed stream requests. Ractor-safe.</p>
     <span class='id identifier rubyid_frame'>frame</span><span class='comma'>,</span> <span class='id identifier rubyid_consumed'>consumed</span> <span class='op'>=</span> <span class='id identifier rubyid_parsed'>parsed</span>
     <span class='id identifier rubyid_buffer'>buffer</span> <span class='op'>=</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='id identifier rubyid_consumed'>consumed</span><span class='op'>..</span><span class='op'>-</span><span class='int'>1</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span>
 
+    <span class='kw'>if</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:type</span><span class='rbracket'>]</span> <span class='op'>!=</span> <span class='symbol'>:continuation</span>
+      <span class='id identifier rubyid_goaway_error'>goaway_error</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#ERROR_PROTOCOL_ERROR-constant" title="Raptor::Http2::ERROR_PROTOCOL_ERROR (constant)">ERROR_PROTOCOL_ERROR</a></span></span>
+      <span class='kw'>break</span>
+    <span class='kw'>end</span>
+
     <span class='kw'>case</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:type</span><span class='rbracket'>]</span>
     <span class='kw'>when</span> <span class='symbol'>:settings</span>
       <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:flags</span><span class='rbracket'>]</span> <span class='op'>&amp;</span> <span class='const'><span class='object_link'><a href="#FLAG_ACK-constant" title="Raptor::Http2::FLAG_ACK (constant)">FLAG_ACK</a></span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
+        <span class='id identifier rubyid_parsed_settings'>parsed_settings</span> <span class='op'>=</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_parse_settings'>parse_settings</span><span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:payload</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+        <span class='id identifier rubyid_peer_initial_window_size'>peer_initial_window_size</span> <span class='op'>=</span> <span class='id identifier rubyid_parsed_settings'>parsed_settings</span><span class='lbracket'>[</span><span class='symbol'>:initial_window_size</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_parsed_settings'>parsed_settings</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='symbol'>:initial_window_size</span><span class='rparen'>)</span>
         <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:settings</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#FLAG_ACK-constant" title="Raptor::Http2::FLAG_ACK (constant)">FLAG_ACK</a></span></span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='kw'>nil</span><span class='rparen'>)</span>
       <span class='kw'>end</span>
 
@@ -941,30 +1122,51 @@ completed stream requests. Ractor-safe.</p>
       <span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span>
       <span class='id identifier rubyid_header_payload'>header_payload</span> <span class='op'>=</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:payload</span><span class='rbracket'>]</span>
 
+      <span class='kw'>unless</span> <span class='id identifier rubyid_streams'>streams</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+        <span class='kw'>if</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='period'>.</span><span class='id identifier rubyid_even?'>even?</span> <span class='op'>||</span> <span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>&lt;=</span> <span class='id identifier rubyid_last_client_stream_id'>last_client_stream_id</span>
+          <span class='id identifier rubyid_goaway_error'>goaway_error</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#ERROR_PROTOCOL_ERROR-constant" title="Raptor::Http2::ERROR_PROTOCOL_ERROR (constant)">ERROR_PROTOCOL_ERROR</a></span></span>
+          <span class='kw'>break</span>
+        <span class='kw'>end</span>
+        <span class='id identifier rubyid_last_client_stream_id'>last_client_stream_id</span> <span class='op'>=</span> <span class='id identifier rubyid_stream_id'>stream_id</span>
+      <span class='kw'>end</span>
+
       <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:flags</span><span class='rbracket'>]</span> <span class='op'>&amp;</span> <span class='const'><span class='object_link'><a href="#FLAG_PRIORITY-constant" title="Raptor::Http2::FLAG_PRIORITY (constant)">FLAG_PRIORITY</a></span></span><span class='rparen'>)</span> <span class='op'>!=</span> <span class='int'>0</span>
         <span class='id identifier rubyid_header_payload'>header_payload</span> <span class='op'>=</span> <span class='id identifier rubyid_header_payload'>header_payload</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='int'>5</span><span class='op'>..</span><span class='op'>-</span><span class='int'>1</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span>
       <span class='kw'>end</span>
 
-      <span class='id identifier rubyid_decoded_headers'>decoded_headers</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span> <span class='op'>=</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_parse_headers'>parse_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_header_payload'>header_payload</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span><span class='rparen'>)</span>
-      <span class='id identifier rubyid_stream'>stream</span> <span class='op'>=</span> <span class='id identifier rubyid_streams'>streams</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
-      <span class='id identifier rubyid_stream'>stream</span> <span class='op'>=</span> <span class='id identifier rubyid_stream'>stream</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='label'>headers:</span> <span class='id identifier rubyid_decoded_headers'>decoded_headers</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_end_stream'>end_stream</span> <span class='op'>=</span> <span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:flags</span><span class='rbracket'>]</span> <span class='op'>&amp;</span> <span class='const'><span class='object_link'><a href="#FLAG_END_STREAM-constant" title="Raptor::Http2::FLAG_END_STREAM (constant)">FLAG_END_STREAM</a></span></span><span class='rparen'>)</span> <span class='op'>!=</span> <span class='int'>0</span>
 
-      <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:flags</span><span class='rbracket'>]</span> <span class='op'>&amp;</span> <span class='const'><span class='object_link'><a href="#FLAG_END_STREAM-constant" title="Raptor::Http2::FLAG_END_STREAM (constant)">FLAG_END_STREAM</a></span></span><span class='rparen'>)</span> <span class='op'>!=</span> <span class='int'>0</span>
-        <span class='id identifier rubyid_stream'>stream</span> <span class='op'>=</span> <span class='id identifier rubyid_stream'>stream</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='label'>end_stream:</span> <span class='kw'>true</span><span class='rparen'>)</span>
-        <span class='id identifier rubyid_completed_requests'>completed_requests</span> <span class='op'>&lt;&lt;</span> <span class='lbrace'>{</span>
-          <span class='label'>stream_id:</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span>
-          <span class='label'>headers:</span> <span class='id identifier rubyid_decoded_headers'>decoded_headers</span><span class='comma'>,</span>
-          <span class='label'>body:</span> <span class='id identifier rubyid_stream'>stream</span><span class='lbracket'>[</span><span class='symbol'>:body</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span>
-        <span class='rbrace'>}</span>
-
-        <span class='id identifier rubyid_streams'>streams</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+      <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:flags</span><span class='rbracket'>]</span> <span class='op'>&amp;</span> <span class='const'><span class='object_link'><a href="#FLAG_END_HEADERS-constant" title="Raptor::Http2::FLAG_END_HEADERS (constant)">FLAG_END_HEADERS</a></span></span><span class='rparen'>)</span> <span class='op'>!=</span> <span class='int'>0</span>
+        <span class='id identifier rubyid_decoded_headers'>decoded_headers</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span> <span class='op'>=</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_parse_headers'>parse_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_header_payload'>header_payload</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span><span class='rparen'>)</span>
+        <span class='id identifier rubyid_streams'>streams</span><span class='comma'>,</span> <span class='id identifier rubyid_completed_requests'>completed_requests</span> <span class='op'>=</span> <span class='id identifier rubyid_finalize_headers'>finalize_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_streams'>streams</span><span class='comma'>,</span> <span class='id identifier rubyid_completed_requests'>completed_requests</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_decoded_headers'>decoded_headers</span><span class='comma'>,</span> <span class='id identifier rubyid_end_stream'>end_stream</span><span class='rparen'>)</span>
       <span class='kw'>else</span>
-        <span class='id identifier rubyid_streams'>streams</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_stream'>stream</span>
+        <span class='id identifier rubyid_pending_headers'>pending_headers</span> <span class='op'>=</span> <span class='lbrace'>{</span> <span class='label'>stream_id:</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='label'>buffer:</span> <span class='id identifier rubyid_header_payload'>header_payload</span><span class='comma'>,</span> <span class='label'>end_stream:</span> <span class='id identifier rubyid_end_stream'>end_stream</span> <span class='rbrace'>}</span>
+      <span class='kw'>end</span>
+
+    <span class='kw'>when</span> <span class='symbol'>:continuation</span>
+      <span class='kw'>if</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>||</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span> <span class='op'>!=</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span>
+        <span class='id identifier rubyid_goaway_error'>goaway_error</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#ERROR_PROTOCOL_ERROR-constant" title="Raptor::Http2::ERROR_PROTOCOL_ERROR (constant)">ERROR_PROTOCOL_ERROR</a></span></span>
+        <span class='kw'>break</span>
+      <span class='kw'>end</span>
+
+      <span class='id identifier rubyid_pending_headers'>pending_headers</span> <span class='op'>=</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='label'>buffer:</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='lbracket'>[</span><span class='symbol'>:buffer</span><span class='rbracket'>]</span> <span class='op'>+</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:payload</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+
+      <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:flags</span><span class='rbracket'>]</span> <span class='op'>&amp;</span> <span class='const'><span class='object_link'><a href="#FLAG_END_HEADERS-constant" title="Raptor::Http2::FLAG_END_HEADERS (constant)">FLAG_END_HEADERS</a></span></span><span class='rparen'>)</span> <span class='op'>!=</span> <span class='int'>0</span>
+        <span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span>
+        <span class='id identifier rubyid_decoded_headers'>decoded_headers</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span> <span class='op'>=</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_parse_headers'>parse_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='lbracket'>[</span><span class='symbol'>:buffer</span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span><span class='rparen'>)</span>
+        <span class='id identifier rubyid_streams'>streams</span><span class='comma'>,</span> <span class='id identifier rubyid_completed_requests'>completed_requests</span> <span class='op'>=</span> <span class='id identifier rubyid_finalize_headers'>finalize_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_streams'>streams</span><span class='comma'>,</span> <span class='id identifier rubyid_completed_requests'>completed_requests</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_decoded_headers'>decoded_headers</span><span class='comma'>,</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='lbracket'>[</span><span class='symbol'>:end_stream</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+        <span class='id identifier rubyid_pending_headers'>pending_headers</span> <span class='op'>=</span> <span class='kw'>nil</span>
       <span class='kw'>end</span>
 
     <span class='kw'>when</span> <span class='symbol'>:data</span>
       <span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span>
-      <span class='id identifier rubyid_stream'>stream</span> <span class='op'>=</span> <span class='id identifier rubyid_streams'>streams</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
+
+      <span class='kw'>unless</span> <span class='id identifier rubyid_streams'>streams</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+        <span class='id identifier rubyid_goaway_error'>goaway_error</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#ERROR_PROTOCOL_ERROR-constant" title="Raptor::Http2::ERROR_PROTOCOL_ERROR (constant)">ERROR_PROTOCOL_ERROR</a></span></span>
+        <span class='kw'>break</span>
+      <span class='kw'>end</span>
+
+      <span class='id identifier rubyid_stream'>stream</span> <span class='op'>=</span> <span class='id identifier rubyid_streams'>streams</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span>
       <span class='id identifier rubyid_existing_body'>existing_body</span> <span class='op'>=</span> <span class='id identifier rubyid_stream'>stream</span><span class='lbracket'>[</span><span class='symbol'>:body</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span>
       <span class='id identifier rubyid_stream'>stream</span> <span class='op'>=</span> <span class='id identifier rubyid_stream'>stream</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='label'>body:</span> <span class='id identifier rubyid_existing_body'>existing_body</span> <span class='op'>+</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:payload</span><span class='rbracket'>]</span><span class='rparen'>)</span>
 
@@ -993,7 +1195,8 @@ completed stream requests. Ractor-safe.</p>
       <span class='kw'>end</span>
 
     <span class='kw'>when</span> <span class='symbol'>:window_update</span>
-      <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_parse_window_update'>parse_window_update</span><span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:payload</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_increment'>increment</span> <span class='op'>=</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_parse_window_update'>parse_window_update</span><span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:payload</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_window_updates'>window_updates</span> <span class='op'>&lt;&lt;</span> <span class='lbracket'>[</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='id identifier rubyid_increment'>increment</span><span class='rbracket'>]</span>
 
     <span class='kw'>when</span> <span class='symbol'>:ping</span>
       <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:flags</span><span class='rbracket'>]</span> <span class='op'>&amp;</span> <span class='const'><span class='object_link'><a href="#FLAG_ACK-constant" title="Raptor::Http2::FLAG_ACK (constant)">FLAG_ACK</a></span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
@@ -1008,7 +1211,12 @@ completed stream requests. Ractor-safe.</p>
     <span class='kw'>end</span>
   <span class='kw'>end</span>
 
-  <span class='id identifier rubyid_build_result'>build_result</span><span class='lparen'>(</span><span class='id identifier rubyid_data'>data</span><span class='comma'>,</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span><span class='comma'>,</span> <span class='id identifier rubyid_streams'>streams</span><span class='comma'>,</span> <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span><span class='comma'>,</span> <span class='id identifier rubyid_completed_requests'>completed_requests</span><span class='comma'>,</span> <span class='id identifier rubyid_connection_window'>connection_window</span><span class='comma'>,</span> <span class='id identifier rubyid_preface_received'>preface_received</span><span class='rparen'>)</span>
+  <span class='kw'>if</span> <span class='id identifier rubyid_goaway_error'>goaway_error</span>
+    <span class='id identifier rubyid_goaway_payload'>goaway_payload</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_last_client_stream_id'>last_client_stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_goaway_error'>goaway_error</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>NN</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:goaway</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_goaway_payload'>goaway_payload</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+
+  <span class='id identifier rubyid_build_result'>build_result</span><span class='lparen'>(</span><span class='id identifier rubyid_data'>data</span><span class='comma'>,</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='comma'>,</span> <span class='id identifier rubyid_hpack_table'>hpack_table</span><span class='comma'>,</span> <span class='id identifier rubyid_streams'>streams</span><span class='comma'>,</span> <span class='id identifier rubyid_outgoing_frames'>outgoing_frames</span><span class='comma'>,</span> <span class='id identifier rubyid_completed_requests'>completed_requests</span><span class='comma'>,</span> <span class='id identifier rubyid_window_updates'>window_updates</span><span class='comma'>,</span> <span class='id identifier rubyid_peer_initial_window_size'>peer_initial_window_size</span><span class='comma'>,</span> <span class='id identifier rubyid_connection_window'>connection_window</span><span class='comma'>,</span> <span class='id identifier rubyid_preface_received'>preface_received</span><span class='comma'>,</span> <span class='id identifier rubyid_last_client_stream_id'>last_client_stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='comma'>,</span> <span class='op'>!</span><span class='id identifier rubyid_goaway_error'>goaway_error</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -1022,7 +1230,99 @@ completed stream requests. Ractor-safe.</p>
 
     
       <div class="method_details first">
-  <h3 class="signature first" id="build_rack_env-instance_method">
+  <h3 class="signature first" id="apply_flow_control_updates-instance_method">
+  
+    #<strong>apply_flow_control_updates</strong>(flow_control, result)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Applies inbound flow-control updates from a parsed result to the
+connection's <code>FlowControl</code>.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>flow_control</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="Http2/FlowControl.html" title="Raptor::Http2::FlowControl (class)">FlowControl</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the per-connection flow controller</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>result</span>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the parsed result from <code>process_frames</code></p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 497</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_apply_flow_control_updates'>apply_flow_control_updates</span><span class='lparen'>(</span><span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_result'>result</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:window_updates</span><span class='rbracket'>]</span><span class='op'>&amp;.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_increment'>increment</span><span class='op'>|</span>
+    <span class='kw'>if</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
+      <span class='id identifier rubyid_flow_control'>flow_control</span><span class='period'>.</span><span class='id identifier rubyid_add_connection_window'>add_connection_window</span><span class='lparen'>(</span><span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
+    <span class='kw'>else</span>
+      <span class='id identifier rubyid_flow_control'>flow_control</span><span class='period'>.</span><span class='id identifier rubyid_add_stream_window'>add_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
+    <span class='kw'>end</span>
+  <span class='kw'>end</span>
+
+  <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_new_size'>new_size</span> <span class='op'>=</span> <span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:peer_initial_window_size</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_flow_control'>flow_control</span><span class='period'>.</span><span class='id identifier rubyid_set_initial_stream_window'>set_initial_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_new_size'>new_size</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="build_rack_env-instance_method">
   
     #<strong>build_rack_env</strong>(headers, body, remote_addr:)  &#x21d2; <tt>Hash</tt> 
   
@@ -1120,54 +1420,54 @@ and populates all required Rack env entries.</p>
       <pre class="lines">
 
 
-406
-407
-408
-409
-410
-411
-412
-413
-414
-415
-416
-417
-418
-419
-420
-421
-422
-423
-424
-425
-426
-427
-428
-429
-430
-431
-432
-433
-434
-435
-436
-437
-438
-439
-440
-441
-442
-443
-444
-445
-446
-447
-448
-449
-450</pre>
+625
+626
+627
+628
+629
+630
+631
+632
+633
+634
+635
+636
+637
+638
+639
+640
+641
+642
+643
+644
+645
+646
+647
+648
+649
+650
+651
+652
+653
+654
+655
+656
+657
+658
+659
+660
+661
+662
+663
+664
+665
+666
+667
+668
+669</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 406</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 625</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_build_rack_env'>build_rack_env</span><span class='lparen'>(</span><span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='label'>remote_addr:</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_env'>env</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
@@ -1222,7 +1522,7 @@ and populates all required Rack env entries.</p>
       <div class="method_details ">
   <h3 class="signature " id="dispatch_stream_request-instance_method">
   
-    #<strong>dispatch_stream_request</strong>(socket, writer, stream_id, headers, body, remote_addr:)  &#x21d2; <tt>void</tt> 
+    #<strong>dispatch_stream_request</strong>(socket, writer, flow_control, stream_id, headers, body, remote_addr:)  &#x21d2; <tt>void</tt> 
   
 
   
@@ -1264,6 +1564,20 @@ the response back as HTTP/2 frames.</p>
       
         &mdash;
         <div class='inline'><p>lock-free frame writer for the connection</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>flow_control</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="Http2/FlowControl.html" title="Raptor::Http2::FlowControl (class)">FlowControl</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>per-connection outbound flow controller</p></div>
       
     </li>
   
@@ -1343,31 +1657,31 @@ the response back as HTTP/2 frames.</p>
       <pre class="lines">
 
 
-313
-314
-315
-316
-317
-318
-319
-320
-321
-322
-323
-324
-325
-326
-327
-328</pre>
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+539</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 313</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 524</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_dispatch_stream_request'>dispatch_stream_request</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='label'>remote_addr:</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_dispatch_stream_request'>dispatch_stream_request</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='label'>remote_addr:</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_env'>env</span> <span class='op'>=</span> <span class='id identifier rubyid_build_rack_env'>build_rack_env</span><span class='lparen'>(</span><span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='label'>remote_addr:</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_response_headers'>response_headers</span><span class='comma'>,</span> <span class='id identifier rubyid_response_body'>response_body</span> <span class='op'>=</span> <span class='ivar'>@app</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
 
-  <span class='id identifier rubyid_write_http2_response'>write_http2_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_response_headers'>response_headers</span><span class='comma'>,</span> <span class='id identifier rubyid_response_body'>response_body</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_write_http2_response'>write_http2_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_response_headers'>response_headers</span><span class='comma'>,</span> <span class='id identifier rubyid_response_body'>response_body</span><span class='rparen'>)</span>
 <span class='kw'>rescue</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_error'>error</span>
   <span class='id identifier rubyid_write_http2_error_response'>write_http2_error_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
 
@@ -1456,40 +1770,56 @@ and dispatches completed stream requests to the thread pool.</p>
       <pre class="lines">
 
 
-275
-276
-277
-278
-279
-280
-281
-282
-283
-284
-285
-286
-287
-288
-289
-290
-291
-292
-293
-294
-295
-296
-297</pre>
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 275</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 455</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle_parsed_request'>handle_parsed_request</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_socket_for'>socket_for</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_socket'>socket</span>
 
   <span class='id identifier rubyid_writer'>writer</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_writer_for'>writer_for</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_flow_control'>flow_control</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_flow_control_for'>flow_control_for</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+
+  <span class='id identifier rubyid_apply_flow_control_updates'>apply_flow_control_updates</span><span class='lparen'>(</span><span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_result'>result</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_flow_control'>flow_control</span>
 
   <span class='id identifier rubyid_writer'>writer</span><span class='period'>.</span><span class='id identifier rubyid_write_frames'>write_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:outgoing_frames</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+
+  <span class='kw'>if</span> <span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:close_connection</span><span class='rbracket'>]</span>
+    <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_close_connection'>close_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+    <span class='kw'>return</span>
+  <span class='kw'>end</span>
 
   <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_update_http2_state'>update_http2_state</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='rparen'>)</span>
 
@@ -1499,7 +1829,7 @@ and dispatches completed stream requests to the thread pool.</p>
 
     <span class='id identifier rubyid_thread_pool'>thread_pool</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_proc'>proc</span> <span class='kw'>do</span>
       <span class='id identifier rubyid_dispatch_stream_request'>dispatch_stream_request</span><span class='lparen'>(</span>
-        <span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span>
+        <span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span>
         <span class='id identifier rubyid_request'>request</span><span class='lbracket'>[</span><span class='symbol'>:headers</span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='id identifier rubyid_request'>request</span><span class='lbracket'>[</span><span class='symbol'>:body</span><span class='rbracket'>]</span><span class='comma'>,</span>
         <span class='label'>remote_addr:</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span>
       <span class='rparen'>)</span>
@@ -1553,26 +1883,26 @@ and dispatches completed stream requests to the thread pool.</p>
       <pre class="lines">
 
 
-458
-459
-460
-461
-462
-463
-464
-465
-466
-467
-468
-469
-470
-471
-472
-473
-474</pre>
+677
+678
+679
+680
+681
+682
+683
+684
+685
+686
+687
+688
+689
+690
+691
+692
+693</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 458</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 677</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_populate_server_name_and_port'>populate_server_name_and_port</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_http_host'>http_host</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>HTTP_HOST</span><span class='rbracket'>]</span>
@@ -1666,18 +1996,18 @@ and dispatches completed stream requests to the thread pool.</p>
       <pre class="lines">
 
 
-385
-386
-387
-388
-389
-390
-391
-392
-393</pre>
+604
+605
+606
+607
+608
+609
+610
+611
+612</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 385</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 604</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_http2_error_response'>write_http2_error_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
@@ -1696,7 +2026,7 @@ and dispatches completed stream requests to the thread pool.</p>
       <div class="method_details ">
   <h3 class="signature " id="write_http2_response-instance_method">
   
-    #<strong>write_http2_response</strong>(socket, writer, stream_id, status, headers, body)  &#x21d2; <tt>void</tt> 
+    #<strong>write_http2_response</strong>(socket, writer, flow_control, stream_id, status, headers, body)  &#x21d2; <tt>void</tt> 
   
 
   
@@ -1705,6 +2035,8 @@ and dispatches completed stream requests to the thread pool.</p>
 </h3><div class="docstring">
   <div class="discussion">
     <p class="note returns_void">This method returns an undefined value.</p><p>Writes a Rack response as HTTP/2 frames to the socket.</p>
+<p>DATA frames are partitioned through <code>flow_control</code> so each write fits
+within the peer's per-stream and connection windows.</p>
 
   </div>
 </div>
@@ -1737,6 +2069,20 @@ and dispatches completed stream requests to the thread pool.</p>
       
         &mdash;
         <div class='inline'><p>lock-free frame writer for the connection</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>flow_control</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="Http2/FlowControl.html" title="Raptor::Http2::FlowControl (class)">FlowControl</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>per-connection outbound flow controller</p></div>
       
     </li>
   
@@ -1805,46 +2151,50 @@ and dispatches completed stream requests to the thread pool.</p>
       <pre class="lines">
 
 
-341
-342
-343
-344
-345
-346
-347
-348
-349
-350
-351
-352
-353
-354
-355
-356
-357
-358
-359
-360
-361
-362
-363
-364
-365
-366
-367
-368
-369
-370
-371
-372
-373
-374
-375</pre>
+556
+557
+558
+559
+560
+561
+562
+563
+564
+565
+566
+567
+568
+569
+570
+571
+572
+573
+574
+575
+576
+577
+578
+579
+580
+581
+582
+583
+584
+585
+586
+587
+588
+589
+590
+591
+592
+593
+594</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 341</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 556</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_write_http2_response'>write_http2_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_write_http2_response'>write_http2_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
 
   <span class='id identifier rubyid_header_pairs'>header_pairs</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>:status</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span><span class='rbracket'>]</span><span class='rbracket'>]</span>
@@ -1864,20 +2214,24 @@ and dispatches completed stream requests to the thread pool.</p>
   <span class='id identifier rubyid_body_chunks'>body_chunks</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
   <span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_chunk'>chunk</span><span class='op'>|</span> <span class='id identifier rubyid_body_chunks'>body_chunks</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_chunk'>chunk</span> <span class='kw'>unless</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='rbrace'>}</span>
 
-  <span class='id identifier rubyid_frames'>frames</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_body_chunks'>body_chunks</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
-    <span class='id identifier rubyid_frames'>frames</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:headers</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#FLAG_END_STREAM-constant" title="Raptor::Http2::FLAG_END_STREAM (constant)">FLAG_END_STREAM</a></span></span> <span class='op'>|</span> <span class='const'><span class='object_link'><a href="#FLAG_END_HEADERS-constant" title="Raptor::Http2::FLAG_END_HEADERS (constant)">FLAG_END_HEADERS</a></span></span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_encoded_headers'>encoded_headers</span><span class='rparen'>)</span>
-  <span class='kw'>else</span>
-    <span class='id identifier rubyid_frames'>frames</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:headers</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#FLAG_END_HEADERS-constant" title="Raptor::Http2::FLAG_END_HEADERS (constant)">FLAG_END_HEADERS</a></span></span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_encoded_headers'>encoded_headers</span><span class='rparen'>)</span>
-
-    <span class='id identifier rubyid_last_index'>last_index</span> <span class='op'>=</span> <span class='id identifier rubyid_body_chunks'>body_chunks</span><span class='period'>.</span><span class='id identifier rubyid_size'>size</span> <span class='op'>-</span> <span class='int'>1</span>
-    <span class='id identifier rubyid_body_chunks'>body_chunks</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_chunk'>chunk</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='op'>|</span>
-      <span class='id identifier rubyid_flags'>flags</span> <span class='op'>=</span> <span class='id identifier rubyid_index'>index</span> <span class='op'>==</span> <span class='id identifier rubyid_last_index'>last_index</span> <span class='op'>?</span> <span class='const'><span class='object_link'><a href="#FLAG_END_STREAM-constant" title="Raptor::Http2::FLAG_END_STREAM (constant)">FLAG_END_STREAM</a></span></span> <span class='op'>:</span> <span class='int'>0</span>
-      <span class='id identifier rubyid_frames'>frames</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:data</span><span class='comma'>,</span> <span class='id identifier rubyid_flags'>flags</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span>
-    <span class='kw'>end</span>
+    <span class='id identifier rubyid_writer'>writer</span><span class='period'>.</span><span class='id identifier rubyid_write_frames'>write_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:headers</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#FLAG_END_STREAM-constant" title="Raptor::Http2::FLAG_END_STREAM (constant)">FLAG_END_STREAM</a></span></span> <span class='op'>|</span> <span class='const'><span class='object_link'><a href="#FLAG_END_HEADERS-constant" title="Raptor::Http2::FLAG_END_HEADERS (constant)">FLAG_END_HEADERS</a></span></span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_encoded_headers'>encoded_headers</span><span class='rparen'>)</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+    <span class='kw'>return</span>
   <span class='kw'>end</span>
 
-  <span class='id identifier rubyid_writer'>writer</span><span class='period'>.</span><span class='id identifier rubyid_write_frames'>write_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_frames'>frames</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_writer'>writer</span><span class='period'>.</span><span class='id identifier rubyid_write_frames'>write_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:headers</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#FLAG_END_HEADERS-constant" title="Raptor::Http2::FLAG_END_HEADERS (constant)">FLAG_END_HEADERS</a></span></span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_encoded_headers'>encoded_headers</span><span class='rparen'>)</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+
+  <span class='id identifier rubyid_last_chunk_index'>last_chunk_index</span> <span class='op'>=</span> <span class='id identifier rubyid_body_chunks'>body_chunks</span><span class='period'>.</span><span class='id identifier rubyid_size'>size</span> <span class='op'>-</span> <span class='int'>1</span>
+  <span class='id identifier rubyid_body_chunks'>body_chunks</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_chunk'>chunk</span><span class='comma'>,</span> <span class='id identifier rubyid_chunk_index'>chunk_index</span><span class='op'>|</span>
+    <span class='id identifier rubyid_offset'>offset</span> <span class='op'>=</span> <span class='int'>0</span>
+    <span class='kw'>while</span> <span class='id identifier rubyid_offset'>offset</span> <span class='op'>&lt;</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span>
+      <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='id identifier rubyid_flow_control'>flow_control</span><span class='period'>.</span><span class='id identifier rubyid_acquire'>acquire</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span> <span class='op'>-</span> <span class='id identifier rubyid_offset'>offset</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_slice'>slice</span> <span class='op'>=</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='id identifier rubyid_offset'>offset</span><span class='comma'>,</span> <span class='id identifier rubyid_granted'>granted</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_offset'>offset</span> <span class='op'>+=</span> <span class='id identifier rubyid_granted'>granted</span>
+      <span class='id identifier rubyid_end_stream'>end_stream</span> <span class='op'>=</span> <span class='id identifier rubyid_chunk_index'>chunk_index</span> <span class='op'>==</span> <span class='id identifier rubyid_last_chunk_index'>last_chunk_index</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_offset'>offset</span> <span class='op'>==</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span>
+      <span class='id identifier rubyid_writer'>writer</span><span class='period'>.</span><span class='id identifier rubyid_write_frames'>write_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_parser'>parser</span><span class='period'>.</span><span class='id identifier rubyid_build_frame'>build_frame</span><span class='lparen'>(</span><span class='symbol'>:data</span><span class='comma'>,</span> <span class='id identifier rubyid_end_stream'>end_stream</span> <span class='op'>?</span> <span class='const'><span class='object_link'><a href="#FLAG_END_STREAM-constant" title="Raptor::Http2::FLAG_END_STREAM (constant)">FLAG_END_STREAM</a></span></span> <span class='op'>:</span> <span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_slice'>slice</span><span class='rparen'>)</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+    <span class='kw'>end</span>
+  <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -1889,9 +2243,9 @@ and dispatches completed stream requests to the thread pool.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon May 25 10:43:39 2026 by
+  Generated on Wed May 27 08:13:43 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
-  0.9.43 (ruby-4.0.5).
+  0.9.44 (ruby-4.0.5).
 </div>
 
     </div>
