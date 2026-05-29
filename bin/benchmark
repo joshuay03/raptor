@@ -1,0 +1,287 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "open3"
+require "optparse"
+require "socket"
+
+require_relative "../lib/raptor/version"
+
+WORKERS = 4
+THREADS = 3
+RUNS_PER_MODE = 4
+WARMUP_SECONDS = 5
+WARMUP_GAP_SECONDS = 25
+MAIN_SECONDS = 10
+BETWEEN_RUNS_SECONDS = 15
+HEY_CONNECTIONS = 12
+H2LOAD_CONNECTIONS = 4
+H2LOAD_STREAMS = 3
+H1_PORT = 9292
+H2_PORT = 9443
+RACKUP_PATH = "test/fixtures/hello_world.ru"
+CERT_PATH = "tmp/bench.crt"
+KEY_PATH = "tmp/bench.key"
+README_PATH = File.expand_path("../README.md", __dir__)
+BENCHMARKS_SECTION_PATTERN = /## \(Micro\) Benchmarks.*?(?=\n## |\z)/m
+
+options = { update_readme: false }
+OptionParser.new do |opts|
+  opts.banner = "Usage: bin/benchmark [--update-readme]"
+  opts.on("--update-readme", "Replace the README's (Micro) Benchmarks section with the results")
+end.parse!(into: options)
+
+def require_tool(name)
+  return if system("which #{name} > /dev/null 2>&1")
+
+  abort "Missing required tool: #{name.inspect}. Run bin/setup."
+end
+
+require_tool("hey")
+require_tool("h2load")
+require_tool("openssl")
+
+def log(message)
+  warn "[bench] #{message}"
+end
+
+def generate_cert
+  FileUtils.mkdir_p(File.dirname(CERT_PATH))
+  cmd = [
+    "openssl", "req", "-x509", "-newkey", "rsa:2048",
+    "-keyout", KEY_PATH, "-out", CERT_PATH,
+    "-days", "365", "-nodes",
+    "-subj", "/CN=localhost",
+    "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"
+  ]
+  return if system(*cmd, out: File::NULL, err: File::NULL)
+
+  abort "Failed to generate TLS cert/key."
+end
+
+def wait_for_port(port, timeout: 30)
+  deadline = Time.now + timeout
+  loop do
+    begin
+      TCPSocket.new("127.0.0.1", port).close
+      return
+    rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+      raise "Port #{port} never opened" if Time.now > deadline
+
+      sleep 0.2
+    end
+  end
+end
+
+def wait_for_port_free(port, timeout: 30)
+  deadline = Time.now + timeout
+  loop do
+    begin
+      TCPSocket.new("127.0.0.1", port).close
+      raise "Port #{port} still in use" if Time.now > deadline
+
+      sleep 0.5
+    rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+      return
+    end
+  end
+end
+
+def start_server(cmd, port)
+  pid = spawn(*cmd, out: File::NULL, err: File::NULL, pgroup: true)
+  wait_for_port(port)
+  pid
+rescue => error
+  Process.kill("TERM", -pid) if pid
+  raise error
+end
+
+def stop_server(pid, port)
+  Process.kill("TERM", -pid)
+  Process.wait(pid)
+rescue Errno::ESRCH, Errno::ECHILD
+ensure
+  wait_for_port_free(port)
+end
+
+def with_server(label, cmd, port)
+  log "Starting #{label}"
+  pid = start_server(cmd, port)
+  yield
+ensure
+  log "Stopping #{label}"
+  stop_server(pid, port) if pid
+end
+
+def run_hey(url:, keep_alive:)
+  keep_alive_flag = keep_alive ? nil : "-disable-keepalive"
+  warmup = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{WARMUP_SECONDS}s", keep_alive_flag, url].compact
+  warmup_output, warmup_status = Open3.capture2(*warmup)
+  abort_with_output "hey warmup failed", warmup_output unless warmup_status.success?
+  check_hey_clean(warmup_output, "warmup")
+
+  sleep WARMUP_GAP_SECONDS
+
+  measure = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{MAIN_SECONDS}s", keep_alive_flag, url].compact
+  output, status = Open3.capture2(*measure)
+  abort_with_output "hey failed", output unless status.success?
+  check_hey_clean(output, "measurement")
+
+  match = output.match(/Requests\/sec:\s+([\d.]+)/)
+  abort_with_output "could not parse hey output", output unless match
+
+  match[1].to_f
+end
+
+def check_hey_clean(output, phase)
+  abort_with_output "hey #{phase} produced errors", output if output.include?("Error distribution:")
+
+  responses = output.scan(/\[(\d{3})\]\s+\d+ responses/).flatten
+  abort_with_output "hey #{phase} received no responses", output if responses.empty?
+
+  non_2xx = responses.reject { |code| code.start_with?("2") }
+  abort_with_output "hey #{phase} received non-2xx responses (#{non_2xx.uniq.join(', ')})", output if non_2xx.any?
+end
+
+def run_h2load(url:)
+  warmup = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", WARMUP_SECONDS.to_s, url]
+  warmup_output, warmup_status = Open3.capture2(*warmup)
+  abort_with_output "h2load warmup failed", warmup_output unless warmup_status.success?
+  check_h2load_clean(warmup_output, "warmup")
+
+  sleep WARMUP_GAP_SECONDS
+
+  measure = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", MAIN_SECONDS.to_s, url]
+  output, status = Open3.capture2(*measure)
+  abort_with_output "h2load failed", output unless status.success?
+  check_h2load_clean(output, "measurement")
+
+  match = output.match(/finished in [\d.]+s,\s+([\d.]+) req\/s/)
+  abort_with_output "could not parse h2load output", output unless match
+
+  match[1].to_f
+end
+
+def check_h2load_clean(output, phase)
+  requests = output.match(/(\d+) succeeded, (\d+) failed, (\d+) errored, (\d+) timeout/)
+  abort_with_output "could not parse h2load requests summary", output unless requests
+
+  succeeded, failed, errored, timeout = requests.captures.map(&:to_i)
+  abort_with_output "h2load #{phase} reported #{failed} failed, #{errored} errored, #{timeout} timeout", output if failed > 0 || errored > 0 || timeout > 0
+  abort_with_output "h2load #{phase} received no successful responses", output if succeeded == 0
+
+  status_codes = output.match(/status codes: \d+ 2xx, (\d+) 3xx, (\d+) 4xx, (\d+) 5xx/)
+  abort_with_output "could not parse h2load status codes", output unless status_codes
+
+  threes, fours, fives = status_codes.captures.map(&:to_i)
+  abort_with_output "h2load #{phase} received non-2xx responses: #{threes} 3xx, #{fours} 4xx, #{fives} 5xx", output if threes > 0 || fours > 0 || fives > 0
+end
+
+def abort_with_output(message, output)
+  warn output
+  abort message
+end
+
+def benchmark(label)
+  log "Benchmarking #{label}"
+  results = []
+  RUNS_PER_MODE.times do |index|
+    result = yield
+    results << result
+    log "  Run #{index + 1}/#{RUNS_PER_MODE}: #{result.round} req/s"
+    sleep BETWEEN_RUNS_SECONDS if index < RUNS_PER_MODE - 1
+  end
+  best_two = results.sort.last(2)
+  average = best_two.sum / 2.0
+  log "  Best 2 avg: #{average.round} req/s"
+  average
+end
+
+def format_req_s(value)
+  rounded = (value / 100.0).round * 100
+  thousands = rounded / 1000.0
+  if thousands == thousands.to_i
+    "#{thousands.to_i}k req/s"
+  else
+    "#{format('%.1f', thousands)}k req/s"
+  end
+end
+
+def puma_version
+  output, status = Open3.capture2("bundle", "exec", "ruby", "-e", "require 'puma/const'; puts Puma::Const::PUMA_VERSION")
+  abort "could not read Puma version" unless status.success?
+
+  output.strip
+end
+
+generate_cert
+
+results = {}
+
+raptor_h1_cmd = ["bundle", "exec", "raptor", "-w", WORKERS.to_s, "-t", THREADS.to_s,
+                 "-b", "tcp://0.0.0.0:#{H1_PORT}", RACKUP_PATH]
+raptor_h2_cmd = ["bundle", "exec", "raptor", "-w", WORKERS.to_s, "-t", THREADS.to_s,
+                 "-b", "ssl://0.0.0.0:#{H2_PORT}?cert=#{CERT_PATH}&key=#{KEY_PATH}", RACKUP_PATH]
+puma_cmd = ["bundle", "exec", "puma", "-w", WORKERS.to_s, "-t", "#{THREADS}:#{THREADS}",
+            "-b", "tcp://0.0.0.0:#{H1_PORT}", RACKUP_PATH]
+
+with_server("Raptor (HTTP/1.1)", raptor_h1_cmd, H1_PORT) do
+  results[:raptor_h1] = benchmark("Raptor HTTP/1.1") do
+    run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: false)
+  end
+  results[:raptor_h1_ka] = benchmark("Raptor HTTP/1.1 (keep-alive)") do
+    run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: true)
+  end
+end
+
+with_server("Raptor (HTTP/2)", raptor_h2_cmd, H2_PORT) do
+  results[:raptor_h2] = benchmark("Raptor HTTP/2") do
+    run_h2load(url: "https://127.0.0.1:#{H2_PORT}/")
+  end
+end
+
+with_server("Puma (HTTP/1.1)", puma_cmd, H1_PORT) do
+  results[:puma_h1] = benchmark("Puma HTTP/1.1") do
+    run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: false)
+  end
+  results[:puma_h1_ka] = benchmark("Puma HTTP/1.1 (keep-alive)") do
+    run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: true)
+  end
+end
+
+raptor = format_req_s(results[:raptor_h1])
+raptor_ka = format_req_s(results[:raptor_h1_ka])
+raptor_h2 = format_req_s(results[:raptor_h2])
+puma = format_req_s(results[:puma_h1])
+puma_ka = format_req_s(results[:puma_h1_ka])
+
+cell_width = [raptor, raptor_ka, raptor_h2, puma, puma_ka, "N/A"].map(&:length).max
+raptor_header_pad = " " * (cell_width - "Raptor".length)
+puma_header_pad = " " * (cell_width - "Puma".length)
+cell = ->(value) { value.ljust(cell_width) }
+
+section = <<~MD
+  ## (Micro) Benchmarks
+
+  Raptor #{Raptor::VERSION} vs Puma #{puma_version}:
+
+  | Protocol              | Raptor#{raptor_header_pad} | Puma#{puma_header_pad} |
+  | --------------------- | #{"-" * cell_width} | #{"-" * cell_width} |
+  | HTTP/1.1              | #{cell.call(raptor)} | #{cell.call(puma)} |
+  | HTTP/1.1 (keep-alive) | #{cell.call(raptor_ka)} | #{cell.call(puma_ka)} |
+  | HTTP/2                | #{cell.call(raptor_h2)} | #{cell.call("N/A")} |
+
+  > #{RUBY_DESCRIPTION}. #{WORKERS} workers, #{THREADS} threads, #{HEY_CONNECTIONS} concurrent connections.
+MD
+
+puts
+puts section
+
+if options[:update_readme]
+  readme = File.read(README_PATH)
+  abort "Could not find existing (Micro) Benchmarks section in README.md" unless readme.match?(BENCHMARKS_SECTION_PATTERN)
+
+  File.write(README_PATH, readme.sub(BENCHMARKS_SECTION_PATTERN, section))
+  log "README.md updated."
+end

@@ -13,6 +13,8 @@ gem "minitest"
 gem "rackup"
 gem "http-2"
 
+gem "puma"
+
 gem "rbs-inline"
 
 gem "yard"
