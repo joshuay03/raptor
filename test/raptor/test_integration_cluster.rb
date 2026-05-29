@@ -345,7 +345,7 @@ module Raptor
 
         Timeout.timeout(5) do
           loop do
-            break if File.exist?(log_path)
+            break if File.exist?(log_path) && File.size(log_path) > 0
             sleep 0.1
           end
         end
