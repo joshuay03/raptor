@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-29
+
 - Load `raptor.rb` or `config/raptor.rb` by default when no config path is supplied
 - Honour the peer's HTTP/2 flow-control windows when sending `DATA` frames
 - Assemble HEADERS across `CONTINUATION` frames

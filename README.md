@@ -1,6 +1,6 @@
 # Raptor
 
-Raptor is a high-performance, preloading, multi-process, multi-threaded Ruby 4+ web server implementing Rack 3+,
+Raptor is a high-performance, preloading, multi-process, multi-threaded Ruby 4+ web server implementing Rack 3.2+,
 leveraging Ractors for parallel HTTP/1.1 and HTTP/2 request processing, native C extensions for HTTP parsing and HPACK
 compression, and NIO for non-blocking I/O.
 
@@ -31,9 +31,9 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 ```
 > bundle exec raptor -t 3 -w 4 hello_world.ru
 Raptor Cluster initializing:
-├─ Version: 0.3.0
-├─ Ruby Version: ruby 4.0.4 (2026-05-12 revision b89eb1bcbf) +YJIT +PRISM [arm64-darwin23]
-├─ Master PID: 31504
+├─ Version: 0.4.0
+├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
+├─ Master PID: 26456
 │  └─ 4 worker processes
 │     ├─ 1 server thread
 │     ├─ 1 reactor thread
@@ -42,10 +42,10 @@ Raptor Cluster initializing:
 │     ├─ 3 worker threads
 │     └─ 1 stats thread
 └─ Listening on 0.0.0.0:9292
-[31506] Worker 0 booted
-[31507] Worker 1 booted
-[31508] Worker 2 booted
-[31509] Worker 3 booted
+[26459] Worker 0 booted
+[26460] Worker 1 booted
+[26461] Worker 2 booted
+[26462] Worker 3 booted
 ```
 
 ```
@@ -62,15 +62,15 @@ Also works with `rackup` and `rails server`:
 
 ## (Micro) Benchmarks
 
-Raptor 0.3.0 vs Puma 8.0.1:
+Raptor 0.4.0 vs Puma 8.0.1:
 
 | Protocol              | Raptor       | Puma         |
 | --------------------- | ------------ | ------------ |
-| HTTP/1.1              | 20.3k req/s  | 20.8k req/s  |
-| HTTP/1.1 (keep-alive) | 60.9k req/s  | 45.4k req/s  |
-| HTTP/2                | 22.9k req/s  | N/A          |
+| HTTP/1.1              | ~20k req/s   | ~21k req/s   |
+| HTTP/1.1 (keep-alive) | ~60k req/s   | ~45k req/s   |
+| HTTP/2                | ~23k req/s   | N/A          |
 
-> Ruby 4.0.4 +YJIT, macOS Apple Silicon. 4 workers, 3 threads, 12 concurrent connections.
+> Ruby 4.0.5 +YJIT, macOS Apple Silicon. 4 workers, 3 threads, 12 concurrent connections.
 
 ## Development
 
