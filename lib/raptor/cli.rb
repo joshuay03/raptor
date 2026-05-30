@@ -41,6 +41,7 @@ module Raptor
       },
       worker_timeout: 60,
       worker_boot_timeout: 60,
+      worker_shutdown_timeout: 30,
       stats_file: "tmp/raptor.json",
       pid_file: nil,
     }.freeze
@@ -256,6 +257,10 @@ module Raptor
 
         opts.on("--worker-boot-timeout SECONDS", Integer, "Kill workers that fail to boot within this window (default: 60)") do |timeout|
           @options[:worker_boot_timeout] = timeout
+        end
+
+        opts.on("--worker-shutdown-timeout SECONDS", Integer, "Force-kill workers that fail to exit within this window after shutdown is signalled (default: 30)") do |timeout|
+          @options[:worker_shutdown_timeout] = timeout
         end
 
         opts.on("--stats-file PATH", String, "Stats file path (default: tmp/raptor.json)") do |path|

@@ -61,6 +61,7 @@ module Raptor
     # @rbs @client_options: Hash[Symbol, Integer]
     # @rbs @worker_timeout: Integer
     # @rbs @worker_boot_timeout: Integer
+    # @rbs @worker_shutdown_timeout: Integer
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @stats_file: String?
     # @rbs @pid_file: String?
@@ -90,6 +91,7 @@ module Raptor
     # @option options [Hash] :client client configuration
     # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
+    # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
@@ -103,6 +105,7 @@ module Raptor
       @client_options = options[:client]
       @worker_timeout = options[:worker_timeout]
       @worker_boot_timeout = options[:worker_boot_timeout]
+      @worker_shutdown_timeout = options[:worker_shutdown_timeout]
       @on_error = options[:on_error]
       @stats_file = options[:stats_file]
       @pid_file = options[:pid_file]
@@ -165,8 +168,7 @@ module Raptor
         sleep 0.1
       end
 
-      @workers.values.each { |pid| Process.kill("TERM", pid) rescue nil }
-      @workers.values.each { |pid| Process.wait(pid) rescue nil }
+      stop_workers
       stats_file_thread&.join
       File.delete(@stats_file) rescue nil if @stats_file
       File.delete(@pid_file) rescue nil if @pid_file
@@ -218,6 +220,27 @@ module Raptor
       end
     rescue Errno::ECHILD
       :no_children
+    end
+
+    # Stops every worker, escalating from `TERM` to `KILL` if any fail
+    # to exit within `worker_shutdown_timeout`.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def stop_workers
+      @workers.values.each { |pid| Process.kill("TERM", pid) rescue nil }
+
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @worker_shutdown_timeout
+      until @workers.empty? || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+        reap_workers
+        sleep 0.05
+      end
+      return if @workers.empty?
+
+      warn "[#{Process.pid}] Force-killing #{@workers.size} worker(s) after #{@worker_shutdown_timeout}s"
+      @workers.values.each { |pid| Process.kill("KILL", pid) rescue nil }
+      @workers.values.each { |pid| Process.wait(pid) rescue nil }
     end
 
     # Kills workers that have stopped checking in. A booted worker that

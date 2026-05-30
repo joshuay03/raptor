@@ -88,7 +88,8 @@ module Rackup
           workers: (options[:Workers] || config[:workers] || Etc.nprocessors).to_i,
           client: cli_defaults[:client].merge(config[:client] || {}),
           worker_timeout: (config[:worker_timeout] || cli_defaults[:worker_timeout]).to_i,
-          worker_boot_timeout: (config[:worker_boot_timeout] || cli_defaults[:worker_boot_timeout]).to_i
+          worker_boot_timeout: (config[:worker_boot_timeout] || cli_defaults[:worker_boot_timeout]).to_i,
+          worker_shutdown_timeout: (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i
         }
 
         [:rackup, :on_error, :stats_file, :pid_file].each do |key|
