@@ -149,8 +149,7 @@ module Raptor
               register(@queue.pop)
             end
           rescue => error
-            warn "#{Thread.current.name} rescued:"
-            warn error.full_message
+            Log.rescued_error(error)
           end
         end
 

@@ -7,6 +7,7 @@ require "atomic-ruby/atomic_thread_pool"
 require "rack/builder"
 require "ractor-pool"
 
+require_relative "log"
 require_relative "binder"
 require_relative "server"
 require_relative "reactor"
@@ -295,8 +296,7 @@ module Raptor
             request.handle_parsed_request(parsed_result, reactor, thread_pool)
           end
         rescue => error
-          warn "#{Thread.current.name} rescued:"
-          warn error.full_message
+          Log.rescued_error(error)
         end
       end
 
