@@ -72,6 +72,7 @@ module Raptor
     # @rbs @workers: Hash[Integer, Integer]
     # @rbs @timed_out: Set[Integer]
     # @rbs @stats: Stats
+    # @rbs @phase: Integer
     # @rbs @phased_restart_requested: bool
     # @rbs @phased_restarting: bool
 
@@ -119,6 +120,7 @@ module Raptor
       @workers = {}
       @timed_out = Set.new
       @stats = Stats.new(@worker_count)
+      @phase = 0
       @phased_restart_requested = false
       @phased_restarting = false
     end
@@ -188,13 +190,15 @@ module Raptor
     private
 
     # Forks a new worker process and registers it at the given index.
+    # The worker inherits the cluster's current phase.
     #
     # @param index [Integer] slot index for this worker in the stats region
     # @return [void]
     #
     # @rbs (Integer index) -> void
     def spawn_worker(index)
-      pid = fork { run_worker(index) }
+      phase = @phase
+      pid = fork { run_worker(index, phase) }
       @workers[index] = pid
     end
 
@@ -282,6 +286,7 @@ module Raptor
     def perform_phased_restart
       @phased_restart_requested = false
       @phased_restarting = true
+      @phase += 1
       puts "[#{Process.pid}] Phased restart starting"
 
       begin
@@ -317,10 +322,11 @@ module Raptor
     # critical component fails.
     #
     # @param index [Integer] slot index for this worker in the stats region
+    # @param phase [Integer] the cluster phase this worker was forked at
     # @return [void]
     #
-    # @rbs (Integer index) -> void
-    def run_worker(index)
+    # @rbs (Integer index, Integer phase) -> void
+    def run_worker(index, phase)
       shutdown_requested = false
       trap("INT") { shutdown_requested = true }
       trap("TERM") { shutdown_requested = true }
@@ -331,6 +337,7 @@ module Raptor
       @stats.write(
         index,
         pid: Process.pid,
+        phase: phase,
         requests: 0,
         backlog: 0,
         busy_threads: 0,
@@ -380,6 +387,7 @@ module Raptor
           @stats.write(
             index,
             pid: Process.pid,
+            phase: phase,
             requests: request_count,
             backlog: reactor.backlog,
             busy_threads: thread_pool.active_count,
@@ -468,7 +476,7 @@ module Raptor
     def log_stats
       @stats.all.each do |stat|
         status = stat[:booted] ? "booted" : "starting"
-        puts "Worker #{stat[:index]}: pid=#{stat[:pid]}, requests=#{stat[:requests]}, " \
+        puts "Worker #{stat[:index]} (phase #{stat[:phase]}): pid=#{stat[:pid]}, requests=#{stat[:requests]}, " \
              "busy=#{stat[:busy_threads]}/#{stat[:thread_capacity]}, backlog=#{stat[:backlog]}, " \
              "#{status}, last_checkin=#{Time.at(stat[:last_checkin]).strftime("%H:%M:%S")}"
       end

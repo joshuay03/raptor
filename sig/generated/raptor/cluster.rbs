@@ -67,6 +67,8 @@ module Raptor
 
     @stats: Stats
 
+    @phase: Integer
+
     @phased_restart_requested: bool
 
     @phased_restarting: bool
@@ -131,6 +133,7 @@ module Raptor
     private
 
     # Forks a new worker process and registers it at the given index.
+    # The worker inherits the cluster's current phase.
     #
     # @param index [Integer] slot index for this worker in the stats region
     # @return [void]
@@ -180,10 +183,11 @@ module Raptor
     # critical component fails.
     #
     # @param index [Integer] slot index for this worker in the stats region
+    # @param phase [Integer] the cluster phase this worker was forked at
     # @return [void]
     #
-    # @rbs (Integer index) -> void
-    def run_worker: (Integer index) -> void
+    # @rbs (Integer index, Integer phase) -> void
+    def run_worker: (Integer index, Integer phase) -> void
 
     # Returns a human-readable description of how a process exited.
     #
