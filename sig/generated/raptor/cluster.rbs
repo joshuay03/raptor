@@ -45,6 +45,8 @@ module Raptor
 
     @worker_boot_timeout: Integer
 
+    @worker_shutdown_timeout: Integer
+
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
     @stats_file: String?
@@ -89,6 +91,7 @@ module Raptor
     # @option options [Hash] :client client configuration
     # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
+    # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
@@ -142,6 +145,14 @@ module Raptor
     #
     # @rbs () -> Symbol
     def reap_workers: () -> Symbol
+
+    # Stops every worker, escalating from TERM to KILL if any fail to
+    # exit within `worker_shutdown_timeout`.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def stop_workers: () -> void
 
     # Kills workers that have stopped checking in. A booted worker that
     # fails to update its stats slot within `worker_timeout` seconds is

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Force-kill workers that fail to exit within `--worker-shutdown-timeout` after shutdown is signalled
 - Kill workers that fail to check in within `--worker-timeout` or `--worker-boot-timeout`
 - Add `index`, `busy_threads`, and `thread_capacity` to per-worker stats
 
