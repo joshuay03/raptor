@@ -39,6 +39,8 @@ module Raptor
         max_body_size: nil,
         body_spool_threshold: 1024 * 1024,
       },
+      worker_timeout: 60,
+      worker_boot_timeout: 60,
       stats_file: "tmp/raptor.json",
       pid_file: nil,
     }.freeze
@@ -246,6 +248,14 @@ module Raptor
 
         opts.on("--body-spool-threshold BYTES", Integer, "Spool request bodies larger than this to a tempfile (default: #{1024 * 1024})") do |bytes|
           @options[:client][:body_spool_threshold] = bytes
+        end
+
+        opts.on("--worker-timeout SECONDS", Integer, "Worker check-in timeout in seconds (default: 60)") do |timeout|
+          @options[:worker_timeout] = timeout
+        end
+
+        opts.on("--worker-boot-timeout SECONDS", Integer, "Worker boot timeout in seconds (default: 60)") do |timeout|
+          @options[:worker_boot_timeout] = timeout
         end
 
         opts.on("--stats-file PATH", String, "Stats file path (default: tmp/raptor.json)") do |path|

@@ -59,6 +59,8 @@ module Raptor
     # @rbs @ractor_count: Integer
     # @rbs @worker_count: Integer
     # @rbs @client_options: Hash[Symbol, Integer]
+    # @rbs @worker_timeout: Integer
+    # @rbs @worker_boot_timeout: Integer
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @stats_file: String?
     # @rbs @pid_file: String?
@@ -67,6 +69,7 @@ module Raptor
     # @rbs @app: untyped
     # @rbs @shutdown: bool
     # @rbs @workers: Hash[Integer, Integer]
+    # @rbs @timed_out: Set[Integer]
     # @rbs @stats: Stats
     # @rbs @phased_restart_requested: bool
     # @rbs @phased_restarting: bool
@@ -85,6 +88,8 @@ module Raptor
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client configuration
+    # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
+    # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
@@ -96,6 +101,8 @@ module Raptor
       @ractor_count = options[:ractors]
       @worker_count = options[:workers]
       @client_options = options[:client]
+      @worker_timeout = options[:worker_timeout]
+      @worker_boot_timeout = options[:worker_boot_timeout]
       @on_error = options[:on_error]
       @stats_file = options[:stats_file]
       @pid_file = options[:pid_file]
@@ -107,6 +114,7 @@ module Raptor
 
       @shutdown = false
       @workers = {}
+      @timed_out = Set.new
       @stats = Stats.new(@worker_count)
       @phased_restart_requested = false
       @phased_restarting = false
@@ -115,9 +123,9 @@ module Raptor
     # Starts the multi-process cluster and manages worker processes.
     #
     # Forks the configured number of worker processes and monitors them,
-    # automatically restarting any that exit unexpectedly. Handles graceful
-    # shutdown via INT or TERM signals, stats logging via USR1, and phased
-    # restart via USR2.
+    # restarting any that exit unexpectedly or stop checking in. Handles
+    # graceful shutdown via INT or TERM signals, stats logging via USR1,
+    # and phased restart via USR2.
     #
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
@@ -152,6 +160,7 @@ module Raptor
         break if reap_workers == :no_children
 
         perform_phased_restart if @phased_restart_requested && !@phased_restarting
+        timeout_hung_workers
 
         sleep 0.1
       end
@@ -200,6 +209,7 @@ module Raptor
 
         index = @workers.key(pid)
         @workers.delete(index)
+        @timed_out.delete(pid)
 
         unless @shutdown
           warn "[#{Process.pid}] Restarting worker #{index} (#{pid}), #{exit_description(status)}"
@@ -208,6 +218,36 @@ module Raptor
       end
     rescue Errno::ECHILD
       :no_children
+    end
+
+    # Kills workers that have stopped checking in. A booted worker that
+    # fails to update its stats slot within `worker_timeout` seconds is
+    # assumed to be hung (deadlocked app, runaway loop, blocked syscall);
+    # a worker still in startup is held to `worker_boot_timeout`. Killed
+    # workers are then restarted by `reap_workers`.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def timeout_hung_workers
+      now = Process.clock_gettime(Process::CLOCK_REALTIME)
+      stats = @stats.all
+
+      @workers.each do |index, pid|
+        next if @timed_out.include?(pid)
+
+        stat = stats[index]
+        next unless stat[:pid] == pid
+
+        timeout = stat[:booted] ? @worker_timeout : @worker_boot_timeout
+        elapsed = now - stat[:last_checkin]
+        next if elapsed <= timeout
+
+        action = stat[:booted] ? "check in" : "boot"
+        warn "[#{Process.pid}] Killing worker #{index} (#{pid}), failed to #{action} within #{timeout}s"
+        Process.kill("KILL", pid) rescue nil
+        @timed_out << pid
+      end
     end
 
     # Replaces each worker process one at a time, waiting for the new
