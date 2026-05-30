@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Add `index`, `busy_threads`, and `thread_capacity` to per-worker stats
+
 ## [0.4.0] - 2026-05-29
 
 - Load `raptor.rb` or `config/raptor.rb` by default when no config path is supplied

@@ -143,11 +143,12 @@ module Raptor
       data = JSON.parse(File.read(stats_file), symbolize_names: true)
 
       puts "Master PID: #{data[:master_pid]}"
-      data[:workers].each_with_index do |worker, index|
+      data[:workers].each do |worker|
         status = worker[:booted] ? "booted" : "starting"
         last_checkin = Time.at(worker[:last_checkin]).strftime("%H:%M:%S")
-        puts "Worker #{index}: pid=#{worker[:pid]}, requests=#{worker[:requests]}, " \
-             "backlog=#{worker[:backlog]}, #{status}, last_checkin=#{last_checkin}"
+        puts "Worker #{worker[:index]}: pid=#{worker[:pid]}, requests=#{worker[:requests]}, " \
+             "busy=#{worker[:busy_threads]}/#{worker[:thread_capacity]}, backlog=#{worker[:backlog]}, " \
+             "#{status}, last_checkin=#{last_checkin}"
       end
     end
 

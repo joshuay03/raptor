@@ -270,6 +270,8 @@ module Raptor
         pid: Process.pid,
         requests: 0,
         backlog: 0,
+        busy_threads: 0,
+        thread_capacity: @thread_count,
         started_at:,
         last_checkin: started_at,
         booted: false
@@ -317,6 +319,8 @@ module Raptor
             pid: Process.pid,
             requests: request_count,
             backlog: reactor.backlog,
+            busy_threads: thread_pool.active_count,
+            thread_capacity: @thread_count,
             started_at:,
             last_checkin: Process.clock_gettime(Process::CLOCK_REALTIME),
             booted: true
@@ -399,11 +403,11 @@ module Raptor
     #
     # @rbs () -> void
     def log_stats
-      @stats.all.each_with_index do |stat, index|
+      @stats.all.each do |stat|
         status = stat[:booted] ? "booted" : "starting"
-        puts "Worker #{index}: pid=#{stat[:pid]}, requests=#{stat[:requests]}, " \
-             "backlog=#{stat[:backlog]}, #{status}, " \
-             "last_checkin=#{Time.at(stat[:last_checkin]).strftime("%H:%M:%S")}"
+        puts "Worker #{stat[:index]}: pid=#{stat[:pid]}, requests=#{stat[:requests]}, " \
+             "busy=#{stat[:busy_threads]}/#{stat[:thread_capacity]}, backlog=#{stat[:backlog]}, " \
+             "#{status}, last_checkin=#{Time.at(stat[:last_checkin]).strftime("%H:%M:%S")}"
       end
     end
 
