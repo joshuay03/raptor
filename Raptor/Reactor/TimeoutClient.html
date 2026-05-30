@@ -108,9 +108,8 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Red-black tree node representing a client connection with timeout tracking.</p>
-<p>TimeoutClient extends RedBlackTree::Node to enable efficient timeout
-management using the tree's ordering properties.</p>
+    <p>A client connection node ordered by absolute expiry time so the
+soonest-to-expire is always at the tree's minimum.</p>
 
   </div>
 </div>
@@ -179,7 +178,7 @@ management using the tree's ordering properties.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Compares timeout nodes by their timeout_at values for tree ordering.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Orders nodes by <code>timeout_at</code> so the tree minimum is the next client to expire.</p></div></span>
   
 </li>
 
@@ -201,7 +200,7 @@ management using the tree's ordering properties.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns the client data stored in this timeout node.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Semantic alias for the inherited <code>data</code> slot.</p></div></span>
   
 </li>
 
@@ -223,7 +222,7 @@ management using the tree's ordering properties.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Calculates remaining timeout duration from the current time.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns seconds until expiry, clamped to 0 so an already-expired client doesn't push the next selector wait into the future.</p></div></span>
   
 </li>
 
@@ -276,12 +275,12 @@ management using the tree's ordering properties.</p>
       <pre class="lines">
 
 
-34
-35
-36</pre>
+32
+33
+34</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 34</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 32</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_timeout_at'>timeout_at</span>
   <span class='ivar'>@timeout_at</span>
@@ -309,7 +308,8 @@ management using the tree's ordering properties.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Compares timeout nodes by their timeout_at values for tree ordering.</p>
+    <p>Orders nodes by <code>timeout_at</code> so the tree minimum is the next
+client to expire.</p>
 
   </div>
 </div>
@@ -344,7 +344,7 @@ management using the tree's ordering properties.</p>
       
       
         &mdash;
-        <div class='inline'><p>-1, 0, or 1 for ordering</p></div>
+        <div class='inline'><p>-1, 0, or 1</p></div>
       
     </li>
   
@@ -382,7 +382,7 @@ management using the tree's ordering properties.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Returns the client data stored in this timeout node.</p>
+    <p>Semantic alias for the inherited <code>data</code> slot.</p>
 
   </div>
 </div>
@@ -399,7 +399,7 @@ management using the tree's ordering properties.</p>
       
       
         &mdash;
-        <div class='inline'><p>the client connection state data</p></div>
+        <div class='inline'><p>the client connection state</p></div>
       
     </li>
   
@@ -411,12 +411,12 @@ management using the tree's ordering properties.</p>
       <pre class="lines">
 
 
-41
-42
-43</pre>
+39
+40
+41</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 41</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 39</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_client_data'>client_data</span>
   <span class='id identifier rubyid_data'>data</span>
@@ -437,7 +437,8 @@ management using the tree's ordering properties.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Calculates remaining timeout duration from the current time.</p>
+    <p>Returns seconds until expiry, clamped to 0 so an already-expired
+client doesn't push the next selector wait into the future.</p>
 
   </div>
 </div>
@@ -472,7 +473,7 @@ management using the tree's ordering properties.</p>
       
       
         &mdash;
-        <div class='inline'><p>remaining timeout in seconds, minimum 0</p></div>
+        <div class='inline'><p>seconds until expiry, never negative</p></div>
       
     </li>
   
@@ -484,12 +485,12 @@ management using the tree's ordering properties.</p>
       <pre class="lines">
 
 
+50
 51
-52
-53</pre>
+52</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 51</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 50</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_timeout'>timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_now'>now</span><span class='rparen'>)</span>
   <span class='lbracket'>[</span><span class='id identifier rubyid_timeout_at'>timeout_at</span> <span class='op'>-</span> <span class='id identifier rubyid_now'>now</span><span class='comma'>,</span> <span class='int'>0</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_max'>max</span>
@@ -504,7 +505,7 @@ management using the tree's ordering properties.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat May 30 04:02:18 2026 by
+  Generated on Sat May 30 05:29:51 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
