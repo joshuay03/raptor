@@ -24,38 +24,38 @@ module Raptor
   #   reactor.shutdown
   #
   class Reactor
-    # Red-black tree node representing a client connection with timeout tracking.
-    #
-    # TimeoutClient extends RedBlackTree::Node to enable efficient timeout
-    # management using the tree's ordering properties.
+    # A client connection node ordered by absolute expiry time so the
+    # soonest-to-expire is always at the tree's minimum.
     #
     class TimeoutClient < RedBlackTree::Node
       # @rbs attr_accessor timeout_at: Float
       attr_accessor :timeout_at
 
-      # Returns the client data stored in this timeout node.
+      # Semantic alias for the inherited `data` slot.
       #
-      # @return [Hash] the client connection state data
+      # @return [Hash] the client connection state
       #
       # @rbs () -> Hash[Symbol, untyped]
       def client_data
         data
       end
 
-      # Calculates remaining timeout duration from the current time.
+      # Returns seconds until expiry, clamped to 0 so an already-expired
+      # client doesn't push the next selector wait into the future.
       #
       # @param now [Float] current monotonic timestamp
-      # @return [Float] remaining timeout in seconds, minimum 0
+      # @return [Float] seconds until expiry, never negative
       #
       # @rbs (Float now) -> Float
       def timeout(now)
         [timeout_at - now, 0].max
       end
 
-      # Compares timeout nodes by their timeout_at values for tree ordering.
+      # Orders nodes by `timeout_at` so the tree minimum is the next
+      # client to expire.
       #
       # @param other [TimeoutClient] another timeout client to compare
-      # @return [Integer] -1, 0, or 1 for ordering
+      # @return [Integer] -1, 0, or 1
       #
       # @rbs (TimeoutClient other) -> Integer
       def <=>(other)
@@ -199,13 +199,12 @@ module Raptor
       socket.close
     end
 
-    # Removes a client connection from the reactor.
-    #
-    # Called when an HTTP request is complete and ready for application
-    # processing. Triggers server accept re-enabling if system capacity allows.
+    # Drops the reactor's references to a client whose parsed request
+    # has been handed off to the thread pool. The socket itself is kept
+    # open so the worker can write the response.
     #
     # @param id [Integer] unique client identifier
-    # @return [TCPSocket, nil] the removed socket, if found
+    # @return [TCPSocket, nil] the socket associated with `id`, if any
     #
     # @rbs (Integer id) -> TCPSocket?
     def remove(id)
@@ -320,10 +319,8 @@ module Raptor
       socket.close rescue nil
     end
 
-    # Initiates reactor shutdown.
-    #
-    # Closes the registration queue and wakes up the selector to begin
-    # graceful shutdown process.
+    # Closes the registration queue and wakes the selector so the
+    # event loop drains pending work and exits.
     #
     # @return [void]
     #

@@ -6,22 +6,16 @@ require "socket"
 require "atomic-ruby/atomic_boolean"
 
 module Raptor
-  # High-performance HTTP server that accepts connections and dispatches them.
+  # Accepts client connections and dispatches them into the request
+  # pipeline. Skips acceptance when the reactor backlog is high so an
+  # overloaded process leaves connections for peers that can absorb
+  # them (via shared `SO_REUSEPORT` listeners).
   #
-  # Server manages the main accept loop, handling incoming client connections from
-  # bound sockets. It uses IO.select for efficient polling and implements automatic
-  # load balancing by checking reactor backlog before accepting connections,
-  # providing natural backpressure based on system capacity.
-  #
-  # Supports TCP, Unix domain, and SSL listeners transparently. TCP_NODELAY is
-  # applied only to TCP sockets, and SSL handshakes are offloaded to the thread
-  # pool so a slow client cannot block the server thread.
-  #
-  # For HTTP/1.1 connections the first request is parsed inline on the server
-  # thread and dispatched directly to the thread pool, falling back to the
-  # reactor only when more data is needed. For HTTP/2 connections (negotiated
-  # via ALPN) the server sends initial SETTINGS and registers the connection
-  # with the reactor for frame processing through the ractor pool.
+  # Supports TCP, Unix, and SSL listeners. SSL handshakes are offloaded
+  # to the thread pool so a slow client can't pin the server thread.
+  # For HTTP/1.1 the first request is parsed inline and dispatched
+  # straight to the thread pool; HTTP/2 (negotiated via ALPN) is
+  # registered with the reactor for frame processing.
   #
   # @example
   #   binder = Binder.new(["tcp://0.0.0.0:3000"])

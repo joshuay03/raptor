@@ -27,11 +27,8 @@ module Raptor
     # @rbs @num_workers: Integer
     # @rbs @mmap: untyped
 
-    # Creates a new Stats instance backed by anonymous shared memory.
-    #
-    # Allocates a MAP_ANON | MAP_SHARED mmap region large enough for
-    # num_workers slots. Must be called before forking so that all
-    # worker processes share the same backing memory.
+    # Allocates the shared mmap region. Must be called before forking
+    # workers so the mapping is inherited by every child process.
     #
     # @param num_workers [Integer] number of worker slots to allocate
     # @return [void]

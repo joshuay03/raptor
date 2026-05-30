@@ -11,13 +11,10 @@ require "rack"
 require_relative "raptor_http"
 
 module Raptor
-  # Handles HTTP request processing and Rack application integration.
-  #
-  # Request manages the HTTP parsing pipeline using Ractors and coordinates
-  # with the reactor for connection state management. It bridges between the
-  # low-level HTTP parsing and high-level Rack application interface, handling
-  # both incomplete requests (that need more data) and complete requests
-  # (ready for application processing).
+  # Parses HTTP/1.x requests and dispatches them to the Rack
+  # application. Coordinates with the Ractor pool for parsing and
+  # with the reactor for requests that need more data before they
+  # can be handled.
   #
   class Request
     BODY_BUFFER_THRESHOLD = 256 * 1024
@@ -93,10 +90,8 @@ module Raptor
       [decoded, :incomplete]
     end
 
-    # Writes a string to the socket, retrying on partial writes and flow control blocks.
-    #
-    # Uses write_nonblock with `WRITE_TIMEOUT` to avoid blocking the thread
-    # indefinitely on slow clients.
+    # Writes `string` in full, retrying on partial writes. Bounded by
+    # `WRITE_TIMEOUT` so a slow client can't pin the writing thread.
     #
     # @param socket [TCPSocket] the socket to write to
     # @param string [String] the data to write

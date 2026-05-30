@@ -81,7 +81,8 @@ module Raptor
     # outbound DATA frames respect RFC 7540 §5.2. Threads dispatching stream
     # responses call `acquire` to reserve send capacity; threads applying
     # inbound WINDOW_UPDATE or SETTINGS frames call the mutating methods to
-    # replenish it. State is held in a single `Atom` so updates use CAS.
+    # replenish it. The connection window and per-stream windows live in
+    # separate `Atom`s so the common fast path skips per-stream tracking.
     #
     class FlowControl
       ACQUIRE_POLL_INTERVAL = 0.001

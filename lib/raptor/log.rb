@@ -2,15 +2,12 @@
 # frozen_string_literal: true
 
 module Raptor
-  # Shared logging helpers used by background threads to surface
-  # diagnostics on stderr without each call site reimplementing the
-  # same formatting.
+  # Shared logging helpers.
   #
   module Log
-    # Writes a `"<thread> rescued:"` line followed by the exception's
-    # full message (class, message, backtrace) to stderr. Used by
-    # background threads that catch their own exceptions to keep
-    # running.
+    # Logs a rescued exception to stderr with the current thread's
+    # name as a prefix. Used by background threads that catch their
+    # own errors to keep running.
     #
     # @param error [Exception] the rescued exception
     # @return [void]
