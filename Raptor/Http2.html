@@ -1831,7 +1831,7 @@ and dispatches completed stream requests to the thread pool.</p>
 
   <span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:completed_requests</span><span class='rbracket'>]</span><span class='op'>&amp;.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_request'>request</span><span class='op'>|</span>
     <span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=</span> <span class='id identifier rubyid_request'>request</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span>
-    <span class='id identifier rubyid_remote_addr'>remote_addr</span> <span class='op'>=</span> <span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:remote_addr</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="../Raptor.html#DEFAULT_REMOTE_ADDR-constant" title="Raptor::DEFAULT_REMOTE_ADDR (constant)">DEFAULT_REMOTE_ADDR</a></span></span>
+    <span class='id identifier rubyid_remote_addr'>remote_addr</span> <span class='op'>=</span> <span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:remote_addr</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#DEFAULT_REMOTE_ADDR-constant" title="Raptor::Server::DEFAULT_REMOTE_ADDR (constant)">DEFAULT_REMOTE_ADDR</a></span></span>
 
     <span class='id identifier rubyid_thread_pool'>thread_pool</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_proc'>proc</span> <span class='kw'>do</span>
       <span class='id identifier rubyid_dispatch_stream_request'>dispatch_stream_request</span><span class='lparen'>(</span>
@@ -1923,7 +1923,7 @@ and dispatches completed stream requests to the thread pool.</p>
     <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_NAME</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='id identifier rubyid_host'>host</span>
     <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_PORT</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='id identifier rubyid_port'>port</span> <span class='op'>||</span> <span class='ivar'>@server_port</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span>
   <span class='kw'>else</span>
-    <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_NAME</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='const'><span class='object_link'><a href="../Raptor.html#DEFAULT_SERVER_NAME-constant" title="Raptor::DEFAULT_SERVER_NAME (constant)">DEFAULT_SERVER_NAME</a></span></span>
+    <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_NAME</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#DEFAULT_SERVER_NAME-constant" title="Raptor::Server::DEFAULT_SERVER_NAME (constant)">DEFAULT_SERVER_NAME</a></span></span>
     <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_PORT</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='ivar'>@server_port</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
@@ -2257,7 +2257,7 @@ within the peer's per-stream and connection windows.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat May 30 01:02:44 2026 by
+  Generated on Sat May 30 04:02:18 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

@@ -865,7 +865,7 @@ both incomplete requests (that need more data) and complete requests
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#build_rack_env-instance_method" title="#build_rack_env (instance method)">#<strong>build_rack_env</strong>(env, parse_data, body, socket, remote_addr: DEFAULT_REMOTE_ADDR, url_scheme: HTTP_SCHEME)  &#x21d2; Hash </a>
+      <a href="#build_rack_env-instance_method" title="#build_rack_env (instance method)">#<strong>build_rack_env</strong>(env, parse_data, body, socket, remote_addr: Server::DEFAULT_REMOTE_ADDR, url_scheme: Server::HTTP_SCHEME)  &#x21d2; Hash </a>
     
 
     
@@ -2070,7 +2070,7 @@ indefinitely on slow clients.</p>
       <div class="method_details first">
   <h3 class="signature first" id="build_rack_env-instance_method">
   
-    #<strong>build_rack_env</strong>(env, parse_data, body, socket, remote_addr: DEFAULT_REMOTE_ADDR, url_scheme: HTTP_SCHEME)  &#x21d2; <tt>Hash</tt> 
+    #<strong>build_rack_env</strong>(env, parse_data, body, socket, remote_addr: Server::DEFAULT_REMOTE_ADDR, url_scheme: Server::HTTP_SCHEME)  &#x21d2; <tt>Hash</tt> 
   
 
   
@@ -2152,7 +2152,7 @@ SERVER_NAME, SERVER_PORT, and hijack support.</p>
         <span class='type'>(<tt>String</tt>)</span>
       
       
-        <em class="default">(defaults to: <tt>DEFAULT_REMOTE_ADDR</tt>)</em>
+        <em class="default">(defaults to: <tt>Server::DEFAULT_REMOTE_ADDR</tt>)</em>
       
       
         &mdash;
@@ -2168,7 +2168,7 @@ SERVER_NAME, SERVER_PORT, and hijack support.</p>
         <span class='type'>(<tt>String</tt>)</span>
       
       
-        <em class="default">(defaults to: <tt>HTTP_SCHEME</tt>)</em>
+        <em class="default">(defaults to: <tt>Server::HTTP_SCHEME</tt>)</em>
       
       
         &mdash;
@@ -2184,7 +2184,7 @@ SERVER_NAME, SERVER_PORT, and hijack support.</p>
         <span class='type'>(<tt>String</tt>)</span>
       
       
-        <em class="default">(defaults to: <tt>DEFAULT_REMOTE_ADDR</tt>)</em>
+        <em class="default">(defaults to: <tt>Server::DEFAULT_REMOTE_ADDR</tt>)</em>
       
       
     </li>
@@ -2197,7 +2197,7 @@ SERVER_NAME, SERVER_PORT, and hijack support.</p>
         <span class='type'>(<tt>String</tt>)</span>
       
       
-        <em class="default">(defaults to: <tt>HTTP_SCHEME</tt>)</em>
+        <em class="default">(defaults to: <tt>Server::HTTP_SCHEME</tt>)</em>
       
       
     </li>
@@ -2277,7 +2277,7 @@ SERVER_NAME, SERVER_PORT, and hijack support.</p>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/request.rb', line 609</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_build_rack_env'>build_rack_env</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_parse_data'>parse_data</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='label'>remote_addr:</span> <span class='const'><span class='object_link'><a href="../Raptor.html#DEFAULT_REMOTE_ADDR-constant" title="Raptor::DEFAULT_REMOTE_ADDR (constant)">DEFAULT_REMOTE_ADDR</a></span></span><span class='comma'>,</span> <span class='label'>url_scheme:</span> <span class='const'><span class='object_link'><a href="../Raptor.html#HTTP_SCHEME-constant" title="Raptor::HTTP_SCHEME (constant)">HTTP_SCHEME</a></span></span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_build_rack_env'>build_rack_env</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_parse_data'>parse_data</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='label'>remote_addr:</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#DEFAULT_REMOTE_ADDR-constant" title="Raptor::Server::DEFAULT_REMOTE_ADDR (constant)">DEFAULT_REMOTE_ADDR</a></span></span><span class='comma'>,</span> <span class='label'>url_scheme:</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#HTTP_SCHEME-constant" title="Raptor::Server::HTTP_SCHEME (constant)">HTTP_SCHEME</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_VERSION</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Rack</span><span class='op'>::</span><span class='const'>VERSION</span>
   <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_URL_SCHEME</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_url_scheme'>url_scheme</span>
   <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_INPUT</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_build_rack_input'>build_rack_input</span><span class='lparen'>(</span><span class='id identifier rubyid_body'>body</span><span class='rparen'>)</span>
@@ -2317,7 +2317,7 @@ SERVER_NAME, SERVER_PORT, and hijack support.</p>
     <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_NAME</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='id identifier rubyid_host'>host</span>
     <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_PORT</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='id identifier rubyid_port'>port</span> <span class='op'>||</span> <span class='ivar'>@server_port</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span>
   <span class='kw'>else</span>
-    <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_NAME</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='const'><span class='object_link'><a href="../Raptor.html#DEFAULT_SERVER_NAME-constant" title="Raptor::DEFAULT_SERVER_NAME (constant)">DEFAULT_SERVER_NAME</a></span></span>
+    <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_NAME</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#DEFAULT_SERVER_NAME-constant" title="Raptor::Server::DEFAULT_SERVER_NAME (constant)">DEFAULT_SERVER_NAME</a></span></span>
     <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_PORT</span><span class='rbracket'>]</span> <span class='op'>||=</span> <span class='ivar'>@server_port</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span>
   <span class='kw'>end</span>
 
@@ -3796,8 +3796,8 @@ For complete requests, removes from reactor, builds Rack env, and dispatches to 
   <span class='kw'>else</span>
     <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_remove'>remove</span><span class='lparen'>(</span><span class='id identifier rubyid_parsed_request'>parsed_request</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_request_count'>request_count</span> <span class='op'>=</span> <span class='lparen'>(</span><span class='id identifier rubyid_parsed_request'>parsed_request</span><span class='lbracket'>[</span><span class='symbol'>:request_count</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='int'>0</span><span class='rparen'>)</span> <span class='op'>+</span> <span class='int'>1</span>
-    <span class='id identifier rubyid_remote_addr'>remote_addr</span> <span class='op'>=</span> <span class='id identifier rubyid_parsed_request'>parsed_request</span><span class='lbracket'>[</span><span class='symbol'>:remote_addr</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="../Raptor.html#DEFAULT_REMOTE_ADDR-constant" title="Raptor::DEFAULT_REMOTE_ADDR (constant)">DEFAULT_REMOTE_ADDR</a></span></span>
-    <span class='id identifier rubyid_url_scheme'>url_scheme</span> <span class='op'>=</span> <span class='id identifier rubyid_parsed_request'>parsed_request</span><span class='lbracket'>[</span><span class='symbol'>:url_scheme</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="../Raptor.html#HTTP_SCHEME-constant" title="Raptor::HTTP_SCHEME (constant)">HTTP_SCHEME</a></span></span>
+    <span class='id identifier rubyid_remote_addr'>remote_addr</span> <span class='op'>=</span> <span class='id identifier rubyid_parsed_request'>parsed_request</span><span class='lbracket'>[</span><span class='symbol'>:remote_addr</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#DEFAULT_REMOTE_ADDR-constant" title="Raptor::Server::DEFAULT_REMOTE_ADDR (constant)">DEFAULT_REMOTE_ADDR</a></span></span>
+    <span class='id identifier rubyid_url_scheme'>url_scheme</span> <span class='op'>=</span> <span class='id identifier rubyid_parsed_request'>parsed_request</span><span class='lbracket'>[</span><span class='symbol'>:url_scheme</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#HTTP_SCHEME-constant" title="Raptor::Server::HTTP_SCHEME (constant)">HTTP_SCHEME</a></span></span>
 
     <span class='id identifier rubyid_thread_pool'>thread_pool</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_proc'>proc</span> <span class='kw'>do</span>
       <span class='id identifier rubyid_process_client'>process_client</span><span class='lparen'>(</span>
@@ -6578,7 +6578,7 @@ system call overhead.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat May 30 01:02:45 2026 by
+  Generated on Sat May 30 04:02:19 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
