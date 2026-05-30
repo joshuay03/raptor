@@ -803,7 +803,6 @@ key-by-key so a config file does not need to restate every client option.</p>
       <pre class="lines">
 
 
-184
 185
 186
 187
@@ -814,10 +813,11 @@ key-by-key so a config file does not need to restate every client option.</p>
 192
 193
 194
-195</pre>
+195
+196</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 184</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 185</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_apply_config_file'>apply_config_file</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_path'>path</span>
@@ -876,7 +876,6 @@ key-by-key so a config file does not need to restate every client option.</p>
       <pre class="lines">
 
 
-202
 203
 204
 205
@@ -942,10 +941,11 @@ key-by-key so a config file does not need to restate every client option.</p>
 265
 266
 267
-268</pre>
+268
+269</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 202</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 203</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_parser'>create_parser</span>
   <span class='const'>OptionParser</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_opts'>opts</span><span class='op'>|</span>
@@ -1081,7 +1081,6 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
       <pre class="lines">
 
 
-165
 166
 167
 168
@@ -1089,10 +1088,11 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
 170
 171
 172
-173</pre>
+173
+174</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 165</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 166</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_extract_config_path'>extract_config_path</span><span class='lparen'>(</span><span class='id identifier rubyid_argv'>argv</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_arg'>arg</span><span class='comma'>,</span> <span class='id identifier rubyid_i'>i</span><span class='op'>|</span>
@@ -1188,7 +1188,8 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
 149
 150
 151
-152</pre>
+152
+153</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 135</span>
@@ -1204,11 +1205,12 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
   <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='const'>JSON</span><span class='period'>.</span><span class='id identifier rubyid_parse'>parse</span><span class='lparen'>(</span><span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_stats_file'>stats_file</span><span class='rparen'>)</span><span class='comma'>,</span> <span class='label'>symbolize_names:</span> <span class='kw'>true</span><span class='rparen'>)</span>
 
   <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Master PID: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:master_pid</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
-  <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:workers</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_worker'>worker</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='op'>|</span>
+  <span class='id identifier rubyid_data'>data</span><span class='lbracket'>[</span><span class='symbol'>:workers</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_worker'>worker</span><span class='op'>|</span>
     <span class='id identifier rubyid_status'>status</span> <span class='op'>=</span> <span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:booted</span><span class='rbracket'>]</span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>booted</span><span class='tstring_end'>&quot;</span></span> <span class='op'>:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>starting</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_last_checkin'>last_checkin</span> <span class='op'>=</span> <span class='const'>Time</span><span class='period'>.</span><span class='id identifier rubyid_at'>at</span><span class='lparen'>(</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:last_checkin</span><span class='rbracket'>]</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_strftime'>strftime</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>%H:%M:%S</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
-    <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'>: pid=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:pid</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, requests=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:requests</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, </span><span class='tstring_end'>&quot;</span></span> \
-         <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>backlog=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:backlog</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_status'>status</span><span class='embexpr_end'>}</span><span class='tstring_content'>, last_checkin=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_last_checkin'>last_checkin</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+    <span class='id identifier rubyid_puts'>puts</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:index</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>: pid=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:pid</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, requests=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:requests</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, </span><span class='tstring_end'>&quot;</span></span> \
+         <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>busy=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:busy_threads</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>/</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:thread_capacity</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, backlog=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_worker'>worker</span><span class='lbracket'>[</span><span class='symbol'>:backlog</span><span class='rbracket'>]</span><span class='embexpr_end'>}</span><span class='tstring_content'>, </span><span class='tstring_end'>&quot;</span></span> \
+         <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_status'>status</span><span class='embexpr_end'>}</span><span class='tstring_content'>, last_checkin=</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_last_checkin'>last_checkin</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -1221,7 +1223,7 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
 </div>
 
       <div id="footer">
-  Generated on Sat May 30 05:33:39 2026 by
+  Generated on Sat May 30 06:58:56 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
