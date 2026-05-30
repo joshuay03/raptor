@@ -149,7 +149,7 @@ module Raptor
       data[:workers].each do |worker|
         status = worker[:booted] ? "booted" : "starting"
         last_checkin = Time.at(worker[:last_checkin]).strftime("%H:%M:%S")
-        puts "Worker #{worker[:index]}: pid=#{worker[:pid]}, requests=#{worker[:requests]}, " \
+        puts "Worker #{worker[:index]} (phase #{worker[:phase]}): pid=#{worker[:pid]}, requests=#{worker[:requests]}, " \
              "busy=#{worker[:busy_threads]}/#{worker[:thread_capacity]}, backlog=#{worker[:backlog]}, " \
              "#{status}, last_checkin=#{last_checkin}"
       end
