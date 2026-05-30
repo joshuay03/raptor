@@ -35,7 +35,11 @@ module Raptor
   class Server
     HTTP_SCHEME = "http"
     HTTPS_SCHEME = "https"
+
     H2_PROTOCOL = "h2"
+
+    DEFAULT_REMOTE_ADDR = "127.0.0.1"
+    DEFAULT_SERVER_NAME = "localhost"
 
     # @rbs @binder: Binder
     # @rbs @reactor: Reactor
@@ -133,7 +137,7 @@ module Raptor
         tcp_client.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
         remote_addr = tcp_client.remote_address.ip_address
       else
-        remote_addr = "127.0.0.1"
+        remote_addr = DEFAULT_REMOTE_ADDR
       end
 
       if listener.is_a?(Binder::SslListener)

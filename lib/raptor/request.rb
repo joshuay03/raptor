@@ -27,7 +27,6 @@ module Raptor
     KEEPALIVE_READ_TIMEOUT = 0.001
     MAX_KEEPALIVE_REQUESTS = 100
 
-    HTTP_SCHEME = "http"
     HTTP_10 = "HTTP/1.0"
     HTTP_11 = "HTTP/1.1"
     STATUS_LINE_CACHE_10 = Hash.new do |h, status|
@@ -330,8 +329,8 @@ module Raptor
       else
         socket = reactor.remove(parsed_request[:id])
         request_count = (parsed_request[:request_count] || 0) + 1
-        remote_addr = parsed_request[:remote_addr] || "127.0.0.1"
-        url_scheme = parsed_request[:url_scheme] || HTTP_SCHEME
+        remote_addr = parsed_request[:remote_addr] || Server::DEFAULT_REMOTE_ADDR
+        url_scheme = parsed_request[:url_scheme] || Server::HTTP_SCHEME
 
         thread_pool << proc do
           process_client(
@@ -607,7 +606,7 @@ module Raptor
     # @return [Hash] fully populated Rack environment hash
     #
     # @rbs (Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, TCPSocket socket, ?remote_addr: String, ?url_scheme: String) -> Hash[String, untyped]
-    def build_rack_env(env, parse_data, body, socket, remote_addr: "127.0.0.1", url_scheme: HTTP_SCHEME)
+    def build_rack_env(env, parse_data, body, socket, remote_addr: Server::DEFAULT_REMOTE_ADDR, url_scheme: Server::HTTP_SCHEME)
       env[Rack::RACK_VERSION] = Rack::VERSION
       env[Rack::RACK_URL_SCHEME] = url_scheme
       env[Rack::RACK_INPUT] = build_rack_input(body)
@@ -647,7 +646,7 @@ module Raptor
         env[Rack::SERVER_NAME] ||= host
         env[Rack::SERVER_PORT] ||= port || @server_port.to_s
       else
-        env[Rack::SERVER_NAME] ||= "localhost"
+        env[Rack::SERVER_NAME] ||= Server::DEFAULT_SERVER_NAME
         env[Rack::SERVER_PORT] ||= @server_port.to_s
       end
 

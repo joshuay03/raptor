@@ -529,7 +529,7 @@ module Raptor
 
       result[:completed_requests]&.each do |request|
         stream_id = request[:stream_id]
-        remote_addr = result[:remote_addr] || "127.0.0.1"
+        remote_addr = result[:remote_addr] || Server::DEFAULT_REMOTE_ADDR
 
         thread_pool << proc do
           dispatch_stream_request(
@@ -749,7 +749,7 @@ module Raptor
         env[Rack::SERVER_NAME] ||= host
         env[Rack::SERVER_PORT] ||= port || @server_port.to_s
       else
-        env[Rack::SERVER_NAME] ||= "localhost"
+        env[Rack::SERVER_NAME] ||= Server::DEFAULT_SERVER_NAME
         env[Rack::SERVER_PORT] ||= @server_port.to_s
       end
     end
