@@ -37,31 +37,37 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @phased_restarting: bool
-
-    @phased_restart_requested: bool
-
-    @stats: Stats
-
-    @workers: Hash[Integer, Integer]
-
-    @shutdown: bool
-
-    @app: untyped
-
-    @server_port: Integer
-
-    @binder: Binder
-
-    @pid_file: String?
-
-    @stats_file: String?
-
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    @worker_count: Integer
 
     @client_options: Hash[Symbol, Integer]
 
-    @worker_count: Integer
+    @worker_timeout: Integer
+
+    @worker_boot_timeout: Integer
+
+    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+
+    @stats_file: String?
+
+    @pid_file: String?
+
+    @binder: Binder
+
+    @server_port: Integer
+
+    @app: untyped
+
+    @shutdown: bool
+
+    @workers: Hash[Integer, Integer]
+
+    @timed_out: Set[Integer]
+
+    @stats: Stats
+
+    @phased_restart_requested: bool
+
+    @phased_restarting: bool
 
     @ractor_count: Integer
 
@@ -81,6 +87,8 @@ module Raptor
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client configuration
+    # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
+    # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
@@ -134,6 +142,17 @@ module Raptor
     #
     # @rbs () -> Symbol
     def reap_workers: () -> Symbol
+
+    # Kills workers that have stopped checking in. A booted worker that
+    # fails to update its stats slot within `worker_timeout` seconds is
+    # assumed to be hung (deadlocked app, runaway loop, blocked syscall);
+    # a worker still in startup is held to `worker_boot_timeout`. Killed
+    # workers are then restarted by `reap_workers`.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def timeout_hung_workers: () -> void
 
     # Replaces each worker process one at a time, waiting for the new
     # worker to boot before moving on to the next. Triggered by SIGUSR2.

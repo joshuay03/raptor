@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Kill workers that fail to check in within `--worker-timeout` or `--worker-boot-timeout`
 - Add `index`, `busy_threads`, and `thread_capacity` to per-worker stats
 
 ## [0.4.0] - 2026-05-29
