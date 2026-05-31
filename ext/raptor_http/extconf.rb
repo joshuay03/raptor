@@ -4,4 +4,4 @@ require "mkmf"
 
 append_cflags("-fvisibility=hidden")
 
-create_makefile("raptor_http")
+create_makefile("raptor/raptor_http")
