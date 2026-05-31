@@ -453,7 +453,7 @@ the combination of NIO reactors, ractor-based parsing, and thread pools.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Stops every worker, escalating from <code>TERM</code> to <code>KILL</code> if any fail to exit within <code>worker_shutdown_timeout</code>.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Stops every worker, escalating from TERM to KILL if any fail to exit within <code>worker_shutdown_timeout</code>.</p></div></span>
   
 </li>
 
@@ -1225,9 +1225,9 @@ unless the cluster is shutting down.</p>
   <div class="discussion">
     <p class="note returns_void">This method returns an undefined value.</p><p>Starts the multi-process cluster and manages worker processes.</p>
 <p>Forks the configured number of worker processes and monitors them,
-automatically restarting any that exit unexpectedly. Handles graceful
-shutdown via INT or TERM signals, stats logging via USR1, and phased
-restart via USR2.</p>
+restarting any that exit unexpectedly or stop checking in. Handles
+graceful shutdown via INT or TERM signals, stats logging via USR1,
+and phased restart via USR2.</p>
 <p>Each worker process includes:</p>
 <ul>
 <li>1 server thread (continuously accepts connections with backpressure control)</li>
@@ -1746,8 +1746,8 @@ The worker inherits the cluster's current phase.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Stops every worker, escalating from <code>TERM</code> to <code>KILL</code> if any fail
-to exit within <code>worker_shutdown_timeout</code>.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Stops every worker, escalating from TERM to KILL if any fail to
+exit within <code>worker_shutdown_timeout</code>.</p>
 
   </div>
 </div>
@@ -1863,8 +1863,8 @@ workers are then restarted by <code>reap_workers</code>.</p>
     <span class='id identifier rubyid_elapsed'>elapsed</span> <span class='op'>=</span> <span class='id identifier rubyid_now'>now</span> <span class='op'>-</span> <span class='id identifier rubyid_stat'>stat</span><span class='lbracket'>[</span><span class='symbol'>:last_checkin</span><span class='rbracket'>]</span>
     <span class='kw'>next</span> <span class='kw'>if</span> <span class='id identifier rubyid_elapsed'>elapsed</span> <span class='op'>&lt;=</span> <span class='id identifier rubyid_timeout'>timeout</span>
 
-    <span class='id identifier rubyid_reason'>reason</span> <span class='op'>=</span> <span class='id identifier rubyid_stat'>stat</span><span class='lbracket'>[</span><span class='symbol'>:booted</span><span class='rbracket'>]</span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>check in</span><span class='tstring_end'>&quot;</span></span> <span class='op'>:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>boot</span><span class='tstring_end'>&quot;</span></span>
-    <span class='id identifier rubyid_warn'>warn</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>[</span><span class='embexpr_beg'>#{</span><span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>] Killing worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'> (</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>), failed to </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_reason'>reason</span><span class='embexpr_end'>}</span><span class='tstring_content'> within </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_timeout'>timeout</span><span class='embexpr_end'>}</span><span class='tstring_content'>s</span><span class='tstring_end'>&quot;</span></span>
+    <span class='id identifier rubyid_action'>action</span> <span class='op'>=</span> <span class='id identifier rubyid_stat'>stat</span><span class='lbracket'>[</span><span class='symbol'>:booted</span><span class='rbracket'>]</span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>check in</span><span class='tstring_end'>&quot;</span></span> <span class='op'>:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>boot</span><span class='tstring_end'>&quot;</span></span>
+    <span class='id identifier rubyid_warn'>warn</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>[</span><span class='embexpr_beg'>#{</span><span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>] Killing worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'> (</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>), failed to </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_action'>action</span><span class='embexpr_end'>}</span><span class='tstring_content'> within </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_timeout'>timeout</span><span class='embexpr_end'>}</span><span class='tstring_content'>s</span><span class='tstring_end'>&quot;</span></span>
     <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_kill'>kill</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>KILL</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
     <span class='ivar'>@timed_out</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_pid'>pid</span>
   <span class='kw'>end</span>
@@ -1930,7 +1930,7 @@ workers are then restarted by <code>reap_workers</code>.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat May 30 14:05:44 2026 by
+  Generated on Sun May 31 00:20:31 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
