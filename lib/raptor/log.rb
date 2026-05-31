@@ -40,14 +40,14 @@ module Raptor
     end
 
     # Builds the log line prefix from the current process, ractor,
-    # and thread. Unnamed ractors and threads are reported as `main`.
+    # and thread. Unnamed ractors and threads are reported as `Main`.
     #
     # @return [String] the prefix
     #
     # @rbs () -> String
     def self.prefix
-      ractor = Ractor.current.name || "main"
-      thread = Thread.current.name || "main"
+      ractor = Ractor.current.name || "Main"
+      thread = Thread.current.name || "Main"
       "[Raptor #{Process.pid}|#{ractor}|#{thread}]"
     end
     private_class_method :prefix

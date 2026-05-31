@@ -73,7 +73,7 @@ module Raptor
     # @rbs () -> Thread
     def run
       Thread.new(@binder.listeners, @reactor, @running) do |server_sockets, reactor, running|
-        Thread.current.name = self.class.name
+        Thread.current.name = "Server"
 
         while running.true?
           begin

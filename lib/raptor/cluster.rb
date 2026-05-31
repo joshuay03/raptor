@@ -156,7 +156,7 @@ module Raptor
 
       stats_file_thread = if @stats_file
         Thread.new do
-          Thread.current.name = "Raptor Stats File"
+          Thread.current.name = "Stats File Writer"
 
           write_stats_file_loop
         end
@@ -353,11 +353,10 @@ module Raptor
         request_count += 1
         @app.call(env)
       }
-      thread_pool = AtomicThreadPool.new(name: "Raptor Workers", size: @thread_count)
+      thread_pool = AtomicThreadPool.new(size: @thread_count)
       request = Request.new(counting_app, @server_port, client_options: @client_options, on_error: @on_error)
       http2 = Http2.new(counting_app, @server_port, on_error: @on_error)
       ractor_pool = RactorPool.new(
-        name: "Raptor Pipeline Workers",
         size: @ractor_count,
         worker: request.http_parser_worker
       ) do |parsed_result|
@@ -381,7 +380,7 @@ module Raptor
       Log.info "Worker #{index} booted"
 
       stats_thread = Thread.new do
-        Thread.current.name = "Raptor Stats"
+        Thread.current.name = "Stats Writer"
 
         loop do
           @stats.write(

@@ -116,7 +116,7 @@ module Raptor
     # @rbs () -> Thread
     def run
       Thread.new do
-        Thread.current.name = self.class.name
+        Thread.current.name = "Reactor"
 
         until @queue.closed? && @queue.empty?
           begin
