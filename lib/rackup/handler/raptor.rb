@@ -42,9 +42,9 @@ module Rackup
         {
           "Host=HOST"   => "Hostname to listen on (default: #{DEFAULT_OPTIONS[:Host]})",
           "Port=PORT"   => "Port to listen on (default: #{DEFAULT_OPTIONS[:Port]})",
-          "Threads=NUM" => "Number of threads per worker (default: 3)",
-          "Ractors=NUM" => "Number of pipeline ractors per worker (default: 1)",
           "Workers=NUM" => "Number of worker processes (default: nprocessors)",
+          "Ractors=NUM" => "Number of pipeline ractors per worker (default: 1)",
+          "Threads=NUM" => "Number of threads per worker (default: 3)",
           "Config=PATH" => "Load additional configuration from PATH"
         }
       end
@@ -78,9 +78,9 @@ module Rackup
           else
             config[:binds] || ["tcp://#{defaults[:Host]}:#{defaults[:Port]}"]
           end,
-          threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,
-          ractors: (options[:Ractors] || config[:ractors] || cli_defaults[:ractors]).to_i,
           workers: (options[:Workers] || config[:workers] || Etc.nprocessors).to_i,
+          ractors: (options[:Ractors] || config[:ractors] || cli_defaults[:ractors]).to_i,
+          threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,
           app: app
         }
         result[:rackup] = config[:rackup] if config.key?(:rackup)

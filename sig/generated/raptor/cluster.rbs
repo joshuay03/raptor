@@ -4,14 +4,15 @@ module Raptor
   # Multi-process web server cluster with advanced concurrency architecture.
   #
   # Cluster manages multiple worker processes, each running a complete server
-  # stack including a reactor thread, server thread, ractor pool for HTTP
-  # parsing, and thread pool for application processing. It handles process
-  # forking, signal management, graceful shutdown, and automatic worker
-  # restart when a worker process unexpectedly exits.
+  # stack including a ractor pool for HTTP parsing, a thread pool for
+  # application processing, plus dedicated reactor and server threads. It
+  # handles process forking, signal management, graceful shutdown, and
+  # automatic worker restart when a worker process unexpectedly exits.
   #
   # The architecture provides horizontal scaling through processes while
-  # maintaining efficient I/O and CPU utilization within each process through
-  # the combination of NIO reactors, ractor-based parsing, and thread pools.
+  # maintaining efficient I/O and CPU utilization within each process
+  # through the combination of ractor-based parsing and thread pools on
+  # top of NIO reactors.
   #
   # Flow per worker process:
   # 1. Server continuously accepts connections but skips acceptance when backlog is high
@@ -22,7 +23,7 @@ module Raptor
   #
   # @example Basic usage
   #   options = {
-  #     threads: 8, ractors: 2, workers: 4,
+  #     workers: 4, ractors: 2, threads: 8,
   #     binds: ["tcp://0.0.0.0:3000"],
   #     rackup: "config.ru",
   #     client: { first_data_timeout: 30, chunk_data_timeout: 10 }
@@ -37,7 +38,7 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @worker_count: Integer
+    @thread_count: Integer
 
     @client_options: Hash[Symbol, Integer]
 
@@ -75,19 +76,19 @@ module Raptor
 
     @ractor_count: Integer
 
-    @thread_count: Integer
+    @worker_count: Integer
 
     # Creates a new Cluster with the specified configuration.
     #
-    # Initializes the cluster with thread, ractor, and worker counts,
+    # Initializes the cluster with worker, ractor, and thread counts,
     # sets up network binding, loads the Rack application, and prepares
     # for multi-process operation.
     #
     # @param options [Hash] cluster configuration options
     # @option options [Array<String>] :binds array of bind URIs
-    # @option options [Integer] :threads number of threads per worker process
-    # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :workers number of worker processes
+    # @option options [Integer] :ractors number of ractors per worker process
+    # @option options [Integer] :threads number of threads per worker process
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client configuration
@@ -112,8 +113,8 @@ module Raptor
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
     # - 1 reactor thread (I/O multiplexing, timeout handling, backlog monitoring)
-    # - N ractor workers (parallel HTTP parsing)
-    # - 1 ractor collector thread (coordinates parsing results)
+    # - N pipeline ractors (parallel HTTP parsing)
+    # - 1 pipeline collector thread (coordinates parsing results)
     # - M worker threads (Rack application processing and response writing)
     # - 1 stats thread (writes per-worker metrics to shared memory every second)
     #

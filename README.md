@@ -29,23 +29,23 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 ```
 
 ```
-> bundle exec raptor -t 3 -w 4 hello_world.ru
-Raptor Cluster initializing:
-├─ Version: 0.4.0
-├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
-├─ Master PID: 26456
-│  └─ 4 worker processes
-│     ├─ 1 server thread
-│     ├─ 1 reactor thread
-│     ├─ 1 pipeline ractor
-│     ├─ 1 pipeline collector thread
-│     ├─ 3 worker threads
-│     └─ 1 stats thread
-└─ Listening on 0.0.0.0:9292
-[26459] Worker 0 booted
-[26460] Worker 1 booted
-[26461] Worker 2 booted
-[26462] Worker 3 booted
+> bundle exec raptor -w 4 -t 3 hello_world.ru
+[Raptor 91348|main|main] Cluster initializing:
+[Raptor 91348|main|main] ├─ Version: 0.4.0
+[Raptor 91348|main|main] ├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
+[Raptor 91348|main|main] ├─ Master PID: 91348
+[Raptor 91348|main|main] │  └─ 4 worker processes
+[Raptor 91348|main|main] │     ├─ 1 server thread
+[Raptor 91348|main|main] │     ├─ 1 reactor thread
+[Raptor 91348|main|main] │     ├─ 1 pipeline ractor
+[Raptor 91348|main|main] │     ├─ 1 pipeline collector thread
+[Raptor 91348|main|main] │     ├─ 3 worker threads
+[Raptor 91348|main|main] │     └─ 1 stats thread
+[Raptor 91348|main|main] └─ Listening on 0.0.0.0:9292
+[Raptor 91350|main|main] Worker 0 booted
+[Raptor 91351|main|main] Worker 1 booted
+[Raptor 91352|main|main] Worker 2 booted
+[Raptor 91353|main|main] Worker 3 booted
 ```
 
 ```

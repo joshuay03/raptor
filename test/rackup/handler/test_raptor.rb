@@ -20,7 +20,7 @@ module Rackup
 
       def test_valid_options_keys
         assert_equal(
-          ["Host=HOST", "Port=PORT", "Threads=NUM", "Ractors=NUM", "Workers=NUM", "Config=PATH"],
+          ["Host=HOST", "Port=PORT", "Workers=NUM", "Ractors=NUM", "Threads=NUM", "Config=PATH"],
           Rackup::Handler::Raptor.valid_options.keys
         )
       end
@@ -74,12 +74,12 @@ module Rackup
       end
 
       def test_config_file_layers_under_rack_options
-        with_config_file({ threads: 8, ractors: 4, workers: 2, client: { first_data_timeout: 60 } }) do |path|
+        with_config_file({ workers: 2, ractors: 4, threads: 8, client: { first_data_timeout: 60 } }) do |path|
           opts = build(Config: path, Workers: 16)
 
-          assert_equal 8, opts[:threads]
-          assert_equal 4, opts[:ractors]
           assert_equal 16, opts[:workers]
+          assert_equal 4, opts[:ractors]
+          assert_equal 8, opts[:threads]
           assert_equal 60, opts[:client][:first_data_timeout]
           assert_equal 10, opts[:client][:chunk_data_timeout]
         end

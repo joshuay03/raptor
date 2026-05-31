@@ -35,12 +35,12 @@ module Raptor
     end
 
     def test_config_file_short_flag_layers_under_cli_args
-      with_config_file({ threads: 8, ractors: 4, workers: 2, client: { first_data_timeout: 60 } }) do |path|
+      with_config_file({ workers: 2, ractors: 4, threads: 8, client: { first_data_timeout: 60 } }) do |path|
         cli = CLI.new(["-c", path, "-w", "16"])
 
-        assert_equal 8, options(cli)[:threads]
-        assert_equal 4, options(cli)[:ractors]
         assert_equal 16, options(cli)[:workers]
+        assert_equal 4, options(cli)[:ractors]
+        assert_equal 8, options(cli)[:threads]
         assert_equal 60, options(cli)[:client][:first_data_timeout]
         assert_equal 10, options(cli)[:client][:chunk_data_timeout]
       end

@@ -12,7 +12,7 @@ module Raptor
   #
   # CLI parses command-line arguments and starts the server cluster with the
   # specified configuration options. It supports configuring the number of
-  # workers, threads, ractors, bind addresses, and various client timeout
+  # workers, ractors, threads, bind addresses, and various client timeout
   # settings.
   #
   # @example Basic usage
@@ -28,9 +28,9 @@ module Raptor
 
     DEFAULT_OPTIONS = {
       binds: ["tcp://0.0.0.0:9292"].freeze,
-      threads: 3,
-      ractors: 1,
       workers: DEFAULT_WORKER_COUNT,
+      ractors: 1,
+      threads: 3,
       rackup: "config.ru",
       client: {
         first_data_timeout: 30,
@@ -219,16 +219,16 @@ module Raptor
           end
         end
 
-        opts.on("-t", "--threads NUM", Integer, "Number of threads (default: 3)") do |num|
-          @options[:threads] = num
+        opts.on("-w", "--workers NUM", Integer, "Number of worker processes (default: #{DEFAULT_WORKER_COUNT})") do |num|
+          @options[:workers] = num
         end
 
         opts.on("-r", "--ractors NUM", Integer, "Number of ractors (default: 1)") do |num|
           @options[:ractors] = num
         end
 
-        opts.on("-w", "--workers NUM", Integer, "Number of worker processes (default: #{DEFAULT_WORKER_COUNT})") do |num|
-          @options[:workers] = num
+        opts.on("-t", "--threads NUM", Integer, "Number of threads (default: 3)") do |num|
+          @options[:threads] = num
         end
 
         opts.on("--first-data-timeout SECONDS", Integer, "First data timeout in seconds (default: 30)") do |timeout|

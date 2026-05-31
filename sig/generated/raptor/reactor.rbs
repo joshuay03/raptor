@@ -5,12 +5,12 @@ module Raptor
   #
   # Reactor uses NIO selectors for efficient I/O multiplexing and implements
   # client timeouts using a red-black tree for O(log n) timeout management.
-  # It coordinates between thread pools for blocking operations and ractor
-  # pools for CPU-intensive HTTP parsing, and provides backlog metrics
-  # that the server uses for backpressure control to prevent overload.
+  # It coordinates between ractor pools for CPU-intensive HTTP parsing and
+  # thread pools for blocking operations, and provides backlog metrics that
+  # the server uses for backpressure control to prevent overload.
   #
   # @example
-  #   reactor = Reactor.new(thread_pool, ractor_pool, client_options: {
+  #   reactor = Reactor.new(ractor_pool, thread_pool, client_options: {
   #     first_data_timeout: 30,
   #     chunk_data_timeout: 10
   #   })
@@ -79,16 +79,16 @@ module Raptor
 
     # Creates a new Reactor instance.
     #
-    # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param ractor_pool [RactorPool] ractor pool for HTTP parsing
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param client_options [Hash] timeout configuration options
     # @option client_options [Integer] :first_data_timeout timeout for initial data
     # @option client_options [Integer] :chunk_data_timeout timeout for subsequent chunks
     # @option client_options [Integer] :persistent_data_timeout timeout for keep-alive connections
     # @return [void]
     #
-    # @rbs (untyped thread_pool, untyped ractor_pool, client_options: Hash[Symbol, Integer]) -> void
-    def initialize: (untyped thread_pool, untyped ractor_pool, client_options: Hash[Symbol, Integer]) -> void
+    # @rbs (untyped ractor_pool, untyped thread_pool, client_options: Hash[Symbol, Integer]) -> void
+    def initialize: (untyped ractor_pool, untyped thread_pool, client_options: Hash[Symbol, Integer]) -> void
 
     # Starts the reactor's main event loop in a new thread.
     #

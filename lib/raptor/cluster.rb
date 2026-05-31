@@ -19,14 +19,15 @@ module Raptor
   # Multi-process web server cluster with advanced concurrency architecture.
   #
   # Cluster manages multiple worker processes, each running a complete server
-  # stack including a reactor thread, server thread, ractor pool for HTTP
-  # parsing, and thread pool for application processing. It handles process
-  # forking, signal management, graceful shutdown, and automatic worker
-  # restart when a worker process unexpectedly exits.
+  # stack including a ractor pool for HTTP parsing, a thread pool for
+  # application processing, plus dedicated reactor and server threads. It
+  # handles process forking, signal management, graceful shutdown, and
+  # automatic worker restart when a worker process unexpectedly exits.
   #
   # The architecture provides horizontal scaling through processes while
-  # maintaining efficient I/O and CPU utilization within each process through
-  # the combination of NIO reactors, ractor-based parsing, and thread pools.
+  # maintaining efficient I/O and CPU utilization within each process
+  # through the combination of ractor-based parsing and thread pools on
+  # top of NIO reactors.
   #
   # Flow per worker process:
   # 1. Server continuously accepts connections but skips acceptance when backlog is high
@@ -37,7 +38,7 @@ module Raptor
   #
   # @example Basic usage
   #   options = {
-  #     threads: 8, ractors: 2, workers: 4,
+  #     workers: 4, ractors: 2, threads: 8,
   #     binds: ["tcp://0.0.0.0:3000"],
   #     rackup: "config.ru",
   #     client: { first_data_timeout: 30, chunk_data_timeout: 10 }
@@ -55,9 +56,9 @@ module Raptor
       new(options).run
     end
 
-    # @rbs @thread_count: Integer
-    # @rbs @ractor_count: Integer
     # @rbs @worker_count: Integer
+    # @rbs @ractor_count: Integer
+    # @rbs @thread_count: Integer
     # @rbs @client_options: Hash[Symbol, Integer]
     # @rbs @worker_timeout: Integer
     # @rbs @worker_boot_timeout: Integer
@@ -78,15 +79,15 @@ module Raptor
 
     # Creates a new Cluster with the specified configuration.
     #
-    # Initializes the cluster with thread, ractor, and worker counts,
+    # Initializes the cluster with worker, ractor, and thread counts,
     # sets up network binding, loads the Rack application, and prepares
     # for multi-process operation.
     #
     # @param options [Hash] cluster configuration options
     # @option options [Array<String>] :binds array of bind URIs
-    # @option options [Integer] :threads number of threads per worker process
-    # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :workers number of worker processes
+    # @option options [Integer] :ractors number of ractors per worker process
+    # @option options [Integer] :threads number of threads per worker process
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client configuration
@@ -100,9 +101,9 @@ module Raptor
     #
     # @rbs (Hash[Symbol, untyped] options) -> void
     def initialize(options)
-      @thread_count = options[:threads]
-      @ractor_count = options[:ractors]
       @worker_count = options[:workers]
+      @ractor_count = options[:ractors]
+      @thread_count = options[:threads]
       @client_options = options[:client]
       @worker_timeout = options[:worker_timeout]
       @worker_boot_timeout = options[:worker_boot_timeout]
@@ -135,8 +136,8 @@ module Raptor
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
     # - 1 reactor thread (I/O multiplexing, timeout handling, backlog monitoring)
-    # - N ractor workers (parallel HTTP parsing)
-    # - 1 ractor collector thread (coordinates parsing results)
+    # - N pipeline ractors (parallel HTTP parsing)
+    # - 1 pipeline collector thread (coordinates parsing results)
     # - M worker threads (Rack application processing and response writing)
     # - 1 stats thread (writes per-worker metrics to shared memory every second)
     #
@@ -217,7 +218,7 @@ module Raptor
         @timed_out.delete(pid)
 
         unless @shutdown
-          warn "[#{Process.pid}] Restarting worker #{index} (#{pid}), #{exit_description(status)}"
+          Log.warn "Restarting worker #{index} (#{pid}), #{exit_description(status)}"
           spawn_worker(index)
         end
       end
@@ -241,7 +242,7 @@ module Raptor
       end
       return if @workers.empty?
 
-      warn "[#{Process.pid}] Force-killing #{@workers.size} worker(s) after #{@worker_shutdown_timeout}s"
+      Log.warn "Force-killing #{@workers.size} worker(s) after #{@worker_shutdown_timeout}s"
       @workers.values.each { |pid| Process.kill("KILL", pid) rescue nil }
       @workers.values.each { |pid| Process.wait(pid) rescue nil }
     end
@@ -270,7 +271,7 @@ module Raptor
         next if elapsed <= timeout
 
         action = stat[:booted] ? "check in" : "boot"
-        warn "[#{Process.pid}] Killing worker #{index} (#{pid}), failed to #{action} within #{timeout}s"
+        Log.warn "Killing worker #{index} (#{pid}), failed to #{action} within #{timeout}s"
         Process.kill("KILL", pid) rescue nil
         @timed_out << pid
       end
@@ -286,7 +287,7 @@ module Raptor
       @phased_restart_requested = false
       @phased_restarting = true
       @phase += 1
-      puts "[#{Process.pid}] Phased restart starting"
+      Log.info "Phased restart starting"
 
       begin
         @workers.keys.sort.each do |index|
@@ -308,7 +309,7 @@ module Raptor
           end
         end
 
-        puts "[#{Process.pid}] Phased restart complete"
+        Log.info "Phased restart complete"
       ensure
         @phased_restarting = false
       end
@@ -371,13 +372,13 @@ module Raptor
         end
       end
 
-      reactor = Reactor.new(thread_pool, ractor_pool, client_options: @client_options)
+      reactor = Reactor.new(ractor_pool, thread_pool, client_options: @client_options)
       reactor_thread = reactor.run
 
       server = Server.new(@binder, reactor, thread_pool, request, client_options: @client_options)
       server_thread = server.run
 
-      puts "[#{Process.pid}] Worker #{index} booted"
+      Log.info "Worker #{index} booted"
 
       stats_thread = Thread.new do
         Thread.current.name = "Raptor Stats"
@@ -451,18 +452,18 @@ module Raptor
     #
     # @rbs () -> void
     def log_initialization
-      puts "Raptor Cluster initializing:"
-      puts "├─ Version: #{VERSION}"
-      puts "├─ Ruby Version: #{RUBY_DESCRIPTION}"
-      puts "├─ Master PID: #{Process.pid}"
-      puts "│  └─ #{@worker_count} worker process#{"es" if @worker_count > 1}"
-      puts "│     ├─ 1 server thread"
-      puts "│     ├─ 1 reactor thread"
-      puts "│     ├─ #{@ractor_count} pipeline ractor#{"s" if @ractor_count > 1}"
-      puts "│     ├─ 1 pipeline collector thread"
-      puts "│     ├─ #{@thread_count} worker thread#{"s" if @thread_count > 1}"
-      puts "│     └─ 1 stats thread"
-      puts "└─ Listening on #{@binder.addresses.join(", ")}"
+      Log.info "Cluster initializing:"
+      Log.info "├─ Version: #{VERSION}"
+      Log.info "├─ Ruby Version: #{RUBY_DESCRIPTION}"
+      Log.info "├─ Master PID: #{Process.pid}"
+      Log.info "│  └─ #{@worker_count} worker process#{"es" if @worker_count > 1}"
+      Log.info "│     ├─ 1 server thread"
+      Log.info "│     ├─ 1 reactor thread"
+      Log.info "│     ├─ #{@ractor_count} pipeline ractor#{"s" if @ractor_count > 1}"
+      Log.info "│     ├─ 1 pipeline collector thread"
+      Log.info "│     ├─ #{@thread_count} worker thread#{"s" if @thread_count > 1}"
+      Log.info "│     └─ 1 stats thread"
+      Log.info "└─ Listening on #{@binder.addresses.join(", ")}"
     end
 
     # Logs current stats for all workers to stdout.
@@ -475,9 +476,9 @@ module Raptor
     def log_stats
       @stats.all.each do |stat|
         status = stat[:booted] ? "booted" : "starting"
-        puts "Worker #{stat[:index]} (phase #{stat[:phase]}): pid=#{stat[:pid]}, requests=#{stat[:requests]}, " \
-             "busy=#{stat[:busy_threads]}/#{stat[:thread_capacity]}, backlog=#{stat[:backlog]}, " \
-             "#{status}, last_checkin=#{Time.at(stat[:last_checkin]).strftime("%H:%M:%S")}"
+        Log.info "Worker #{stat[:index]} (phase #{stat[:phase]}): pid=#{stat[:pid]}, requests=#{stat[:requests]}, " \
+                 "busy=#{stat[:busy_threads]}/#{stat[:thread_capacity]}, backlog=#{stat[:backlog]}, " \
+                 "#{status}, last_checkin=#{Time.at(stat[:last_checkin]).strftime("%H:%M:%S")}"
       end
     end
 

@@ -1,16 +1,41 @@
 # Generated from lib/raptor/log.rb with RBS::Inline
 
 module Raptor
-  # Shared logging helpers.
+  # Shared logging helpers. Every line is prefixed with
+  # `[Raptor <pid>|<ractor>|<thread>]` so output is identifiable
+  # and traceable to its source in a mixed log stream.
   module Log
-    # Logs a rescued exception to stderr with the current thread's
-    # name as a prefix. Used by background threads that catch their
-    # own errors to keep running.
+    # Writes an informational message to stdout.
+    #
+    # @param message [String] the message to log
+    # @return [void]
+    #
+    # @rbs (String message) -> void
+    def self.info: (String message) -> void
+
+    # Writes a warning to stderr.
+    #
+    # @param message [String] the message to log
+    # @return [void]
+    #
+    # @rbs (String message) -> void
+    def self.warn: (String message) -> void
+
+    # Logs a rescued exception to stderr. The full message (class,
+    # message, backtrace) is written on subsequent unprefixed lines.
     #
     # @param error [Exception] the rescued exception
     # @return [void]
     #
     # @rbs (Exception error) -> void
     def self.rescued_error: (Exception error) -> void
+
+    # Builds the log line prefix from the current process, ractor,
+    # and thread. Unnamed ractors and threads are reported as `main`.
+    #
+    # @return [String] the prefix
+    #
+    # @rbs () -> String
+    def self.prefix: () -> String
   end
 end

@@ -19,7 +19,7 @@ module Raptor
   #
   # @example
   #   binder = Binder.new(["tcp://0.0.0.0:3000"])
-  #   reactor = Reactor.new(thread_pool, ractor_pool, client_options: {})
+  #   reactor = Reactor.new(ractor_pool, thread_pool, client_options: {})
   #   request = Request.new(app, 3000)
   #   server = Server.new(binder, reactor, thread_pool, request, client_options: { first_data_timeout: 30 })
   #   server.run
@@ -216,7 +216,7 @@ module Raptor
 
         retry
       rescue OpenSSL::SSL::SSLError => error
-        warn "SSL handshake failed: #{error.message}"
+        Log.rescued_error(error)
         ssl_socket.close rescue nil
         false
       end
@@ -242,7 +242,7 @@ module Raptor
       end
       return true if ready
 
-      warn "SSL handshake timed out"
+      Log.warn "SSL handshake timed out"
       ssl_socket.close rescue nil
       false
     end
