@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-31
+
 - Fix `LoadError` when requiring the native extensions from an installed gem
 
 ## [0.5.0] - 2026-05-31
