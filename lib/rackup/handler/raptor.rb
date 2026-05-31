@@ -89,10 +89,11 @@ module Rackup
           client: cli_defaults[:client].merge(config[:client] || {}),
           worker_timeout: (config[:worker_timeout] || cli_defaults[:worker_timeout]).to_i,
           worker_boot_timeout: (config[:worker_boot_timeout] || cli_defaults[:worker_boot_timeout]).to_i,
-          worker_shutdown_timeout: (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i
+          worker_shutdown_timeout: (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i,
+          stats_file: config.key?(:stats_file) ? config[:stats_file] : cli_defaults[:stats_file]
         }
 
-        [:rackup, :on_error, :stats_file, :pid_file].each do |key|
+        [:rackup, :on_error, :pid_file].each do |key|
           result[key] = config[key] if config.key?(key)
         end
 

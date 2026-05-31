@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Apply the default `stats_file` in the Rack handler
 - Add `phase` to per-worker stats
 - Force-kill workers that fail to exit within `--worker-shutdown-timeout` after shutdown is signalled
 - Kill workers that fail to check in within `--worker-timeout` or `--worker-boot-timeout`
