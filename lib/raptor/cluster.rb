@@ -62,9 +62,9 @@ module Raptor
     # @rbs @worker_timeout: Integer
     # @rbs @worker_boot_timeout: Integer
     # @rbs @worker_shutdown_timeout: Integer
-    # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @stats_file: String?
     # @rbs @pid_file: String?
+    # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @binder: Binder
     # @rbs @server_port: Integer
     # @rbs @app: untyped
@@ -83,19 +83,19 @@ module Raptor
     # for multi-process operation.
     #
     # @param options [Hash] cluster configuration options
+    # @option options [Array<String>] :binds array of bind URIs
     # @option options [Integer] :threads number of threads per worker process
     # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :workers number of worker processes
-    # @option options [Array<String>] :binds array of bind URIs
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [Hash] :client client configuration
     # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
-    # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
+    # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
     # @rbs (Hash[Symbol, untyped] options) -> void
@@ -107,9 +107,9 @@ module Raptor
       @worker_timeout = options[:worker_timeout]
       @worker_boot_timeout = options[:worker_boot_timeout]
       @worker_shutdown_timeout = options[:worker_shutdown_timeout]
-      @on_error = options[:on_error]
       @stats_file = options[:stats_file]
       @pid_file = options[:pid_file]
+      @on_error = options[:on_error]
 
       @binder = Binder.new(options[:binds])
       @server_port = @binder.server_port

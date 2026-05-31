@@ -72,31 +72,25 @@ module Rackup
         config_path = options[:Config] || ::Raptor::CLI.default_config_path
         config = config_path ? ::Raptor::CLI.load_config_file(config_path) : {}
 
-        binds = if options[:Host] || options[:Port]
-          host = options[:Host] || defaults[:Host]
-          port = options[:Port] || defaults[:Port]
-          ["tcp://#{host}:#{port}"]
-        else
-          config[:binds] || ["tcp://#{defaults[:Host]}:#{defaults[:Port]}"]
-        end
-
         result = {
-          app: app,
-          binds: binds,
+          binds: if options[:Host] || options[:Port]
+            ["tcp://#{options[:Host] || defaults[:Host]}:#{options[:Port] || defaults[:Port]}"]
+          else
+            config[:binds] || ["tcp://#{defaults[:Host]}:#{defaults[:Port]}"]
+          end,
           threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,
           ractors: (options[:Ractors] || config[:ractors] || cli_defaults[:ractors]).to_i,
           workers: (options[:Workers] || config[:workers] || Etc.nprocessors).to_i,
-          client: cli_defaults[:client].merge(config[:client] || {}),
-          worker_timeout: (config[:worker_timeout] || cli_defaults[:worker_timeout]).to_i,
-          worker_boot_timeout: (config[:worker_boot_timeout] || cli_defaults[:worker_boot_timeout]).to_i,
-          worker_shutdown_timeout: (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i,
-          stats_file: config.key?(:stats_file) ? config[:stats_file] : cli_defaults[:stats_file]
+          app: app
         }
-
-        [:rackup, :on_error, :pid_file].each do |key|
-          result[key] = config[key] if config.key?(key)
-        end
-
+        result[:rackup] = config[:rackup] if config.key?(:rackup)
+        result[:client] = cli_defaults[:client].merge(config[:client] || {})
+        result[:worker_timeout] = (config[:worker_timeout] || cli_defaults[:worker_timeout]).to_i
+        result[:worker_boot_timeout] = (config[:worker_boot_timeout] || cli_defaults[:worker_boot_timeout]).to_i
+        result[:worker_shutdown_timeout] = (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i
+        result[:stats_file] = config.key?(:stats_file) ? config[:stats_file] : cli_defaults[:stats_file]
+        result[:pid_file] = config[:pid_file] if config.key?(:pid_file)
+        result[:on_error] = config[:on_error] if config.key?(:on_error)
         result
       end
       private_class_method :build_cluster_options
