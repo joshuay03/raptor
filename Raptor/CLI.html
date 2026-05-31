@@ -109,7 +109,7 @@
     <p>Command-line interface for the Raptor web server.</p>
 <p>CLI parses command-line arguments and starts the server cluster with the
 specified configuration options. It supports configuring the number of
-workers, threads, ractors, bind addresses, and various client timeout
+workers, ractors, threads, bind addresses, and various client timeout
 settings.</p>
 
   </div>
@@ -197,9 +197,9 @@ settings.</p>
         </dt>
         <dd><pre class="code"><span class='lbrace'>{</span>
   <span class='label'>binds:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tcp://0.0.0.0:9292</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span><span class='comma'>,</span>
-  <span class='label'>threads:</span> <span class='int'>3</span><span class='comma'>,</span>
-  <span class='label'>ractors:</span> <span class='int'>1</span><span class='comma'>,</span>
   <span class='label'>workers:</span> <span class='const'><span class='object_link'><a href="#DEFAULT_WORKER_COUNT-constant" title="Raptor::CLI::DEFAULT_WORKER_COUNT (constant)">DEFAULT_WORKER_COUNT</a></span></span><span class='comma'>,</span>
+  <span class='label'>ractors:</span> <span class='int'>1</span><span class='comma'>,</span>
+  <span class='label'>threads:</span> <span class='int'>3</span><span class='comma'>,</span>
   <span class='label'>rackup:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config.ru</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
   <span class='label'>client:</span> <span class='lbrace'>{</span>
     <span class='label'>first_data_timeout:</span> <span class='int'>30</span><span class='comma'>,</span>
@@ -978,16 +978,16 @@ key-by-key so a config file does not need to restate every client option.</p>
       <span class='kw'>end</span>
     <span class='kw'>end</span>
 
-    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-t</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--threads NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of threads (default: 3)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
-      <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:threads</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
+    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-w</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--workers NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of worker processes (default: </span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="#DEFAULT_WORKER_COUNT-constant" title="Raptor::CLI::DEFAULT_WORKER_COUNT (constant)">DEFAULT_WORKER_COUNT</a></span></span><span class='embexpr_end'>}</span><span class='tstring_content'>)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
+      <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:workers</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
     <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-r</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--ractors NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of ractors (default: 1)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:ractors</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
-    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-w</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--workers NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of worker processes (default: </span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="#DEFAULT_WORKER_COUNT-constant" title="Raptor::CLI::DEFAULT_WORKER_COUNT (constant)">DEFAULT_WORKER_COUNT</a></span></span><span class='embexpr_end'>}</span><span class='tstring_content'>)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
-      <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:workers</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
+    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-t</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--threads NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of threads (default: 3)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
+      <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:threads</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
     <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--first-data-timeout SECONDS</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>First data timeout in seconds (default: 30)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_timeout'>timeout</span><span class='op'>|</span>
@@ -1250,7 +1250,7 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
 </div>
 
       <div id="footer">
-  Generated on Sun May 31 00:39:27 2026 by
+  Generated on Sun May 31 01:19:46 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

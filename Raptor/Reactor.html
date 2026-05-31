@@ -109,9 +109,9 @@
     <p>High-performance I/O reactor for managing client connections and timeouts.</p>
 <p>Reactor uses NIO selectors for efficient I/O multiplexing and implements
 client timeouts using a red-black tree for O(log n) timeout management.
-It coordinates between thread pools for blocking operations and ractor
-pools for CPU-intensive HTTP parsing, and provides backlog metrics
-that the server uses for backpressure control to prevent overload.</p>
+It coordinates between ractor pools for CPU-intensive HTTP parsing and
+thread pools for blocking operations, and provides backlog metrics that
+the server uses for backpressure control to prevent overload.</p>
 
   </div>
 </div>
@@ -121,7 +121,7 @@ that the server uses for backpressure control to prevent overload.</p>
     <h4 class="tag_title">Examples:</h4>
     
       
-      <pre class="example code"><code><span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='const'>Reactor</span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='label'>client_options:</span> <span class='lbrace'>{</span>
+      <pre class="example code"><code><span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='const'>Reactor</span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='label'>client_options:</span> <span class='lbrace'>{</span>
   <span class='label'>first_data_timeout:</span> <span class='int'>30</span><span class='comma'>,</span>
   <span class='label'>chunk_data_timeout:</span> <span class='int'>10</span>
 <span class='rbrace'>}</span><span class='rparen'>)</span>
@@ -380,7 +380,7 @@ that the server uses for backpressure control to prevent overload.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(thread_pool, ractor_pool, client_options:)  &#x21d2; Reactor </a>
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(ractor_pool, thread_pool, client_options:)  &#x21d2; Reactor </a>
     
 
     
@@ -653,7 +653,7 @@ that the server uses for backpressure control to prevent overload.</p>
     <div class="method_details first">
   <h3 class="signature first" id="initialize-instance_method">
   
-    #<strong>initialize</strong>(thread_pool, ractor_pool, client_options:)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Reactor (class)">Reactor</a></span></tt> 
+    #<strong>initialize</strong>(ractor_pool, thread_pool, client_options:)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Reactor (class)">Reactor</a></span></tt> 
   
 
   
@@ -671,20 +671,6 @@ that the server uses for backpressure control to prevent overload.</p>
   
     <li>
       
-        <span class='name'>thread_pool</span>
-      
-      
-        <span class='type'>(<tt>AtomicThreadPool</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>thread pool for application processing</p></div>
-      
-    </li>
-  
-    <li>
-      
         <span class='name'>ractor_pool</span>
       
       
@@ -694,6 +680,20 @@ that the server uses for backpressure control to prevent overload.</p>
       
         &mdash;
         <div class='inline'><p>ractor pool for HTTP parsing</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>thread_pool</span>
+      
+      
+        <span class='type'>(<tt>AtomicThreadPool</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>thread pool for application processing</p></div>
       
     </li>
   
@@ -796,9 +796,9 @@ that the server uses for backpressure control to prevent overload.</p>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 92</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='label'>client_options:</span><span class='rparen'>)</span>
-  <span class='ivar'>@thread_pool</span> <span class='op'>=</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='label'>client_options:</span><span class='rparen'>)</span>
   <span class='ivar'>@ractor_pool</span> <span class='op'>=</span> <span class='id identifier rubyid_ractor_pool'>ractor_pool</span>
+  <span class='ivar'>@thread_pool</span> <span class='op'>=</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span>
   <span class='ivar'>@client_options</span> <span class='op'>=</span> <span class='id identifier rubyid_client_options'>client_options</span>
 
   <span class='ivar'>@selector</span> <span class='op'>=</span> <span class='const'>NIO</span><span class='op'>::</span><span class='const'>Selector</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
@@ -2358,7 +2358,7 @@ that need to coordinate concurrent socket writes.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun May 31 00:39:28 2026 by
+  Generated on Sun May 31 01:19:47 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
