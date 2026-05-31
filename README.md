@@ -31,7 +31,7 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 ```
 > bundle exec raptor -w 4 -t 3 hello_world.ru
 [Raptor 91348|main|main] Cluster initializing:
-[Raptor 91348|main|main] ├─ Version: 0.4.0
+[Raptor 91348|main|main] ├─ Version: 0.5.0
 [Raptor 91348|main|main] ├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
 [Raptor 91348|main|main] ├─ Master PID: 91348
 [Raptor 91348|main|main] │  └─ 4 worker processes
@@ -62,16 +62,18 @@ Also works with `rackup` and `rails server`:
 
 ## (Micro) Benchmarks
 
-Raptor 0.4.0 vs Puma 8.0.2:
+Raptor 0.5.0 vs Puma 8.0.2:
 
 | Protocol              | Raptor      | Puma        |
 | --------------------- | ----------- | ----------- |
-| HTTP/1.1              | 20.3k req/s | 20.6k req/s |
-| HTTP/1.1 (keep-alive) | 61.1k req/s | 39.2k req/s |
+| HTTP/1.1              | 20.1k req/s | 20k req/s   |
+| HTTP/1.1 (keep-alive) | 61.4k req/s | 39.1k req/s |
 | HTTP/2                | 22.8k req/s | N/A         |
 
-> ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]. 4 workers, 3 threads, 12 concurrent
-connections.
+> ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
+> 4 workers, 3 threads, 12 concurrent connections
+
+See [bin/benchmark](bin/benchmark) for more details.
 
 ## Development
 

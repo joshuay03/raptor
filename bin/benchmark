@@ -14,7 +14,7 @@ RUNS_PER_MODE = 4
 WARMUP_SECONDS = 5
 WARMUP_GAP_SECONDS = 25
 MAIN_SECONDS = 10
-BETWEEN_RUNS_SECONDS = 15
+BETWEEN_RUNS_SECONDS = 30
 HEY_CONNECTIONS = 12
 H2LOAD_CONNECTIONS = 4
 H2LOAD_STREAMS = 3
@@ -272,7 +272,10 @@ section = <<~MD
   | HTTP/1.1 (keep-alive) | #{cell.call(raptor_ka)} | #{cell.call(puma_ka)} |
   | HTTP/2                | #{cell.call(raptor_h2)} | #{cell.call("N/A")} |
 
-  > #{RUBY_DESCRIPTION}. #{WORKERS} workers, #{THREADS} threads, #{HEY_CONNECTIONS} concurrent connections.
+  > #{RUBY_DESCRIPTION}
+  > #{WORKERS} workers, #{THREADS} threads, #{HEY_CONNECTIONS} concurrent connections
+
+  See [bin/benchmark](bin/benchmark) for more details.
 MD
 
 puts
