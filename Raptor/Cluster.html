@@ -554,6 +554,17 @@ for multi-process operation.</p>
     <ul class="option">
       
         <li>
+          <span class="name">:binds</span>
+          <span class="type">(<tt>Array&lt;String&gt;</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>array of bind URIs</p></div>
+          
+        </li>
+      
+        <li>
           <span class="name">:threads</span>
           <span class="type">(<tt>Integer</tt>)</span>
           <span class="default">
@@ -583,17 +594,6 @@ for multi-process operation.</p>
           </span>
           
             &mdash; <div class='inline'><p>number of worker processes</p></div>
-          
-        </li>
-      
-        <li>
-          <span class="name">:binds</span>
-          <span class="type">(<tt>Array&lt;String&gt;</tt>)</span>
-          <span class="default">
-            
-          </span>
-          
-            &mdash; <div class='inline'><p>array of bind URIs</p></div>
           
         </li>
       
@@ -664,17 +664,6 @@ for multi-process operation.</p>
         </li>
       
         <li>
-          <span class="name">:on_error</span>
-          <span class="type">(<tt>#call</tt>)</span>
-          <span class="default">
-            
-          </span>
-          
-            &mdash; <div class='inline'><p>callback invoked with (env, exception) when the Rack app raises</p></div>
-          
-        </li>
-      
-        <li>
           <span class="name">:stats_file</span>
           <span class="type">(<tt>String</tt>, <tt>nil</tt>)</span>
           <span class="default">
@@ -693,6 +682,17 @@ for multi-process operation.</p>
           </span>
           
             &mdash; <div class='inline'><p>path to write the master PID to, or nil to disable</p></div>
+          
+        </li>
+      
+        <li>
+          <span class="name">:on_error</span>
+          <span class="type">(<tt>#call</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>callback invoked with (env, exception) when the Rack app raises</p></div>
           
         </li>
       
@@ -743,9 +743,9 @@ for multi-process operation.</p>
   <span class='ivar'>@worker_timeout</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:worker_timeout</span><span class='rbracket'>]</span>
   <span class='ivar'>@worker_boot_timeout</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:worker_boot_timeout</span><span class='rbracket'>]</span>
   <span class='ivar'>@worker_shutdown_timeout</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:worker_shutdown_timeout</span><span class='rbracket'>]</span>
-  <span class='ivar'>@on_error</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:on_error</span><span class='rbracket'>]</span>
   <span class='ivar'>@stats_file</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:stats_file</span><span class='rbracket'>]</span>
   <span class='ivar'>@pid_file</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:pid_file</span><span class='rbracket'>]</span>
+  <span class='ivar'>@on_error</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:on_error</span><span class='rbracket'>]</span>
 
   <span class='ivar'>@binder</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Binder.html" title="Raptor::Binder (class)">Binder</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Binder.html#initialize-instance_method" title="Raptor::Binder#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:binds</span><span class='rbracket'>]</span><span class='rparen'>)</span>
   <span class='ivar'>@server_port</span> <span class='op'>=</span> <span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_server_port'>server_port</span>
@@ -1928,7 +1928,7 @@ workers are then restarted by <code>reap_workers</code>.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun May 31 00:23:39 2026 by
+  Generated on Sun May 31 00:39:28 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
