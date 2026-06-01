@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-02
+
 - Raise the backpressure threshold floor so low thread counts don't throttle prematurely
 
 ## [0.5.1] - 2026-05-31

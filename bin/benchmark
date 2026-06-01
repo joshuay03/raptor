@@ -29,8 +29,10 @@ BENCHMARKS_SECTION_PATTERN = /## \(Micro\) Benchmarks.*?(?=\n## |\z)/m
 options = { update_readme: false }
 OptionParser.new do |opts|
   opts.banner = "Usage: bin/benchmark [--update-readme]"
-  opts.on("--update-readme", "Replace the README's (Micro) Benchmarks section with the results")
-end.parse!(into: options)
+  opts.on("--update-readme", "Replace the README's (Micro) Benchmarks section with the results") do
+    options[:update_readme] = true
+  end
+end.parse!
 
 def require_tool(name)
   return if system("which #{name} > /dev/null 2>&1")
