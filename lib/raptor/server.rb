@@ -35,6 +35,8 @@ module Raptor
     DEFAULT_REMOTE_ADDR = "127.0.0.1"
     DEFAULT_SERVER_NAME = "localhost"
 
+    MIN_BACKPRESSURE_THRESHOLD = 64
+
     # @rbs @binder: Binder
     # @rbs @reactor: Reactor
     # @rbs @thread_pool: AtomicThreadPool
@@ -83,7 +85,7 @@ module Raptor
           end
 
           next unless ready_servers
-          next if @reactor.backlog >= (@thread_pool.size * 1.2).ceil
+          next if @reactor.backlog >= [(@thread_pool.size * 1.2).ceil, MIN_BACKPRESSURE_THRESHOLD].max
 
           ready_servers.each do |listener|
             accept_connection(listener, reactor)

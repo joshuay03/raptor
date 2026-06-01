@@ -15,6 +15,8 @@ gem "http-2"
 
 gem "puma"
 
+gem "vernier"
+
 gem "rbs-inline"
 
 gem "yard"
