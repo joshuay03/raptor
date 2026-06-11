@@ -68,7 +68,7 @@ Raptor 0.6.0 vs Puma 8.0.2:
 | --------------------- | ----------- | ----------- |
 | HTTP/1.1              | 20.2k req/s | 20k req/s   |
 | HTTP/1.1 (keep-alive) | 61.4k req/s | 39.2k req/s |
-| HTTP/2                | 22.8k req/s | N/A         |
+| HTTP/2                | 56.7k req/s | N/A         |
 
 > ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
 > 4 workers, 3 threads, 12 concurrent connections

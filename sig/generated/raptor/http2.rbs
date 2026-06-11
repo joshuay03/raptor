@@ -112,6 +112,12 @@ module Raptor
       def discard_stream: (Integer stream_id) -> void
     end
 
+    EAGER_READ_TIMEOUT: ::Float
+
+    EAGER_READ_BUFFER_SIZE: untyped
+
+    EAGER_MAX_ROUNDS: ::Integer
+
     FLAG_END_STREAM: ::Integer
 
     FLAG_END_HEADERS: ::Integer
@@ -205,7 +211,9 @@ module Raptor
     # Handles a parsed HTTP/2 request from the ractor pool.
     #
     # Writes outgoing protocol frames to the socket, updates reactor state,
-    # and dispatches completed stream requests to the thread pool.
+    # and dispatches completed stream requests to the thread pool. Eagerly
+    # consumes subsequent frame batches that are already buffered, skipping
+    # the reactor and ractor pool hops while the connection is hot.
     #
     # @param result [Hash] the parsed result from the ractor pool
     # @param reactor [Reactor] the reactor managing the connection
@@ -226,6 +234,15 @@ module Raptor
     #
     # @rbs (FlowControl flow_control, Hash[Symbol, untyped] result) -> void
     def apply_flow_control_updates: (FlowControl flow_control, Hash[Symbol, untyped] result) -> void
+
+    # Reads the next frame batch from `socket` within a short window, or
+    # returns nil if nothing arrives in time.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @return [String, nil] the bytes read, or nil if nothing was available
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket) -> String?
+    def eager_read_next_batch: (OpenSSL::SSL::SSLSocket socket) -> String?
 
     # Dispatches a completed stream request to the Rack app and writes
     # the response back as HTTP/2 frames.

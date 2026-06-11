@@ -223,6 +223,10 @@ module Raptor
       end
     end
 
+    EAGER_READ_TIMEOUT = 0.001
+    EAGER_READ_BUFFER_SIZE = 64 * 1024
+    EAGER_MAX_ROUNDS = 4
+
     FLAG_END_STREAM = 0x1
     FLAG_END_HEADERS = 0x4
     FLAG_ACK = 0x1
@@ -236,7 +240,7 @@ module Raptor
 
     SERVER_PROTOCOL = "HTTP/2"
     RACK_HEADER_PREFIX = "rack."
-    HOP_BY_HOP_HEADERS = Set.new(%w[connection transfer-encoding keep-alive upgrade proxy-connection]).freeze
+    HOP_BY_HOP_HEADERS = ["connection", "transfer-encoding", "keep-alive", "upgrade", "proxy-connection"].freeze
 
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
@@ -500,7 +504,9 @@ module Raptor
     # Handles a parsed HTTP/2 request from the ractor pool.
     #
     # Writes outgoing protocol frames to the socket, updates reactor state,
-    # and dispatches completed stream requests to the thread pool.
+    # and dispatches completed stream requests to the thread pool. Eagerly
+    # consumes subsequent frame batches that are already buffered, skipping
+    # the reactor and ractor pool hops while the connection is hot.
     #
     # @param result [Hash] the parsed result from the ractor pool
     # @param reactor [Reactor] the reactor managing the connection
@@ -515,31 +521,42 @@ module Raptor
       writer = reactor.writer_for(result[:id])
       flow_control = reactor.flow_control_for(result[:id])
 
-      if flow_control && (result[:window_updates] || result[:peer_initial_window_size])
-        apply_flow_control_updates(flow_control, result)
-      end
+      rounds = 0
+      loop do
+        if flow_control && (result[:window_updates] || result[:peer_initial_window_size])
+          apply_flow_control_updates(flow_control, result)
+        end
 
-      writer.write_frames(socket, result[:outgoing_frames])
+        writer.write_frames(socket, result[:outgoing_frames])
 
-      if result[:close_connection]
-        reactor.close_connection(result[:id])
-        return
+        if result[:close_connection]
+          reactor.close_connection(result[:id])
+          return
+        end
+
+        result[:completed_requests]&.each do |request|
+          stream_id = request[:stream_id]
+          remote_addr = result[:remote_addr] || Server::DEFAULT_REMOTE_ADDR
+
+          thread_pool << proc do
+            dispatch_stream_request(
+              socket, writer, flow_control, stream_id,
+              request[:headers], request[:body],
+              remote_addr: remote_addr
+            )
+          end
+        end
+
+        rounds += 1
+        break if rounds >= EAGER_MAX_ROUNDS
+
+        next_batch = eager_read_next_batch(socket)
+        break unless next_batch
+
+        result = Raptor::Http2.process_frames(result.merge(buffer: result[:buffer] + next_batch))
       end
 
       reactor.update_http2_state(result)
-
-      result[:completed_requests]&.each do |request|
-        stream_id = request[:stream_id]
-        remote_addr = result[:remote_addr] || Server::DEFAULT_REMOTE_ADDR
-
-        thread_pool << proc do
-          dispatch_stream_request(
-            socket, writer, flow_control, stream_id,
-            request[:headers], request[:body],
-            remote_addr: remote_addr
-          )
-        end
-      end
     end
 
     private
@@ -564,6 +581,32 @@ module Raptor
       if (new_size = result[:peer_initial_window_size])
         flow_control.set_initial_stream_window(new_size)
       end
+    end
+
+    # Reads the next frame batch from `socket` within a short window, or
+    # returns nil if nothing arrives in time.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @return [String, nil] the bytes read, or nil if nothing was available
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket) -> String?
+    def eager_read_next_batch(socket)
+      return unless socket.wait_readable(EAGER_READ_TIMEOUT)
+
+      data = begin
+        socket.read_nonblock(EAGER_READ_BUFFER_SIZE)
+      rescue IO::WaitReadable, EOFError, IOError
+        return
+      end
+
+      buffer = String.new
+      buffer << data
+
+      while socket.pending > 0
+        buffer << socket.read_nonblock(socket.pending)
+      end
+
+      buffer
     end
 
     # Dispatches a completed stream request to the Rack app and writes

@@ -159,7 +159,7 @@ module Raptor
 
     def goaway_error_code(result)
       goaway = result[:outgoing_frames].find { |frame| frame.getbyte(3) == GOAWAY_FRAME_TYPE }
-      return nil unless goaway
+      return unless goaway
 
       _last_stream_id, error_code = goaway.byteslice(9, 8).unpack("NN")
       error_code

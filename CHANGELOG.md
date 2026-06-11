@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Eagerly consume back-to-back HTTP/2 frame batches in the pipeline collector
+
 ## [0.6.0] - 2026-06-02
 
 - Raise the backpressure threshold floor so low thread counts don't throttle prematurely

@@ -35,7 +35,7 @@ module Raptor
       h[status] = "HTTP/1.1 #{status}#{reason ? " #{reason}" : ""}\r\n".freeze
     end
 
-    STATUS_WITH_NO_ENTITY_BODY = Set.new([204, 304, *100..199]).freeze
+    STATUS_WITH_NO_ENTITY_BODY = [204, 304, *100..199].freeze
     BAD_REQUEST_RESPONSE = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     CONTENT_TOO_LARGE_RESPONSE = "HTTP/1.1 413 Content Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -947,7 +947,7 @@ module Raptor
     def calculate_content_length(body)
       if body.respond_to?(:to_ary)
         array = body.to_ary
-        return nil unless array.is_a?(Array)
+        return unless array.is_a?(Array)
 
         array.sum { |chunk| chunk.is_a?(String) ? chunk.bytesize : 0 }
       elsif body.respond_to?(:to_path) && (path = body.to_path) && File.readable?(path)
