@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-12
+
 - Eagerly consume back-to-back HTTP/2 frame batches in the pipeline collector
 
 ## [0.6.0] - 2026-06-02
