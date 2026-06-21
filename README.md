@@ -4,6 +4,10 @@ Raptor is a high-performance, preloading, pre-forking, multi-threaded Ruby 4+ we
 NIO for non-blocking I/O and Ractors for parallel HTTP/1.1 and HTTP/2 parsing via native C extensions, which also
 implement HPACK compression.
 
+> [!NOTE]
+> **Your application does not need to be Ractor-safe.** Ractors handle protocol-level work only; your Rack application
+> is invoked on a thread pool, so any thread-safe Rack app (including Rails) works as-is.
+
 ## Installation
 
 Install the gem and add to the application's Gemfile by executing:
