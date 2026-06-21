@@ -65,10 +65,8 @@ NIO for non-blocking I/O and Ractors for parallel HTTP/1.1 and HTTP/2 parsing vi
 implement HPACK compression.</p>
 <blockquote>
 <p>[!NOTE]
-<strong>Your application does not need to be Ractor-safe.</strong> Ractors are used internally by Raptor for protocol-level work
-only: HTTP/1.1 message parsing, chunked body decoding, HTTP/2 frame parsing, and HPACK header decoding. Your Rack
-application is invoked on a regular thread pool, so any thread-safe Rack app (including Rails) runs on Raptor as-is,
-with no Ractor-compatible code required.</p>
+<strong>Your application does not need to be Ractor-safe.</strong> Ractors handle protocol-level work only; your Rack application
+is invoked on a thread pool, so any thread-safe Rack app (including Rails) works as-is.</p>
 </blockquote>
 <h2 id="Installation">Installation</h2>
 <p>Install the gem and add to the application's Gemfile by executing:</p>
@@ -157,7 +155,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Jun 21 00:45:29 2026 by
+  Generated on Sun Jun 21 00:52:25 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
