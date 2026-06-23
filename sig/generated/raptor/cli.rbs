@@ -18,6 +18,8 @@ module Raptor
   class CLI
     DEFAULT_WORKER_COUNT: untyped
 
+    NESTED_OPTION_KEYS: untyped
+
     DEFAULT_OPTIONS: untyped
 
     DEFAULT_CONFIG_PATHS: untyped
@@ -102,9 +104,6 @@ module Raptor
     def extract_config_path: (Array[String] argv) -> String?
 
     # Loads a config file and merges it into `@options` over the defaults.
-    #
-    # Top-level keys replace defaults; the nested `:client` hash is merged
-    # key-by-key so a config file does not need to restate every client option.
     #
     # @param path [String, nil] path to the config file, or nil to no-op
     # @return [void]

@@ -78,13 +78,16 @@ module Rackup
           else
             config[:binds] || ["tcp://#{defaults[:Host]}:#{defaults[:Port]}"]
           end,
+          socket_backlog: (config[:socket_backlog] || cli_defaults[:socket_backlog]).to_i,
           workers: (options[:Workers] || config[:workers] || Etc.nprocessors).to_i,
           ractors: (options[:Ractors] || config[:ractors] || cli_defaults[:ractors]).to_i,
           threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,
           app: app
         }
         result[:rackup] = config[:rackup] if config.key?(:rackup)
-        result[:client] = cli_defaults[:client].merge(config[:client] || {})
+        ::Raptor::CLI::NESTED_OPTION_KEYS.each do |key|
+          result[key] = cli_defaults[key].merge(config[key] || {})
+        end
         result[:worker_timeout] = (config[:worker_timeout] || cli_defaults[:worker_timeout]).to_i
         result[:worker_boot_timeout] = (config[:worker_boot_timeout] || cli_defaults[:worker_boot_timeout]).to_i
         result[:worker_shutdown_timeout] = (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i

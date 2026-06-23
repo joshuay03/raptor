@@ -6,7 +6,7 @@ require "stringio"
 require "atomic-ruby/atom"
 require "rack"
 
-require_relative "request"
+require_relative "http1"
 require_relative "raptor_http2"
 
 module Raptor
@@ -27,12 +27,17 @@ module Raptor
       IDLE = :idle
 
       # @rbs @state: Atom
+      # @rbs @write_timeout: Integer
 
       # Creates a new Writer.
       #
-      # @rbs () -> void
-      def initialize
+      # @param write_timeout [Integer] per-write socket timeout passed through to {Http1.socket_write}
+      # @return [void]
+      #
+      # @rbs (write_timeout: Integer) -> void
+      def initialize(write_timeout:)
         @state = Atom.new(IDLE)
+        @write_timeout = write_timeout
       end
 
       # Writes frames to the socket, coordinating with concurrent writers
@@ -69,7 +74,7 @@ module Raptor
           break if pending.empty?
 
           pending.each do |frame|
-            Request.socket_write(socket, frame) rescue nil
+            Http1.socket_write(socket, frame, timeout: @write_timeout) rescue nil
           end
         end
       end
@@ -78,7 +83,7 @@ module Raptor
     # Per-connection outbound flow-control accounting.
     #
     # Tracks the peer's connection-level and per-stream receive windows so
-    # outbound DATA frames respect RFC 7540 §5.2. Threads dispatching stream
+    # outbound DATA frames respect RFC 7540 section 5.2. Threads dispatching stream
     # responses call `acquire` to reserve send capacity; threads applying
     # inbound WINDOW_UPDATE or SETTINGS frames call the mutating methods to
     # replenish it. The connection window and per-stream windows live in
@@ -146,9 +151,9 @@ module Raptor
           end
 
           if granted > 0
-            @stream_windows.swap do |s|
-              current = s[stream_id] || initial
-              s.merge(stream_id => current - granted)
+            @stream_windows.swap do |windows|
+              current = windows[stream_id] || initial
+              windows.merge(stream_id => current - granted)
             end
             return granted
           end
@@ -178,14 +183,14 @@ module Raptor
       # @rbs (Integer stream_id, Integer increment) -> void
       def add_stream_window(stream_id, increment)
         initial = @initial_stream_window.value
-        @stream_windows.swap do |s|
-          current = s[stream_id] || initial
-          s.merge(stream_id => current + increment)
+        @stream_windows.swap do |windows|
+          current = windows[stream_id] || initial
+          windows.merge(stream_id => current + increment)
         end
       end
 
       # Updates the peer's `SETTINGS_INITIAL_WINDOW_SIZE`. Shifts every
-      # existing stream window by the delta as required by RFC 7540 §6.9.2.
+      # existing stream window by the delta as required by RFC 7540 section 6.9.2.
       #
       # @param new_size [Integer] the peer's new initial window size
       # @return [void]
@@ -197,8 +202,8 @@ module Raptor
         delta = new_size - old
         return if delta.zero?
 
-        @stream_windows.swap do |s|
-          s.transform_values { |size| size + delta }
+        @stream_windows.swap do |windows|
+          windows.transform_values { |size| size + delta }
         end
       end
 
@@ -213,12 +218,12 @@ module Raptor
       def discard_stream(stream_id)
         return unless @stream_windows.value.key?(stream_id)
 
-        @stream_windows.swap do |s|
-          next s unless s.key?(stream_id)
+        @stream_windows.swap do |windows|
+          next windows unless windows.key?(stream_id)
 
-          new = s.dup
-          new.delete(stream_id)
-          new
+          pruned = windows.dup
+          pruned.delete(stream_id)
+          pruned
         end
       end
     end
@@ -244,34 +249,48 @@ module Raptor
 
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
+    # @rbs @write_timeout: Integer
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    # @rbs @initial_settings_frame: String
+
+    # The initial server SETTINGS frame sent on every new HTTP/2 connection.
+    #
+    # @return [String] the encoded SETTINGS frame
+    attr_reader :initial_settings_frame
 
     # Creates a new Http2 handler.
     #
     # @param app [#call] the Rack application to dispatch requests to
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @param connection_options [Hash] per-connection settings shared across protocols
+    # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
+    # @param http2_options [Hash] HTTP/2-specific settings
+    # @option http2_options [Integer] :max_concurrent_streams maximum HTTP/2 concurrent streams per connection
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize(app, server_port, on_error: nil)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize(app, server_port, connection_options: {}, http2_options: {}, on_error: nil)
       @app = app
       @server_port = server_port
+      @write_timeout = connection_options[:write_timeout] || Http1::WRITE_TIMEOUT
       @on_error = on_error
-    end
 
-    # Builds the initial server SETTINGS frame to send on connection establishment.
-    #
-    # @return [String] the encoded SETTINGS frame
-    #
-    # @rbs () -> String
-    def self.build_server_settings_frame
       parser = Http2Parser.new
       settings_payload = parser.build_settings(
-        max_concurrent_streams: 100,
+        max_concurrent_streams: http2_options[:max_concurrent_streams],
         initial_window_size: DEFAULT_WINDOW_SIZE
       )
-      parser.build_frame(:settings, 0, 0, settings_payload)
+      @initial_settings_frame = parser.build_frame(:settings, 0, 0, settings_payload).freeze
+    end
+
+    # Creates a per-connection {Writer} configured with the handler's write timeout.
+    #
+    # @return [Writer] a new per-connection frame writer
+    #
+    # @rbs () -> Writer
+    def create_writer
+      Writer.new(write_timeout: @write_timeout)
     end
 
     # Processes HTTP/2 frames from the connection buffer.

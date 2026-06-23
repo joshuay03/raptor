@@ -14,10 +14,12 @@ module Raptor
   # the server uses for backpressure control to prevent overload.
   #
   # @example
-  #   reactor = Reactor.new(ractor_pool, thread_pool, client_options: {
-  #     first_data_timeout: 30,
-  #     chunk_data_timeout: 10
-  #   })
+  #   reactor = Reactor.new(
+  #     ractor_pool,
+  #     thread_pool,
+  #     connection_options: { first_data_timeout: 30, chunk_data_timeout: 10 },
+  #     http1_options: { persistent_data_timeout: 65 }
+  #   )
   #   reactor.run
   #   reactor.add(id: client.object_id, socket: client)
   #   # ... later
@@ -68,7 +70,9 @@ module Raptor
 
     # @rbs @thread_pool: untyped
     # @rbs @ractor_pool: untyped
-    # @rbs @client_options: Hash[Symbol, Integer]
+    # @rbs @first_data_timeout: Integer
+    # @rbs @chunk_data_timeout: Integer
+    # @rbs @persistent_data_timeout: Integer
     # @rbs @selector: NIO::Selector
     # @rbs @queue: Queue[TCPSocket]
     # @rbs @timeouts: RedBlackTree[TimeoutClient]
@@ -82,17 +86,20 @@ module Raptor
     #
     # @param ractor_pool [RactorPool] ractor pool for HTTP parsing
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
-    # @param client_options [Hash] timeout configuration options
-    # @option client_options [Integer] :first_data_timeout timeout for initial data
-    # @option client_options [Integer] :chunk_data_timeout timeout for subsequent chunks
-    # @option client_options [Integer] :persistent_data_timeout timeout for keep-alive connections
+    # @param connection_options [Hash] per-connection timeout configuration
+    # @option connection_options [Integer] :first_data_timeout timeout for initial data
+    # @option connection_options [Integer] :chunk_data_timeout timeout for subsequent chunks
+    # @param http1_options [Hash] HTTP/1.1-specific configuration
+    # @option http1_options [Integer] :persistent_data_timeout timeout for keep-alive idle connections
     # @return [void]
     #
-    # @rbs (untyped ractor_pool, untyped thread_pool, client_options: Hash[Symbol, Integer]) -> void
-    def initialize(ractor_pool, thread_pool, client_options:)
+    # @rbs (untyped ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
+    def initialize(ractor_pool, thread_pool, connection_options:, http1_options:)
       @ractor_pool = ractor_pool
       @thread_pool = thread_pool
-      @client_options = client_options
+      @first_data_timeout = connection_options[:first_data_timeout]
+      @chunk_data_timeout = connection_options[:chunk_data_timeout]
+      @persistent_data_timeout = http1_options[:persistent_data_timeout]
 
       @selector = NIO::Selector.new
       @queue = Queue.new
@@ -354,11 +361,11 @@ module Raptor
       state = @socket_to_state[socket]
       client = TimeoutClient.new(state)
       timeout = if state[:persisted]
-        @client_options[:persistent_data_timeout]
+        @persistent_data_timeout
       elsif first_data_received?(state)
-        @client_options[:chunk_data_timeout]
+        @chunk_data_timeout
       else
-        @client_options[:first_data_timeout]
+        @first_data_timeout
       end
       client.timeout_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       @timeouts << client

@@ -19,9 +19,10 @@ module Raptor
   #
   # @example
   #   binder = Binder.new(["tcp://0.0.0.0:3000"])
-  #   reactor = Reactor.new(ractor_pool, thread_pool, client_options: {})
-  #   request = Request.new(app, 3000)
-  #   server = Server.new(binder, reactor, thread_pool, request, client_options: { first_data_timeout: 30 })
+  #   reactor = Reactor.new(ractor_pool, thread_pool, connection_options: {}, http1_options: {})
+  #   http1 = Http1.new(app, 3000)
+  #   http2 = Http2.new(app, 3000)
+  #   server = Server.new(binder, reactor, thread_pool, http1, http2, connection_options: { first_data_timeout: 30 })
   #   server.run
   #   # ... later
   #   server.shutdown
@@ -40,8 +41,9 @@ module Raptor
     # @rbs @binder: Binder
     # @rbs @reactor: Reactor
     # @rbs @thread_pool: AtomicThreadPool
-    # @rbs @request: Request
-    # @rbs @client_options: Hash[Symbol, untyped]
+    # @rbs @http1: Http1
+    # @rbs @http2: Http2
+    # @rbs @first_data_timeout: Integer
     # @rbs @running: AtomicBoolean
 
     # Creates a new Server instance.
@@ -49,17 +51,19 @@ module Raptor
     # @param binder [Binder] the binder managing listening sockets
     # @param reactor [Reactor] the reactor for handling client connections
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
-    # @param request [Request] the HTTP/1.1 request handler
-    # @param client_options [Hash] client timeout configuration, used to bound TLS handshakes
+    # @param http1 [Http1] the HTTP/1.1 handler
+    # @param http2 [Http2] the HTTP/2 handler (provides the initial SETTINGS frame)
+    # @param connection_options [Hash] per-connection timeout configuration, used to bound TLS handshakes
     # @return [void]
     #
-    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Request request, client_options: Hash[Symbol, untyped]) -> void
-    def initialize(binder, reactor, thread_pool, request, client_options:)
+    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped]) -> void
+    def initialize(binder, reactor, thread_pool, http1, http2, connection_options:)
       @binder = binder
       @reactor = reactor
       @thread_pool = thread_pool
-      @request = request
-      @client_options = client_options
+      @http1 = http1
+      @http2 = http2
+      @first_data_timeout = connection_options[:first_data_timeout]
       @running = AtomicBoolean.new(true)
     end
 
@@ -74,12 +78,12 @@ module Raptor
     #
     # @rbs () -> Thread
     def run
-      Thread.new(@binder.listeners, @reactor, @running) do |server_sockets, reactor, running|
+      Thread.new do
         Thread.current.name = "Server"
 
-        while running.true?
+        while @running.true?
           begin
-            ready_servers, _, _ = IO.select(server_sockets, nil, nil, 1)
+            ready_servers, _, _ = IO.select(@binder.listeners, nil, nil, 1)
           rescue IOError, Errno::EBADF
             break
           end
@@ -87,9 +91,7 @@ module Raptor
           next unless ready_servers
           next if @reactor.backlog >= [(@thread_pool.size * 1.2).ceil, MIN_BACKPRESSURE_THRESHOLD].max
 
-          ready_servers.each do |listener|
-            accept_connection(listener, reactor)
-          end
+          ready_servers.each { |listener| accept_connection(listener) }
         end
       end
     end
@@ -118,11 +120,10 @@ module Raptor
     # follow the HTTP/1.1 path.
     #
     # @param listener [TCPServer, UNIXServer, Binder::SslListener] the ready listener
-    # @param reactor [Reactor] the reactor to dispatch connections to
     # @return [void]
     #
-    # @rbs (TCPServer | UNIXServer | Binder::SslListener listener, Reactor reactor) -> void
-    def accept_connection(listener, reactor)
+    # @rbs (TCPServer | UNIXServer | Binder::SslListener listener) -> void
+    def accept_connection(listener)
       tcp_client = begin
         listener.is_a?(Binder::SslListener) ? listener.tcp_server.accept_nonblock : listener.accept_nonblock
       rescue IO::WaitReadable
@@ -138,15 +139,15 @@ module Raptor
 
       if listener.is_a?(Binder::SslListener)
         @thread_pool << proc do
-          dispatch_ssl_connection(listener, tcp_client, remote_addr, reactor)
+          dispatch_ssl_connection(listener, tcp_client, remote_addr)
         end
         return
       end
 
-      @request.eager_accept(
+      @http1.eager_accept(
         tcp_client,
         tcp_client.object_id,
-        reactor,
+        @reactor,
         @thread_pool,
         remote_addr,
         HTTP_SCHEME
@@ -160,35 +161,34 @@ module Raptor
     # @param listener [Binder::SslListener] the SSL listener that accepted the connection
     # @param tcp_client [TCPSocket] the accepted TCP socket
     # @param remote_addr [String] the client's IP address
-    # @param reactor [Reactor] the reactor to dispatch the connection to
     # @return [void]
     #
-    # @rbs (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr, Reactor reactor) -> void
-    def dispatch_ssl_connection(listener, tcp_client, remote_addr, reactor)
+    # @rbs (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr) -> void
+    def dispatch_ssl_connection(listener, tcp_client, remote_addr)
       ssl_socket = OpenSSL::SSL::SSLSocket.new(tcp_client, listener.ssl_context)
       ssl_socket.sync_close = true
       return unless perform_ssl_handshake(ssl_socket)
 
       if ssl_socket.alpn_protocol == H2_PROTOCOL
-        ssl_socket.write(Http2.build_server_settings_frame) rescue nil
+        ssl_socket.write(@http2.initial_settings_frame) rescue nil
 
-        reactor.add(
+        @reactor.add(
           id: ssl_socket.object_id,
           socket: ssl_socket,
           remote_addr: remote_addr,
           url_scheme: HTTPS_SCHEME,
           protocol: :http2,
-          writer: Http2::Writer.new,
+          writer: @http2.create_writer,
           flow_control: Http2::FlowControl.new
         )
 
         return
       end
 
-      @request.eager_accept(
+      @http1.eager_accept(
         ssl_socket,
         ssl_socket.object_id,
-        reactor,
+        @reactor,
         @thread_pool,
         remote_addr,
         HTTPS_SCHEME
@@ -204,7 +204,7 @@ module Raptor
     #
     # @rbs (OpenSSL::SSL::SSLSocket ssl_socket) -> bool
     def perform_ssl_handshake(ssl_socket)
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @client_options[:first_data_timeout]
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @first_data_timeout
 
       begin
         ssl_socket.accept_nonblock

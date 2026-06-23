@@ -1,11 +1,11 @@
-# Generated from lib/raptor/request.rb with RBS::Inline
+# Generated from lib/raptor/http1.rb with RBS::Inline
 
 module Raptor
   # Parses HTTP/1.x requests and dispatches them to the Rack
   # application. Coordinates with the Ractor pool for parsing and
   # with the reactor for requests that need more data before they
   # can be handled.
-  class Request
+  class Http1
     BODY_BUFFER_THRESHOLD: untyped
 
     FILE_CHUNK_SIZE: untyped
@@ -76,7 +76,51 @@ module Raptor
     def self.decode_chunked: (String buffer, ?Integer? max_size) -> [ String, Symbol ]
 
     # Writes `string` in full, retrying on partial writes. Bounded by
-    # `WRITE_TIMEOUT` so a slow client can't pin the writing thread.
+    # `timeout` so a slow client can't pin the writing thread.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param string [String] the data to write
+    # @param timeout [Integer] seconds to wait for the socket to become writable on each partial write
+    # @return [void]
+    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, String string, ?timeout: Integer) -> void
+    def self.socket_write: (TCPSocket socket, String string, ?timeout: Integer) -> void
+
+    @running: AtomicBoolean
+
+    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+
+    @max_keepalive_requests: Integer
+
+    @body_spool_threshold: Integer?
+
+    @max_body_size: Integer?
+
+    @write_timeout: Integer
+
+    @server_port: Integer
+
+    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
+
+    # Creates a new Http1 handler.
+    #
+    # @param app [#call] the Rack application to dispatch complete requests to
+    # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @param connection_options [Hash] per-connection settings shared across protocols
+    # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
+    # @option connection_options [Integer, nil] :max_body_size maximum request body size in bytes
+    # @option connection_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
+    # @param http1_options [Hash] HTTP/1.1-specific settings
+    # @option http1_options [Integer] :max_keepalive_requests maximum requests per HTTP/1.1 keep-alive connection
+    # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
+    # @return [void]
+    #
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+
+    # Instance-level wrapper around {.socket_write} that applies the
+    # configured `write_timeout`.
     #
     # @param socket [TCPSocket] the socket to write to
     # @param string [String] the data to write
@@ -84,32 +128,7 @@ module Raptor
     # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
     #
     # @rbs (TCPSocket socket, String string) -> void
-    def self.socket_write: (TCPSocket socket, String string) -> void
-
-    @running: AtomicBoolean
-
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
-
-    @body_spool_threshold: Integer?
-
-    @max_body_size: Integer?
-
-    @server_port: Integer
-
-    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
-
-    # Creates a new Request handler.
-    #
-    # @param app [#call] the Rack application to dispatch complete requests to
-    # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
-    # @param client_options [Hash] client limits configuration
-    # @option client_options [Integer, nil] :max_body_size maximum request body size in bytes
-    # @option client_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
-    # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
-    # @return [void]
-    #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?client_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def socket_write: (TCPSocket socket, String string) -> void
 
     # Signals eager keep-alive loops to stop processing further requests on
     # their connections. In-flight requests complete normally.

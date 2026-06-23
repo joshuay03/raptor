@@ -17,10 +17,15 @@ module Raptor
 
       @state: Atom
 
+      @write_timeout: Integer
+
       # Creates a new Writer.
       #
-      # @rbs () -> void
-      def initialize: () -> void
+      # @param write_timeout [Integer] per-write socket timeout passed through to {Http1.socket_write}
+      # @return [void]
+      #
+      # @rbs (write_timeout: Integer) -> void
+      def initialize: (write_timeout: Integer) -> void
 
       # Writes frames to the socket, coordinating with concurrent writers
       # so that exactly one thread is actively writing at any time.
@@ -36,7 +41,7 @@ module Raptor
     # Per-connection outbound flow-control accounting.
     #
     # Tracks the peer's connection-level and per-stream receive windows so
-    # outbound DATA frames respect RFC 7540 §5.2. Threads dispatching stream
+    # outbound DATA frames respect RFC 7540 section 5.2. Threads dispatching stream
     # responses call `acquire` to reserve send capacity; threads applying
     # inbound WINDOW_UPDATE or SETTINGS frames call the mutating methods to
     # replenish it. The connection window and per-stream windows live in
@@ -93,7 +98,7 @@ module Raptor
       def add_stream_window: (Integer stream_id, Integer increment) -> void
 
       # Updates the peer's `SETTINGS_INITIAL_WINDOW_SIZE`. Shifts every
-      # existing stream window by the delta as required by RFC 7540 §6.9.2.
+      # existing stream window by the delta as required by RFC 7540 section 6.9.2.
       #
       # @param new_size [Integer] the peer's new initial window size
       # @return [void]
@@ -140,28 +145,41 @@ module Raptor
 
     HOP_BY_HOP_HEADERS: untyped
 
+    @initial_settings_frame: String
+
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+
+    @write_timeout: Integer
 
     @server_port: Integer
 
     @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
 
+    # The initial server SETTINGS frame sent on every new HTTP/2 connection.
+    #
+    # @return [String] the encoded SETTINGS frame
+    attr_reader initial_settings_frame: untyped
+
     # Creates a new Http2 handler.
     #
     # @param app [#call] the Rack application to dispatch requests to
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @param connection_options [Hash] per-connection settings shared across protocols
+    # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
+    # @param http2_options [Hash] HTTP/2-specific settings
+    # @option http2_options [Integer] :max_concurrent_streams maximum HTTP/2 concurrent streams per connection
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
 
-    # Builds the initial server SETTINGS frame to send on connection establishment.
+    # Creates a per-connection {Writer} configured with the handler's write timeout.
     #
-    # @return [String] the encoded SETTINGS frame
+    # @return [Writer] a new per-connection frame writer
     #
-    # @rbs () -> String
-    def self.build_server_settings_frame: () -> String
+    # @rbs () -> Writer
+    def create_writer: () -> Writer
 
     # Processes HTTP/2 frames from the connection buffer.
     #

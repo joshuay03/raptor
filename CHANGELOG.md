@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Add new configuration options and split `client:` into protocol-scoped namespaces
+
 ## [0.7.0] - 2026-06-12
 
 - Eagerly consume back-to-back HTTP/2 frame batches in the pipeline collector

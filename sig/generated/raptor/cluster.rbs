@@ -26,7 +26,7 @@ module Raptor
   #     workers: 4, ractors: 2, threads: 8,
   #     binds: ["tcp://0.0.0.0:3000"],
   #     rackup: "config.ru",
-  #     client: { first_data_timeout: 30, chunk_data_timeout: 10 }
+  #     connection: { first_data_timeout: 30, chunk_data_timeout: 10 }
   #   }
   #   Cluster.run(options)
   class Cluster
@@ -38,9 +38,11 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @thread_count: Integer
+    @connection_options: Hash[Symbol, untyped]
 
-    @client_options: Hash[Symbol, Integer]
+    @http1_options: Hash[Symbol, untyped]
+
+    @http2_options: Hash[Symbol, untyped]
 
     @worker_timeout: Integer
 
@@ -74,6 +76,8 @@ module Raptor
 
     @phased_restarting: bool
 
+    @thread_count: Integer
+
     @ractor_count: Integer
 
     @worker_count: Integer
@@ -86,12 +90,15 @@ module Raptor
     #
     # @param options [Hash] cluster configuration options
     # @option options [Array<String>] :binds array of bind URIs
+    # @option options [Integer] :socket_backlog kernel listen() queue depth for TCP/SSL listeners
     # @option options [Integer] :workers number of worker processes
     # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :threads number of threads per worker process
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
-    # @option options [Hash] :client client configuration
+    # @option options [Hash] :connection per-connection settings shared across protocols
+    # @option options [Hash] :http1 HTTP/1.1-specific settings
+    # @option options [Hash] :http2 HTTP/2-specific settings
     # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing

@@ -100,7 +100,7 @@ module Raptor
     end
 
     def test_rack_input_uses_tempfile_above_spool_threshold
-      @options[:client] = @options[:client].merge(body_spool_threshold: 4)
+      @options[:connection] = @options[:connection].merge(body_spool_threshold: 4)
 
       with_server("rack_input_class.ru") do |uri|
         response = Net::HTTP.post(uri, "body larger than four bytes")
@@ -305,7 +305,7 @@ module Raptor
     end
 
     def test_http10_connection_keepalive_when_requested
-      @options[:client] = @options[:client].merge(persistent_data_timeout: 1)
+      @options[:http1] = @options[:http1].merge(persistent_data_timeout: 1)
 
       with_server do |uri|
         response = raw_request(uri, "GET / HTTP/1.0\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: keep-alive\r\n\r\n")
@@ -315,7 +315,7 @@ module Raptor
     end
 
     def test_first_data_timeout_returns_408
-      @options[:client] = @options[:client].merge(first_data_timeout: 1)
+      @options[:connection] = @options[:connection].merge(first_data_timeout: 1)
 
       with_server do |uri|
         socket = TCPSocket.new(uri.host, uri.port)
@@ -357,7 +357,7 @@ module Raptor
     end
 
     def test_max_body_size_returns_413
-      @options[:client] = @options[:client].merge(max_body_size: 5)
+      @options[:connection] = @options[:connection].merge(max_body_size: 5)
 
       with_server("rack_input.ru") do |uri|
         response = Net::HTTP.post(uri, "this body is well over five bytes")
@@ -663,7 +663,7 @@ module Raptor
       server_port = cluster.instance_variable_get(:@server_port)
 
       cluster_pid = fork do
-        Raptor::Request.prepend(Module.new do
+        Raptor::Http1.prepend(Module.new do
           define_method(:handle_parsed_request) do |*args|
             Thread.current[:_test_handle_count] = (Thread.current[:_test_handle_count] || 0) + 1
             raise "injected collector failure" if Thread.current[:_test_handle_count] == 1

@@ -51,9 +51,11 @@ module Raptor
       def members: () -> [ :tcp_server, :ssl_context ]
     end
 
-    @bind_uris: Array[String]
-
     @listeners: Array[TCPServer | UNIXServer | SslListener]
+
+    @socket_backlog: Integer
+
+    @bind_uris: Array[String]
 
     # Array of listening sockets.
     #
@@ -67,14 +69,15 @@ module Raptor
     # all available loopback addresses (both IPv4 and IPv6).
     #
     # @param bind_uris [Array<String>] array of URI strings to bind to
+    # @param socket_backlog [Integer] kernel listen() queue depth for TCP/SSL listeners
     # @return [void]
     # @raise [UnknownBindSchemeError] if a URI has an unsupported scheme
     #
     # @example
     #   binder = Binder.new(["tcp://0.0.0.0:3000", "unix:///tmp/raptor.sock"])
     #
-    # @rbs (Array[String] bind_uris) -> void
-    def initialize: (Array[String] bind_uris) -> void
+    # @rbs (Array[String] bind_uris, ?socket_backlog: Integer) -> void
+    def initialize: (Array[String] bind_uris, ?socket_backlog: Integer) -> void
 
     # Returns the bound addresses as strings.
     #

@@ -29,10 +29,13 @@ module Rackup
         opts = build({})
 
         assert_equal ["tcp://0.0.0.0:9292"], opts[:binds]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:socket_backlog], opts[:socket_backlog]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:ractors], opts[:ractors]
         assert_equal Etc.nprocessors, opts[:workers]
-        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:client], opts[:client]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:connection], opts[:connection]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http1], opts[:http1]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http2], opts[:http2]
       end
 
       def test_passes_app_through
@@ -74,14 +77,14 @@ module Rackup
       end
 
       def test_config_file_layers_under_rack_options
-        with_config_file({ workers: 2, ractors: 4, threads: 8, client: { first_data_timeout: 60 } }) do |path|
+        with_config_file({ workers: 2, ractors: 4, threads: 8, connection: { first_data_timeout: 60 } }) do |path|
           opts = build(Config: path, Workers: 16)
 
           assert_equal 16, opts[:workers]
           assert_equal 4, opts[:ractors]
           assert_equal 8, opts[:threads]
-          assert_equal 60, opts[:client][:first_data_timeout]
-          assert_equal 10, opts[:client][:chunk_data_timeout]
+          assert_equal 60, opts[:connection][:first_data_timeout]
+          assert_equal 10, opts[:connection][:chunk_data_timeout]
         end
       end
 

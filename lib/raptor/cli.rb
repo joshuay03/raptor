@@ -26,18 +26,28 @@ module Raptor
   class CLI
     DEFAULT_WORKER_COUNT = Etc.nprocessors
 
+    NESTED_OPTION_KEYS = [:connection, :http1, :http2].freeze
+
     DEFAULT_OPTIONS = {
       binds: ["tcp://0.0.0.0:9292"].freeze,
+      socket_backlog: 1024,
       workers: DEFAULT_WORKER_COUNT,
       ractors: 1,
       threads: 3,
       rackup: "config.ru",
-      client: {
+      connection: {
         first_data_timeout: 30,
         chunk_data_timeout: 10,
-        persistent_data_timeout: 65,
+        write_timeout: 5,
         max_body_size: nil,
         body_spool_threshold: 1024 * 1024,
+      },
+      http1: {
+        persistent_data_timeout: 65,
+        max_keepalive_requests: 100,
+      },
+      http2: {
+        max_concurrent_streams: 100,
       },
       worker_timeout: 60,
       worker_boot_timeout: 60,
@@ -109,7 +119,7 @@ module Raptor
         @command = :server
       end
       @options = DEFAULT_OPTIONS.dup
-      @options[:client] = @options[:client].dup
+      NESTED_OPTION_KEYS.each { |key| @options[key] = @options[key].dup }
 
       apply_config_file(extract_config_path(argv) || self.class.default_config_path)
 
@@ -178,9 +188,6 @@ module Raptor
 
     # Loads a config file and merges it into `@options` over the defaults.
     #
-    # Top-level keys replace defaults; the nested `:client` hash is merged
-    # key-by-key so a config file does not need to restate every client option.
-    #
     # @param path [String, nil] path to the config file, or nil to no-op
     # @return [void]
     #
@@ -190,8 +197,8 @@ module Raptor
 
       config = self.class.load_config_file(path)
       config.each do |key, value|
-        if key == :client && value.is_a?(Hash)
-          @options[:client] = @options[:client].merge(value)
+        if NESTED_OPTION_KEYS.include?(key) && value.is_a?(Hash)
+          @options[key] = @options[key].merge(value)
         else
           @options[key] = value
         end
@@ -219,36 +226,52 @@ module Raptor
           end
         end
 
+        opts.on("--socket-backlog NUM", Integer, "Socket listen backlog (default: 1024)") do |num|
+          @options[:socket_backlog] = num
+        end
+
         opts.on("-w", "--workers NUM", Integer, "Number of worker processes (default: #{DEFAULT_WORKER_COUNT})") do |num|
           @options[:workers] = num
         end
 
-        opts.on("-r", "--ractors NUM", Integer, "Number of ractors (default: 1)") do |num|
+        opts.on("-r", "--ractors NUM", Integer, "Number of pipeline ractors per worker (default: 1)") do |num|
           @options[:ractors] = num
         end
 
-        opts.on("-t", "--threads NUM", Integer, "Number of threads (default: 3)") do |num|
+        opts.on("-t", "--threads NUM", Integer, "Number of application threads per worker (default: 3)") do |num|
           @options[:threads] = num
         end
 
         opts.on("--first-data-timeout SECONDS", Integer, "First data timeout in seconds (default: 30)") do |timeout|
-          @options[:client][:first_data_timeout] = timeout
+          @options[:connection][:first_data_timeout] = timeout
         end
 
         opts.on("--chunk-data-timeout SECONDS", Integer, "Chunk data timeout in seconds (default: 10)") do |timeout|
-          @options[:client][:chunk_data_timeout] = timeout
+          @options[:connection][:chunk_data_timeout] = timeout
         end
 
-        opts.on("--persistent-data-timeout SECONDS", Integer, "Persistent data timeout in seconds (default: 65)") do |timeout|
-          @options[:client][:persistent_data_timeout] = timeout
+        opts.on("--write-timeout SECONDS", Integer, "Per-write socket timeout in seconds (default: 5)") do |timeout|
+          @options[:connection][:write_timeout] = timeout
         end
 
         opts.on("--max-body-size BYTES", Integer, "Maximum request body size in bytes (default: unlimited)") do |bytes|
-          @options[:client][:max_body_size] = bytes
+          @options[:connection][:max_body_size] = bytes
         end
 
-        opts.on("--body-spool-threshold BYTES", Integer, "Spool request bodies larger than this to a tempfile (default: #{1024 * 1024})") do |bytes|
-          @options[:client][:body_spool_threshold] = bytes
+        opts.on("--body-spool-threshold BYTES", Integer, "Request body spool threshold in bytes (default: #{1024 * 1024})") do |bytes|
+          @options[:connection][:body_spool_threshold] = bytes
+        end
+
+        opts.on("--http1-persistent-data-timeout SECONDS", Integer, "HTTP/1.1 keep-alive idle timeout in seconds (default: 65)") do |timeout|
+          @options[:http1][:persistent_data_timeout] = timeout
+        end
+
+        opts.on("--http1-max-keepalive-requests NUM", Integer, "Maximum HTTP/1.1 requests per keep-alive connection (default: 100)") do |num|
+          @options[:http1][:max_keepalive_requests] = num
+        end
+
+        opts.on("--http2-max-concurrent-streams NUM", Integer, "Maximum HTTP/2 concurrent streams per connection (default: 100)") do |num|
+          @options[:http2][:max_concurrent_streams] = num
         end
 
         opts.on("--worker-timeout SECONDS", Integer, "Worker check-in timeout in seconds (default: 60)") do |timeout|

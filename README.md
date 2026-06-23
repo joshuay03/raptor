@@ -64,6 +64,46 @@ Also works with `rackup` and `rails server`:
 > bundle exec rails server -u raptor
 ```
 
+## Configuration
+
+Raptor accepts configuration via command-line flags, a Ruby config file, or both (CLI flags override config file
+values). Run `bundle exec raptor --help` for the full flag list.
+
+The config file is a Ruby file that evaluates to a hash of options. By default Raptor loads `raptor.rb` then
+`config/raptor.rb` from the working directory; pass `-c PATH` to point at a specific file. Settings are nested under
+`connection:` (shared across protocols), `http1:` (HTTP/1.1-specific), and `http2:` (HTTP/2-specific).
+
+```ruby
+# raptor.rb
+
+{
+  binds: ["tcp://0.0.0.0:9292"],
+  socket_backlog: 1024,
+  workers: 4,
+  ractors: 1,
+  threads: 3,
+  connection: {
+    first_data_timeout: 30,
+    chunk_data_timeout: 10,
+    write_timeout: 5,
+    max_body_size: nil,
+    body_spool_threshold: 1024 * 1024,
+  },
+  http1: {
+    persistent_data_timeout: 65,
+    max_keepalive_requests: 100,
+  },
+  http2: {
+    max_concurrent_streams: 100,
+  },
+  worker_timeout: 60,
+  worker_boot_timeout: 60,
+  worker_shutdown_timeout: 30,
+  stats_file: "tmp/raptor.json",
+  pid_file: nil,
+}
+```
+
 ## (Micro) Benchmarks
 
 Raptor 0.7.0 vs Puma 8.0.2:

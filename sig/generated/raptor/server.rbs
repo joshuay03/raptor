@@ -14,9 +14,10 @@ module Raptor
   #
   # @example
   #   binder = Binder.new(["tcp://0.0.0.0:3000"])
-  #   reactor = Reactor.new(ractor_pool, thread_pool, client_options: {})
-  #   request = Request.new(app, 3000)
-  #   server = Server.new(binder, reactor, thread_pool, request, client_options: { first_data_timeout: 30 })
+  #   reactor = Reactor.new(ractor_pool, thread_pool, connection_options: {}, http1_options: {})
+  #   http1 = Http1.new(app, 3000)
+  #   http2 = Http2.new(app, 3000)
+  #   server = Server.new(binder, reactor, thread_pool, http1, http2, connection_options: { first_data_timeout: 30 })
   #   server.run
   #   # ... later
   #   server.shutdown
@@ -35,9 +36,11 @@ module Raptor
 
     @running: AtomicBoolean
 
-    @client_options: Hash[Symbol, untyped]
+    @first_data_timeout: Integer
 
-    @request: Request
+    @http2: Http2
+
+    @http1: Http1
 
     @thread_pool: AtomicThreadPool
 
@@ -50,12 +53,13 @@ module Raptor
     # @param binder [Binder] the binder managing listening sockets
     # @param reactor [Reactor] the reactor for handling client connections
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
-    # @param request [Request] the HTTP/1.1 request handler
-    # @param client_options [Hash] client timeout configuration, used to bound TLS handshakes
+    # @param http1 [Http1] the HTTP/1.1 handler
+    # @param http2 [Http2] the HTTP/2 handler (provides the initial SETTINGS frame)
+    # @param connection_options [Hash] per-connection timeout configuration, used to bound TLS handshakes
     # @return [void]
     #
-    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Request request, client_options: Hash[Symbol, untyped]) -> void
-    def initialize: (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Request request, client_options: Hash[Symbol, untyped]) -> void
+    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped]) -> void
+    def initialize: (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped]) -> void
 
     # Starts the server's main accept loop in a new thread.
     #
@@ -90,11 +94,10 @@ module Raptor
     # follow the HTTP/1.1 path.
     #
     # @param listener [TCPServer, UNIXServer, Binder::SslListener] the ready listener
-    # @param reactor [Reactor] the reactor to dispatch connections to
     # @return [void]
     #
-    # @rbs (TCPServer | UNIXServer | Binder::SslListener listener, Reactor reactor) -> void
-    def accept_connection: (TCPServer | UNIXServer | Binder::SslListener listener, Reactor reactor) -> void
+    # @rbs (TCPServer | UNIXServer | Binder::SslListener listener) -> void
+    def accept_connection: (TCPServer | UNIXServer | Binder::SslListener listener) -> void
 
     # Performs the TLS handshake for an accepted SSL connection and dispatches
     # it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
@@ -103,11 +106,10 @@ module Raptor
     # @param listener [Binder::SslListener] the SSL listener that accepted the connection
     # @param tcp_client [TCPSocket] the accepted TCP socket
     # @param remote_addr [String] the client's IP address
-    # @param reactor [Reactor] the reactor to dispatch the connection to
     # @return [void]
     #
-    # @rbs (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr, Reactor reactor) -> void
-    def dispatch_ssl_connection: (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr, Reactor reactor) -> void
+    # @rbs (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr) -> void
+    def dispatch_ssl_connection: (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr) -> void
 
     # Drives a non-blocking SSL handshake to completion, bounded by the
     # configured first-data timeout. Returns true on success, false on

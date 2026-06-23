@@ -10,10 +10,12 @@ module Raptor
   # the server uses for backpressure control to prevent overload.
   #
   # @example
-  #   reactor = Reactor.new(ractor_pool, thread_pool, client_options: {
-  #     first_data_timeout: 30,
-  #     chunk_data_timeout: 10
-  #   })
+  #   reactor = Reactor.new(
+  #     ractor_pool,
+  #     thread_pool,
+  #     connection_options: { first_data_timeout: 30, chunk_data_timeout: 10 },
+  #     http1_options: { persistent_data_timeout: 65 }
+  #   )
   #   reactor.run
   #   reactor.add(id: client.object_id, socket: client)
   #   # ... later
@@ -71,7 +73,11 @@ module Raptor
 
     @selector: NIO::Selector
 
-    @client_options: Hash[Symbol, Integer]
+    @persistent_data_timeout: Integer
+
+    @chunk_data_timeout: Integer
+
+    @first_data_timeout: Integer
 
     @ractor_pool: untyped
 
@@ -81,14 +87,15 @@ module Raptor
     #
     # @param ractor_pool [RactorPool] ractor pool for HTTP parsing
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
-    # @param client_options [Hash] timeout configuration options
-    # @option client_options [Integer] :first_data_timeout timeout for initial data
-    # @option client_options [Integer] :chunk_data_timeout timeout for subsequent chunks
-    # @option client_options [Integer] :persistent_data_timeout timeout for keep-alive connections
+    # @param connection_options [Hash] per-connection timeout configuration
+    # @option connection_options [Integer] :first_data_timeout timeout for initial data
+    # @option connection_options [Integer] :chunk_data_timeout timeout for subsequent chunks
+    # @param http1_options [Hash] HTTP/1.1-specific configuration
+    # @option http1_options [Integer] :persistent_data_timeout timeout for keep-alive idle connections
     # @return [void]
     #
-    # @rbs (untyped ractor_pool, untyped thread_pool, client_options: Hash[Symbol, Integer]) -> void
-    def initialize: (untyped ractor_pool, untyped thread_pool, client_options: Hash[Symbol, Integer]) -> void
+    # @rbs (untyped ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
+    def initialize: (untyped ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
 
     # Starts the reactor's main event loop in a new thread.
     #

@@ -16,7 +16,7 @@ module Raptor
   # with the reactor for requests that need more data before they
   # can be handled.
   #
-  class Request
+  class Http1
     BODY_BUFFER_THRESHOLD = 256 * 1024
     FILE_CHUNK_SIZE = 64 * 1024
     READ_BUFFER_SIZE = 64 * 1024
@@ -91,15 +91,16 @@ module Raptor
     end
 
     # Writes `string` in full, retrying on partial writes. Bounded by
-    # `WRITE_TIMEOUT` so a slow client can't pin the writing thread.
+    # `timeout` so a slow client can't pin the writing thread.
     #
     # @param socket [TCPSocket] the socket to write to
     # @param string [String] the data to write
+    # @param timeout [Integer] seconds to wait for the socket to become writable on each partial write
     # @return [void]
     # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
     #
-    # @rbs (TCPSocket socket, String string) -> void
-    def self.socket_write(socket, string)
+    # @rbs (TCPSocket socket, String string, ?timeout: Integer) -> void
+    def self.socket_write(socket, string, timeout: WRITE_TIMEOUT)
       bytes = 0
       byte_size = string.bytesize
 
@@ -107,7 +108,7 @@ module Raptor
         begin
           bytes += socket.write_nonblock(bytes.zero? ? string : string.byteslice(bytes..-1))
         rescue IO::WaitWritable
-          raise WriteError unless socket.wait_writable(WRITE_TIMEOUT)
+          raise WriteError unless socket.wait_writable(timeout)
           retry
         rescue IOError
           raise WriteError
@@ -117,29 +118,49 @@ module Raptor
 
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
+    # @rbs @write_timeout: Integer
     # @rbs @max_body_size: Integer?
     # @rbs @body_spool_threshold: Integer?
+    # @rbs @max_keepalive_requests: Integer
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @running: AtomicBoolean
 
-    # Creates a new Request handler.
+    # Creates a new Http1 handler.
     #
     # @param app [#call] the Rack application to dispatch complete requests to
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
-    # @param client_options [Hash] client limits configuration
-    # @option client_options [Integer, nil] :max_body_size maximum request body size in bytes
-    # @option client_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
+    # @param connection_options [Hash] per-connection settings shared across protocols
+    # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
+    # @option connection_options [Integer, nil] :max_body_size maximum request body size in bytes
+    # @option connection_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
+    # @param http1_options [Hash] HTTP/1.1-specific settings
+    # @option http1_options [Integer] :max_keepalive_requests maximum requests per HTTP/1.1 keep-alive connection
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?client_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize(app, server_port, client_options: {}, on_error: nil)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize(app, server_port, connection_options: {}, http1_options: {}, on_error: nil)
       @app = app
       @server_port = server_port
-      @max_body_size = client_options[:max_body_size]
-      @body_spool_threshold = client_options[:body_spool_threshold]
+      @write_timeout = connection_options[:write_timeout] || WRITE_TIMEOUT
+      @max_body_size = connection_options[:max_body_size]
+      @body_spool_threshold = connection_options[:body_spool_threshold]
+      @max_keepalive_requests = http1_options[:max_keepalive_requests] || MAX_KEEPALIVE_REQUESTS
       @on_error = on_error
       @running = AtomicBoolean.new(true)
+    end
+
+    # Instance-level wrapper around {.socket_write} that applies the
+    # configured `write_timeout`.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param string [String] the data to write
+    # @return [void]
+    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, String string) -> void
+    def socket_write(socket, string)
+      self.class.socket_write(socket, string, timeout: @write_timeout)
     end
 
     # Signals eager keep-alive loops to stop processing further requests on
@@ -211,7 +232,7 @@ module Raptor
         body = buffer.byteslice(nread..-1) || ""
 
         if env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
-          body, chunked_state = Request.decode_chunked(body, @max_body_size)
+          body, chunked_state = Http1.decode_chunked(body, @max_body_size)
           case chunked_state
           when :complete
             env.delete(HTTP_TRANSFER_ENCODING)
@@ -269,7 +290,7 @@ module Raptor
             if max_body_size && parser.content_length > max_body_size
               data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
             elsif env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
-              decoded_body, chunked_state = Raptor::Request.decode_chunked(body_buffer, max_body_size)
+              decoded_body, chunked_state = Raptor::Http1.decode_chunked(body_buffer, max_body_size)
 
               case chunked_state
               when :complete
@@ -680,7 +701,7 @@ module Raptor
     #
     # @rbs (Hash[String, untyped] env, Integer request_count) -> bool
     def keep_alive?(env, request_count)
-      return false if request_count >= MAX_KEEPALIVE_REQUESTS
+      return false if request_count >= @max_keepalive_requests
 
       connection_header = env[HTTP_CONNECTION]
 
@@ -716,7 +737,7 @@ module Raptor
       end
       response << "\r\n"
 
-      Request.socket_write(socket, response)
+      socket_write(socket, response)
     end
 
     # Writes a complete HTTP response to the socket.
@@ -849,7 +870,7 @@ module Raptor
     def write_hijacked_response(socket, response, headers, response_hijack)
       response << format_headers(headers)
       response << "\r\n"
-      Request.socket_write(socket, response)
+      socket_write(socket, response)
       uncork_socket(socket)
       response_hijack.call(socket)
     end
@@ -874,7 +895,7 @@ module Raptor
 
       response << format_headers(headers)
       response << "\r\n"
-      Request.socket_write(socket, response)
+      socket_write(socket, response)
     end
 
     # Writes a complete response with a body.
@@ -896,7 +917,7 @@ module Raptor
       if body.respond_to?(:call)
         response << format_headers(headers)
         response << "\r\n"
-        Request.socket_write(socket, response)
+        socket_write(socket, response)
         uncork_socket(socket)
         body.call(socket)
         return
@@ -933,7 +954,7 @@ module Raptor
         raise TypeError, "body must respond to each, to_ary, or to_path"
       end
 
-      Request.socket_write(socket, "0\r\n\r\n") if use_chunked
+      socket_write(socket, "0\r\n\r\n") if use_chunked
     end
 
     # Calculates content length from an array or file body without consuming it.
@@ -973,15 +994,15 @@ module Raptor
     def write_file_body(socket, response, path, content_length, use_chunked)
       File.open(path, "rb") do |file|
         if use_chunked
-          Request.socket_write(socket, response)
+          socket_write(socket, response)
           while (chunk = file.read(FILE_CHUNK_SIZE))
-            Request.socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+            socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
           end
         elsif content_length && content_length < BODY_BUFFER_THRESHOLD
           response << file.read(content_length)
-          Request.socket_write(socket, response)
+          socket_write(socket, response)
         else
-          Request.socket_write(socket, response)
+          socket_write(socket, response)
           IO.copy_stream(file, socket)
         end
       end
@@ -1024,12 +1045,12 @@ module Raptor
 
       if use_chunked
         response << "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n"
-        Request.socket_write(socket, response)
+        socket_write(socket, response)
       elsif chunk.bytesize < BODY_BUFFER_THRESHOLD
-        Request.socket_write(socket, response << chunk)
+        socket_write(socket, response << chunk)
       else
-        Request.socket_write(socket, response)
-        Request.socket_write(socket, chunk)
+        socket_write(socket, response)
+        socket_write(socket, chunk)
       end
     end
 
@@ -1045,13 +1066,13 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
     def write_multiple_chunks(socket, response, body_array, use_chunked)
       if use_chunked
-        Request.socket_write(socket, response)
+        socket_write(socket, response)
         body_array.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
           next if chunk.empty?
 
-          Request.socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+          socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
         end
       else
         body_array.each do |chunk|
@@ -1059,7 +1080,7 @@ module Raptor
 
           response << chunk
         end
-        Request.socket_write(socket, response)
+        socket_write(socket, response)
       end
     end
 
@@ -1075,13 +1096,13 @@ module Raptor
     # @rbs (TCPSocket socket, String response, untyped body, bool use_chunked) -> void
     def write_enumerable_body(socket, response, body, use_chunked)
       if use_chunked
-        Request.socket_write(socket, response)
+        socket_write(socket, response)
         body.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
           next if chunk.empty?
 
-          Request.socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+          socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
         end
       else
         body.each do |chunk|
@@ -1089,7 +1110,7 @@ module Raptor
 
           response << chunk
         end
-        Request.socket_write(socket, response)
+        socket_write(socket, response)
       end
     end
 

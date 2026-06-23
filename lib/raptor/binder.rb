@@ -56,6 +56,7 @@ module Raptor
     end
 
     # @rbs @bind_uris: Array[String]
+    # @rbs @socket_backlog: Integer
     # @rbs @listeners: Array[TCPServer | UNIXServer | SslListener]
 
     # Array of listening sockets.
@@ -70,15 +71,17 @@ module Raptor
     # all available loopback addresses (both IPv4 and IPv6).
     #
     # @param bind_uris [Array<String>] array of URI strings to bind to
+    # @param socket_backlog [Integer] kernel listen() queue depth for TCP/SSL listeners
     # @return [void]
     # @raise [UnknownBindSchemeError] if a URI has an unsupported scheme
     #
     # @example
     #   binder = Binder.new(["tcp://0.0.0.0:3000", "unix:///tmp/raptor.sock"])
     #
-    # @rbs (Array[String] bind_uris) -> void
-    def initialize(bind_uris)
+    # @rbs (Array[String] bind_uris, ?socket_backlog: Integer) -> void
+    def initialize(bind_uris, socket_backlog: SOCKET_BACKLOG)
       @bind_uris = bind_uris
+      @socket_backlog = socket_backlog
       @listeners = nil
       parse
     end
@@ -174,7 +177,7 @@ module Raptor
       tcp_server = TCPServer.new(host, port)
       tcp_server.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
       tcp_server.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) if Socket.const_defined?(:SO_REUSEPORT)
-      tcp_server.listen SOCKET_BACKLOG
+      tcp_server.listen @socket_backlog
 
       [tcp_server]
     end

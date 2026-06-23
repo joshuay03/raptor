@@ -11,7 +11,7 @@ require_relative "log"
 require_relative "binder"
 require_relative "server"
 require_relative "reactor"
-require_relative "request"
+require_relative "http1"
 require_relative "http2"
 require_relative "stats"
 
@@ -41,7 +41,7 @@ module Raptor
   #     workers: 4, ractors: 2, threads: 8,
   #     binds: ["tcp://0.0.0.0:3000"],
   #     rackup: "config.ru",
-  #     client: { first_data_timeout: 30, chunk_data_timeout: 10 }
+  #     connection: { first_data_timeout: 30, chunk_data_timeout: 10 }
   #   }
   #   Cluster.run(options)
   #
@@ -59,7 +59,9 @@ module Raptor
     # @rbs @worker_count: Integer
     # @rbs @ractor_count: Integer
     # @rbs @thread_count: Integer
-    # @rbs @client_options: Hash[Symbol, Integer]
+    # @rbs @connection_options: Hash[Symbol, untyped]
+    # @rbs @http1_options: Hash[Symbol, untyped]
+    # @rbs @http2_options: Hash[Symbol, untyped]
     # @rbs @worker_timeout: Integer
     # @rbs @worker_boot_timeout: Integer
     # @rbs @worker_shutdown_timeout: Integer
@@ -85,12 +87,15 @@ module Raptor
     #
     # @param options [Hash] cluster configuration options
     # @option options [Array<String>] :binds array of bind URIs
+    # @option options [Integer] :socket_backlog kernel listen() queue depth for TCP/SSL listeners
     # @option options [Integer] :workers number of worker processes
     # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :threads number of threads per worker process
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
-    # @option options [Hash] :client client configuration
+    # @option options [Hash] :connection per-connection settings shared across protocols
+    # @option options [Hash] :http1 HTTP/1.1-specific settings
+    # @option options [Hash] :http2 HTTP/2-specific settings
     # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
@@ -104,7 +109,9 @@ module Raptor
       @worker_count = options[:workers]
       @ractor_count = options[:ractors]
       @thread_count = options[:threads]
-      @client_options = options[:client]
+      @connection_options = options[:connection]
+      @http1_options = options[:http1]
+      @http2_options = options[:http2]
       @worker_timeout = options[:worker_timeout]
       @worker_boot_timeout = options[:worker_boot_timeout]
       @worker_shutdown_timeout = options[:worker_shutdown_timeout]
@@ -112,7 +119,7 @@ module Raptor
       @pid_file = options[:pid_file]
       @on_error = options[:on_error]
 
-      @binder = Binder.new(options[:binds])
+      @binder = Binder.new(options[:binds], socket_backlog: options[:socket_backlog])
       @server_port = @binder.server_port
       @app = options[:app] || Rack::Builder.parse_file(options[:rackup])
       log_initialization
@@ -354,27 +361,44 @@ module Raptor
         @app.call(env)
       }
       thread_pool = AtomicThreadPool.new(size: @thread_count)
-      request = Request.new(counting_app, @server_port, client_options: @client_options, on_error: @on_error)
-      http2 = Http2.new(counting_app, @server_port, on_error: @on_error)
+      http1 = Http1.new(
+        counting_app,
+        @server_port,
+        connection_options: @connection_options,
+        http1_options: @http1_options,
+        on_error: @on_error
+      )
+      http2 = Http2.new(
+        counting_app,
+        @server_port,
+        connection_options: @connection_options,
+        http2_options: @http2_options,
+        on_error: @on_error
+      )
       ractor_pool = RactorPool.new(
         size: @ractor_count,
-        worker: request.http_parser_worker
+        worker: http1.http_parser_worker
       ) do |parsed_result|
         begin
           if parsed_result[:protocol] == :http2
             http2.handle_parsed_request(parsed_result, reactor, thread_pool)
           else
-            request.handle_parsed_request(parsed_result, reactor, thread_pool)
+            http1.handle_parsed_request(parsed_result, reactor, thread_pool)
           end
         rescue => error
           Log.rescued_error(error)
         end
       end
 
-      reactor = Reactor.new(ractor_pool, thread_pool, client_options: @client_options)
+      reactor = Reactor.new(
+        ractor_pool,
+        thread_pool,
+        connection_options: @connection_options,
+        http1_options: @http1_options
+      )
       reactor_thread = reactor.run
 
-      server = Server.new(@binder, reactor, thread_pool, request, client_options: @client_options)
+      server = Server.new(@binder, reactor, thread_pool, http1, http2, connection_options: @connection_options)
       server_thread = server.run
 
       Log.info "Worker #{index} booted"
@@ -412,7 +436,7 @@ module Raptor
       reactor.shutdown
       reactor_thread.join
       ractor_pool.shutdown
-      request.shutdown
+      http1.shutdown
       thread_pool.shutdown
       stats_thread.join
     end
