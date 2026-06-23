@@ -370,7 +370,7 @@ registered with the reactor for frame processing.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(binder, reactor, thread_pool, request, client_options:)  &#x21d2; Server </a>
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(binder, reactor, thread_pool, request, http2, connection_options:)  &#x21d2; Server </a>
     
 
     
@@ -489,7 +489,7 @@ registered with the reactor for frame processing.</p>
     <div class="method_details first">
   <h3 class="signature first" id="initialize-instance_method">
   
-    #<strong>initialize</strong>(binder, reactor, thread_pool, request, client_options:)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Server (class)">Server</a></span></tt> 
+    #<strong>initialize</strong>(binder, reactor, thread_pool, request, http2, connection_options:)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Server (class)">Server</a></span></tt> 
   
 
   
@@ -595,24 +595,26 @@ registered with the reactor for frame processing.</p>
       <pre class="lines">
 
 
-57
-58
-59
 60
 61
 62
 63
-64</pre>
+64
+65
+66
+67
+68</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 57</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 60</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_binder'>binder</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='label'>client_options:</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_binder'>binder</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='id identifier rubyid_http2'>http2</span><span class='comma'>,</span> <span class='label'>connection_options:</span><span class='rparen'>)</span>
   <span class='ivar'>@binder</span> <span class='op'>=</span> <span class='id identifier rubyid_binder'>binder</span>
   <span class='ivar'>@reactor</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span>
   <span class='ivar'>@thread_pool</span> <span class='op'>=</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span>
   <span class='ivar'>@request</span> <span class='op'>=</span> <span class='id identifier rubyid_request'>request</span>
-  <span class='ivar'>@client_options</span> <span class='op'>=</span> <span class='id identifier rubyid_client_options'>client_options</span>
+  <span class='ivar'>@http2</span> <span class='op'>=</span> <span class='id identifier rubyid_http2'>http2</span>
+  <span class='ivar'>@first_data_timeout</span> <span class='op'>=</span> <span class='id identifier rubyid_connection_options'>connection_options</span><span class='lbracket'>[</span><span class='symbol'>:first_data_timeout</span><span class='rbracket'>]</span>
   <span class='ivar'>@running</span> <span class='op'>=</span> <span class='const'>AtomicBoolean</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='kw'>true</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -688,10 +690,6 @@ follow the HTTP/1.1 path.</p>
       <pre class="lines">
 
 
-125
-126
-127
-128
 129
 130
 131
@@ -717,10 +715,14 @@ follow the HTTP/1.1 path.</p>
 151
 152
 153
-154</pre>
+154
+155
+156
+157
+158</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 125</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 129</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_accept_connection'>accept_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_listener'>listener</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tcp_client'>tcp_client</span> <span class='op'>=</span> <span class='kw'>begin</span>
@@ -843,10 +845,6 @@ it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
       <pre class="lines">
 
 
-167
-168
-169
-170
 171
 172
 173
@@ -872,10 +870,14 @@ it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
 193
 194
 195
-196</pre>
+196
+197
+198
+199
+200</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 167</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 171</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_dispatch_ssl_connection'>dispatch_ssl_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_listener'>listener</span><span class='comma'>,</span> <span class='id identifier rubyid_tcp_client'>tcp_client</span><span class='comma'>,</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_ssl_socket'>ssl_socket</span> <span class='op'>=</span> <span class='const'>OpenSSL</span><span class='op'>::</span><span class='const'>SSL</span><span class='op'>::</span><span class='const'>SSLSocket</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_tcp_client'>tcp_client</span><span class='comma'>,</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_ssl_context'>ssl_context</span><span class='rparen'>)</span>
@@ -883,7 +885,7 @@ it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_perform_ssl_handshake'>perform_ssl_handshake</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='rparen'>)</span>
 
   <span class='kw'>if</span> <span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='period'>.</span><span class='id identifier rubyid_alpn_protocol'>alpn_protocol</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="#H2_PROTOCOL-constant" title="Raptor::Server::H2_PROTOCOL (constant)">H2_PROTOCOL</a></span></span>
-    <span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='period'>.</span><span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Http2.html" title="Raptor::Http2 (class)">Http2</a></span></span><span class='period'>.</span><span class='id identifier rubyid_build_server_settings_frame'><span class='object_link'><a href="Http2.html#build_server_settings_frame-class_method" title="Raptor::Http2.build_server_settings_frame (method)">build_server_settings_frame</a></span></span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
+    <span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='period'>.</span><span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='ivar'>@http2</span><span class='period'>.</span><span class='id identifier rubyid_initial_settings_frame'>initial_settings_frame</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
 
     <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_add'>add</span><span class='lparen'>(</span>
       <span class='label'>id:</span> <span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='period'>.</span><span class='id identifier rubyid_object_id'>object_id</span><span class='comma'>,</span>
@@ -891,7 +893,7 @@ it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
       <span class='label'>remote_addr:</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='comma'>,</span>
       <span class='label'>url_scheme:</span> <span class='const'><span class='object_link'><a href="#HTTPS_SCHEME-constant" title="Raptor::Server::HTTPS_SCHEME (constant)">HTTPS_SCHEME</a></span></span><span class='comma'>,</span>
       <span class='label'>protocol:</span> <span class='symbol'>:http2</span><span class='comma'>,</span>
-      <span class='label'>writer:</span> <span class='const'><span class='object_link'><a href="Http2.html" title="Raptor::Http2 (class)">Http2</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Http2/Writer.html" title="Raptor::Http2::Writer (class)">Writer</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http2/Writer.html#initialize-instance_method" title="Raptor::Http2::Writer#initialize (method)">new</a></span></span><span class='comma'>,</span>
+      <span class='label'>writer:</span> <span class='ivar'>@http2</span><span class='period'>.</span><span class='id identifier rubyid_create_writer'>create_writer</span><span class='comma'>,</span>
       <span class='label'>flow_control:</span> <span class='const'><span class='object_link'><a href="Http2.html" title="Raptor::Http2 (class)">Http2</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Http2/FlowControl.html" title="Raptor::Http2::FlowControl (class)">FlowControl</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http2/FlowControl.html#initialize-instance_method" title="Raptor::Http2::FlowControl#initialize (method)">new</a></span></span>
     <span class='rparen'>)</span>
 
@@ -972,10 +974,6 @@ timeout or SSL error.</p>
       <pre class="lines">
 
 
-206
-207
-208
-209
 210
 211
 212
@@ -991,13 +989,17 @@ timeout or SSL error.</p>
 222
 223
 224
-225</pre>
+225
+226
+227
+228
+229</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 206</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 210</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_perform_ssl_handshake'>perform_ssl_handshake</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span> <span class='op'>+</span> <span class='ivar'>@client_options</span><span class='lbracket'>[</span><span class='symbol'>:first_data_timeout</span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span> <span class='op'>+</span> <span class='ivar'>@first_data_timeout</span>
 
   <span class='kw'>begin</span>
     <span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='period'>.</span><span class='id identifier rubyid_accept_nonblock'>accept_nonblock</span>
@@ -1065,10 +1067,6 @@ worker processes through backpressure control.</p>
       <pre class="lines">
 
 
-76
-77
-78
-79
 80
 81
 82
@@ -1084,10 +1082,14 @@ worker processes through backpressure control.</p>
 92
 93
 94
-95</pre>
+95
+96
+97
+98
+99</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 76</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 80</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
   <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_listeners'>listeners</span><span class='comma'>,</span> <span class='ivar'>@reactor</span><span class='comma'>,</span> <span class='ivar'>@running</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_server_sockets'>server_sockets</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_running'>running</span><span class='op'>|</span>
@@ -1140,13 +1142,13 @@ The server thread will exit after handling any in-flight accept operations.</p>
       <pre class="lines">
 
 
-105
-106
-107
-108</pre>
+109
+110
+111
+112</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 105</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 109</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='ivar'>@running</span><span class='period'>.</span><span class='id identifier rubyid_make_false'>make_false</span>
@@ -1244,10 +1246,6 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
       <pre class="lines">
 
 
-236
-237
-238
-239
 240
 241
 242
@@ -1258,10 +1256,14 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 247
 248
 249
-250</pre>
+250
+251
+252
+253
+254</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 236</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 240</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_wait_for_handshake'>wait_for_handshake</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='comma'>,</span> <span class='id identifier rubyid_deadline'>deadline</span><span class='comma'>,</span> <span class='id identifier rubyid_direction'>direction</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_remaining'>remaining</span> <span class='op'>=</span> <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>-</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span>
@@ -1288,7 +1290,7 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jun 21 00:52:26 2026 by
+  Generated on Tue Jun 23 21:15:31 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

@@ -107,6 +107,41 @@ Hello, World!%
 <pre class="code ruby"><code class="ruby">&gt; bundle exec rackup -s raptor hello_world.ru
 &gt; bundle exec rails server -u raptor
 </code></pre>
+<h2 id="Configuration">Configuration</h2>
+<p>Raptor accepts configuration via command-line flags, a Ruby config file, or both (CLI flags override config file
+values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
+<p>The config file is a Ruby file that evaluates to a hash of options. By default Raptor loads <code>raptor.rb</code> then
+<code>config/raptor.rb</code> from the working directory; pass <code>-c PATH</code> to point at a specific file. Per-protocol settings are
+nested under <code>connection:</code> (shared across protocols), <code>http1:</code>, and <code>http2:</code>.</p>
+<pre class="code ruby"><code class="ruby"><span class='comment'># raptor.rb
+</span>
+<span class='lbrace'>{</span>
+  <span class='label'>binds:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tcp://0.0.0.0:9292</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='comma'>,</span>
+  <span class='label'>socket_backlog:</span> <span class='int'>1024</span><span class='comma'>,</span>
+  <span class='label'>workers:</span> <span class='int'>4</span><span class='comma'>,</span>
+  <span class='label'>ractors:</span> <span class='int'>1</span><span class='comma'>,</span>
+  <span class='label'>threads:</span> <span class='int'>3</span><span class='comma'>,</span>
+  <span class='label'>connection:</span> <span class='lbrace'>{</span>
+    <span class='label'>first_data_timeout:</span> <span class='int'>30</span><span class='comma'>,</span>
+    <span class='label'>chunk_data_timeout:</span> <span class='int'>10</span><span class='comma'>,</span>
+    <span class='label'>write_timeout:</span> <span class='int'>5</span><span class='comma'>,</span>
+    <span class='label'>max_body_size:</span> <span class='kw'>nil</span><span class='comma'>,</span>
+    <span class='label'>body_spool_threshold:</span> <span class='int'>1024</span> <span class='op'>*</span> <span class='int'>1024</span><span class='comma'>,</span>
+  <span class='rbrace'>}</span><span class='comma'>,</span>
+  <span class='label'>http1:</span> <span class='lbrace'>{</span>
+    <span class='label'>persistent_data_timeout:</span> <span class='int'>65</span><span class='comma'>,</span>
+    <span class='label'>max_keepalive_requests:</span> <span class='int'>100</span><span class='comma'>,</span>
+  <span class='rbrace'>}</span><span class='comma'>,</span>
+  <span class='label'>http2:</span> <span class='lbrace'>{</span>
+    <span class='label'>max_concurrent_streams:</span> <span class='int'>100</span><span class='comma'>,</span>
+  <span class='rbrace'>}</span><span class='comma'>,</span>
+  <span class='label'>worker_timeout:</span> <span class='int'>60</span><span class='comma'>,</span>
+  <span class='label'>worker_boot_timeout:</span> <span class='int'>60</span><span class='comma'>,</span>
+  <span class='label'>worker_shutdown_timeout:</span> <span class='int'>30</span><span class='comma'>,</span>
+  <span class='label'>stats_file:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tmp/raptor.json</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
+  <span class='label'>pid_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
+<span class='rbrace'>}</span>
+</code></pre>
 <h2 id="_Micro__Benchmarks">(Micro) Benchmarks</h2>
 <p>Raptor 0.7.0 vs Puma 8.0.2:</p>
 <table>
@@ -155,7 +190,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Jun 21 00:52:25 2026 by
+  Generated on Tue Jun 23 21:15:30 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

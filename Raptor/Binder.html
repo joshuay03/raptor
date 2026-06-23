@@ -356,7 +356,7 @@ supports binding to multiple addresses simultaneously.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(bind_uris)  &#x21d2; Binder </a>
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(bind_uris, socket_backlog: SOCKET_BACKLOG)  &#x21d2; Binder </a>
     
 
     
@@ -453,7 +453,7 @@ supports binding to multiple addresses simultaneously.</p>
     <div class="method_details first">
   <h3 class="signature first" id="initialize-instance_method">
   
-    #<strong>initialize</strong>(bind_uris)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Binder (class)">Binder</a></span></tt> 
+    #<strong>initialize</strong>(bind_uris, socket_backlog: SOCKET_BACKLOG)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Binder (class)">Binder</a></span></tt> 
   
 
   
@@ -519,17 +519,19 @@ all available loopback addresses (both IPv4 and IPv6).</p>
       <pre class="lines">
 
 
-80
-81
 82
 83
-84</pre>
+84
+85
+86
+87</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 80</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 82</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='comma'>,</span> <span class='label'>socket_backlog:</span> <span class='const'><span class='object_link'><a href="#SOCKET_BACKLOG-constant" title="Raptor::Binder::SOCKET_BACKLOG (constant)">SOCKET_BACKLOG</a></span></span><span class='rparen'>)</span>
   <span class='ivar'>@bind_uris</span> <span class='op'>=</span> <span class='id identifier rubyid_bind_uris'>bind_uris</span>
+  <span class='ivar'>@socket_backlog</span> <span class='op'>=</span> <span class='id identifier rubyid_socket_backlog'>socket_backlog</span>
   <span class='ivar'>@listeners</span> <span class='op'>=</span> <span class='kw'>nil</span>
   <span class='id identifier rubyid_parse'>parse</span>
 <span class='kw'>end</span></pre>
@@ -585,12 +587,12 @@ all available loopback addresses (both IPv4 and IPv6).</p>
       <pre class="lines">
 
 
-64
 65
-66</pre>
+66
+67</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 64</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 65</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_listeners'>listeners</span>
   <span class='ivar'>@listeners</span>
@@ -657,9 +659,6 @@ path, and SSL listeners as &quot;ssl://host:port&quot;.</p>
       <pre class="lines">
 
 
-97
-98
-99
 100
 101
 102
@@ -670,10 +669,13 @@ path, and SSL listeners as &quot;ssl://host:port&quot;.</p>
 107
 108
 109
-110</pre>
+110
+111
+112
+113</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 97</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 100</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_addresses'>addresses</span>
   <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span>
@@ -718,12 +720,12 @@ path, and SSL listeners as &quot;ssl://host:port&quot;.</p>
       <pre class="lines">
 
 
-132
-133
-134</pre>
+135
+136
+137</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 132</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 135</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close'>close</span>
   <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:close</span><span class='rparen'>)</span>
@@ -822,9 +824,6 @@ certificate and private key files respectively.</p>
       <pre class="lines">
 
 
-222
-223
-224
 225
 226
 227
@@ -835,10 +834,13 @@ certificate and private key files respectively.</p>
 232
 233
 234
-235</pre>
+235
+236
+237
+238</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 222</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 225</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_ssl_listeners'>create_ssl_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='comma'>,</span> <span class='id identifier rubyid_ssl_params'>ssl_params</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>openssl</span><span class='tstring_end'>&quot;</span></span>
@@ -931,9 +933,6 @@ certificate and private key files respectively.</p>
       <pre class="lines">
 
 
-167
-168
-169
 170
 171
 172
@@ -944,10 +943,13 @@ certificate and private key files respectively.</p>
 177
 178
 179
-180</pre>
+180
+181
+182
+183</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 167</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 170</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_tcp_listeners'>create_tcp_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_host'>host</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>localhost</span><span class='tstring_end'>&quot;</span></span>
@@ -959,7 +961,7 @@ certificate and private key files respectively.</p>
   <span class='id identifier rubyid_tcp_server'>tcp_server</span> <span class='op'>=</span> <span class='const'>TCPServer</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tcp_server'>tcp_server</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOL_SOCKET</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SO_REUSEADDR</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tcp_server'>tcp_server</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOL_SOCKET</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SO_REUSEPORT</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_const_defined?'>const_defined?</span><span class='lparen'>(</span><span class='symbol'>:SO_REUSEPORT</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_tcp_server'>tcp_server</span><span class='period'>.</span><span class='id identifier rubyid_listen'>listen</span> <span class='const'><span class='object_link'><a href="#SOCKET_BACKLOG-constant" title="Raptor::Binder::SOCKET_BACKLOG (constant)">SOCKET_BACKLOG</a></span></span>
+  <span class='id identifier rubyid_tcp_server'>tcp_server</span><span class='period'>.</span><span class='id identifier rubyid_listen'>listen</span> <span class='ivar'>@socket_backlog</span>
 
   <span class='lbracket'>[</span><span class='id identifier rubyid_tcp_server'>tcp_server</span><span class='rbracket'>]</span>
 <span class='kw'>end</span></pre>
@@ -1045,9 +1047,6 @@ socket file on normal process exit.</p>
       <pre class="lines">
 
 
-193
-194
-195
 196
 197
 198
@@ -1060,10 +1059,13 @@ socket file on normal process exit.</p>
 205
 206
 207
-208</pre>
+208
+209
+210
+211</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 193</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 196</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_unix_listeners'>create_unix_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
@@ -1126,16 +1128,16 @@ socket file on normal process exit.</p>
       <pre class="lines">
 
 
-242
-243
-244
 245
 246
 247
-248</pre>
+248
+249
+250
+251</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 242</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 245</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_loopback_addresses'>loopback_addresses</span>
   <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_ip_address_list'>ip_address_list</span><span class='period'>.</span><span class='id identifier rubyid_filter_map'>filter_map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='op'>|</span>
@@ -1189,9 +1191,6 @@ socket file on normal process exit.</p>
       <pre class="lines">
 
 
-144
-145
-146
 147
 148
 149
@@ -1203,10 +1202,13 @@ socket file on normal process exit.</p>
 155
 156
 157
-158</pre>
+158
+159
+160
+161</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 144</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 147</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_parse'>parse</span>
   <span class='ivar'>@listeners</span> <span class='op'>=</span> <span class='ivar'>@bind_uris</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='op'>|</span>
@@ -1270,15 +1272,15 @@ if no TCP or SSL listener is configured (e.g., Unix socket only).</p>
       <pre class="lines">
 
 
-120
-121
-122
 123
 124
-125</pre>
+125
+126
+127
+128</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 120</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 123</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_server_port'>server_port</span>
   <span class='id identifier rubyid_tcp_listener'>tcp_listener</span> <span class='op'>=</span> <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_find'>find</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>TCPServer</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span><span class='rparen'>)</span> <span class='rbrace'>}</span>
@@ -1296,7 +1298,7 @@ if no TCP or SSL listener is configured (e.g., Unix socket only).</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jun 21 00:52:25 2026 by
+  Generated on Tue Jun 23 21:15:31 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
