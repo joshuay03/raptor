@@ -104,6 +104,44 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
 }
 ```
 
+## Bindings
+
+Raptor accepts multiple `binds:` URIs across three schemes.
+
+- `tcp://host:port` for TCP. Host can be a specific IP, `0.0.0.0` / `[::]`, or `localhost` (expanded to both IPv4 and
+  IPv6 loopback addresses).
+- `unix:///path/to/socket` for a Unix domain socket. Stale sockets left by crashed processes are cleaned up
+  automatically.
+- `ssl://host:port?cert=/path/to.crt&key=/path/to.key` for TLS. HTTP/1.1 and HTTP/2 are negotiated via ALPN.
+
+Multiple binds can be combined freely.
+
+## Signals
+
+Send to the master process.
+
+| Signal | Effect                                      |
+| ------ | ------------------------------------------- |
+| `INT`  | Graceful shutdown                           |
+| `TERM` | Graceful shutdown                           |
+| `USR1` | Log per-worker stats to stdout              |
+| `USR2` | Phased restart (rolling worker replacement) |
+
+## Stats
+
+Each worker writes per-worker stats (request count, busy threads, backlog, last check-in) to shared memory and to a
+JSON file (default `tmp/raptor.json`; set via `stats_file`).
+
+```
+> bundle exec raptor stats
+Master PID: 91348
+Worker 0 (phase 0): pid=91350, requests=1234, busy=2/3, backlog=0, booted, last_checkin=10:42:01
+Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_checkin=10:42:01
+...
+```
+
+Sending `SIGUSR1` to the master logs the same summary to stdout.
+
 ## (Micro) Benchmarks
 
 Raptor 0.7.0 vs Puma 8.0.2:
