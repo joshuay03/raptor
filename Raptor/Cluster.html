@@ -139,7 +139,7 @@ top of NIO reactors.</p>
   <span class='label'>workers:</span> <span class='int'>4</span><span class='comma'>,</span> <span class='label'>ractors:</span> <span class='int'>2</span><span class='comma'>,</span> <span class='label'>threads:</span> <span class='int'>8</span><span class='comma'>,</span>
   <span class='label'>binds:</span> <span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tcp://0.0.0.0:3000</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='comma'>,</span>
   <span class='label'>rackup:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config.ru</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
-  <span class='label'>client:</span> <span class='lbrace'>{</span> <span class='label'>first_data_timeout:</span> <span class='int'>30</span><span class='comma'>,</span> <span class='label'>chunk_data_timeout:</span> <span class='int'>10</span> <span class='rbrace'>}</span>
+  <span class='label'>connection:</span> <span class='lbrace'>{</span> <span class='label'>first_data_timeout:</span> <span class='int'>30</span><span class='comma'>,</span> <span class='label'>chunk_data_timeout:</span> <span class='int'>10</span> <span class='rbrace'>}</span>
 <span class='rbrace'>}</span>
 <span class='const'>Cluster</span><span class='period'>.</span><span class='id identifier rubyid_run'><span class='object_link'><a href="#run-class_method" title="Raptor::Cluster.run (method)">run</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span></code></pre>
     
@@ -566,6 +566,17 @@ for multi-process operation.</p>
         </li>
       
         <li>
+          <span class="name">:socket_backlog</span>
+          <span class="type">(<tt>Integer</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>kernel listen() queue depth for TCP/SSL listeners</p></div>
+          
+        </li>
+      
+        <li>
           <span class="name">:workers</span>
           <span class="type">(<tt>Integer</tt>)</span>
           <span class="default">
@@ -621,13 +632,35 @@ for multi-process operation.</p>
         </li>
       
         <li>
-          <span class="name">:client</span>
+          <span class="name">:connection</span>
           <span class="type">(<tt>Hash</tt>)</span>
           <span class="default">
             
           </span>
           
-            &mdash; <div class='inline'><p>client configuration</p></div>
+            &mdash; <div class='inline'><p>per-connection settings shared across protocols</p></div>
+          
+        </li>
+      
+        <li>
+          <span class="name">:http1</span>
+          <span class="type">(<tt>Hash</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>HTTP/1.1-specific settings</p></div>
+          
+        </li>
+      
+        <li>
+          <span class="name">:http2</span>
+          <span class="type">(<tt>Hash</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>HTTP/2-specific settings</p></div>
           
         </li>
       
@@ -1510,17 +1543,17 @@ critical component fails.</p>
     <span class='ivar'>@app</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
   <span class='rbrace'>}</span>
   <span class='id identifier rubyid_thread_pool'>thread_pool</span> <span class='op'>=</span> <span class='const'>AtomicThreadPool</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='label'>size:</span> <span class='ivar'>@thread_count</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_request'>request</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Request.html" title="Raptor::Request (class)">Request</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Request.html#initialize-instance_method" title="Raptor::Request#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span> <span class='ivar'>@server_port</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span> <span class='label'>http1_options:</span> <span class='ivar'>@http1_options</span><span class='comma'>,</span> <span class='label'>on_error:</span> <span class='ivar'>@on_error</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_http1'>http1</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http1.html#initialize-instance_method" title="Raptor::Http1#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span> <span class='ivar'>@server_port</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span> <span class='label'>http1_options:</span> <span class='ivar'>@http1_options</span><span class='comma'>,</span> <span class='label'>on_error:</span> <span class='ivar'>@on_error</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_http2'>http2</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2.html" title="Raptor::Http2 (class)">Http2</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http2.html#initialize-instance_method" title="Raptor::Http2#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span> <span class='ivar'>@server_port</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span> <span class='label'>http2_options:</span> <span class='ivar'>@http2_options</span><span class='comma'>,</span> <span class='label'>on_error:</span> <span class='ivar'>@on_error</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_ractor_pool'>ractor_pool</span> <span class='op'>=</span> <span class='const'>RactorPool</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span>
     <span class='label'>size:</span> <span class='ivar'>@ractor_count</span><span class='comma'>,</span>
-    <span class='label'>worker:</span> <span class='id identifier rubyid_request'>request</span><span class='period'>.</span><span class='id identifier rubyid_http_parser_worker'>http_parser_worker</span>
+    <span class='label'>worker:</span> <span class='id identifier rubyid_http1'>http1</span><span class='period'>.</span><span class='id identifier rubyid_http_parser_worker'>http_parser_worker</span>
   <span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='op'>|</span>
     <span class='kw'>begin</span>
       <span class='kw'>if</span> <span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='lbracket'>[</span><span class='symbol'>:protocol</span><span class='rbracket'>]</span> <span class='op'>==</span> <span class='symbol'>:http2</span>
         <span class='id identifier rubyid_http2'>http2</span><span class='period'>.</span><span class='id identifier rubyid_handle_parsed_request'>handle_parsed_request</span><span class='lparen'>(</span><span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
       <span class='kw'>else</span>
-        <span class='id identifier rubyid_request'>request</span><span class='period'>.</span><span class='id identifier rubyid_handle_parsed_request'>handle_parsed_request</span><span class='lparen'>(</span><span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
+        <span class='id identifier rubyid_http1'>http1</span><span class='period'>.</span><span class='id identifier rubyid_handle_parsed_request'>handle_parsed_request</span><span class='lparen'>(</span><span class='id identifier rubyid_parsed_result'>parsed_result</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
       <span class='kw'>end</span>
     <span class='kw'>rescue</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_error'>error</span>
       <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_rescued_error'><span class='object_link'><a href="Log.html#rescued_error-class_method" title="Raptor::Log.rescued_error (method)">rescued_error</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_error'>error</span><span class='rparen'>)</span>
@@ -1530,7 +1563,7 @@ critical component fails.</p>
   <span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Reactor.html" title="Raptor::Reactor (class)">Reactor</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Reactor.html#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span> <span class='label'>http1_options:</span> <span class='ivar'>@http1_options</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_reactor_thread'>reactor_thread</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
 
-  <span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Server.html#initialize-instance_method" title="Raptor::Server#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@binder</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_request'>request</span><span class='comma'>,</span> <span class='id identifier rubyid_http2'>http2</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Server.html#initialize-instance_method" title="Raptor::Server#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@binder</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_http1'>http1</span><span class='comma'>,</span> <span class='id identifier rubyid_http2'>http2</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_server_thread'>server_thread</span> <span class='op'>=</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
 
   <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'> booted</span><span class='tstring_end'>&quot;</span></span>
@@ -1568,7 +1601,7 @@ critical component fails.</p>
   <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_reactor_thread'>reactor_thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
   <span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
-  <span class='id identifier rubyid_request'>request</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='id identifier rubyid_http1'>http1</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_stats_thread'>stats_thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
 <span class='kw'>end</span></pre>
@@ -1931,7 +1964,7 @@ workers are then restarted by <code>reap_workers</code>.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Jun 23 21:15:31 2026 by
+  Generated on Wed Jun 24 21:23:45 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

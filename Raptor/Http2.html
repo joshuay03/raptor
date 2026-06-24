@@ -566,28 +566,6 @@ pipeline used by HTTP/1.1 connections.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#build_server_settings_frame-class_method" title="build_server_settings_frame (class method)">.<strong>build_server_settings_frame</strong>  &#x21d2; String </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  
-  
-
-  
-    <span class="summary_desc"><div class='inline'><p>Builds the initial server SETTINGS frame to send on connection establishment.</p></div></span>
-  
-</li>
-
-      
-        <li class="public ">
-  <span class="summary_signature">
-    
       <a href="#process_frames-class_method" title="process_frames (class method)">.<strong>process_frames</strong>(data)  &#x21d2; Hash </a>
     
 
@@ -895,6 +873,38 @@ pipeline used by HTTP/1.1 connections.</p>
   
     <li>
       
+        <span class='name'>connection_options</span>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>{}</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>per-connection settings shared across protocols</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>http2_options</span>
+      
+      
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>{}</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>HTTP/2-specific settings</p></div>
+      
+    </li>
+  
+    <li>
+      
         <span class='name'>on_error</span>
       
       
@@ -906,6 +916,32 @@ pipeline used by HTTP/1.1 connections.</p>
       
         &mdash;
         <div class='inline'><p>callback invoked with (env, exception) when the Rack app raises</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>connection_options:</span>
+      
+      
+        <span class='type'>(<tt>Hash[Symbol, untyped]</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>{}</tt>)</em>
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>http2_options:</span>
+      
+      
+        <span class='type'>(<tt>Hash[Symbol, untyped]</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>{}</tt>)</em>
+      
       
     </li>
   
@@ -923,6 +959,50 @@ pipeline used by HTTP/1.1 connections.</p>
     </li>
   
 </ul>
+
+  
+    
+    
+    
+    
+    
+    
+    <p class="tag_title">Options Hash (<tt>connection_options:</tt>):</p>
+    <ul class="option">
+      
+        <li>
+          <span class="name">:write_timeout</span>
+          <span class="type">(<tt>Integer</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>per-write socket timeout in seconds</p></div>
+          
+        </li>
+      
+    </ul>
+  
+    
+    
+    <p class="tag_title">Options Hash (<tt>http2_options:</tt>):</p>
+    <ul class="option">
+      
+        <li>
+          <span class="name">:max_concurrent_streams</span>
+          <span class="type">(<tt>Integer</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>maximum HTTP/2 concurrent streams per connection</p></div>
+          
+        </li>
+      
+    </ul>
+  
+    
+    
 
 
 </div><table class="source_code">
@@ -951,7 +1031,7 @@ pipeline used by HTTP/1.1 connections.</p>
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='id identifier rubyid_server_port'>server_port</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='comma'>,</span> <span class='label'>http2_options:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='comma'>,</span> <span class='label'>on_error:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='ivar'>@app</span> <span class='op'>=</span> <span class='id identifier rubyid_app'>app</span>
   <span class='ivar'>@server_port</span> <span class='op'>=</span> <span class='id identifier rubyid_server_port'>server_port</span>
-  <span class='ivar'>@write_timeout</span> <span class='op'>=</span> <span class='id identifier rubyid_connection_options'>connection_options</span><span class='lbracket'>[</span><span class='symbol'>:write_timeout</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="Request.html" title="Raptor::Request (class)">Request</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Request.html#WRITE_TIMEOUT-constant" title="Raptor::Request::WRITE_TIMEOUT (constant)">WRITE_TIMEOUT</a></span></span>
+  <span class='ivar'>@write_timeout</span> <span class='op'>=</span> <span class='id identifier rubyid_connection_options'>connection_options</span><span class='lbracket'>[</span><span class='symbol'>:write_timeout</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Http1.html#WRITE_TIMEOUT-constant" title="Raptor::Http1::WRITE_TIMEOUT (constant)">WRITE_TIMEOUT</a></span></span>
   <span class='ivar'>@on_error</span> <span class='op'>=</span> <span class='id identifier rubyid_on_error'>on_error</span>
 
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
@@ -1038,58 +1118,7 @@ writes don't pay the encoding cost.</p>
 
     
       <div class="method_details first">
-  <h3 class="signature first" id="build_server_settings_frame-class_method">
-  
-    .<strong>build_server_settings_frame</strong>  &#x21d2; <tt>String</tt> 
-  
-
-  
-
-  
-</h3><div class="docstring">
-  <div class="discussion">
-    <p>Builds the initial server SETTINGS frame to send on connection establishment.</p>
-
-  </div>
-</div>
-<div class="tags">
-  
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>String</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>the encoded SETTINGS frame</p></div>
-      
-    </li>
-  
-</ul>
-
-</div><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-164</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'sig/generated/raptor/http2.rbs', line 164</span>
-
-def self.build_server_settings_frame: () -&gt; String</pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-      <div class="method_details ">
-  <h3 class="signature " id="process_frames-class_method">
+  <h3 class="signature first" id="process_frames-class_method">
   
     .<strong>process_frames</strong>(data)  &#x21d2; <tt>Hash</tt> 
   
@@ -2663,7 +2692,7 @@ within the peer's per-stream and connection windows.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Jun 23 21:15:31 2026 by
+  Generated on Wed Jun 24 21:23:45 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

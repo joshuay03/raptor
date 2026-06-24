@@ -121,10 +121,9 @@ the server uses for backpressure control to prevent overload.</p>
     <h4 class="tag_title">Examples:</h4>
     
       
-      <pre class="example code"><code><span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='const'>Reactor</span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='label'>client_options:</span> <span class='lbrace'>{</span>
-  <span class='label'>first_data_timeout:</span> <span class='int'>30</span><span class='comma'>,</span>
-  <span class='label'>chunk_data_timeout:</span> <span class='int'>10</span>
-<span class='rbrace'>}</span><span class='rparen'>)</span>
+      <pre class="example code"><code><span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='const'>Reactor</span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span>
+  <span class='label'>connection_options:</span> <span class='lbrace'>{</span> <span class='label'>first_data_timeout:</span> <span class='int'>30</span><span class='comma'>,</span> <span class='label'>chunk_data_timeout:</span> <span class='int'>10</span> <span class='rbrace'>}</span><span class='comma'>,</span>
+  <span class='label'>http1_options:</span> <span class='lbrace'>{</span> <span class='label'>persistent_data_timeout:</span> <span class='int'>65</span> <span class='rbrace'>}</span><span class='rparen'>)</span>
 <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
 <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_add'>add</span><span class='lparen'>(</span><span class='label'>id:</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_object_id'>object_id</span><span class='comma'>,</span> <span class='label'>socket:</span> <span class='id identifier rubyid_client'>client</span><span class='rparen'>)</span>
 <span class='comment'># ... later
@@ -699,7 +698,7 @@ the server uses for backpressure control to prevent overload.</p>
   
     <li>
       
-        <span class='name'>client_options</span>
+        <span class='name'>connection_options</span>
       
       
         <span class='type'>(<tt>Hash</tt>)</span>
@@ -707,16 +706,41 @@ the server uses for backpressure control to prevent overload.</p>
       
       
         &mdash;
-        <div class='inline'><p>timeout configuration options</p></div>
+        <div class='inline'><p>per-connection timeout configuration</p></div>
       
     </li>
   
     <li>
       
-        <span class='name'>client_options:</span>
+        <span class='name'>http1_options</span>
       
       
-        <span class='type'>(<tt>Hash[Symbol, Integer]</tt>)</span>
+        <span class='type'>(<tt>Hash</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>HTTP/1.1-specific configuration</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>connection_options:</span>
+      
+      
+        <span class='type'>(<tt>Hash[Symbol, untyped]</tt>)</span>
+      
+      
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>http1_options:</span>
+      
+      
+        <span class='type'>(<tt>Hash[Symbol, untyped]</tt>)</span>
       
       
       
@@ -731,8 +755,51 @@ the server uses for backpressure control to prevent overload.</p>
     
     
     
+    <p class="tag_title">Options Hash (<tt>connection_options:</tt>):</p>
+    <ul class="option">
+      
+        <li>
+          <span class="name">:first_data_timeout</span>
+          <span class="type">(<tt>Integer</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>timeout for initial data</p></div>
+          
+        </li>
+      
+        <li>
+          <span class="name">:chunk_data_timeout</span>
+          <span class="type">(<tt>Integer</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>timeout for subsequent chunks</p></div>
+          
+        </li>
+      
+    </ul>
+  
     
     
+    <p class="tag_title">Options Hash (<tt>http1_options:</tt>):</p>
+    <ul class="option">
+      
+        <li>
+          <span class="name">:persistent_data_timeout</span>
+          <span class="type">(<tt>Integer</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>timeout for keep-alive idle connections</p></div>
+          
+        </li>
+      
+    </ul>
+  
 
 
 </div><table class="source_code">
@@ -2326,7 +2393,7 @@ that need to coordinate concurrent socket writes.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Jun 23 21:15:31 2026 by
+  Generated on Wed Jun 24 21:23:45 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
