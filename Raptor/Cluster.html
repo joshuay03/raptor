@@ -931,18 +931,18 @@ for multi-process operation.</p>
       <pre class="lines">
 
 
-433
-434
-435
-436
-437
-438
-439
-440
-441</pre>
+457
+458
+459
+460
+461
+462
+463
+464
+465</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 433</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 457</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_exit_description'>exit_description</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_exited?'>exited?</span>
@@ -983,23 +983,23 @@ and bind addresses.</p>
       <pre class="lines">
 
 
-460
-461
-462
-463
-464
-465
-466
-467
-468
-469
-470
-471
-472
-473</pre>
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 460</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 484</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_log_initialization'>log_initialization</span>
   <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Cluster initializing:</span><span class='tstring_end'>&quot;</span></span>
@@ -1045,17 +1045,17 @@ and bind addresses.</p>
       <pre class="lines">
 
 
-482
-483
-484
-485
-486
-487
-488
-489</pre>
+506
+507
+508
+509
+510
+511
+512
+513</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 482</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 506</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_log_stats'>log_stats</span>
   <span class='ivar'>@stats</span><span class='period'>.</span><span class='id identifier rubyid_all'>all</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_stat'>stat</span><span class='op'>|</span>
@@ -1510,7 +1510,31 @@ critical component fails.</p>
 422
 423
 424
-425</pre>
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 336</span>
@@ -1543,8 +1567,20 @@ critical component fails.</p>
     <span class='ivar'>@app</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
   <span class='rbrace'>}</span>
   <span class='id identifier rubyid_thread_pool'>thread_pool</span> <span class='op'>=</span> <span class='const'>AtomicThreadPool</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='label'>size:</span> <span class='ivar'>@thread_count</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_http1'>http1</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http1.html#initialize-instance_method" title="Raptor::Http1#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span> <span class='ivar'>@server_port</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span> <span class='label'>http1_options:</span> <span class='ivar'>@http1_options</span><span class='comma'>,</span> <span class='label'>on_error:</span> <span class='ivar'>@on_error</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_http2'>http2</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2.html" title="Raptor::Http2 (class)">Http2</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http2.html#initialize-instance_method" title="Raptor::Http2#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span> <span class='ivar'>@server_port</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span> <span class='label'>http2_options:</span> <span class='ivar'>@http2_options</span><span class='comma'>,</span> <span class='label'>on_error:</span> <span class='ivar'>@on_error</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_http1'>http1</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http1.html#initialize-instance_method" title="Raptor::Http1#initialize (method)">new</a></span></span><span class='lparen'>(</span>
+    <span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span>
+    <span class='ivar'>@server_port</span><span class='comma'>,</span>
+    <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span>
+    <span class='label'>http1_options:</span> <span class='ivar'>@http1_options</span><span class='comma'>,</span>
+    <span class='label'>on_error:</span> <span class='ivar'>@on_error</span>
+  <span class='rparen'>)</span>
+  <span class='id identifier rubyid_http2'>http2</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2.html" title="Raptor::Http2 (class)">Http2</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http2.html#initialize-instance_method" title="Raptor::Http2#initialize (method)">new</a></span></span><span class='lparen'>(</span>
+    <span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span>
+    <span class='ivar'>@server_port</span><span class='comma'>,</span>
+    <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span>
+    <span class='label'>http2_options:</span> <span class='ivar'>@http2_options</span><span class='comma'>,</span>
+    <span class='label'>on_error:</span> <span class='ivar'>@on_error</span>
+  <span class='rparen'>)</span>
   <span class='id identifier rubyid_ractor_pool'>ractor_pool</span> <span class='op'>=</span> <span class='const'>RactorPool</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span>
     <span class='label'>size:</span> <span class='ivar'>@ractor_count</span><span class='comma'>,</span>
     <span class='label'>worker:</span> <span class='id identifier rubyid_http1'>http1</span><span class='period'>.</span><span class='id identifier rubyid_http_parser_worker'>http_parser_worker</span>
@@ -1560,10 +1596,22 @@ critical component fails.</p>
     <span class='kw'>end</span>
   <span class='kw'>end</span>
 
-  <span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Reactor.html" title="Raptor::Reactor (class)">Reactor</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Reactor.html#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span> <span class='label'>http1_options:</span> <span class='ivar'>@http1_options</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_reactor'>reactor</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Reactor.html" title="Raptor::Reactor (class)">Reactor</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Reactor.html#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span>
+    <span class='id identifier rubyid_ractor_pool'>ractor_pool</span><span class='comma'>,</span>
+    <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span>
+    <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='comma'>,</span>
+    <span class='label'>http1_options:</span> <span class='ivar'>@http1_options</span>
+  <span class='rparen'>)</span>
   <span class='id identifier rubyid_reactor_thread'>reactor_thread</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
 
-  <span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Server.html#initialize-instance_method" title="Raptor::Server#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@binder</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_http1'>http1</span><span class='comma'>,</span> <span class='id identifier rubyid_http2'>http2</span><span class='comma'>,</span> <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Server.html#initialize-instance_method" title="Raptor::Server#initialize (method)">new</a></span></span><span class='lparen'>(</span>
+    <span class='ivar'>@binder</span><span class='comma'>,</span>
+    <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span>
+    <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span>
+    <span class='id identifier rubyid_http1'>http1</span><span class='comma'>,</span>
+    <span class='id identifier rubyid_http2'>http2</span><span class='comma'>,</span>
+    <span class='label'>connection_options:</span> <span class='ivar'>@connection_options</span>
+  <span class='rparen'>)</span>
   <span class='id identifier rubyid_server_thread'>server_thread</span> <span class='op'>=</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
 
   <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'> booted</span><span class='tstring_end'>&quot;</span></span>
@@ -1634,14 +1682,14 @@ critical component fails.</p>
       <pre class="lines">
 
 
-448
-449
-450
-451
-452</pre>
+472
+473
+474
+475
+476</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 448</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 472</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@shutdown</span>
@@ -1932,18 +1980,18 @@ workers are then restarted by <code>reap_workers</code>.</p>
       <pre class="lines">
 
 
-496
-497
-498
-499
-500
-501
-502
-503
-504</pre>
+520
+521
+522
+523
+524
+525
+526
+527
+528</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 496</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 520</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_stats_file_loop'>write_stats_file_loop</span>
   <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
@@ -1964,7 +2012,7 @@ workers are then restarted by <code>reap_workers</code>.</p>
 </div>
 
       <div id="footer">
-  Generated on Wed Jun 24 21:32:01 2026 by
+  Generated on Wed Jun 24 21:44:18 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
