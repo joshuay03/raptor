@@ -787,6 +787,8 @@ module Raptor
       end
 
       env[Http1::REMOTE_ADDR] = remote_addr
+      env[Http1::SERVER_SOFTWARE] = Http1::SERVER_SOFTWARE_VALUE
+      env[Http1::HTTP_VERSION] = SERVER_PROTOCOL
 
       populate_server_name_and_port(env)
 

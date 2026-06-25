@@ -76,6 +76,15 @@ module Raptor
       end
     end
 
+    def test_http2_http_version_present
+      with_http2_server("http_version.ru") do |port|
+        responses = http2_get(port, "/")
+
+        assert_equal "200", responses[0][:status]
+        assert_equal "HTTP/2", responses[0][:body]
+      end
+    end
+
     def test_http2_post_with_body
       with_http2_server("rack_input.ru") do |port|
         responses = http2_request(port, "POST", "/", body: "request body content")

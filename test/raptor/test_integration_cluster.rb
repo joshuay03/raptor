@@ -241,6 +241,24 @@ module Raptor
       end
     end
 
+    def test_server_software_present
+      with_server("server_software.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal "Raptor/#{Raptor::VERSION}", response.body
+      end
+    end
+
+    def test_http_version_present
+      with_server("http_version.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal "HTTP/1.1", response.body
+      end
+    end
+
     def test_server_name_and_port
       with_server("server_name_port.ru") do |uri|
         response = Net::HTTP.get_response(uri)

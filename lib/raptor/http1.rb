@@ -9,6 +9,7 @@ require "atomic-ruby/atomic_boolean"
 require "rack"
 
 require_relative "raptor_http"
+require_relative "version"
 
 module Raptor
   # Parses HTTP/1.x requests and dispatches them to the Rack
@@ -50,9 +51,12 @@ module Raptor
     CONTENT_LENGTH = "CONTENT_LENGTH"
     CONTENT_TYPE = "CONTENT_TYPE"
     REMOTE_ADDR = "REMOTE_ADDR"
+    SERVER_SOFTWARE = "SERVER_SOFTWARE"
+    SERVER_SOFTWARE_VALUE = "Raptor/#{Raptor::VERSION}".freeze
     HTTP_CONNECTION = "HTTP_CONNECTION"
     HTTP_EXPECT = "HTTP_EXPECT"
     HTTP_TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING"
+    HTTP_VERSION = "HTTP_VERSION"
     RACK_HEADER_PREFIX = "rack."
     RACK_HIJACKED = "rack.hijacked"
     RACK_HIJACK_IO = "rack.hijack_io"
@@ -733,6 +737,8 @@ module Raptor
       end
 
       env[REMOTE_ADDR] = remote_addr
+      env[SERVER_SOFTWARE] = SERVER_SOFTWARE_VALUE
+      env[HTTP_VERSION] = env[Rack::SERVER_PROTOCOL]
 
       behind_tls_proxy = (url_scheme == Server::HTTP_SCHEME) && forwarded_https?(env)
       env[Rack::RACK_URL_SCHEME] = behind_tls_proxy ? Server::HTTPS_SCHEME : url_scheme

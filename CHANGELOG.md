@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Populate `SERVER_SOFTWARE` and `HTTP_VERSION` in the Rack env
 - Honour `X-Forwarded-Proto`, `X-Forwarded-Scheme`, and `X-Forwarded-Ssl` from upstream proxies
 - Split newline-joined response header values into separate header lines
 - Reject excessive chunked framing overhead with 400 (slow-trickle attack guard)
