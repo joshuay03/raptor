@@ -70,11 +70,11 @@ module Raptor
       def message = "could not write response"
     end
 
-    # Detects request-smuggling vectors in the message framing per RFC 9112
-    # section 6.3.
-    #
-    # Returns true when `Transfer-Encoding` is present and `chunked` is missing,
-    # not the final encoding, duplicated, or accompanied by a `Content-Length`.
+    # Returns true when the message framing shows a request-smuggling vector
+    # per RFC 9112 section 6.3: a `Transfer-Encoding` where `chunked` is
+    # missing, not the final encoding, or duplicated; a `Transfer-Encoding`
+    # paired with a `Content-Length`; or a `Content-Length` containing any
+    # non-digit character.
     #
     # @param env [Hash] the Rack environment after header parsing
     # @return [Boolean]
@@ -82,12 +82,17 @@ module Raptor
     # @rbs (Hash[String, untyped] env) -> bool
     def self.request_smuggling?(env)
       transfer_encoding = env[HTTP_TRANSFER_ENCODING]
-      return false unless transfer_encoding
-      return true if env[CONTENT_LENGTH]
+      content_length = env[CONTENT_LENGTH]
 
-      encodings = transfer_encoding.downcase.split(",").map(&:strip)
-      return true if encodings.last != TRANSFER_ENCODING_CHUNKED
-      return true if encodings.count(TRANSFER_ENCODING_CHUNKED) > 1
+      if transfer_encoding
+        return true if content_length
+
+        encodings = transfer_encoding.downcase.split(",").map(&:strip)
+        return true if encodings.last != TRANSFER_ENCODING_CHUNKED
+        return true if encodings.count(TRANSFER_ENCODING_CHUNKED) > 1
+      elsif content_length
+        return true if content_length.match?(/[^\d]/)
+      end
 
       false
     end

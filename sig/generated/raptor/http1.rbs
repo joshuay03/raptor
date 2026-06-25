@@ -82,11 +82,11 @@ module Raptor
       def message: () -> String
     end
 
-    # Detects request-smuggling vectors in the message framing per RFC 9112
-    # section 6.3.
-    #
-    # Returns true when `Transfer-Encoding` is present and `chunked` is missing,
-    # not the final encoding, duplicated, or accompanied by a `Content-Length`.
+    # Returns true when the message framing shows a request-smuggling vector
+    # per RFC 9112 section 6.3: a `Transfer-Encoding` where `chunked` is
+    # missing, not the final encoding, or duplicated; a `Transfer-Encoding`
+    # paired with a `Content-Length`; or a `Content-Length` containing any
+    # non-digit character.
     #
     # @param env [Hash] the Rack environment after header parsing
     # @return [Boolean]

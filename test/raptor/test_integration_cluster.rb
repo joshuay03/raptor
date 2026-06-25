@@ -529,6 +529,46 @@ module Raptor
       end
     end
 
+    def test_negative_content_length_returns_400
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Content-Length: -5\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
+    def test_non_digit_content_length_returns_400
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Content-Length: 10abc\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
+    def test_duplicate_content_length_returns_400
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Content-Length: 100\r\n" \
+          "Content-Length: 200\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
     def test_excessive_chunk_overhead_returns_400
       with_server("rack_input.ru") do |uri|
         bloated_extension = "A" * (Raptor::Http1::MAX_CHUNK_OVERHEAD + 1)
