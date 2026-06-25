@@ -406,6 +406,47 @@ module Raptor
       end
     end
 
+    def test_transfer_encoding_with_content_length_returns_400
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Transfer-Encoding: chunked\r\n" \
+          "Content-Length: 5\r\n" \
+          "Connection: close\r\n\r\n" \
+          "5\r\nhello\r\n0\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
+    def test_transfer_encoding_without_chunked_returns_400
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Transfer-Encoding: gzip\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
+    def test_chunked_not_last_in_transfer_encoding_returns_400
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Transfer-Encoding: chunked, gzip\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
     def test_too_long_uri_returns_400
       with_server do |uri|
         long_path = "/" + "a" * (13 * 1024)

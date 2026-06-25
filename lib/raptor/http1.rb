@@ -38,17 +38,20 @@ module Raptor
     STATUS_WITH_NO_ENTITY_BODY = [204, 304, *100..199].freeze
     CONTINUE_RESPONSE = "HTTP/1.1 100 Continue\r\n\r\n"
     BAD_REQUEST_RESPONSE = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-    INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     CONTENT_TOO_LARGE_RESPONSE = "HTTP/1.1 413 Content Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 
     CONNECTION_CLOSE = "close"
     CONNECTION_KEEPALIVE = "keep-alive"
-    TRANSFER_ENCODING_CHUNKED = "chunked"
     EXPECT_100_CONTINUE = "100-continue"
+    TRANSFER_ENCODING_CHUNKED = "chunked"
 
+    CONTENT_LENGTH = "CONTENT_LENGTH"
+    CONTENT_TYPE = "CONTENT_TYPE"
+    REMOTE_ADDR = "REMOTE_ADDR"
     HTTP_CONNECTION = "HTTP_CONNECTION"
-    HTTP_TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING"
     HTTP_EXPECT = "HTTP_EXPECT"
+    HTTP_TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING"
     RACK_HEADER_PREFIX = "rack."
     RACK_HIJACKED = "rack.hijacked"
     RACK_HIJACK_IO = "rack.hijack_io"
@@ -60,6 +63,28 @@ module Raptor
     class WriteError < Error
       # @rbs () -> String
       def message = "could not write response"
+    end
+
+    # Detects request-smuggling vectors in the message framing per RFC 9112
+    # section 6.3.
+    #
+    # Returns true when `Transfer-Encoding` is present and `chunked` is missing,
+    # not the final encoding, duplicated, or accompanied by a `Content-Length`.
+    #
+    # @param env [Hash] the Rack environment after header parsing
+    # @return [Boolean]
+    #
+    # @rbs (Hash[String, untyped] env) -> bool
+    def self.request_smuggling?(env)
+      transfer_encoding = env[HTTP_TRANSFER_ENCODING]
+      return false unless transfer_encoding
+      return true if env[CONTENT_LENGTH]
+
+      encodings = transfer_encoding.downcase.split(",").map(&:strip)
+      return true if encodings.last != TRANSFER_ENCODING_CHUNKED
+      return true if encodings.count(TRANSFER_ENCODING_CHUNKED) > 1
+
+      false
     end
 
     # Decodes a chunked transfer-encoded body buffer.
@@ -226,6 +251,9 @@ module Raptor
       if !parser.finished?
         fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
         return
+      elsif Http1.request_smuggling?(env)
+        reject_malformed(socket)
+        return
       elsif parser.has_body?
         if @max_body_size && parser.content_length > @max_body_size
           reject_oversized(socket)
@@ -287,7 +315,9 @@ module Raptor
         parse_data[:parse_count] += 1
 
         message = if parser.finished?
-          if parser.has_body?
+          if Raptor::Http1.request_smuggling?(env)
+            data.merge(env: env, body: nil, parse_data: parse_data, complete: true, malformed: true)
+          elsif parser.has_body?
             body_buffer = data[:buffer].byteslice(nread..-1) || ""
 
             if max_body_size && parser.content_length > max_body_size
@@ -689,10 +719,10 @@ module Raptor
       env[Rack::QUERY_STRING] = "" unless env.key?(Rack::QUERY_STRING)
 
       if (content_length = parse_data[:content_length]).positive?
-        env["CONTENT_LENGTH"] = content_length.to_s
+        env[CONTENT_LENGTH] = content_length.to_s
       end
 
-      env["REMOTE_ADDR"] = remote_addr
+      env[REMOTE_ADDR] = remote_addr
 
       http_host = env[Rack::HTTP_HOST]
       if http_host

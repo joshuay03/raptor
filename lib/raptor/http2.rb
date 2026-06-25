@@ -762,9 +762,9 @@ module Raptor
           when ":authority" then env[Rack::HTTP_HOST] = value
           end
         elsif name == "content-type"
-          env["CONTENT_TYPE"] = value
+          env[Http1::CONTENT_TYPE] = value
         elsif name == "content-length"
-          env["CONTENT_LENGTH"] = value
+          env[Http1::CONTENT_LENGTH] = value
         else
           rack_key = "HTTP_#{name.upcase.tr("-", "_")}"
           env[rack_key] = value
@@ -782,11 +782,11 @@ module Raptor
       env[Rack::PATH_INFO] = "" unless env.key?(Rack::PATH_INFO)
       env[Rack::QUERY_STRING] = "" unless env.key?(Rack::QUERY_STRING)
 
-      if body.bytesize.positive? && !env.key?("CONTENT_LENGTH")
-        env["CONTENT_LENGTH"] = body.bytesize.to_s
+      if body.bytesize.positive? && !env.key?(Http1::CONTENT_LENGTH)
+        env[Http1::CONTENT_LENGTH] = body.bytesize.to_s
       end
 
-      env["REMOTE_ADDR"] = remote_addr
+      env[Http1::REMOTE_ADDR] = remote_addr
 
       populate_server_name_and_port(env)
 
