@@ -545,9 +545,9 @@ consulted again and need not be tracked.</p>
     <span class='kw'>end</span>
 
     <span class='kw'>if</span> <span class='id identifier rubyid_granted'>granted</span> <span class='op'>&gt;</span> <span class='int'>0</span>
-      <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_s'>s</span><span class='op'>|</span>
-        <span class='id identifier rubyid_current'>current</span> <span class='op'>=</span> <span class='id identifier rubyid_s'>s</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
-        <span class='id identifier rubyid_s'>s</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>-</span> <span class='id identifier rubyid_granted'>granted</span><span class='rparen'>)</span>
+      <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_windows'>windows</span><span class='op'>|</span>
+        <span class='id identifier rubyid_current'>current</span> <span class='op'>=</span> <span class='id identifier rubyid_windows'>windows</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
+        <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>-</span> <span class='id identifier rubyid_granted'>granted</span><span class='rparen'>)</span>
       <span class='kw'>end</span>
       <span class='kw'>return</span> <span class='id identifier rubyid_granted'>granted</span>
     <span class='kw'>end</span>
@@ -688,9 +688,9 @@ a WINDOW_UPDATE on a specific stream.</p>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_add_stream_window'>add_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_initial'>initial</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
-  <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_s'>s</span><span class='op'>|</span>
-    <span class='id identifier rubyid_current'>current</span> <span class='op'>=</span> <span class='id identifier rubyid_s'>s</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
-    <span class='id identifier rubyid_s'>s</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>+</span> <span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
+  <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_windows'>windows</span><span class='op'>|</span>
+    <span class='id identifier rubyid_current'>current</span> <span class='op'>=</span> <span class='id identifier rubyid_windows'>windows</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
+    <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>+</span> <span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -760,12 +760,12 @@ bound across the lifetime of a connection.</p>
 <span class='kw'>def</span> <span class='id identifier rubyid_discard_stream'>discard_stream</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
 
-  <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_s'>s</span><span class='op'>|</span>
-    <span class='kw'>next</span> <span class='id identifier rubyid_s'>s</span> <span class='kw'>unless</span> <span class='id identifier rubyid_s'>s</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+  <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_windows'>windows</span><span class='op'>|</span>
+    <span class='kw'>next</span> <span class='id identifier rubyid_windows'>windows</span> <span class='kw'>unless</span> <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
 
-    <span class='id identifier rubyid_new'>new</span> <span class='op'>=</span> <span class='id identifier rubyid_s'>s</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
-    <span class='id identifier rubyid_new'>new</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
-    <span class='id identifier rubyid_new'>new</span>
+    <span class='id identifier rubyid_pruned'>pruned</span> <span class='op'>=</span> <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
+    <span class='id identifier rubyid_pruned'>pruned</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_pruned'>pruned</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -836,8 +836,8 @@ existing stream window by the delta as required by RFC 7540 §6.9.2.</p>
   <span class='id identifier rubyid_delta'>delta</span> <span class='op'>=</span> <span class='id identifier rubyid_new_size'>new_size</span> <span class='op'>-</span> <span class='id identifier rubyid_old'>old</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_delta'>delta</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
 
-  <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_s'>s</span><span class='op'>|</span>
-    <span class='id identifier rubyid_s'>s</span><span class='period'>.</span><span class='id identifier rubyid_transform_values'>transform_values</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_size'>size</span><span class='op'>|</span> <span class='id identifier rubyid_size'>size</span> <span class='op'>+</span> <span class='id identifier rubyid_delta'>delta</span> <span class='rbrace'>}</span>
+  <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_windows'>windows</span><span class='op'>|</span>
+    <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_transform_values'>transform_values</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_size'>size</span><span class='op'>|</span> <span class='id identifier rubyid_size'>size</span> <span class='op'>+</span> <span class='id identifier rubyid_delta'>delta</span> <span class='rbrace'>}</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -850,7 +850,7 @@ existing stream window by the delta as required by RFC 7540 §6.9.2.</p>
 </div>
 
       <div id="footer">
-  Generated on Thu Jun 25 21:46:08 2026 by
+  Generated on Thu Jun 25 21:49:59 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
