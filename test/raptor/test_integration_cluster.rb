@@ -250,6 +250,58 @@ module Raptor
       end
     end
 
+    def test_x_forwarded_proto_promotes_to_https
+      with_server("forwarded_proto.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["X-Forwarded-Proto"] = "https"
+          request["Host"] = "example.com"
+          http.request(request)
+        end
+
+        assert_equal "https|443", response.body
+      end
+    end
+
+    def test_x_forwarded_scheme_promotes_to_https
+      with_server("forwarded_proto.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["X-Forwarded-Scheme"] = "https"
+          request["Host"] = "example.com"
+          http.request(request)
+        end
+
+        assert_equal "https|443", response.body
+      end
+    end
+
+    def test_x_forwarded_ssl_promotes_to_https
+      with_server("forwarded_proto.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["X-Forwarded-Ssl"] = "on"
+          request["Host"] = "example.com"
+          http.request(request)
+        end
+
+        assert_equal "https|443", response.body
+      end
+    end
+
+    def test_x_forwarded_proto_takes_first_value_from_proxy_chain
+      with_server("forwarded_proto.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["X-Forwarded-Proto"] = "https, http"
+          request["Host"] = "example.com"
+          http.request(request)
+        end
+
+        assert_equal "https|443", response.body
+      end
+    end
+
     def test_http_headers_prefixed
       with_server("http_headers.ru") do |uri|
         response = Net::HTTP.start(uri.host, uri.port) do |http|

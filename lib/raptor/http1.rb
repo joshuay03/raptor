@@ -708,7 +708,6 @@ module Raptor
     # @rbs (Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, TCPSocket socket, ?remote_addr: String, ?url_scheme: String) -> Hash[String, untyped]
     def build_rack_env(env, parse_data, body, socket, remote_addr: Server::DEFAULT_REMOTE_ADDR, url_scheme: Server::HTTP_SCHEME)
       env[Rack::RACK_VERSION] = Rack::VERSION
-      env[Rack::RACK_URL_SCHEME] = url_scheme
       env[Rack::RACK_INPUT] = build_rack_input(body)
       env[Rack::RACK_ERRORS] = $stderr
       env[Rack::RACK_RESPONSE_FINISHED] = []
@@ -735,6 +734,10 @@ module Raptor
 
       env[REMOTE_ADDR] = remote_addr
 
+      behind_tls_proxy = (url_scheme == Server::HTTP_SCHEME) && forwarded_https?(env)
+      env[Rack::RACK_URL_SCHEME] = behind_tls_proxy ? Server::HTTPS_SCHEME : url_scheme
+      default_port = behind_tls_proxy ? "443" : @server_port.to_s
+
       http_host = env[Rack::HTTP_HOST]
       if http_host
         if http_host.start_with?("[")
@@ -744,10 +747,10 @@ module Raptor
           host, port = http_host.split(":", 2)
         end
         env[Rack::SERVER_NAME] ||= host
-        env[Rack::SERVER_PORT] ||= port || @server_port.to_s
+        env[Rack::SERVER_PORT] ||= port || default_port
       else
         env[Rack::SERVER_NAME] ||= Server::DEFAULT_SERVER_NAME
-        env[Rack::SERVER_PORT] ||= @server_port.to_s
+        env[Rack::SERVER_PORT] ||= default_port
       end
 
       env
@@ -771,6 +774,21 @@ module Raptor
       else
         (body ? StringIO.new(body) : StringIO.new).set_encoding(Encoding::ASCII_8BIT)
       end
+    end
+
+    # Returns true when an upstream proxy signals that it terminated TLS for
+    # this request via `X-Forwarded-Proto`, `X-Forwarded-Scheme`, or
+    # `X-Forwarded-Ssl`. Only the first comma-separated value is consulted.
+    #
+    # @param env [Hash] the Rack environment
+    # @return [Boolean]
+    #
+    # @rbs (Hash[String, untyped] env) -> bool
+    def forwarded_https?(env)
+      proto = env["HTTP_X_FORWARDED_PROTO"] || env["HTTP_X_FORWARDED_SCHEME"]
+      return true if proto && proto.split(",").first&.strip&.casecmp?(Server::HTTPS_SCHEME)
+
+      env["HTTP_X_FORWARDED_SSL"]&.casecmp?("on") || false
     end
 
     # Determines whether the connection should be kept alive after the response.

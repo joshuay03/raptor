@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Honour `X-Forwarded-Proto`, `X-Forwarded-Scheme`, and `X-Forwarded-Ssl` from upstream proxies
 - Split newline-joined response header values into separate header lines
 - Reject excessive chunked framing overhead with 400 (slow-trickle attack guard)
 - Reject ambiguous request framing (`Transfer-Encoding` + `Content-Length`, or `chunked` not the final encoding) with 400

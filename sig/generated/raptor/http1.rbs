@@ -346,6 +346,16 @@ module Raptor
     # @rbs (String? body) -> IO
     def build_rack_input: (String? body) -> IO
 
+    # Returns true when an upstream proxy signals that it terminated TLS for
+    # this request via `X-Forwarded-Proto`, `X-Forwarded-Scheme`, or
+    # `X-Forwarded-Ssl`. Only the first comma-separated value is consulted.
+    #
+    # @param env [Hash] the Rack environment
+    # @return [Boolean]
+    #
+    # @rbs (Hash[String, untyped] env) -> bool
+    def forwarded_https?: (Hash[String, untyped] env) -> bool
+
     # Determines whether the connection should be kept alive after the response.
     #
     # Returns false if the request limit has been reached. For HTTP/1.1, keep-alive
