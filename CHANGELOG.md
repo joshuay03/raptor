@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Send `100 Continue` when an HTTP/1.1 client sends `Expect: 100-continue`
 - Add new configuration options and split `client:` into protocol-scoped namespaces
 
 ## [0.7.0] - 2026-06-12

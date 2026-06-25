@@ -36,6 +36,7 @@ module Raptor
     end
 
     STATUS_WITH_NO_ENTITY_BODY = [204, 304, *100..199].freeze
+    CONTINUE_RESPONSE = "HTTP/1.1 100 Continue\r\n\r\n"
     BAD_REQUEST_RESPONSE = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     CONTENT_TOO_LARGE_RESPONSE = "HTTP/1.1 413 Content Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -43,9 +44,11 @@ module Raptor
     CONNECTION_CLOSE = "close"
     CONNECTION_KEEPALIVE = "keep-alive"
     TRANSFER_ENCODING_CHUNKED = "chunked"
+    EXPECT_100_CONTINUE = "100-continue"
 
     HTTP_CONNECTION = "HTTP_CONNECTION"
     HTTP_TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING"
+    HTTP_EXPECT = "HTTP_EXPECT"
     RACK_HEADER_PREFIX = "rack."
     RACK_HIJACKED = "rack.hijacked"
     RACK_HIJACK_IO = "rack.hijack_io"
@@ -341,6 +344,7 @@ module Raptor
       end
 
       unless parsed_request[:complete]
+        parsed_request = send_continue_if_expected(parsed_request, reactor)
         reactor.update_state(parsed_request)
       else
         socket = reactor.remove(parsed_request[:id])
@@ -366,6 +370,41 @@ module Raptor
     end
 
     private
+
+    # Returns true if the request expects a 100 Continue response per
+    # RFC 7231 section 5.1.1.
+    #
+    # @param env [Hash] the parsed Rack environment (possibly incomplete)
+    # @return [Boolean]
+    #
+    # @rbs (Hash[String, untyped] env) -> bool
+    def expects_100_continue?(env)
+      (env[Rack::SERVER_PROTOCOL] == HTTP_11) && env[HTTP_EXPECT]&.casecmp?(EXPECT_100_CONTINUE)
+    end
+
+    # Sends an HTTP 100 Continue response when an HTTP/1.1 client requested
+    # `Expect: 100-continue` and the request body has not yet been received.
+    #
+    # Returns the state hash with `:continued` set when the response has been
+    # written. A write failure is silently ignored.
+    #
+    # @param state [Hash] the partially-parsed connection state
+    # @param reactor [Reactor] the reactor holding the connection's socket
+    # @return [Hash] the state, with `:continued` set if 100 was written
+    #
+    # @rbs (Hash[Symbol, untyped] state, Reactor reactor) -> Hash[Symbol, untyped]
+    def send_continue_if_expected(state, reactor)
+      return state if state[:continued]
+
+      env = state[:env]
+      return state unless env && expects_100_continue?(env)
+
+      socket = reactor.socket_for(state[:id])
+      return state unless socket
+
+      socket_write(socket, CONTINUE_RESPONSE) rescue nil
+      state.merge(continued: true)
+    end
 
     # Processes a client connection by handling the current request and,
     # if keep-alive, eagerly reading subsequent requests inline.
@@ -570,6 +609,9 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
     def fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme, persisted: true)
+      continued = expects_100_continue?(env)
+      socket_write(socket, CONTINUE_RESPONSE) rescue nil if continued
+
       reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
       state = {
         id: id,
@@ -581,6 +623,7 @@ module Raptor
         url_scheme: url_scheme
       }
       state[:persisted] = true if persisted
+      state[:continued] = true if continued
       reactor.update_state(Ractor.make_shareable(state))
     end
 

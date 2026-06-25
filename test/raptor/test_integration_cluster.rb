@@ -118,6 +118,46 @@ module Raptor
       end
     end
 
+    def test_expect_100_continue_sent_before_body
+      with_server("rack_input.ru") do |uri|
+        socket = TCPSocket.new(uri.host, uri.port)
+        socket.write(
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Content-Length: 5\r\n" \
+          "Expect: 100-continue\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        expected = Raptor::Http1::CONTINUE_RESPONSE
+        assert_equal expected, Timeout.timeout(5) { socket.read(expected.bytesize) }
+
+        socket.write("hello")
+        response = Timeout.timeout(5) { socket.read }
+
+        assert_match(/\AHTTP\/1\.1 200/, response)
+        assert_includes response, "hello"
+      ensure
+        socket&.close
+      end
+    end
+
+    def test_expect_100_continue_ignored_for_http10
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri,
+          "POST / HTTP/1.0\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Content-Length: 5\r\n" \
+          "Expect: 100-continue\r\n" \
+          "Connection: close\r\n\r\nhello"
+        )
+
+        refute_match(/100 Continue/, response)
+        assert_match(/\AHTTP\/1\.[01] 200/, response)
+        assert_includes response, "hello"
+      end
+    end
+
     def test_array_body_with_multiple_chunks
       with_server("array_body.ru") do |uri|
         response = Net::HTTP.get_response(uri)

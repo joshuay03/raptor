@@ -28,6 +28,8 @@ module Raptor
 
     STATUS_WITH_NO_ENTITY_BODY: untyped
 
+    CONTINUE_RESPONSE: ::String
+
     BAD_REQUEST_RESPONSE: ::String
 
     INTERNAL_SERVER_ERROR_RESPONSE: ::String
@@ -40,9 +42,13 @@ module Raptor
 
     TRANSFER_ENCODING_CHUNKED: ::String
 
+    EXPECT_100_CONTINUE: ::String
+
     HTTP_CONNECTION: ::String
 
     HTTP_TRANSFER_ENCODING: ::String
+
+    HTTP_EXPECT: ::String
 
     RACK_HEADER_PREFIX: ::String
 
@@ -178,6 +184,28 @@ module Raptor
     def handle_parsed_request: (Hash[Symbol, untyped] parsed_request, Reactor reactor, AtomicThreadPool thread_pool) -> void
 
     private
+
+    # Returns true if the request expects a 100 Continue response per
+    # RFC 7231 section 5.1.1.
+    #
+    # @param env [Hash] the parsed Rack environment (possibly incomplete)
+    # @return [Boolean]
+    #
+    # @rbs (Hash[String, untyped] env) -> bool
+    def expects_100_continue?: (Hash[String, untyped] env) -> bool
+
+    # Sends an HTTP 100 Continue response when an HTTP/1.1 client requested
+    # `Expect: 100-continue` and the request body has not yet been received.
+    #
+    # Returns the state hash with `:continued` set when the response has been
+    # written. A write failure is silently ignored.
+    #
+    # @param state [Hash] the partially-parsed connection state
+    # @param reactor [Reactor] the reactor holding the connection's socket
+    # @return [Hash] the state, with `:continued` set if 100 was written
+    #
+    # @rbs (Hash[Symbol, untyped] state, Reactor reactor) -> Hash[Symbol, untyped]
+    def send_continue_if_expected: (Hash[Symbol, untyped] state, Reactor reactor) -> Hash[Symbol, untyped]
 
     # Processes a client connection by handling the current request and,
     # if keep-alive, eagerly reading subsequent requests inline.
