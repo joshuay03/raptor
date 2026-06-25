@@ -1232,16 +1232,10 @@ module Raptor
       headers.each do |name, value|
         next if illegal_header_key?(name)
 
-        if value.is_a?(Array)
-          value.each do |header_value|
-            next if illegal_header_value?(header_value.to_s)
+        Array(value).flat_map { |entry| entry.to_s.split("\n") }.each do |header_value|
+          next if illegal_header_value?(header_value)
 
-            result << "#{name}: #{header_value}\r\n"
-          end
-        else
-          next if illegal_header_value?(value.to_s)
-
-          result << "#{name}: #{value}\r\n"
+          result << "#{name}: #{header_value}\r\n"
         end
       end
       result

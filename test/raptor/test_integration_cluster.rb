@@ -275,6 +275,18 @@ module Raptor
       end
     end
 
+    def test_newline_joined_header_values
+      with_server("newline_joined_headers.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        cookies = response.get_fields("set-cookie")
+        assert_equal 2, cookies.length
+        assert_includes cookies, "cookie1=value1"
+        assert_includes cookies, "cookie2=value2"
+      end
+    end
+
     def test_rack_headers_not_sent_to_client
       with_server("rack_header_filtering.ru") do |uri|
         response = Net::HTTP.get_response(uri)
