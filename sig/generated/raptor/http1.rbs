@@ -10,6 +10,8 @@ module Raptor
 
     FILE_CHUNK_SIZE: untyped
 
+    MAX_CHUNK_OVERHEAD: untyped
+
     READ_BUFFER_SIZE: untyped
 
     WRITE_TIMEOUT: ::Integer
@@ -90,7 +92,8 @@ module Raptor
     #
     # Returns the decoded bytes and a state symbol: `:complete` when the
     # terminating zero-length chunk was found, `:too_large` when the decoded
-    # size would exceed `max_size`, or `:incomplete` otherwise.
+    # size would exceed `max_size`, `:malformed` when chunk framing overhead
+    # exceeds `MAX_CHUNK_OVERHEAD`, or `:incomplete` otherwise.
     #
     # @param buffer [String] the raw body buffer to decode
     # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited

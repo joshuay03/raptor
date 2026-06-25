@@ -19,6 +19,7 @@ module Raptor
   class Http1
     BODY_BUFFER_THRESHOLD = 256 * 1024
     FILE_CHUNK_SIZE = 64 * 1024
+    MAX_CHUNK_OVERHEAD = 16 * 1024
     READ_BUFFER_SIZE = 64 * 1024
     WRITE_TIMEOUT = 5
     KEEPALIVE_READ_TIMEOUT = 0.001
@@ -91,7 +92,8 @@ module Raptor
     #
     # Returns the decoded bytes and a state symbol: `:complete` when the
     # terminating zero-length chunk was found, `:too_large` when the decoded
-    # size would exceed `max_size`, or `:incomplete` otherwise.
+    # size would exceed `max_size`, `:malformed` when chunk framing overhead
+    # exceeds `MAX_CHUNK_OVERHEAD`, or `:incomplete` otherwise.
     #
     # @param buffer [String] the raw body buffer to decode
     # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited
@@ -101,6 +103,7 @@ module Raptor
     def self.decode_chunked(buffer, max_size = nil)
       decoded = String.new
       offset = 0
+      overhead = 0
 
       while offset < buffer.bytesize
         crlf = buffer.index("\r\n", offset)
@@ -108,7 +111,10 @@ module Raptor
 
         chunk_size = buffer.byteslice(offset, crlf - offset).to_i(16)
         return [decoded, :complete] if chunk_size == 0
-        return [decoded, :too_large] if max_size && decoded.bytesize + chunk_size > max_size
+        return [decoded, :too_large] if max_size && (decoded.bytesize + chunk_size) > max_size
+
+        overhead += (crlf - offset) + 4
+        return [decoded, :malformed] if overhead > (decoded.bytesize + chunk_size + MAX_CHUNK_OVERHEAD)
 
         offset = crlf + 2
         decoded << buffer.byteslice(offset, chunk_size)
@@ -270,6 +276,9 @@ module Raptor
           when :too_large
             reject_oversized(socket)
             return
+          when :malformed
+            reject_malformed(socket)
+            return
           else
             fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
             return
@@ -331,6 +340,8 @@ module Raptor
                 data.merge(env: env, body: decoded_body, parse_data: parse_data, complete: true)
               when :too_large
                 data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
+              when :malformed
+                data.merge(env: env, body: nil, parse_data: parse_data, complete: true, malformed: true)
               else
                 data.merge(env: env, parse_data: parse_data)
               end

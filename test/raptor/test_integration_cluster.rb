@@ -447,6 +447,21 @@ module Raptor
       end
     end
 
+    def test_excessive_chunk_overhead_returns_400
+      with_server("rack_input.ru") do |uri|
+        bloated_extension = "A" * (Raptor::Http1::MAX_CHUNK_OVERHEAD + 1)
+        response = raw_request(uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Transfer-Encoding: chunked\r\n" \
+          "Connection: close\r\n\r\n" \
+          "1; #{bloated_extension}\r\nX\r\n0\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
     def test_too_long_uri_returns_400
       with_server do |uri|
         long_path = "/" + "a" * (13 * 1024)

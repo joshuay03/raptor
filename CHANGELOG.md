@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reject excessive chunked framing overhead with 400 (slow-trickle attack guard)
 - Reject ambiguous request framing (`Transfer-Encoding` + `Content-Length`, or `chunked` not the final encoding) with 400
 - Send `100 Continue` when an HTTP/1.1 client sends `Expect: 100-continue`
 - Add new configuration options and split `client:` into protocol-scoped namespaces
