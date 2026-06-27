@@ -1115,7 +1115,7 @@ can be handled.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns true when the message framing shows a request-smuggling vector per RFC 9112 §6.3: a <code>Transfer-Encoding</code> where <code>chunked</code> is missing, not the final encoding, or duplicated; a <code>Transfer-Encoding</code> paired with a <code>Content-Length</code>; or a <code>Content-Length</code> containing any non-digit character.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns true when the message framing shows a request-smuggling vector per RFC 9112 section 6.3: a <code>Transfer-Encoding</code> where <code>chunked</code> is missing, not the final encoding, or duplicated; a <code>Transfer-Encoding</code> paired with a <code>Content-Length</code>; or a <code>Content-Length</code> containing any non-digit character.</p></div></span>
   
 </li>
 
@@ -1345,7 +1345,7 @@ can be handled.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns true if the request expects a 100 Continue response per RFC 7231 §5.1.1.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns true if the request expects a 100 Continue response per RFC 7231 section 5.1.1.</p></div></span>
   
 </li>
 
@@ -2279,8 +2279,7 @@ can be handled.</p>
 <p>Returns the decoded bytes and a state symbol: <code>:complete</code> when the
 terminating zero-length chunk was found, <code>:too_large</code> when the decoded
 size would exceed <code>max_size</code>, <code>:malformed</code> when chunk framing overhead
-exceeds <code>MAX_CHUNK_OVERHEAD</code> (a slow-trickle attack guard), or
-<code>:incomplete</code> otherwise.</p>
+exceeds <code>MAX_CHUNK_OVERHEAD</code>, or <code>:incomplete</code> otherwise.</p>
 
   </div>
 </div>
@@ -2381,10 +2380,10 @@ exceeds <code>MAX_CHUNK_OVERHEAD</code> (a slow-trickle attack guard), or
 
     <span class='id identifier rubyid_chunk_size'>chunk_size</span> <span class='op'>=</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='id identifier rubyid_offset'>offset</span><span class='comma'>,</span> <span class='id identifier rubyid_crlf'>crlf</span> <span class='op'>-</span> <span class='id identifier rubyid_offset'>offset</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_to_i'>to_i</span><span class='lparen'>(</span><span class='int'>16</span><span class='rparen'>)</span>
     <span class='kw'>return</span> <span class='lbracket'>[</span><span class='id identifier rubyid_decoded'>decoded</span><span class='comma'>,</span> <span class='symbol'>:complete</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_chunk_size'>chunk_size</span> <span class='op'>==</span> <span class='int'>0</span>
-    <span class='kw'>return</span> <span class='lbracket'>[</span><span class='id identifier rubyid_decoded'>decoded</span><span class='comma'>,</span> <span class='symbol'>:too_large</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_max_size'>max_size</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_decoded'>decoded</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span> <span class='op'>+</span> <span class='id identifier rubyid_chunk_size'>chunk_size</span> <span class='op'>&gt;</span> <span class='id identifier rubyid_max_size'>max_size</span>
+    <span class='kw'>return</span> <span class='lbracket'>[</span><span class='id identifier rubyid_decoded'>decoded</span><span class='comma'>,</span> <span class='symbol'>:too_large</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_max_size'>max_size</span> <span class='op'>&amp;&amp;</span> <span class='lparen'>(</span><span class='id identifier rubyid_decoded'>decoded</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span> <span class='op'>+</span> <span class='id identifier rubyid_chunk_size'>chunk_size</span><span class='rparen'>)</span> <span class='op'>&gt;</span> <span class='id identifier rubyid_max_size'>max_size</span>
 
     <span class='id identifier rubyid_overhead'>overhead</span> <span class='op'>+=</span> <span class='lparen'>(</span><span class='id identifier rubyid_crlf'>crlf</span> <span class='op'>-</span> <span class='id identifier rubyid_offset'>offset</span><span class='rparen'>)</span> <span class='op'>+</span> <span class='int'>4</span>
-    <span class='kw'>return</span> <span class='lbracket'>[</span><span class='id identifier rubyid_decoded'>decoded</span><span class='comma'>,</span> <span class='symbol'>:malformed</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_overhead'>overhead</span> <span class='op'>&gt;</span> <span class='id identifier rubyid_decoded'>decoded</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span> <span class='op'>+</span> <span class='id identifier rubyid_chunk_size'>chunk_size</span> <span class='op'>+</span> <span class='const'><span class='object_link'><a href="#MAX_CHUNK_OVERHEAD-constant" title="Raptor::Http1::MAX_CHUNK_OVERHEAD (constant)">MAX_CHUNK_OVERHEAD</a></span></span>
+    <span class='kw'>return</span> <span class='lbracket'>[</span><span class='id identifier rubyid_decoded'>decoded</span><span class='comma'>,</span> <span class='symbol'>:malformed</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_overhead'>overhead</span> <span class='op'>&gt;</span> <span class='lparen'>(</span><span class='id identifier rubyid_decoded'>decoded</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span> <span class='op'>+</span> <span class='id identifier rubyid_chunk_size'>chunk_size</span> <span class='op'>+</span> <span class='const'><span class='object_link'><a href="#MAX_CHUNK_OVERHEAD-constant" title="Raptor::Http1::MAX_CHUNK_OVERHEAD (constant)">MAX_CHUNK_OVERHEAD</a></span></span><span class='rparen'>)</span>
 
     <span class='id identifier rubyid_offset'>offset</span> <span class='op'>=</span> <span class='id identifier rubyid_crlf'>crlf</span> <span class='op'>+</span> <span class='int'>2</span>
     <span class='id identifier rubyid_decoded'>decoded</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_buffer'>buffer</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='id identifier rubyid_offset'>offset</span><span class='comma'>,</span> <span class='id identifier rubyid_chunk_size'>chunk_size</span><span class='rparen'>)</span>
@@ -2410,10 +2409,10 @@ exceeds <code>MAX_CHUNK_OVERHEAD</code> (a slow-trickle attack guard), or
 </h3><div class="docstring">
   <div class="discussion">
     <p>Returns true when the message framing shows a request-smuggling vector
-per RFC 9112 §6.3: a <code>Transfer-Encoding</code> where <code>chunked</code> is missing, not
-the final encoding, or duplicated; a <code>Transfer-Encoding</code> paired with a
-<code>Content-Length</code>; or a <code>Content-Length</code> containing any non-digit
-character.</p>
+per RFC 9112 section 6.3: a <code>Transfer-Encoding</code> where <code>chunked</code> is
+missing, not the final encoding, or duplicated; a <code>Transfer-Encoding</code>
+paired with a <code>Content-Length</code>; or a <code>Content-Length</code> containing any
+non-digit character.</p>
 
   </div>
 </div>
@@ -2478,17 +2477,17 @@ character.</p>
       <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 83</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_request_smuggling?'>request_smuggling?</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_te'>te</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#HTTP_TRANSFER_ENCODING-constant" title="Raptor::Http1::HTTP_TRANSFER_ENCODING (constant)">HTTP_TRANSFER_ENCODING</a></span></span><span class='rbracket'>]</span>
-  <span class='id identifier rubyid_cl'>cl</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#CONTENT_LENGTH-constant" title="Raptor::Http1::CONTENT_LENGTH (constant)">CONTENT_LENGTH</a></span></span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_transfer_encoding'>transfer_encoding</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#HTTP_TRANSFER_ENCODING-constant" title="Raptor::Http1::HTTP_TRANSFER_ENCODING (constant)">HTTP_TRANSFER_ENCODING</a></span></span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_content_length'>content_length</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#CONTENT_LENGTH-constant" title="Raptor::Http1::CONTENT_LENGTH (constant)">CONTENT_LENGTH</a></span></span><span class='rbracket'>]</span>
 
-  <span class='kw'>if</span> <span class='id identifier rubyid_te'>te</span>
-    <span class='kw'>return</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='id identifier rubyid_cl'>cl</span>
+  <span class='kw'>if</span> <span class='id identifier rubyid_transfer_encoding'>transfer_encoding</span>
+    <span class='kw'>return</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='id identifier rubyid_content_length'>content_length</span>
 
-    <span class='id identifier rubyid_encodings'>encodings</span> <span class='op'>=</span> <span class='id identifier rubyid_te'>te</span><span class='period'>.</span><span class='id identifier rubyid_downcase'>downcase</span><span class='period'>.</span><span class='id identifier rubyid_split'>split</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>,</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:strip</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_encodings'>encodings</span> <span class='op'>=</span> <span class='id identifier rubyid_transfer_encoding'>transfer_encoding</span><span class='period'>.</span><span class='id identifier rubyid_downcase'>downcase</span><span class='period'>.</span><span class='id identifier rubyid_split'>split</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>,</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:strip</span><span class='rparen'>)</span>
     <span class='kw'>return</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='id identifier rubyid_encodings'>encodings</span><span class='period'>.</span><span class='id identifier rubyid_last'>last</span> <span class='op'>!=</span> <span class='const'><span class='object_link'><a href="#TRANSFER_ENCODING_CHUNKED-constant" title="Raptor::Http1::TRANSFER_ENCODING_CHUNKED (constant)">TRANSFER_ENCODING_CHUNKED</a></span></span>
     <span class='kw'>return</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='id identifier rubyid_encodings'>encodings</span><span class='period'>.</span><span class='id identifier rubyid_count'>count</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#TRANSFER_ENCODING_CHUNKED-constant" title="Raptor::Http1::TRANSFER_ENCODING_CHUNKED (constant)">TRANSFER_ENCODING_CHUNKED</a></span></span><span class='rparen'>)</span> <span class='op'>&gt;</span> <span class='int'>1</span>
-  <span class='kw'>elsif</span> <span class='id identifier rubyid_cl'>cl</span>
-    <span class='kw'>return</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='id identifier rubyid_cl'>cl</span><span class='period'>.</span><span class='id identifier rubyid_match?'>match?</span><span class='lparen'>(</span><span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>[^\d]</span><span class='regexp_end'>/</span></span><span class='rparen'>)</span>
+  <span class='kw'>elsif</span> <span class='id identifier rubyid_content_length'>content_length</span>
+    <span class='kw'>return</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='id identifier rubyid_content_length'>content_length</span><span class='period'>.</span><span class='id identifier rubyid_match?'>match?</span><span class='lparen'>(</span><span class='tstring'><span class='regexp_beg'>/</span><span class='tstring_content'>[^\d]</span><span class='regexp_end'>/</span></span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
   <span class='kw'>false</span>
@@ -2855,15 +2854,13 @@ SERVER_NAME, SERVER_PORT, and hijack support.</p>
 765
 766
 767
-768
-769</pre>
+768</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 718</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_build_rack_env'>build_rack_env</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_parse_data'>parse_data</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='label'>remote_addr:</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#DEFAULT_REMOTE_ADDR-constant" title="Raptor::Server::DEFAULT_REMOTE_ADDR (constant)">DEFAULT_REMOTE_ADDR</a></span></span><span class='comma'>,</span> <span class='label'>url_scheme:</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#HTTP_SCHEME-constant" title="Raptor::Server::HTTP_SCHEME (constant)">HTTP_SCHEME</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_VERSION</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Rack</span><span class='op'>::</span><span class='const'>VERSION</span>
-  <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_URL_SCHEME</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_url_scheme'>url_scheme</span>
   <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_INPUT</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_build_rack_input'>build_rack_input</span><span class='lparen'>(</span><span class='id identifier rubyid_body'>body</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_ERRORS</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='gvar'>$stderr</span>
   <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_RESPONSE_FINISHED</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
@@ -2893,7 +2890,7 @@ SERVER_NAME, SERVER_PORT, and hijack support.</p>
   <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#HTTP_VERSION-constant" title="Raptor::Http1::HTTP_VERSION (constant)">HTTP_VERSION</a></span></span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>SERVER_PROTOCOL</span><span class='rbracket'>]</span>
 
   <span class='id identifier rubyid_behind_tls_proxy'>behind_tls_proxy</span> <span class='op'>=</span> <span class='id identifier rubyid_url_scheme'>url_scheme</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#HTTP_SCHEME-constant" title="Raptor::Server::HTTP_SCHEME (constant)">HTTP_SCHEME</a></span></span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_forwarded_https?'>forwarded_https?</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_URL_SCHEME</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#HTTPS_SCHEME-constant" title="Raptor::Server::HTTPS_SCHEME (constant)">HTTPS_SCHEME</a></span></span> <span class='kw'>if</span> <span class='id identifier rubyid_behind_tls_proxy'>behind_tls_proxy</span>
+  <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_URL_SCHEME</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_behind_tls_proxy'>behind_tls_proxy</span> <span class='op'>?</span> <span class='const'><span class='object_link'><a href="Server.html" title="Raptor::Server (class)">Server</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Server.html#HTTPS_SCHEME-constant" title="Raptor::Server::HTTPS_SCHEME (constant)">HTTPS_SCHEME</a></span></span> <span class='op'>:</span> <span class='id identifier rubyid_url_scheme'>url_scheme</span>
   <span class='id identifier rubyid_default_port'>default_port</span> <span class='op'>=</span> <span class='id identifier rubyid_behind_tls_proxy'>behind_tls_proxy</span> <span class='op'>?</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>443</span><span class='tstring_end'>&quot;</span></span> <span class='op'>:</span> <span class='ivar'>@server_port</span><span class='period'>.</span><span class='id identifier rubyid_to_s'>to_s</span>
 
   <span class='id identifier rubyid_http_host'>http_host</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>HTTP_HOST</span><span class='rbracket'>]</span>
@@ -2978,6 +2975,7 @@ for larger bodies to bound per-worker memory.</p>
       <pre class="lines">
 
 
+778
 779
 780
 781
@@ -2987,11 +2985,10 @@ for larger bodies to bound per-worker memory.</p>
 785
 786
 787
-788
-789</pre>
+788</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 779</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 778</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_build_rack_input'>build_rack_input</span><span class='lparen'>(</span><span class='id identifier rubyid_body'>body</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_body'>body</span> <span class='op'>&amp;&amp;</span> <span class='ivar'>@body_spool_threshold</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span> <span class='op'>&gt;</span> <span class='ivar'>@body_spool_threshold</span>
@@ -3081,13 +3078,13 @@ for larger bodies to bound per-worker memory.</p>
       <pre class="lines">
 
 
+966
 967
 968
-969
-970</pre>
+969</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 967</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 966</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_build_status_line'>build_status_line</span><span class='lparen'>(</span><span class='id identifier rubyid_http_version'>http_version</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_cache'>cache</span> <span class='op'>=</span> <span class='id identifier rubyid_http_version'>http_version</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="#HTTP_11-constant" title="Raptor::Http1::HTTP_11 (constant)">HTTP_11</a></span></span> <span class='op'>?</span> <span class='const'><span class='object_link'><a href="#STATUS_LINE_CACHE_11-constant" title="Raptor::Http1::STATUS_LINE_CACHE_11 (constant)">STATUS_LINE_CACHE_11</a></span></span> <span class='op'>:</span> <span class='const'><span class='object_link'><a href="#STATUS_LINE_CACHE_10-constant" title="Raptor::Http1::STATUS_LINE_CACHE_10 (constant)">STATUS_LINE_CACHE_10</a></span></span>
@@ -3157,6 +3154,7 @@ for larger bodies to bound per-worker memory.</p>
       <pre class="lines">
 
 
+1081
 1082
 1083
 1084
@@ -3167,11 +3165,10 @@ for larger bodies to bound per-worker memory.</p>
 1089
 1090
 1091
-1092
-1093</pre>
+1092</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1082</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1081</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_calculate_content_length'>calculate_content_length</span><span class='lparen'>(</span><span class='id identifier rubyid_body'>body</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:to_ary</span><span class='rparen'>)</span>
@@ -3276,16 +3273,16 @@ failures are rescued so all callbacks are always attempted.</p>
       <pre class="lines">
 
 
+1285
 1286
 1287
 1288
 1289
 1290
-1291
-1292</pre>
+1291</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1286</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1285</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_call_response_finished'>call_response_finished</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_error'>error</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_env'>env</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_RESPONSE_FINISHED</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Array</span><span class='rparen'>)</span>
@@ -3343,12 +3340,12 @@ Available on Linux only; this method is not defined on other platforms.</p>
       <pre class="lines">
 
 
+1303
 1304
-1305
-1306</pre>
+1305</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1304</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1303</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_cork_socket'>cork_socket</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>IPPROTO_TCP</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>TCP_CORK</span><span class='comma'>,</span> <span class='int'>1</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>TCPSocket</span><span class='rparen'>)</span>
@@ -3948,7 +3945,7 @@ arrives within the timeout, when the thread pool has queued work
 </h3><div class="docstring">
   <div class="discussion">
     <p>Returns true if the request expects a 100 Continue response per
-RFC 7231 §5.1.1.</p>
+RFC 7231 section 5.1.1.</p>
 
   </div>
 </div>
@@ -4299,6 +4296,7 @@ as separate header lines.</p>
       <pre class="lines">
 
 
+1259
 1260
 1261
 1262
@@ -4310,11 +4308,10 @@ as separate header lines.</p>
 1268
 1269
 1270
-1271
-1272</pre>
+1271</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1260</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1259</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_format_headers'>format_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_headers'>headers</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_result'>result</span> <span class='op'>=</span> <span class='op'>+</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span>
@@ -4391,15 +4388,15 @@ this request via <code>X-Forwarded-Proto</code>, <code>X-Forwarded-Scheme</code>
       <pre class="lines">
 
 
+798
 799
 800
 801
 802
-803
-804</pre>
+803</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 799</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 798</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_forwarded_https?'>forwarded_https?</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_proto'>proto</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>HTTP_X_FORWARDED_PROTO</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>HTTP_X_FORWARDED_SCHEME</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
@@ -4791,12 +4788,12 @@ app processing) or incomplete request state (needs more data).</p>
       <pre class="lines">
 
 
+1236
 1237
-1238
-1239</pre>
+1238</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1237</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1236</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_illegal_header_key?'>illegal_header_key?</span><span class='lparen'>(</span><span class='id identifier rubyid_key'>key</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_key'>key</span><span class='period'>.</span><span class='id identifier rubyid_match?'>match?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#ILLEGAL_HEADER_KEY_REGEX-constant" title="Raptor::Http1::ILLEGAL_HEADER_KEY_REGEX (constant)">ILLEGAL_HEADER_KEY_REGEX</a></span></span><span class='rparen'>)</span>
@@ -4864,12 +4861,12 @@ app processing) or incomplete request state (needs more data).</p>
       <pre class="lines">
 
 
+1246
 1247
-1248
-1249</pre>
+1248</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1247</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1246</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_illegal_header_value?'>illegal_header_value?</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_match?'>match?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#ILLEGAL_HEADER_VALUE_REGEX-constant" title="Raptor::Http1::ILLEGAL_HEADER_VALUE_REGEX (constant)">ILLEGAL_HEADER_VALUE_REGEX</a></span></span><span class='rparen'>)</span>
@@ -4954,6 +4951,7 @@ keep-alive must be explicitly requested.</p>
       <pre class="lines">
 
 
+816
 817
 818
 819
@@ -4963,11 +4961,10 @@ keep-alive must be explicitly requested.</p>
 823
 824
 825
-826
-827</pre>
+826</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 817</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 816</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_keep_alive?'>keep_alive?</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_request_count'>request_count</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>false</span> <span class='kw'>if</span> <span class='id identifier rubyid_request_count'>request_count</span> <span class='op'>&gt;=</span> <span class='ivar'>@max_keepalive_requests</span>
@@ -5061,6 +5058,7 @@ Raises if headers is not a Hash or contains non-String keys.</p>
       <pre class="lines">
 
 
+922
 923
 924
 925
@@ -5076,11 +5074,10 @@ Raises if headers is not a Hash or contains non-String keys.</p>
 935
 936
 937
-938
-939</pre>
+938</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 923</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 922</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_normalize_headers'>normalize_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_headers'>headers</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>TypeError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>headers must be a Hash</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_headers'>headers</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Hash</span><span class='rparen'>)</span>
@@ -5664,10 +5661,8 @@ exceeds the configured maximum size.</p>
   <div class="discussion">
     <p>Sends an HTTP 100 Continue response when an HTTP/1.1 client requested
 <code>Expect: 100-continue</code> and the request body has not yet been received.</p>
-<p>Returns the state hash, marked <code>:continued</code> once the 100 response has
-been written so subsequent partial-parse passes do not resend it. A
-write failure is silently ignored; the connection will be reaped by
-the reactor's <code>chunk_data_timeout</code> if the client never recovers.</p>
+<p>Returns the state hash with <code>:continued</code> set when the response has been
+written. A write failure is silently ignored.</p>
 
   </div>
 </div>
@@ -5818,6 +5813,7 @@ the reactor's <code>chunk_data_timeout</code> if the client never recovers.</p>
       <pre class="lines">
 
 
+837
 838
 839
 840
@@ -5834,11 +5830,10 @@ the reactor's <code>chunk_data_timeout</code> if the client never recovers.</p>
 851
 852
 853
-854
-855</pre>
+854</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 838</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 837</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_send_early_hints'>send_early_hints</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_hints'>hints</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_hints'>hints</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -6035,12 +6030,12 @@ Available on Linux only; this method is not defined on other platforms.</p>
       <pre class="lines">
 
 
+1316
 1317
-1318
-1319</pre>
+1318</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1317</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1316</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_uncork_socket'>uncork_socket</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>IPPROTO_TCP</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>TCP_CORK</span><span class='comma'>,</span> <span class='int'>0</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>TCPSocket</span><span class='rparen'>)</span>
@@ -6124,16 +6119,16 @@ that must not have an entity body (204, 304, 1xx).</p>
       <pre class="lines">
 
 
+951
 952
 953
 954
 955
 956
-957
-958</pre>
+957</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 952</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 951</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_validate_headers'>validate_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='const'><span class='object_link'><a href="#STATUS_WITH_NO_ENTITY_BODY-constant" title="Raptor::Http1::STATUS_WITH_NO_ENTITY_BODY (constant)">STATUS_WITH_NO_ENTITY_BODY</a></span></span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
@@ -6217,14 +6212,14 @@ that must not have an entity body (204, 304, 1xx).</p>
       <pre class="lines">
 
 
+906
 907
 908
 909
-910
-911</pre>
+910</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 907</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 906</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_validate_status'>validate_status</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>TypeError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>status must be an Integer</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Integer</span><span class='rparen'>)</span>
@@ -6321,16 +6316,16 @@ that must not have an entity body (204, 304, 1xx).</p>
       <pre class="lines">
 
 
+1135
 1136
 1137
 1138
 1139
 1140
-1141
-1142</pre>
+1141</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1136</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1135</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_array_body'>write_array_body</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_response'>response</span><span class='comma'>,</span> <span class='id identifier rubyid_body_array'>body_array</span><span class='comma'>,</span> <span class='id identifier rubyid_use_chunked'>use_chunked</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_body_array'>body_array</span><span class='period'>.</span><span class='id identifier rubyid_length'>length</span> <span class='op'>==</span> <span class='int'>1</span>
@@ -6444,6 +6439,7 @@ that must not have an entity body (204, 304, 1xx).</p>
       <pre class="lines">
 
 
+1210
 1211
 1212
 1213
@@ -6461,11 +6457,10 @@ that must not have an entity body (204, 304, 1xx).</p>
 1225
 1226
 1227
-1228
-1229</pre>
+1228</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1211</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1210</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_enumerable_body'>write_enumerable_body</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_response'>response</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_use_chunked'>use_chunked</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_use_chunked'>use_chunked</span>
@@ -6591,6 +6586,7 @@ and chunked encoding when required.</p>
       <pre class="lines">
 
 
+1107
 1108
 1109
 1110
@@ -6605,11 +6601,10 @@ and chunked encoding when required.</p>
 1119
 1120
 1121
-1122
-1123</pre>
+1122</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1108</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1107</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_file_body'>write_file_body</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_response'>response</span><span class='comma'>,</span> <span class='id identifier rubyid_path'>path</span><span class='comma'>,</span> <span class='id identifier rubyid_content_length'>content_length</span><span class='comma'>,</span> <span class='id identifier rubyid_use_chunked'>use_chunked</span><span class='rparen'>)</span>
   <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_open'>open</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rb</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_file'>file</span><span class='op'>|</span>
@@ -6734,6 +6729,7 @@ for HTTP/1.1 when the length cannot be determined upfront.</p>
       <pre class="lines">
 
 
+1029
 1030
 1031
 1032
@@ -6775,11 +6771,10 @@ for HTTP/1.1 when the length cannot be determined upfront.</p>
 1068
 1069
 1070
-1071
-1072</pre>
+1071</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1030</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1029</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_full_response'>write_full_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_response'>response</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_http_version'>http_version</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:call</span><span class='rparen'>)</span>
@@ -6915,16 +6910,16 @@ of the raw connection.</p>
       <pre class="lines">
 
 
+983
 984
 985
 986
 987
 988
-989
-990</pre>
+989</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 984</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 983</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_hijacked_response'>write_hijacked_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_response'>response</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_response_hijack'>response_hijack</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_response'>response</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_format_headers'>format_headers</span><span class='lparen'>(</span><span class='id identifier rubyid_headers'>headers</span><span class='rparen'>)</span>
@@ -7038,6 +7033,7 @@ of the raw connection.</p>
       <pre class="lines">
 
 
+1180
 1181
 1182
 1183
@@ -7055,11 +7051,10 @@ of the raw connection.</p>
 1195
 1196
 1197
-1198
-1199</pre>
+1198</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1181</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1180</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_multiple_chunks'>write_multiple_chunks</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_response'>response</span><span class='comma'>,</span> <span class='id identifier rubyid_body_array'>body_array</span><span class='comma'>,</span> <span class='id identifier rubyid_use_chunked'>use_chunked</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_use_chunked'>use_chunked</span>
@@ -7172,6 +7167,7 @@ that did not supply one.</p>
       <pre class="lines">
 
 
+1004
 1005
 1006
 1007
@@ -7179,11 +7175,10 @@ that did not supply one.</p>
 1009
 1010
 1011
-1012
-1013</pre>
+1012</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1005</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1004</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_no_body_response'>write_no_body_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_response'>response</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
   <span class='kw'>unless</span> <span class='const'><span class='object_link'><a href="#STATUS_WITH_NO_ENTITY_BODY-constant" title="Raptor::Http1::STATUS_WITH_NO_ENTITY_BODY (constant)">STATUS_WITH_NO_ENTITY_BODY</a></span></span><span class='period'>.</span><span class='id identifier rubyid_include?'>include?</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
@@ -7328,6 +7323,7 @@ and dispatches to the appropriate body write strategy.</p>
       <pre class="lines">
 
 
+870
 871
 872
 873
@@ -7353,11 +7349,10 @@ and dispatches to the appropriate body write strategy.</p>
 893
 894
 895
-896
-897</pre>
+896</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 871</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 870</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_response'>write_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='label'>keep_alive:</span> <span class='kw'>false</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_validate_status'>validate_status</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
@@ -7493,6 +7488,7 @@ system call overhead.</p>
       <pre class="lines">
 
 
+1156
 1157
 1158
 1159
@@ -7504,11 +7500,10 @@ system call overhead.</p>
 1165
 1166
 1167
-1168
-1169</pre>
+1168</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1157</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http1.rb', line 1156</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_single_chunk'>write_single_chunk</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_response'>response</span><span class='comma'>,</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='comma'>,</span> <span class='id identifier rubyid_use_chunked'>use_chunked</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>TypeError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>body must yield String values</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>String</span><span class='rparen'>)</span>
@@ -7533,7 +7528,7 @@ system call overhead.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Jun 27 01:06:13 2026 by
+  Generated on Sat Jun 27 01:40:09 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
