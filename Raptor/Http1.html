@@ -1115,7 +1115,7 @@ can be handled.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns true when the message framing shows a request-smuggling vector per RFC 9112 section 6.3: a <code>Transfer-Encoding</code> where <code>chunked</code> is missing, not the final encoding, or duplicated; a <code>Transfer-Encoding</code> paired with a <code>Content-Length</code>; or a <code>Content-Length</code> containing any non-digit character.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns true when the message framing shows a request-smuggling vector per RFC 9112 §6.3: a <code>Transfer-Encoding</code> where <code>chunked</code> is missing, not the final encoding, or duplicated; a <code>Transfer-Encoding</code> paired with a <code>Content-Length</code>; or a <code>Content-Length</code> containing any non-digit character.</p></div></span>
   
 </li>
 
@@ -1345,7 +1345,7 @@ can be handled.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns true if the request expects a 100 Continue response per RFC 7231 section 5.1.1.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns true if the request expects a 100 Continue response per RFC 7231 §5.1.1.</p></div></span>
   
 </li>
 
@@ -2279,7 +2279,8 @@ can be handled.</p>
 <p>Returns the decoded bytes and a state symbol: <code>:complete</code> when the
 terminating zero-length chunk was found, <code>:too_large</code> when the decoded
 size would exceed <code>max_size</code>, <code>:malformed</code> when chunk framing overhead
-exceeds <code>MAX_CHUNK_OVERHEAD</code>, or <code>:incomplete</code> otherwise.</p>
+exceeds <code>MAX_CHUNK_OVERHEAD</code> (a slow-trickle attack guard), or
+<code>:incomplete</code> otherwise.</p>
 
   </div>
 </div>
@@ -2409,10 +2410,10 @@ exceeds <code>MAX_CHUNK_OVERHEAD</code>, or <code>:incomplete</code> otherwise.<
 </h3><div class="docstring">
   <div class="discussion">
     <p>Returns true when the message framing shows a request-smuggling vector
-per RFC 9112 section 6.3: a <code>Transfer-Encoding</code> where <code>chunked</code> is
-missing, not the final encoding, or duplicated; a <code>Transfer-Encoding</code>
-paired with a <code>Content-Length</code>; or a <code>Content-Length</code> containing any
-non-digit character.</p>
+per RFC 9112 §6.3: a <code>Transfer-Encoding</code> where <code>chunked</code> is missing, not
+the final encoding, or duplicated; a <code>Transfer-Encoding</code> paired with a
+<code>Content-Length</code>; or a <code>Content-Length</code> containing any non-digit
+character.</p>
 
   </div>
 </div>
@@ -3947,7 +3948,7 @@ arrives within the timeout, when the thread pool has queued work
 </h3><div class="docstring">
   <div class="discussion">
     <p>Returns true if the request expects a 100 Continue response per
-RFC 7231 section 5.1.1.</p>
+RFC 7231 §5.1.1.</p>
 
   </div>
 </div>
@@ -5663,8 +5664,10 @@ exceeds the configured maximum size.</p>
   <div class="discussion">
     <p>Sends an HTTP 100 Continue response when an HTTP/1.1 client requested
 <code>Expect: 100-continue</code> and the request body has not yet been received.</p>
-<p>Returns the state hash with <code>:continued</code> set when the response has been
-written. A write failure is silently ignored.</p>
+<p>Returns the state hash, marked <code>:continued</code> once the 100 response has
+been written so subsequent partial-parse passes do not resend it. A
+write failure is silently ignored; the connection will be reaped by
+the reactor's <code>chunk_data_timeout</code> if the client never recovers.</p>
 
   </div>
 </div>
@@ -7530,7 +7533,7 @@ system call overhead.</p>
 </div>
 
       <div id="footer">
-  Generated on Thu Jun 25 22:25:04 2026 by
+  Generated on Sat Jun 27 01:06:13 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
