@@ -84,6 +84,8 @@ module Raptor
 
     @worker_count: Integer
 
+    @drain_accept_queue: bool
+
     # Creates a new Cluster with the specified configuration.
     #
     # Initializes the cluster with worker, ractor, and thread counts,
@@ -93,6 +95,7 @@ module Raptor
     # @param options [Hash] cluster configuration options
     # @option options [Array<String>] :binds array of bind URIs
     # @option options [Integer] :socket_backlog kernel listen() queue depth for TCP/SSL listeners
+    # @option options [Boolean] :drain_accept_queue whether to drain the kernel accept queue on shutdown
     # @option options [Integer] :workers number of worker processes
     # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :threads number of threads per worker process

@@ -56,6 +56,7 @@ module Raptor
       new(options).run
     end
 
+    # @rbs @drain_accept_queue: bool
     # @rbs @worker_count: Integer
     # @rbs @ractor_count: Integer
     # @rbs @thread_count: Integer
@@ -89,6 +90,7 @@ module Raptor
     # @param options [Hash] cluster configuration options
     # @option options [Array<String>] :binds array of bind URIs
     # @option options [Integer] :socket_backlog kernel listen() queue depth for TCP/SSL listeners
+    # @option options [Boolean] :drain_accept_queue whether to drain the kernel accept queue on shutdown
     # @option options [Integer] :workers number of worker processes
     # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :threads number of threads per worker process
@@ -108,6 +110,7 @@ module Raptor
     #
     # @rbs (Hash[Symbol, untyped] options) -> void
     def initialize(options)
+      @drain_accept_queue = options[:drain_accept_queue]
       @worker_count = options[:workers]
       @ractor_count = options[:ractors]
       @thread_count = options[:threads]
@@ -401,7 +404,7 @@ module Raptor
       )
       reactor_thread = reactor.run
 
-      server = Server.new(@binder, reactor, thread_pool, http1, http2, connection_options: @connection_options)
+      server = Server.new(@binder, reactor, thread_pool, http1, http2, connection_options: @connection_options, drain_accept_queue: @drain_accept_queue)
       server_thread = server.run
 
       Log.info "Worker #{index} booted"

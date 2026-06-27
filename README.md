@@ -79,6 +79,7 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
 {
   binds: ["tcp://0.0.0.0:9292"],
   socket_backlog: 1024,
+  drain_accept_queue: false,
   workers: 4,
   ractors: 1,
   threads: 3,

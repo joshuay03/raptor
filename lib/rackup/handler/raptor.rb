@@ -79,6 +79,7 @@ module Rackup
             config[:binds] || ["tcp://#{defaults[:Host]}:#{defaults[:Port]}"]
           end,
           socket_backlog: (config[:socket_backlog] || cli_defaults[:socket_backlog]).to_i,
+          drain_accept_queue: config.key?(:drain_accept_queue) ? config[:drain_accept_queue] : cli_defaults[:drain_accept_queue],
           workers: (options[:Workers] || config[:workers] || Etc.nprocessors).to_i,
           ractors: (options[:Ractors] || config[:ractors] || cli_defaults[:ractors]).to_i,
           threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,

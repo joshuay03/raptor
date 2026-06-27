@@ -16,6 +16,7 @@ module Raptor
 
       assert_equal ["tcp://0.0.0.0:9292"], options(cli)[:binds]
       assert_equal 1024, options(cli)[:socket_backlog]
+      assert_equal false, options(cli)[:drain_accept_queue]
       assert_equal CLI::DEFAULT_WORKER_COUNT, options(cli)[:workers]
       assert_equal 1, options(cli)[:ractors]
       assert_equal 3, options(cli)[:threads]
@@ -106,6 +107,18 @@ module Raptor
       cli = CLI.new(["--socket-backlog", "2048"])
 
       assert_equal 2048, options(cli)[:socket_backlog]
+    end
+
+    def test_drain_accept_queue_enabled
+      cli = CLI.new(["--drain-accept-queue"])
+
+      assert_equal true, options(cli)[:drain_accept_queue]
+    end
+
+    def test_drain_accept_queue_disabled
+      cli = CLI.new(["--no-drain-accept-queue"])
+
+      assert_equal false, options(cli)[:drain_accept_queue]
     end
 
     def test_workers_short_flag

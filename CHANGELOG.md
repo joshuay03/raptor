@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add `drain_accept_queue` for dispatching every queued connection on shutdown
 - Add `worker_drain_timeout` for force-killing hung app threads during worker shutdown
 - Reject `Content-Length` values containing non-digit characters with 400
 - Populate `SERVER_SOFTWARE` and `HTTP_VERSION` in the Rack env

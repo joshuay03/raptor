@@ -44,6 +44,7 @@ module Raptor
     # @rbs @http1: Http1
     # @rbs @http2: Http2
     # @rbs @first_data_timeout: Integer
+    # @rbs @drain_accept_queue: bool
     # @rbs @running: AtomicBoolean
 
     # Creates a new Server instance.
@@ -54,16 +55,18 @@ module Raptor
     # @param http1 [Http1] the HTTP/1.1 handler
     # @param http2 [Http2] the HTTP/2 handler (provides the initial SETTINGS frame)
     # @param connection_options [Hash] per-connection timeout configuration, used to bound TLS handshakes
+    # @param drain_accept_queue [Boolean] whether to drain the kernel accept queue on shutdown
     # @return [void]
     #
-    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped]) -> void
-    def initialize(binder, reactor, thread_pool, http1, http2, connection_options:)
+    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], ?drain_accept_queue: bool) -> void
+    def initialize(binder, reactor, thread_pool, http1, http2, connection_options:, drain_accept_queue: false)
       @binder = binder
       @reactor = reactor
       @thread_pool = thread_pool
       @http1 = http1
       @http2 = http2
       @first_data_timeout = connection_options[:first_data_timeout]
+      @drain_accept_queue = drain_accept_queue
       @running = AtomicBoolean.new(true)
     end
 
@@ -98,18 +101,34 @@ module Raptor
 
     # Gracefully shuts down the server.
     #
-    # Stops accepting new connections and closes all listening sockets.
-    # The server thread will exit after handling any in-flight accept operations.
+    # Stops accepting new connections and closes all listening sockets. When
+    # `drain_accept_queue` is enabled, dispatches every connection already in
+    # the kernel accept queue before closing the listeners.
     #
     # @return [void]
     #
     # @rbs () -> void
     def shutdown
       @running.make_false
+      drain_accept_queue if @drain_accept_queue
       @binder.close
     end
 
     private
+
+    # Dispatches every connection already in the kernel accept queue for each
+    # listener until all are drained.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def drain_accept_queue
+      loop do
+        accepted = false
+        @binder.listeners.each { |listener| accepted = true if accept_connection(listener) }
+        break unless accepted
+      end
+    end
 
     # Accepts a connection from the given listener and dispatches it.
     #
@@ -120,14 +139,14 @@ module Raptor
     # follow the HTTP/1.1 path.
     #
     # @param listener [TCPServer, UNIXServer, Binder::SslListener] the ready listener
-    # @return [void]
+    # @return [Boolean] true if a connection was accepted, false if the listener had nothing to dispatch
     #
-    # @rbs (TCPServer | UNIXServer | Binder::SslListener listener) -> void
+    # @rbs (TCPServer | UNIXServer | Binder::SslListener listener) -> bool
     def accept_connection(listener)
       tcp_client = begin
         listener.is_a?(Binder::SslListener) ? listener.tcp_server.accept_nonblock : listener.accept_nonblock
       rescue IO::WaitReadable
-        return
+        return false
       end
 
       if tcp_client.is_a?(TCPSocket)
@@ -141,7 +160,7 @@ module Raptor
         @thread_pool << proc do
           dispatch_ssl_connection(listener, tcp_client, remote_addr)
         end
-        return
+        return true
       end
 
       @http1.eager_accept(
@@ -152,6 +171,7 @@ module Raptor
         remote_addr,
         HTTP_SCHEME
       )
+      true
     end
 
     # Performs the TLS handshake for an accepted SSL connection and dispatches

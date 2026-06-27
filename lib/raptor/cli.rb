@@ -31,6 +31,7 @@ module Raptor
     DEFAULT_OPTIONS = {
       binds: ["tcp://0.0.0.0:9292"].freeze,
       socket_backlog: 1024,
+      drain_accept_queue: false,
       workers: DEFAULT_WORKER_COUNT,
       ractors: 1,
       threads: 3,
@@ -229,6 +230,10 @@ module Raptor
 
         opts.on("--socket-backlog NUM", Integer, "Socket listen backlog (default: 1024)") do |num|
           @options[:socket_backlog] = num
+        end
+
+        opts.on("--[no-]drain-accept-queue", "Drain the kernel accept queue on shutdown (default: off)") do |bool|
+          @options[:drain_accept_queue] = bool
         end
 
         opts.on("-w", "--workers NUM", Integer, "Number of worker processes (default: #{DEFAULT_WORKER_COUNT})") do |num|

@@ -30,6 +30,7 @@ module Rackup
 
         assert_equal ["tcp://0.0.0.0:9292"], opts[:binds]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:socket_backlog], opts[:socket_backlog]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:drain_accept_queue], opts[:drain_accept_queue]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:ractors], opts[:ractors]
         assert_equal Etc.nprocessors, opts[:workers]
