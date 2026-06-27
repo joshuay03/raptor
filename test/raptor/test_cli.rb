@@ -32,6 +32,8 @@ module Raptor
       assert_equal 25, options(cli)[:worker_drain_timeout]
       assert_equal "tmp/raptor.json", options(cli)[:stats_file]
       assert_nil options(cli)[:pid_file]
+      assert_nil options(cli)[:stdout_file]
+      assert_nil options(cli)[:stderr_file]
     end
 
     def test_rackup_file_positional_argument
@@ -221,6 +223,18 @@ module Raptor
       cli = CLI.new(["--pid-file", "/tmp/raptor.pid"])
 
       assert_equal "/tmp/raptor.pid", options(cli)[:pid_file]
+    end
+
+    def test_stdout_file
+      cli = CLI.new(["--stdout-file", "/tmp/raptor.out"])
+
+      assert_equal "/tmp/raptor.out", options(cli)[:stdout_file]
+    end
+
+    def test_stderr_file
+      cli = CLI.new(["--stderr-file", "/tmp/raptor.err"])
+
+      assert_equal "/tmp/raptor.err", options(cli)[:stderr_file]
     end
 
     def test_multiple_options_together

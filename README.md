@@ -103,6 +103,8 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   worker_shutdown_timeout: 30,
   stats_file: "tmp/raptor.json",
   pid_file: nil,
+  stdout_file: nil,
+  stderr_file: nil,
 }
 ```
 
@@ -122,12 +124,13 @@ Multiple binds can be combined freely.
 
 Send to the master process.
 
-| Signal | Effect                                      |
-| ------ | ------------------------------------------- |
-| `INT`  | Graceful shutdown                           |
-| `TERM` | Graceful shutdown                           |
-| `USR1` | Log per-worker stats to stdout              |
-| `USR2` | Phased restart (rolling worker replacement) |
+| Signal | Effect                                                   |
+| ------ | -------------------------------------------------------- |
+| `INT`  | Graceful shutdown                                        |
+| `TERM` | Graceful shutdown                                        |
+| `HUP`  | Reopen `stdout_file` / `stderr_file` (master + workers)  |
+| `USR1` | Log per-worker stats to stdout                           |
+| `USR2` | Phased restart (rolling worker replacement)              |
 
 ## Stats
 

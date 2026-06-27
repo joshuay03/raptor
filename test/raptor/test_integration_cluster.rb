@@ -846,6 +846,37 @@ module Raptor
       rackup_file&.unlink
     end
 
+    def test_sighup_reopens_stdout_file
+      log_path = "/tmp/raptor_test_stdout_#{Process.pid}.log"
+      rotated_path = "#{log_path}.1"
+      File.delete(log_path) rescue nil
+      File.delete(rotated_path) rescue nil
+
+      @options[:stdout_file] = log_path
+
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { cluster.run }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      Timeout.timeout(5) { sleep 0.05 until File.exist?(log_path) && !File.read(log_path).empty? }
+
+      File.rename(log_path, rotated_path)
+      refute File.exist?(log_path)
+
+      Process.kill("HUP", cluster_pid)
+      Timeout.timeout(5) { sleep 0.05 until File.exist?(log_path) }
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+      File.delete(log_path) rescue nil
+      File.delete(rotated_path) rescue nil
+    end
+
     def test_worker_drain_timeout_force_kills_hanging_app_threads
       fixture_content = <<~RUBY
         run proc { |env|

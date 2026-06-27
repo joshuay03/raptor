@@ -56,6 +56,8 @@ module Raptor
       worker_shutdown_timeout: 30,
       stats_file: "tmp/raptor.json",
       pid_file: nil,
+      stdout_file: nil,
+      stderr_file: nil,
     }.freeze
 
     DEFAULT_CONFIG_PATHS = ["raptor.rb", "config/raptor.rb"].freeze
@@ -302,6 +304,14 @@ module Raptor
 
         opts.on("--pid-file PATH", String, "PID file path (default: none)") do |path|
           @options[:pid_file] = path
+        end
+
+        opts.on("--stdout-file PATH", String, "Redirect stdout to PATH; reopened on SIGHUP (default: none)") do |path|
+          @options[:stdout_file] = path
+        end
+
+        opts.on("--stderr-file PATH", String, "Redirect stderr to PATH; reopened on SIGHUP (default: none)") do |path|
+          @options[:stderr_file] = path
         end
 
         opts.on("--help", "Show this help") do

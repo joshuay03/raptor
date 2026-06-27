@@ -69,6 +69,8 @@ module Raptor
     # @rbs @worker_shutdown_timeout: Integer
     # @rbs @stats_file: String?
     # @rbs @pid_file: String?
+    # @rbs @stdout_file: String?
+    # @rbs @stderr_file: String?
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @binder: Binder
     # @rbs @server_port: Integer
@@ -105,6 +107,8 @@ module Raptor
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
+    # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
+    # @option options [String, nil] :stderr_file path to redirect stderr to, reopened on SIGHUP, or nil to disable
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
@@ -123,6 +127,8 @@ module Raptor
       @worker_shutdown_timeout = options[:worker_shutdown_timeout]
       @stats_file = options[:stats_file]
       @pid_file = options[:pid_file]
+      @stdout_file = options[:stdout_file]
+      @stderr_file = options[:stderr_file]
       @on_error = options[:on_error]
 
       @binder = Binder.new(options[:binds], socket_backlog: options[:socket_backlog])
@@ -158,8 +164,11 @@ module Raptor
     #
     # @rbs () -> void
     def run
+      reopen_logs
+
       trap("INT") { shutdown }
       trap("TERM") { shutdown }
+      trap("HUP") { reopen_logs_and_signal_workers }
       trap("USR1") { log_stats }
       trap("USR2") { @phased_restart_requested = true }
 
@@ -343,6 +352,7 @@ module Raptor
       shutdown_requested = false
       trap("INT") { shutdown_requested = true }
       trap("TERM") { shutdown_requested = true }
+      trap("HUP") { reopen_logs }
 
       started_at = Process.clock_gettime(Process::CLOCK_REALTIME)
       request_count = 0
@@ -526,6 +536,28 @@ module Raptor
                  "busy=#{stat[:busy_threads]}/#{stat[:thread_capacity]}, backlog=#{stat[:backlog]}, " \
                  "#{status}, last_checkin=#{Time.at(stat[:last_checkin]).strftime("%H:%M:%S")}"
       end
+    end
+
+    # Redirects `$stdout` and `$stderr` to `stdout_file` and `stderr_file`
+    # when configured. No-op for either stream when its target is nil.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def reopen_logs
+      $stdout.reopen(@stdout_file, "a").sync = true if @stdout_file
+      $stderr.reopen(@stderr_file, "a").sync = true if @stderr_file
+    end
+
+    # Reopens the master's log files and forwards SIGHUP to each worker so
+    # they reopen their own inherited file descriptors.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def reopen_logs_and_signal_workers
+      reopen_logs
+      @workers.values.each { |pid| Process.kill("HUP", pid) rescue nil }
     end
 
     # Writes the stats file on a 1-second interval until shutdown.

@@ -56,6 +56,10 @@ module Raptor
 
     @pid_file: String?
 
+    @stdout_file: String?
+
+    @stderr_file: String?
+
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
     @binder: Binder
@@ -110,6 +114,8 @@ module Raptor
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
+    # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
+    # @option options [String, nil] :stderr_file path to redirect stderr to, reopened on SIGHUP, or nil to disable
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
@@ -244,6 +250,22 @@ module Raptor
     #
     # @rbs () -> void
     def log_stats: () -> void
+
+    # Redirects `$stdout` and `$stderr` to `stdout_file` and `stderr_file`
+    # when configured. No-op for either stream when its target is nil.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def reopen_logs: () -> void
+
+    # Reopens the master's log files and forwards SIGHUP to each worker so
+    # they reopen their own inherited file descriptors.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def reopen_logs_and_signal_workers: () -> void
 
     # Writes the stats file on a 1-second interval until shutdown.
     #
