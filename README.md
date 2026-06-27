@@ -96,8 +96,9 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   http2: {
     max_concurrent_streams: 100,
   },
-  worker_timeout: 60,
   worker_boot_timeout: 60,
+  worker_timeout: 60,
+  worker_drain_timeout: 25,
   worker_shutdown_timeout: 30,
   stats_file: "tmp/raptor.json",
   pid_file: nil,

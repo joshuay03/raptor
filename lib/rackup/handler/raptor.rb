@@ -88,8 +88,9 @@ module Rackup
         ::Raptor::CLI::NESTED_OPTION_KEYS.each do |key|
           result[key] = cli_defaults[key].merge(config[key] || {})
         end
-        result[:worker_timeout] = (config[:worker_timeout] || cli_defaults[:worker_timeout]).to_i
         result[:worker_boot_timeout] = (config[:worker_boot_timeout] || cli_defaults[:worker_boot_timeout]).to_i
+        result[:worker_timeout] = (config[:worker_timeout] || cli_defaults[:worker_timeout]).to_i
+        result[:worker_drain_timeout] = (config[:worker_drain_timeout] || cli_defaults[:worker_drain_timeout]).to_i
         result[:worker_shutdown_timeout] = (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i
         result[:stats_file] = config.key?(:stats_file) ? config[:stats_file] : cli_defaults[:stats_file]
         result[:pid_file] = config[:pid_file] if config.key?(:pid_file)

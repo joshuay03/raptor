@@ -62,8 +62,9 @@ module Raptor
     # @rbs @connection_options: Hash[Symbol, untyped]
     # @rbs @http1_options: Hash[Symbol, untyped]
     # @rbs @http2_options: Hash[Symbol, untyped]
-    # @rbs @worker_timeout: Integer
     # @rbs @worker_boot_timeout: Integer
+    # @rbs @worker_timeout: Integer
+    # @rbs @worker_drain_timeout: Integer
     # @rbs @worker_shutdown_timeout: Integer
     # @rbs @stats_file: String?
     # @rbs @pid_file: String?
@@ -96,8 +97,9 @@ module Raptor
     # @option options [Hash] :connection per-connection settings shared across protocols
     # @option options [Hash] :http1 HTTP/1.1-specific settings
     # @option options [Hash] :http2 HTTP/2-specific settings
-    # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
+    # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
+    # @option options [Integer] :worker_drain_timeout seconds a worker waits for in-flight requests during shutdown before force-killing app threads
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
@@ -112,8 +114,9 @@ module Raptor
       @connection_options = options[:connection]
       @http1_options = options[:http1]
       @http2_options = options[:http2]
-      @worker_timeout = options[:worker_timeout]
       @worker_boot_timeout = options[:worker_boot_timeout]
+      @worker_timeout = options[:worker_timeout]
+      @worker_drain_timeout = options[:worker_drain_timeout]
       @worker_shutdown_timeout = options[:worker_shutdown_timeout]
       @stats_file = options[:stats_file]
       @pid_file = options[:pid_file]
@@ -437,8 +440,25 @@ module Raptor
       reactor_thread.join
       ractor_pool.shutdown
       http1.shutdown
-      thread_pool.shutdown
+      drain_thread_pool(thread_pool)
       stats_thread.join
+    end
+
+    # Shuts down the worker's application thread pool, force-killing the
+    # underlying threads if in-flight requests have not finished within
+    # `worker_drain_timeout` seconds.
+    #
+    # @param thread_pool [AtomicThreadPool] the worker's thread pool
+    # @return [void]
+    #
+    # @rbs (AtomicThreadPool thread_pool) -> void
+    def drain_thread_pool(thread_pool)
+      drain = Thread.new { thread_pool.shutdown }
+      return if drain.join(@worker_drain_timeout)
+
+      Log.warn "Force-killing in-flight app threads after #{@worker_drain_timeout}s drain timeout"
+      thread_pool.instance_variable_get(:@threads).each(&:kill)
+      drain.join
     end
 
     # Returns a human-readable description of how a process exited.

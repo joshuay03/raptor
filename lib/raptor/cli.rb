@@ -49,8 +49,9 @@ module Raptor
       http2: {
         max_concurrent_streams: 100,
       },
-      worker_timeout: 60,
       worker_boot_timeout: 60,
+      worker_timeout: 60,
+      worker_drain_timeout: 25,
       worker_shutdown_timeout: 30,
       stats_file: "tmp/raptor.json",
       pid_file: nil,
@@ -274,12 +275,16 @@ module Raptor
           @options[:http2][:max_concurrent_streams] = num
         end
 
+        opts.on("--worker-boot-timeout SECONDS", Integer, "Worker boot timeout in seconds (default: 60)") do |timeout|
+          @options[:worker_boot_timeout] = timeout
+        end
+
         opts.on("--worker-timeout SECONDS", Integer, "Worker check-in timeout in seconds (default: 60)") do |timeout|
           @options[:worker_timeout] = timeout
         end
 
-        opts.on("--worker-boot-timeout SECONDS", Integer, "Worker boot timeout in seconds (default: 60)") do |timeout|
-          @options[:worker_boot_timeout] = timeout
+        opts.on("--worker-drain-timeout SECONDS", Integer, "Worker request-drain timeout in seconds (default: 25)") do |timeout|
+          @options[:worker_drain_timeout] = timeout
         end
 
         opts.on("--worker-shutdown-timeout SECONDS", Integer, "Worker shutdown timeout in seconds (default: 30)") do |timeout|

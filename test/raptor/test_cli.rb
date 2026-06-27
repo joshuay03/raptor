@@ -28,6 +28,7 @@ module Raptor
       assert_equal 65, options(cli)[:http1][:persistent_data_timeout]
       assert_equal 100, options(cli)[:http1][:max_keepalive_requests]
       assert_equal 100, options(cli)[:http2][:max_concurrent_streams]
+      assert_equal 25, options(cli)[:worker_drain_timeout]
       assert_equal "tmp/raptor.json", options(cli)[:stats_file]
       assert_nil options(cli)[:pid_file]
     end
@@ -189,6 +190,12 @@ module Raptor
       cli = CLI.new(["--http2-max-concurrent-streams", "250"])
 
       assert_equal 250, options(cli)[:http2][:max_concurrent_streams]
+    end
+
+    def test_worker_drain_timeout
+      cli = CLI.new(["--worker-drain-timeout", "10"])
+
+      assert_equal 10, options(cli)[:worker_drain_timeout]
     end
 
     def test_stats_file

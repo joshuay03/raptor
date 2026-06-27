@@ -44,9 +44,11 @@ module Raptor
 
     @http2_options: Hash[Symbol, untyped]
 
+    @worker_boot_timeout: Integer
+
     @worker_timeout: Integer
 
-    @worker_boot_timeout: Integer
+    @worker_drain_timeout: Integer
 
     @worker_shutdown_timeout: Integer
 
@@ -99,8 +101,9 @@ module Raptor
     # @option options [Hash] :connection per-connection settings shared across protocols
     # @option options [Hash] :http1 HTTP/1.1-specific settings
     # @option options [Hash] :http2 HTTP/2-specific settings
-    # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_boot_timeout seconds to wait for a worker to finish booting before killing it
+    # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
+    # @option options [Integer] :worker_drain_timeout seconds a worker waits for in-flight requests during shutdown before force-killing app threads
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
@@ -196,6 +199,16 @@ module Raptor
     #
     # @rbs (Integer index, Integer phase) -> void
     def run_worker: (Integer index, Integer phase) -> void
+
+    # Shuts down the worker's application thread pool, force-killing the
+    # underlying threads if in-flight requests have not finished within
+    # `worker_drain_timeout` seconds.
+    #
+    # @param thread_pool [AtomicThreadPool] the worker's thread pool
+    # @return [void]
+    #
+    # @rbs (AtomicThreadPool thread_pool) -> void
+    def drain_thread_pool: (AtomicThreadPool thread_pool) -> void
 
     # Returns a human-readable description of how a process exited.
     #

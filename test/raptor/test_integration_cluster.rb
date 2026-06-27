@@ -846,6 +846,42 @@ module Raptor
       rackup_file&.unlink
     end
 
+    def test_worker_drain_timeout_force_kills_hanging_app_threads
+      fixture_content = <<~RUBY
+        run proc { |env|
+          sleep 30 if env["PATH_INFO"] == "/slow"
+          [200, { "content-type" => "text/plain" }, ["ok"]]
+        }
+      RUBY
+      rackup_file = Tempfile.new(["config", ".ru"])
+      rackup_file.write(fixture_content)
+      rackup_file.close
+      @options[:rackup] = rackup_file.path
+      @options[:worker_drain_timeout] = 1
+      @options[:worker_shutdown_timeout] = 5
+
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      client_socket = TCPSocket.new("127.0.0.1", server_port)
+      client_socket.write("GET /slow HTTP/1.1\r\nHost: localhost\r\n\r\n")
+      sleep 0.3
+
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      Process.kill("TERM", cluster_pid)
+      Process.wait(cluster_pid)
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+
+      assert_operator elapsed, :<, 4
+    ensure
+      client_socket&.close
+      rackup_file&.unlink
+    end
+
     def test_reactor_thread_survives_unexpected_error
       cluster = without_output { Cluster.new(@options) }
       server_port = cluster.instance_variable_get(:@server_port)
