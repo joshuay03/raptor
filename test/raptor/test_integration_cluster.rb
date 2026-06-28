@@ -259,6 +259,56 @@ module Raptor
       end
     end
 
+    def test_environment_option_sets_internal_environment
+      @options[:environment] = "production"
+
+      cluster = without_output { Cluster.new(@options) }
+
+      assert_equal "production", cluster.instance_variable_get(:@environment)
+    ensure
+      cluster&.instance_variable_get(:@binder)&.close
+    end
+
+    def test_environment_falls_back_to_rails_env_then_rack_env_then_development
+      original_rack_env = ENV["RACK_ENV"]
+      original_rails_env = ENV["RAILS_ENV"]
+      ENV.delete("RACK_ENV")
+      ENV.delete("RAILS_ENV")
+
+      cluster = without_output { Cluster.new(@options) }
+      assert_equal "development", cluster.instance_variable_get(:@environment)
+      cluster.instance_variable_get(:@binder).close
+
+      ENV["RACK_ENV"] = "rack_only"
+      cluster = without_output { Cluster.new(@options) }
+      assert_equal "rack_only", cluster.instance_variable_get(:@environment)
+      cluster.instance_variable_get(:@binder).close
+
+      ENV["RAILS_ENV"] = "rails_wins"
+      cluster = without_output { Cluster.new(@options) }
+      assert_equal "rails_wins", cluster.instance_variable_get(:@environment)
+    ensure
+      ENV["RACK_ENV"] = original_rack_env
+      ENV["RAILS_ENV"] = original_rails_env
+      cluster&.instance_variable_get(:@binder)&.close
+    end
+
+    def test_chdir_option_changes_working_directory
+      original_pwd = Dir.pwd
+      target = File.realpath("/tmp")
+
+      @options[:chdir] = target
+
+      with_server("cwd.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal target, response.body
+      end
+    ensure
+      Dir.chdir(original_pwd) if original_pwd
+    end
+
     def test_server_name_and_port
       with_server("server_name_port.ru") do |uri|
         response = Net::HTTP.get_response(uri)

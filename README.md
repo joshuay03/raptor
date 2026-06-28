@@ -83,6 +83,8 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   workers: 4,
   ractors: 1,
   threads: 3,
+  chdir: nil,
+  environment: nil,
   connection: {
     first_data_timeout: 30,
     chunk_data_timeout: 10,

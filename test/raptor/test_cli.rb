@@ -21,6 +21,8 @@ module Raptor
       assert_equal 1, options(cli)[:ractors]
       assert_equal 3, options(cli)[:threads]
       assert_equal "config.ru", options(cli)[:rackup]
+      assert_nil options(cli)[:chdir]
+      assert_nil options(cli)[:environment]
       assert_equal 30, options(cli)[:connection][:first_data_timeout]
       assert_equal 10, options(cli)[:connection][:chunk_data_timeout]
       assert_equal 5, options(cli)[:connection][:write_timeout]
@@ -158,6 +160,30 @@ module Raptor
       cli = CLI.new(["--threads", "8"])
 
       assert_equal 8, options(cli)[:threads]
+    end
+
+    def test_chdir_short_flag
+      cli = CLI.new(["-C", "/tmp"])
+
+      assert_equal "/tmp", options(cli)[:chdir]
+    end
+
+    def test_chdir_long_flag
+      cli = CLI.new(["--chdir", "/tmp"])
+
+      assert_equal "/tmp", options(cli)[:chdir]
+    end
+
+    def test_environment_short_flag
+      cli = CLI.new(["-e", "production"])
+
+      assert_equal "production", options(cli)[:environment]
+    end
+
+    def test_environment_long_flag
+      cli = CLI.new(["--environment", "production"])
+
+      assert_equal "production", options(cli)[:environment]
     end
 
     def test_first_data_timeout

@@ -86,6 +86,8 @@ module Rackup
           app: app
         }
         result[:rackup] = config[:rackup] if config.key?(:rackup)
+        result[:chdir] = config[:chdir] if config.key?(:chdir)
+        result[:environment] = config[:environment] if config.key?(:environment)
         ::Raptor::CLI::NESTED_OPTION_KEYS.each do |key|
           result[key] = cli_defaults[key].merge(config[key] || {})
         end

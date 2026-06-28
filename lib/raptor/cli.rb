@@ -36,6 +36,8 @@ module Raptor
       ractors: 1,
       threads: 3,
       rackup: "config.ru",
+      chdir: nil,
+      environment: nil,
       connection: {
         first_data_timeout: 30,
         chunk_data_timeout: 10,
@@ -249,6 +251,14 @@ module Raptor
 
         opts.on("-t", "--threads NUM", Integer, "Number of application threads per worker (default: 3)") do |num|
           @options[:threads] = num
+        end
+
+        opts.on("-C", "--chdir PATH", String, "Change to PATH before loading the Rack application (default: none)") do |path|
+          @options[:chdir] = path
+        end
+
+        opts.on("-e", "--environment ENV", String, "Application environment label; falls back to $RAILS_ENV, then $RACK_ENV, then development") do |env|
+          @options[:environment] = env
         end
 
         opts.on("--first-data-timeout SECONDS", Integer, "First data timeout in seconds (default: 30)") do |timeout|

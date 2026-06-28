@@ -60,6 +60,7 @@ module Raptor
     # @rbs @worker_count: Integer
     # @rbs @ractor_count: Integer
     # @rbs @thread_count: Integer
+    # @rbs @environment: String
     # @rbs @connection_options: Hash[Symbol, untyped]
     # @rbs @http1_options: Hash[Symbol, untyped]
     # @rbs @http2_options: Hash[Symbol, untyped]
@@ -100,6 +101,8 @@ module Raptor
     # @option options [Integer] :threads number of threads per worker process
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
+    # @option options [String, nil] :chdir directory to change to before loading the Rack application, or nil to leave the working directory unchanged
+    # @option options [String, nil] :environment Raptor's application environment label; falls back to `$RAILS_ENV`, then `$RACK_ENV`, then `"development"`
     # @option options [Hash] :connection per-connection settings shared across protocols
     # @option options [Hash] :http1 HTTP/1.1-specific settings
     # @option options [Hash] :http2 HTTP/2-specific settings
@@ -121,6 +124,7 @@ module Raptor
       @worker_count = options[:workers]
       @ractor_count = options[:ractors]
       @thread_count = options[:threads]
+      @environment = options[:environment] || ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
       @connection_options = options[:connection]
       @http1_options = options[:http1]
       @http2_options = options[:http2]
@@ -135,6 +139,8 @@ module Raptor
       @access_log_file = options[:access_log_file]
       @access_log_io = nil
       @on_error = options[:on_error]
+
+      Dir.chdir(options[:chdir]) if options[:chdir]
 
       @binder = Binder.new(options[:binds], socket_backlog: options[:socket_backlog])
       @server_port = @binder.server_port
@@ -518,6 +524,7 @@ module Raptor
       Log.info "Cluster initializing:"
       Log.info "├─ Version: #{VERSION}"
       Log.info "├─ Ruby Version: #{RUBY_DESCRIPTION}"
+      Log.info "├─ Environment: #{@environment}"
       Log.info "├─ Master PID: #{Process.pid}"
       Log.info "│  └─ #{@worker_count} worker process#{"es" if @worker_count > 1}"
       Log.info "│     ├─ 1 server thread"

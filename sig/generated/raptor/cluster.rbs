@@ -38,6 +38,8 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
+    @connection_options: Hash[Symbol, untyped]
+
     @http1_options: Hash[Symbol, untyped]
 
     @http2_options: Hash[Symbol, untyped]
@@ -84,7 +86,7 @@ module Raptor
 
     @phased_restarting: bool
 
-    @connection_options: Hash[Symbol, untyped]
+    @environment: String
 
     @thread_count: Integer
 
@@ -109,6 +111,8 @@ module Raptor
     # @option options [Integer] :threads number of threads per worker process
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
+    # @option options [String, nil] :chdir directory to change to before loading the Rack application, or nil to leave the working directory unchanged
+    # @option options [String, nil] :environment Raptor's application environment label; falls back to `$RAILS_ENV`, then `$RACK_ENV`, then `"development"`
     # @option options [Hash] :connection per-connection settings shared across protocols
     # @option options [Hash] :http1 HTTP/1.1-specific settings
     # @option options [Hash] :http2 HTTP/2-specific settings
