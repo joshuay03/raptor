@@ -852,6 +852,46 @@ module Raptor
       end
     end
 
+    def test_hot_restart_on_usr2_re_execs_master_and_inherits_listener
+      sock_path = "/tmp/raptor_hot_test_#{Process.pid}.sock"
+      stats_path = "/tmp/raptor_hot_stats_#{Process.pid}.json"
+      File.delete(sock_path) rescue nil
+      File.delete(stats_path) rescue nil
+
+      raptor_exe = File.expand_path("../../exe/raptor", __dir__)
+      lib_path = File.expand_path("../../lib", __dir__)
+      fixture_path = File.expand_path("../fixtures/hello_world.ru", __dir__)
+
+      cluster_pid = Process.spawn(
+        RbConfig.ruby, "-I", lib_path, raptor_exe,
+        "-b", "unix://#{sock_path}",
+        "-w", "1",
+        "--stats-file", stats_path,
+        fixture_path,
+        out: "/dev/null", err: "/dev/null"
+      )
+
+      initial_worker_pid = wait_for_booted_worker_pid(stats_path)
+
+      response = raw_unix_request(sock_path, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+      assert_match %r{\AHTTP/1\.1 200 OK}, response
+
+      Process.kill("USR2", cluster_pid)
+
+      restarted_worker_pid = wait_for_booted_worker_pid(stats_path, except: initial_worker_pid)
+
+      refute_equal initial_worker_pid, restarted_worker_pid
+      assert_equal cluster_pid, JSON.parse(File.read(stats_path), symbolize_names: true)[:master_pid]
+
+      response = raw_unix_request(sock_path, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+      assert_match %r{\AHTTP/1\.1 200 OK}, response
+    ensure
+      Process.kill("TERM", cluster_pid) rescue nil
+      Process.wait(cluster_pid) rescue nil
+      File.delete(sock_path) rescue nil
+      File.delete(stats_path) rescue nil
+    end
+
     def test_cluster_shuts_down_promptly_with_active_keepalive_pipeline
       fixture_content = <<~RUBY
         run proc { |_env| sleep 0.2; [200, { "content-type" => "text/plain" }, ["ok"]] }
@@ -1126,6 +1166,20 @@ module Raptor
       socket.read
     ensure
       socket&.close
+    end
+
+    def wait_for_booted_worker_pid(stats_path, except: nil, timeout: 20)
+      Timeout.timeout(timeout) do
+        loop do
+          if File.exist?(stats_path)
+            data = JSON.parse(File.read(stats_path), symbolize_names: true) rescue nil
+            worker = data&.dig(:workers)&.find { |entry| entry[:booted] && entry[:pid] != except }
+            return worker[:pid] if worker
+          end
+
+          sleep 0.1
+        end
+      end
     end
 
     def raw_unix_request(socket_path, request)

@@ -51,7 +51,11 @@ module Raptor
       def members: () -> [ :tcp_server, :ssl_context ]
     end
 
+    @uri_listeners: Hash[String, Array[TCPServer | UNIXServer | SslListener]]
+
     @listeners: Array[TCPServer | UNIXServer | SslListener]
+
+    @inherited_fds: Hash[String, Array[Integer]]
 
     @socket_backlog: Integer
 
@@ -66,18 +70,21 @@ module Raptor
     #
     # Parses the provided bind URIs and creates listening sockets for each one.
     # Supports tcp://, unix://, and ssl:// schemes. Localhost is expanded to
-    # all available loopback addresses (both IPv4 and IPv6).
+    # all available loopback addresses (both IPv4 and IPv6). When `inherited_fds`
+    # supplies file descriptors for a URI, the listener is reconstructed from
+    # those FDs instead of binding fresh.
     #
     # @param bind_uris [Array<String>] array of URI strings to bind to
     # @param socket_backlog [Integer] kernel listen() queue depth for TCP/SSL listeners
+    # @param inherited_fds [Hash{String => Array<Integer>}] inherited listener FDs keyed by bind URI
     # @return [void]
     # @raise [UnknownBindSchemeError] if a URI has an unsupported scheme
     #
     # @example
     #   binder = Binder.new(["tcp://0.0.0.0:3000", "unix:///tmp/raptor.sock"])
     #
-    # @rbs (Array[String] bind_uris, ?socket_backlog: Integer) -> void
-    def initialize: (Array[String] bind_uris, ?socket_backlog: Integer) -> void
+    # @rbs (Array[String] bind_uris, ?socket_backlog: Integer, ?inherited_fds: Hash[String, Array[Integer]]) -> void
+    def initialize: (Array[String] bind_uris, ?socket_backlog: Integer, ?inherited_fds: Hash[String, Array[Integer]]) -> void
 
     # Returns the bound addresses as strings.
     #
@@ -109,15 +116,53 @@ module Raptor
     # @rbs () -> void
     def close: () -> void
 
+    # Returns the file descriptors of every listener, grouped by the bind URI
+    # they were created from. The result is the payload to hand to a successor
+    # process via the `inherited_fds:` constructor argument.
+    #
+    # @return [Hash{String => Array<Integer>}]
+    #
+    # @rbs () -> Hash[String, Array[Integer]]
+    def inheritable_fds: () -> Hash[String, Array[Integer]]
+
+    # Clears the close-on-exec flag on every listener so the file descriptors
+    # survive `Kernel.exec`.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def clear_close_on_exec: () -> void
+
     private
 
-    # Parses bind URIs and creates listening sockets.
+    # Parses bind URIs and creates listening sockets, reusing inherited file
+    # descriptors for URIs supplied in `@inherited_fds`.
     #
     # @return [void]
     # @raise [UnknownBindSchemeError] if a URI scheme is not supported
     #
     # @rbs () -> void
     def parse: () -> void
+
+    # Creates fresh listeners for the given bind URI.
+    #
+    # @param bind_uri [String] the URI to bind
+    # @return [Array<TCPServer, UNIXServer, SslListener>]
+    # @raise [UnknownBindSchemeError] if the URI scheme is not supported
+    #
+    # @rbs (String bind_uri) -> Array[TCPServer | UNIXServer | SslListener]
+    def create_listeners: (String bind_uri) -> Array[TCPServer | UNIXServer | SslListener]
+
+    # Reconstructs listeners for the given bind URI from inherited file
+    # descriptors.
+    #
+    # @param bind_uri [String] the URI the FDs were bound to
+    # @param filenos [Array<Integer>] file descriptors to wrap
+    # @return [Array<TCPServer, UNIXServer, SslListener>]
+    # @raise [UnknownBindSchemeError] if the URI scheme is not supported
+    #
+    # @rbs (String bind_uri, Array[Integer] filenos) -> Array[TCPServer | UNIXServer | SslListener]
+    def restore_listeners: (String bind_uri, Array[Integer] filenos) -> Array[TCPServer | UNIXServer | SslListener]
 
     # Creates TCP server sockets for the given host and port.
     #
@@ -141,6 +186,16 @@ module Raptor
     # @rbs (String path) -> Array[UNIXServer]
     def create_unix_listeners: (String path) -> Array[UNIXServer]
 
+    # Registers an `at_exit` hook that removes the Unix socket file on the
+    # owning master's clean exit. Each call records the current process so
+    # forked workers won't delete a socket their master still owns.
+    #
+    # @param path [String] filesystem path of the Unix socket
+    # @return [void]
+    #
+    # @rbs (String path) -> void
+    def register_unix_socket_cleanup: (String path) -> void
+
     # Creates SSL server sockets for the given host, port, and SSL parameters.
     #
     # Wraps each TCP listener with an SSL context to produce SslListener objects.
@@ -154,6 +209,15 @@ module Raptor
     #
     # @rbs (String? host, Integer? port, Hash[String, String] ssl_params) -> Array[SslListener]
     def create_ssl_listeners: (String? host, Integer? port, Hash[String, String] ssl_params) -> Array[SslListener]
+
+    # Builds a frozen `OpenSSL::SSL::SSLContext` configured for HTTP/2 and
+    # HTTP/1.1 ALPN negotiation.
+    #
+    # @param ssl_params [Hash<String, String>] SSL options ("cert" and "key" paths)
+    # @return [OpenSSL::SSL::SSLContext]
+    #
+    # @rbs (Hash[String, String] ssl_params) -> OpenSSL::SSL::SSLContext
+    def build_ssl_context: (Hash[String, String] ssl_params) -> OpenSSL::SSL::SSLContext
 
     # Returns all available loopback IP addresses.
     #

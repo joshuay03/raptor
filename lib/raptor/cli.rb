@@ -119,14 +119,17 @@ module Raptor
     #
     # @rbs (Array[String] argv) -> void
     def initialize(argv)
+      @options = DEFAULT_OPTIONS.dup
+      NESTED_OPTION_KEYS.each { |key| @options[key] = @options[key].dup }
+      @options[:launch_command] = $PROGRAM_NAME
+      @options[:launch_argv] = argv.dup
+
       if argv.first == "stats"
         argv.shift
         @command = :stats
       else
         @command = :server
       end
-      @options = DEFAULT_OPTIONS.dup
-      NESTED_OPTION_KEYS.each { |key| @options[key] = @options[key].dup }
 
       apply_config_file(extract_config_path(argv) || self.class.default_config_path)
 

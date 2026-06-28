@@ -46,6 +46,8 @@ module Raptor
   #   Cluster.run(options)
   #
   class Cluster
+    INHERITED_FDS_ENV = "RAPTOR_INHERITED_FDS"
+
     # Convenience method to create and run a cluster with the given options.
     #
     # @param options [Hash] cluster configuration options
@@ -74,6 +76,8 @@ module Raptor
     # @rbs @stderr_file: String?
     # @rbs @access_log_file: String?
     # @rbs @access_log_io: IO?
+    # @rbs @launch_command: String?
+    # @rbs @launch_argv: Array[String]?
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @binder: Binder
     # @rbs @server_port: Integer
@@ -85,6 +89,7 @@ module Raptor
     # @rbs @phase: Integer
     # @rbs @phased_restart_requested: bool
     # @rbs @phased_restarting: bool
+    # @rbs @hot_restart_requested: bool
 
     # Creates a new Cluster with the specified configuration.
     #
@@ -115,7 +120,9 @@ module Raptor
     # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
     # @option options [String, nil] :stderr_file path to redirect stderr to, reopened on SIGHUP, or nil to disable
     # @option options [String, nil] :access_log_file path to write Common Log Format access logs to, reopened on SIGHUP, or nil to disable
-    # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
+    # @option options [String, nil] :launch_command path of the program to re-exec on hot restart, or nil to disable
+    # @option options [Array<String>, nil] :launch_argv command-line arguments for the hot-restart exec, or nil to disable
+    # @option options [#call, nil] :on_error callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
     # @rbs (Hash[Symbol, untyped] options) -> void
@@ -138,11 +145,14 @@ module Raptor
       @stderr_file = options[:stderr_file]
       @access_log_file = options[:access_log_file]
       @access_log_io = nil
+      @launch_command = options[:launch_command]
+      @launch_argv = options[:launch_argv]
       @on_error = options[:on_error]
 
       Dir.chdir(options[:chdir]) if options[:chdir]
 
-      @binder = Binder.new(options[:binds], socket_backlog: options[:socket_backlog])
+      inherited_fds = (raw = ENV.delete(INHERITED_FDS_ENV)) ? JSON.parse(raw) : {}
+      @binder = Binder.new(options[:binds], socket_backlog: options[:socket_backlog], inherited_fds: inherited_fds)
       @server_port = @binder.server_port
       @app = options[:app] || Rack::Builder.parse_file(options[:rackup])
       log_initialization
@@ -154,13 +164,15 @@ module Raptor
       @phase = 0
       @phased_restart_requested = false
       @phased_restarting = false
+      @hot_restart_requested = false
     end
 
     # Starts the multi-process cluster and manages worker processes.
     #
     # Forks the configured number of worker processes and monitors them,
     # restarting any that exit unexpectedly or stop checking in. Handles
-    # graceful shutdown via INT or TERM signals, and phased restart via USR1.
+    # graceful shutdown via INT or TERM signals, phased restart via USR1,
+    # and hot restart via USR2.
     #
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
@@ -180,6 +192,7 @@ module Raptor
       trap("TERM") { shutdown }
       trap("HUP") { reopen_logs_and_signal_workers }
       trap("USR1") { @phased_restart_requested = true }
+      trap("USR2") { @hot_restart_requested = true }
 
       File.open(@pid_file, File::CREAT | File::EXCL | File::WRONLY) { |file| file.write(Process.pid.to_s) } if @pid_file
 
@@ -196,6 +209,7 @@ module Raptor
       until @shutdown
         break if reap_workers == :no_children
 
+        perform_hot_restart if @hot_restart_requested
         perform_phased_restart if @phased_restart_requested && !@phased_restarting
         timeout_hung_workers
 
@@ -346,6 +360,34 @@ module Raptor
       end
     end
 
+    # Re-execs the master process with a fresh boot of the same Raptor
+    # invocation, handing the new master its listening sockets so accepted
+    # connections continue to be served across the swap.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def perform_hot_restart
+      @hot_restart_requested = false
+
+      unless @launch_command && @launch_argv
+        Log.warn "Hot restart unavailable: launch command not captured"
+        return
+      end
+
+      Log.info "Hot restart starting"
+      @shutdown = true
+      stop_workers
+      @binder.clear_close_on_exec
+      ENV[INHERITED_FDS_ENV] = JSON.generate(@binder.inheritable_fds)
+      File.delete(@stats_file) rescue nil if @stats_file
+      File.delete(@pid_file) rescue nil if @pid_file
+      @stats.unmap
+      $stdout.flush
+      $stderr.flush
+      exec(@launch_command, *@launch_argv)
+    end
+
     # Runs the full server stack inside a worker process.
     #
     # Sets up and coordinates the reactor, server, ractor pool, thread pool,
@@ -363,6 +405,7 @@ module Raptor
       trap("TERM") { shutdown_requested = true }
       trap("HUP") { reopen_logs }
       trap("USR1", "IGNORE")
+      trap("USR2", "IGNORE")
 
       started_at = Process.clock_gettime(Process::CLOCK_REALTIME)
       request_count = 0

@@ -30,6 +30,8 @@ module Raptor
   #   }
   #   Cluster.run(options)
   class Cluster
+    INHERITED_FDS_ENV: ::String
+
     # Convenience method to create and run a cluster with the given options.
     #
     # @param options [Hash] cluster configuration options
@@ -37,8 +39,6 @@ module Raptor
     #
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
-
-    @http1_options: Hash[Symbol, untyped]
 
     @http2_options: Hash[Symbol, untyped]
 
@@ -62,6 +62,10 @@ module Raptor
 
     @access_log_io: IO?
 
+    @launch_command: String?
+
+    @launch_argv: Array[String]?
+
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
     @binder: Binder
@@ -83,6 +87,10 @@ module Raptor
     @phased_restart_requested: bool
 
     @phased_restarting: bool
+
+    @hot_restart_requested: bool
+
+    @http1_options: Hash[Symbol, untyped]
 
     @connection_options: Hash[Symbol, untyped]
 
@@ -125,7 +133,9 @@ module Raptor
     # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
     # @option options [String, nil] :stderr_file path to redirect stderr to, reopened on SIGHUP, or nil to disable
     # @option options [String, nil] :access_log_file path to write Common Log Format access logs to, reopened on SIGHUP, or nil to disable
-    # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
+    # @option options [String, nil] :launch_command path of the program to re-exec on hot restart, or nil to disable
+    # @option options [Array<String>, nil] :launch_argv command-line arguments for the hot-restart exec, or nil to disable
+    # @option options [#call, nil] :on_error callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
     # @rbs (Hash[Symbol, untyped] options) -> void
@@ -135,7 +145,8 @@ module Raptor
     #
     # Forks the configured number of worker processes and monitors them,
     # restarting any that exit unexpectedly or stop checking in. Handles
-    # graceful shutdown via INT or TERM signals, and phased restart via USR1.
+    # graceful shutdown via INT or TERM signals, phased restart via USR1,
+    # and hot restart via USR2.
     #
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
@@ -203,6 +214,15 @@ module Raptor
     #
     # @rbs () -> void
     def perform_phased_restart: () -> void
+
+    # Re-execs the master process with a fresh boot of the same Raptor
+    # invocation, handing the new master its listening sockets so accepted
+    # connections continue to be served across the swap.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def perform_hot_restart: () -> void
 
     # Runs the full server stack inside a worker process.
     #

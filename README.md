@@ -133,6 +133,7 @@ Send to the master process.
 | `TERM` | Graceful shutdown                                           |
 | `HUP`  | Reopen `stdout_file`, `stderr_file`, and `access_log_file`  |
 | `USR1` | Phased restart (rolling worker replacement)                 |
+| `USR2` | Hot restart (re-exec master, inheriting listening sockets)  |
 
 ## Stats
 

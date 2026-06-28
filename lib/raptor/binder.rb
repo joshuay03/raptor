@@ -57,7 +57,9 @@ module Raptor
 
     # @rbs @bind_uris: Array[String]
     # @rbs @socket_backlog: Integer
+    # @rbs @inherited_fds: Hash[String, Array[Integer]]
     # @rbs @listeners: Array[TCPServer | UNIXServer | SslListener]
+    # @rbs @uri_listeners: Hash[String, Array[TCPServer | UNIXServer | SslListener]]
 
     # Array of listening sockets.
     #
@@ -68,21 +70,26 @@ module Raptor
     #
     # Parses the provided bind URIs and creates listening sockets for each one.
     # Supports tcp://, unix://, and ssl:// schemes. Localhost is expanded to
-    # all available loopback addresses (both IPv4 and IPv6).
+    # all available loopback addresses (both IPv4 and IPv6). When `inherited_fds`
+    # supplies file descriptors for a URI, the listener is reconstructed from
+    # those FDs instead of binding fresh.
     #
     # @param bind_uris [Array<String>] array of URI strings to bind to
     # @param socket_backlog [Integer] kernel listen() queue depth for TCP/SSL listeners
+    # @param inherited_fds [Hash{String => Array<Integer>}] inherited listener FDs keyed by bind URI
     # @return [void]
     # @raise [UnknownBindSchemeError] if a URI has an unsupported scheme
     #
     # @example
     #   binder = Binder.new(["tcp://0.0.0.0:3000", "unix:///tmp/raptor.sock"])
     #
-    # @rbs (Array[String] bind_uris, ?socket_backlog: Integer) -> void
-    def initialize(bind_uris, socket_backlog: SOCKET_BACKLOG)
+    # @rbs (Array[String] bind_uris, ?socket_backlog: Integer, ?inherited_fds: Hash[String, Array[Integer]]) -> void
+    def initialize(bind_uris, socket_backlog: SOCKET_BACKLOG, inherited_fds: {})
       @bind_uris = bind_uris
       @socket_backlog = socket_backlog
+      @inherited_fds = inherited_fds
       @listeners = nil
+      @uri_listeners = nil
       parse
     end
 
@@ -136,28 +143,91 @@ module Raptor
       @listeners.each(&:close)
     end
 
+    # Returns the file descriptors of every listener, grouped by the bind URI
+    # they were created from. The result is the payload to hand to a successor
+    # process via the `inherited_fds:` constructor argument.
+    #
+    # @return [Hash{String => Array<Integer>}]
+    #
+    # @rbs () -> Hash[String, Array[Integer]]
+    def inheritable_fds
+      @uri_listeners.transform_values { |listeners| listeners.map { |listener| listener.to_io.fileno } }
+    end
+
+    # Clears the close-on-exec flag on every listener so the file descriptors
+    # survive `Kernel.exec`.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def clear_close_on_exec
+      @listeners.each { |listener| listener.to_io.close_on_exec = false }
+    end
+
     private
 
-    # Parses bind URIs and creates listening sockets.
+    # Parses bind URIs and creates listening sockets, reusing inherited file
+    # descriptors for URIs supplied in `@inherited_fds`.
     #
     # @return [void]
     # @raise [UnknownBindSchemeError] if a URI scheme is not supported
     #
     # @rbs () -> void
     def parse
-      @listeners = @bind_uris.map do |bind_uri|
-        uri = URI.parse(bind_uri)
-        case uri.scheme
-        when "tcp"
-          create_tcp_listeners(uri.host, uri.port)
-        when "unix"
-          create_unix_listeners(uri.path)
-        when "ssl"
-          create_ssl_listeners(uri.host, uri.port, URI.decode_www_form(uri.query || "").to_h)
+      @uri_listeners = @bind_uris.to_h do |bind_uri|
+        if filenos = @inherited_fds[bind_uri]
+          [bind_uri, restore_listeners(bind_uri, filenos)]
         else
-          raise UnknownBindSchemeError.new(uri.scheme)
+          [bind_uri, create_listeners(bind_uri)]
         end
-      end.tap(&:flatten!)
+      end
+      @listeners = @uri_listeners.values.flatten
+    end
+
+    # Creates fresh listeners for the given bind URI.
+    #
+    # @param bind_uri [String] the URI to bind
+    # @return [Array<TCPServer, UNIXServer, SslListener>]
+    # @raise [UnknownBindSchemeError] if the URI scheme is not supported
+    #
+    # @rbs (String bind_uri) -> Array[TCPServer | UNIXServer | SslListener]
+    def create_listeners(bind_uri)
+      uri = URI.parse(bind_uri)
+      case uri.scheme
+      when "tcp"
+        create_tcp_listeners(uri.host, uri.port)
+      when "unix"
+        create_unix_listeners(uri.path)
+      when "ssl"
+        create_ssl_listeners(uri.host, uri.port, URI.decode_www_form(uri.query || "").to_h)
+      else
+        raise UnknownBindSchemeError.new(uri.scheme)
+      end
+    end
+
+    # Reconstructs listeners for the given bind URI from inherited file
+    # descriptors.
+    #
+    # @param bind_uri [String] the URI the FDs were bound to
+    # @param filenos [Array<Integer>] file descriptors to wrap
+    # @return [Array<TCPServer, UNIXServer, SslListener>]
+    # @raise [UnknownBindSchemeError] if the URI scheme is not supported
+    #
+    # @rbs (String bind_uri, Array[Integer] filenos) -> Array[TCPServer | UNIXServer | SslListener]
+    def restore_listeners(bind_uri, filenos)
+      uri = URI.parse(bind_uri)
+      case uri.scheme
+      when "tcp"
+        filenos.map { |fileno| TCPServer.for_fd(fileno) }
+      when "unix"
+        register_unix_socket_cleanup(uri.path)
+        filenos.map { |fileno| UNIXServer.for_fd(fileno) }
+      when "ssl"
+        ssl_context = build_ssl_context(URI.decode_www_form(uri.query || "").to_h)
+        filenos.map { |fileno| SslListener.new(tcp_server: TCPServer.for_fd(fileno), ssl_context: ssl_context) }
+      else
+        raise UnknownBindSchemeError.new(uri.scheme)
+      end
     end
 
     # Creates TCP server sockets for the given host and port.
@@ -203,11 +273,22 @@ module Raptor
         end
       end
 
-      server = UNIXServer.new(path)
+      register_unix_socket_cleanup(path)
+
+      [UNIXServer.new(path)]
+    end
+
+    # Registers an `at_exit` hook that removes the Unix socket file on the
+    # owning master's clean exit. Each call records the current process so
+    # forked workers won't delete a socket their master still owns.
+    #
+    # @param path [String] filesystem path of the Unix socket
+    # @return [void]
+    #
+    # @rbs (String path) -> void
+    def register_unix_socket_cleanup(path)
       master_pid = Process.pid
       at_exit { File.delete(path) rescue nil if Process.pid == master_pid }
-
-      [server]
     end
 
     # Creates SSL server sockets for the given host, port, and SSL parameters.
@@ -223,18 +304,28 @@ module Raptor
     #
     # @rbs (String? host, Integer? port, Hash[String, String] ssl_params) -> Array[SslListener]
     def create_ssl_listeners(host, port, ssl_params)
+      tcp_servers = create_tcp_listeners(host, port)
+      ssl_context = build_ssl_context(ssl_params)
+      tcp_servers.map { |tcp_server| SslListener.new(tcp_server: tcp_server, ssl_context: ssl_context) }
+    end
+
+    # Builds a frozen `OpenSSL::SSL::SSLContext` configured for HTTP/2 and
+    # HTTP/1.1 ALPN negotiation.
+    #
+    # @param ssl_params [Hash<String, String>] SSL options ("cert" and "key" paths)
+    # @return [OpenSSL::SSL::SSLContext]
+    #
+    # @rbs (Hash[String, String] ssl_params) -> OpenSSL::SSL::SSLContext
+    def build_ssl_context(ssl_params)
       require "openssl"
 
-      tcp_servers = create_tcp_listeners(host, port)
-
-      ssl_context = OpenSSL::SSL::SSLContext.new
-      ssl_context.cert = OpenSSL::X509::Certificate.new(File.read(ssl_params["cert"]))
-      ssl_context.key = OpenSSL::PKey.read(File.read(ssl_params["key"]))
-      ssl_context.alpn_protocols = ["h2", "http/1.1"]
-      ssl_context.alpn_select_cb = ->(protocols) { protocols.include?("h2") ? "h2" : "http/1.1" }
-      ssl_context.freeze
-
-      tcp_servers.map { |tcp_server| SslListener.new(tcp_server: tcp_server, ssl_context: ssl_context) }
+      OpenSSL::SSL::SSLContext.new.tap do |ssl_context|
+        ssl_context.cert = OpenSSL::X509::Certificate.new(File.read(ssl_params["cert"]))
+        ssl_context.key = OpenSSL::PKey.read(File.read(ssl_params["key"]))
+        ssl_context.alpn_protocols = ["h2", "http/1.1"]
+        ssl_context.alpn_select_cb = ->(protocols) { protocols.include?("h2") ? "h2" : "http/1.1" }
+        ssl_context.freeze
+      end
     end
 
     # Returns all available loopback IP addresses.
