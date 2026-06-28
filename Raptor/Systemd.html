@@ -107,7 +107,7 @@ socket-activation file descriptors.</p>
 
     <dl class="constants">
       
-        <dt id="NOTIFY_SOCKET_ENV-constant" class="">NOTIFY_SOCKET_ENV =
+        <dt id="LISTEN_FDS_START-constant" class="">LISTEN_FDS_START =
           <div class="docstring">
   <div class="discussion">
     
@@ -122,7 +122,7 @@ socket-activation file descriptors.</p>
     <li>
       
       
-        <span class='type'>(<tt>::String</tt>)</span>
+        <span class='type'>(<tt>::Integer</tt>)</span>
       
       
       
@@ -132,61 +132,7 @@ socket-activation file descriptors.</p>
 
 </div>
         </dt>
-        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>NOTIFY_SOCKET</span><span class='tstring_end'>&quot;</span></span></pre></dd>
-      
-        <dt id="LISTEN_PID_ENV-constant" class="">LISTEN_PID_ENV =
-          <div class="docstring">
-  <div class="discussion">
-    
-
-  </div>
-</div>
-<div class="tags">
-  
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>::String</tt>)</span>
-      
-      
-      
-    </li>
-  
-</ul>
-
-</div>
-        </dt>
-        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LISTEN_PID</span><span class='tstring_end'>&quot;</span></span></pre></dd>
-      
-        <dt id="LISTEN_FDS_ENV-constant" class="">LISTEN_FDS_ENV =
-          <div class="docstring">
-  <div class="discussion">
-    
-
-  </div>
-</div>
-<div class="tags">
-  
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>::String</tt>)</span>
-      
-      
-      
-    </li>
-  
-</ul>
-
-</div>
-        </dt>
-        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LISTEN_FDS</span><span class='tstring_end'>&quot;</span></span></pre></dd>
+        <dd><pre class="code"><span class='int'>3</span></pre></dd>
       
         <dt id="LISTEN_FDNAMES_ENV-constant" class="">LISTEN_FDNAMES_ENV =
           <div class="docstring">
@@ -215,7 +161,7 @@ socket-activation file descriptors.</p>
         </dt>
         <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LISTEN_FDNAMES</span><span class='tstring_end'>&quot;</span></span></pre></dd>
       
-        <dt id="LISTEN_FDS_START-constant" class="">LISTEN_FDS_START =
+        <dt id="LISTEN_FDS_ENV-constant" class="">LISTEN_FDS_ENV =
           <div class="docstring">
   <div class="discussion">
     
@@ -230,7 +176,7 @@ socket-activation file descriptors.</p>
     <li>
       
       
-        <span class='type'>(<tt>::Integer</tt>)</span>
+        <span class='type'>(<tt>::String</tt>)</span>
       
       
       
@@ -240,7 +186,61 @@ socket-activation file descriptors.</p>
 
 </div>
         </dt>
-        <dd><pre class="code"><span class='int'>3</span></pre></dd>
+        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LISTEN_FDS</span><span class='tstring_end'>&quot;</span></span></pre></dd>
+      
+        <dt id="LISTEN_PID_ENV-constant" class="">LISTEN_PID_ENV =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::String</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LISTEN_PID</span><span class='tstring_end'>&quot;</span></span></pre></dd>
+      
+        <dt id="NOTIFY_SOCKET_ENV-constant" class="">NOTIFY_SOCKET_ENV =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::String</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>NOTIFY_SOCKET</span><span class='tstring_end'>&quot;</span></span></pre></dd>
       
     </dl>
   
@@ -360,14 +360,14 @@ act on stale values.</p>
       <pre class="lines">
 
 
-62
 63
 64
 65
-66</pre>
+66
+67</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/systemd.rb', line 62</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/systemd.rb', line 63</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_clear_listen_env'>clear_listen_env</span>
   <span class='const'>ENV</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#LISTEN_PID_ENV-constant" title="Raptor::Systemd::LISTEN_PID_ENV (constant)">LISTEN_PID_ENV</a></span></span><span class='rparen'>)</span>
@@ -417,15 +417,15 @@ empty array when systemd has not exported any.</p>
       <pre class="lines">
 
 
-49
 50
 51
 52
 53
-54</pre>
+54
+55</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/systemd.rb', line 49</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/systemd.rb', line 50</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_listen_fds'>listen_fds</span>
   <span class='kw'>return</span> <span class='lbracket'>[</span><span class='rbracket'>]</span> <span class='kw'>unless</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#LISTEN_PID_ENV-constant" title="Raptor::Systemd::LISTEN_PID_ENV (constant)">LISTEN_PID_ENV</a></span></span><span class='rbracket'>]</span><span class='op'>&amp;.</span><span class='id identifier rubyid_to_i'>to_i</span> <span class='op'>==</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span>
@@ -468,7 +468,7 @@ success and false when the socket is unset or the send fails.</p>
       
       
         &mdash;
-        <div class='inline'><p>notify protocol payload, eg &quot;READY=1&quot;</p></div>
+        <div class='inline'><p>notify protocol payload, e.g. &quot;READY=1&quot;</p></div>
       
     </li>
   
@@ -494,7 +494,6 @@ success and false when the socket is unset or the send fails.</p>
       <pre class="lines">
 
 
-24
 25
 26
 27
@@ -511,10 +510,11 @@ success and false when the socket is unset or the send fails.</p>
 38
 39
 40
-41</pre>
+41
+42</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/systemd.rb', line 24</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/systemd.rb', line 25</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_notify'>notify</span><span class='lparen'>(</span><span class='id identifier rubyid_message'>message</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket_path'>socket_path</span> <span class='op'>=</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#NOTIFY_SOCKET_ENV-constant" title="Raptor::Systemd::NOTIFY_SOCKET_ENV (constant)">NOTIFY_SOCKET_ENV</a></span></span><span class='rbracket'>]</span>
@@ -529,7 +529,7 @@ success and false when the socket is unset or the send fails.</p>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>AF_UNIX</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOCK_DGRAM</span><span class='comma'>,</span> <span class='int'>0</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_send'>send</span><span class='lparen'>(</span><span class='id identifier rubyid_message'>message</span><span class='comma'>,</span> <span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_address'>address</span><span class='rparen'>)</span>
   <span class='kw'>true</span>
-<span class='kw'>rescue</span> <span class='const'>StandardError</span>
+<span class='kw'>rescue</span> <span class='const'>SystemCallError</span><span class='comma'>,</span> <span class='const'>IOError</span>
   <span class='kw'>false</span>
 <span class='kw'>ensure</span>
   <span class='id identifier rubyid_socket'>socket</span><span class='op'>&amp;.</span><span class='id identifier rubyid_close'>close</span>
@@ -544,7 +544,7 @@ success and false when the socket is unset or the send fails.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jun 28 01:08:05 2026 by
+  Generated on Sun Jun 28 01:50:23 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

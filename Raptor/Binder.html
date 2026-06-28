@@ -422,7 +422,7 @@ supports binding to multiple addresses simultaneously.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#inheritable_payload-instance_method" title="#inheritable_payload (instance method)">#<strong>inheritable_payload</strong>  &#x21d2; Hash{String =&gt; Array&lt;Integer&gt;} </a>
+      <a href="#inheritable_fds-instance_method" title="#inheritable_fds (instance method)">#<strong>inheritable_fds</strong>  &#x21d2; Hash{String =&gt; Array&lt;Integer&gt;} </a>
     
 
     
@@ -534,7 +534,7 @@ supports binding to multiple addresses simultaneously.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#restore_listeners-instance_method" title="#restore_listeners (instance method)">#<strong>restore_listeners</strong>(bind_uri, fds)  &#x21d2; Array&lt;TCPServer, UNIXServer, SslListener&gt; </a>
+      <a href="#restore_listeners-instance_method" title="#restore_listeners (instance method)">#<strong>restore_listeners</strong>(bind_uri, filenos)  &#x21d2; Array&lt;TCPServer, UNIXServer, SslListener&gt; </a>
     
 
     
@@ -1494,9 +1494,9 @@ socket file on normal process exit.</p>
 </div>
     
       <div class="method_details ">
-  <h3 class="signature " id="inheritable_payload-instance_method">
+  <h3 class="signature " id="inheritable_fds-instance_method">
   
-    #<strong>inheritable_payload</strong>  &#x21d2; <tt>Hash{String =&gt; Array&lt;Integer&gt;}</tt> 
+    #<strong>inheritable_fds</strong>  &#x21d2; <tt>Hash{String =&gt; Array&lt;Integer&gt;}</tt> 
   
 
   
@@ -1505,8 +1505,8 @@ socket file on normal process exit.</p>
 </h3><div class="docstring">
   <div class="discussion">
     <p>Returns the file descriptors of every listener, grouped by the bind URI
-they were created from. The result is the payload to pass back into a
-successor process as <code>inherited_fds</code>.</p>
+they were created from. The result is the payload to hand to a successor
+process via the <code>inherited_fds:</code> constructor argument.</p>
 
   </div>
 </div>
@@ -1539,7 +1539,7 @@ successor process as <code>inherited_fds</code>.</p>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 153</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_inheritable_payload'>inheritable_payload</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_inheritable_fds'>inheritable_fds</span>
   <span class='ivar'>@uri_listeners</span><span class='period'>.</span><span class='id identifier rubyid_transform_values'>transform_values</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listeners'>listeners</span><span class='op'>|</span> <span class='id identifier rubyid_listeners'>listeners</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_to_io'>to_io</span><span class='period'>.</span><span class='id identifier rubyid_fileno'>fileno</span> <span class='rbrace'>}</span> <span class='rbrace'>}</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -1667,8 +1667,8 @@ descriptors for URIs supplied in <code>@inherited_fds</code>.</p>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_parse'>parse</span>
   <span class='ivar'>@uri_listeners</span> <span class='op'>=</span> <span class='ivar'>@bind_uris</span><span class='period'>.</span><span class='id identifier rubyid_to_h'>to_h</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='op'>|</span>
-    <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_fds'>fds</span> <span class='op'>=</span> <span class='ivar'>@inherited_fds</span><span class='lbracket'>[</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='rbracket'>]</span><span class='rparen'>)</span>
-      <span class='lbracket'>[</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='comma'>,</span> <span class='id identifier rubyid_restore_listeners'>restore_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='comma'>,</span> <span class='id identifier rubyid_fds'>fds</span><span class='rparen'>)</span><span class='rbracket'>]</span>
+    <span class='kw'>if</span> <span class='id identifier rubyid_filenos'>filenos</span> <span class='op'>=</span> <span class='ivar'>@inherited_fds</span><span class='lbracket'>[</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='rbracket'>]</span>
+      <span class='lbracket'>[</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='comma'>,</span> <span class='id identifier rubyid_restore_listeners'>restore_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='comma'>,</span> <span class='id identifier rubyid_filenos'>filenos</span><span class='rparen'>)</span><span class='rbracket'>]</span>
     <span class='kw'>else</span>
       <span class='lbracket'>[</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='comma'>,</span> <span class='id identifier rubyid_create_listeners'>create_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='rparen'>)</span><span class='rbracket'>]</span>
     <span class='kw'>end</span>
@@ -1744,7 +1744,7 @@ forked workers won't delete a socket their master still owns.</p>
       <div class="method_details ">
   <h3 class="signature " id="restore_listeners-instance_method">
   
-    #<strong>restore_listeners</strong>(bind_uri, fds)  &#x21d2; <tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>&gt;</tt> 
+    #<strong>restore_listeners</strong>(bind_uri, filenos)  &#x21d2; <tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>&gt;</tt> 
   
 
   
@@ -1777,7 +1777,7 @@ descriptors.</p>
   
     <li>
       
-        <span class='name'>fds</span>
+        <span class='name'>filenos</span>
       
       
         <span class='type'>(<tt>Array&lt;Integer&gt;</tt>)</span>
@@ -1846,17 +1846,17 @@ descriptors.</p>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 217</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_restore_listeners'>restore_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='comma'>,</span> <span class='id identifier rubyid_fds'>fds</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_restore_listeners'>restore_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='comma'>,</span> <span class='id identifier rubyid_filenos'>filenos</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_uri'>uri</span> <span class='op'>=</span> <span class='const'>URI</span><span class='period'>.</span><span class='id identifier rubyid_parse'>parse</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='rparen'>)</span>
   <span class='kw'>case</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_scheme'>scheme</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tcp</span><span class='tstring_end'>&quot;</span></span>
-    <span class='id identifier rubyid_fds'>fds</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fd'>fd</span><span class='op'>|</span> <span class='const'>TCPServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fd'>fd</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+    <span class='id identifier rubyid_filenos'>filenos</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fileno'>fileno</span><span class='op'>|</span> <span class='const'>TCPServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fileno'>fileno</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>unix</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_register_unix_socket_cleanup'>register_unix_socket_cleanup</span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
-    <span class='id identifier rubyid_fds'>fds</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fd'>fd</span><span class='op'>|</span> <span class='const'>UNIXServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fd'>fd</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+    <span class='id identifier rubyid_filenos'>filenos</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fileno'>fileno</span><span class='op'>|</span> <span class='const'>UNIXServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fileno'>fileno</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>ssl</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_ssl_context'>ssl_context</span> <span class='op'>=</span> <span class='id identifier rubyid_build_ssl_context'>build_ssl_context</span><span class='lparen'>(</span><span class='const'>URI</span><span class='period'>.</span><span class='id identifier rubyid_decode_www_form'>decode_www_form</span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_query'>query</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_to_h'>to_h</span><span class='rparen'>)</span>
-    <span class='id identifier rubyid_fds'>fds</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fd'>fd</span><span class='op'>|</span> <span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Binder/SslListener.html#new-class_method" title="Raptor::Binder::SslListener.new (method)">new</a></span></span><span class='lparen'>(</span><span class='label'>tcp_server:</span> <span class='const'>TCPServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fd'>fd</span><span class='rparen'>)</span><span class='comma'>,</span> <span class='label'>ssl_context:</span> <span class='id identifier rubyid_ssl_context'>ssl_context</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+    <span class='id identifier rubyid_filenos'>filenos</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fileno'>fileno</span><span class='op'>|</span> <span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Binder/SslListener.html#new-class_method" title="Raptor::Binder::SslListener.new (method)">new</a></span></span><span class='lparen'>(</span><span class='label'>tcp_server:</span> <span class='const'>TCPServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fileno'>fileno</span><span class='rparen'>)</span><span class='comma'>,</span> <span class='label'>ssl_context:</span> <span class='id identifier rubyid_ssl_context'>ssl_context</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
   <span class='kw'>else</span>
     <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="Binder/UnknownBindSchemeError.html" title="Raptor::Binder::UnknownBindSchemeError (class)">UnknownBindSchemeError</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Binder/UnknownBindSchemeError.html#initialize-instance_method" title="Raptor::Binder::UnknownBindSchemeError#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_scheme'>scheme</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
@@ -1934,7 +1934,7 @@ if no TCP or SSL listener is configured (e.g., Unix socket only).</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jun 28 01:08:05 2026 by
+  Generated on Sun Jun 28 01:50:24 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
