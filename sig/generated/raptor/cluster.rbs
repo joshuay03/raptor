@@ -38,8 +38,6 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @connection_options: Hash[Symbol, untyped]
-
     @http1_options: Hash[Symbol, untyped]
 
     @http2_options: Hash[Symbol, untyped]
@@ -85,6 +83,8 @@ module Raptor
     @phased_restart_requested: bool
 
     @phased_restarting: bool
+
+    @connection_options: Hash[Symbol, untyped]
 
     @environment: String
 
@@ -135,8 +135,7 @@ module Raptor
     #
     # Forks the configured number of worker processes and monitors them,
     # restarting any that exit unexpectedly or stop checking in. Handles
-    # graceful shutdown via INT or TERM signals, stats logging via USR1,
-    # and phased restart via USR2.
+    # graceful shutdown via INT or TERM signals, and phased restart via USR1.
     #
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
@@ -198,7 +197,7 @@ module Raptor
     def timeout_hung_workers: () -> void
 
     # Replaces each worker process one at a time, waiting for the new
-    # worker to boot before moving on to the next. Triggered by SIGUSR2.
+    # worker to boot before moving on to the next.
     #
     # @return [void]
     #
@@ -250,15 +249,6 @@ module Raptor
     #
     # @rbs () -> void
     def log_initialization: () -> void
-
-    # Logs current stats for all workers to stdout.
-    #
-    # Triggered by SIGUSR1 in the master process.
-    #
-    # @return [void]
-    #
-    # @rbs () -> void
-    def log_stats: () -> void
 
     # Redirects `$stdout`, `$stderr`, and the access log to their configured
     # paths. No-op for any stream whose target path is nil.

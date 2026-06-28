@@ -819,7 +819,7 @@ module Raptor
       end
     end
 
-    def test_phased_restart_on_usr2_replaces_workers
+    def test_phased_restart_on_usr1_replaces_workers
       @options[:workers] = 2
       cluster = without_output { Cluster.new(@options) }
       server_port = cluster.instance_variable_get(:@server_port)
@@ -831,7 +831,7 @@ module Raptor
       original_pids = `pgrep -P #{cluster_pid}`.strip.split.map(&:to_i).reject(&:zero?).sort
       skip "could not find worker PIDs" if original_pids.empty?
 
-      Process.kill("USR2", cluster_pid)
+      Process.kill("USR1", cluster_pid)
 
       current_pids = []
       Timeout.timeout(30) do

@@ -132,8 +132,7 @@ Send to the master process.
 | `INT`  | Graceful shutdown                                           |
 | `TERM` | Graceful shutdown                                           |
 | `HUP`  | Reopen `stdout_file`, `stderr_file`, and `access_log_file`  |
-| `USR1` | Log per-worker stats to stdout                              |
-| `USR2` | Phased restart (rolling worker replacement)                 |
+| `USR1` | Phased restart (rolling worker replacement)                 |
 
 ## Stats
 
@@ -147,8 +146,6 @@ Worker 0 (phase 0): pid=91350, requests=1234, busy=2/3, backlog=0, booted, last_
 Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_checkin=10:42:01
 ...
 ```
-
-Sending `SIGUSR1` to the master logs the same summary to stdout.
 
 ## (Micro) Benchmarks
 

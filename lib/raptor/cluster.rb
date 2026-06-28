@@ -160,8 +160,7 @@ module Raptor
     #
     # Forks the configured number of worker processes and monitors them,
     # restarting any that exit unexpectedly or stop checking in. Handles
-    # graceful shutdown via INT or TERM signals, stats logging via USR1,
-    # and phased restart via USR2.
+    # graceful shutdown via INT or TERM signals, and phased restart via USR1.
     #
     # Each worker process includes:
     # - 1 server thread (continuously accepts connections with backpressure control)
@@ -180,8 +179,7 @@ module Raptor
       trap("INT") { shutdown }
       trap("TERM") { shutdown }
       trap("HUP") { reopen_logs_and_signal_workers }
-      trap("USR1") { log_stats }
-      trap("USR2") { @phased_restart_requested = true }
+      trap("USR1") { @phased_restart_requested = true }
 
       File.open(@pid_file, File::CREAT | File::EXCL | File::WRONLY) { |file| file.write(Process.pid.to_s) } if @pid_file
 
@@ -311,7 +309,7 @@ module Raptor
     end
 
     # Replaces each worker process one at a time, waiting for the new
-    # worker to boot before moving on to the next. Triggered by SIGUSR2.
+    # worker to boot before moving on to the next.
     #
     # @return [void]
     #
@@ -364,6 +362,7 @@ module Raptor
       trap("INT") { shutdown_requested = true }
       trap("TERM") { shutdown_requested = true }
       trap("HUP") { reopen_logs }
+      trap("USR1", "IGNORE")
 
       started_at = Process.clock_gettime(Process::CLOCK_REALTIME)
       request_count = 0
@@ -534,22 +533,6 @@ module Raptor
       Log.info "│     ├─ #{@thread_count} worker thread#{"s" if @thread_count > 1}"
       Log.info "│     └─ 1 stats thread"
       Log.info "└─ Listening on #{@binder.addresses.join(", ")}"
-    end
-
-    # Logs current stats for all workers to stdout.
-    #
-    # Triggered by SIGUSR1 in the master process.
-    #
-    # @return [void]
-    #
-    # @rbs () -> void
-    def log_stats
-      @stats.all.each do |stat|
-        status = stat[:booted] ? "booted" : "starting"
-        Log.info "Worker #{stat[:index]} (phase #{stat[:phase]}): pid=#{stat[:pid]}, requests=#{stat[:requests]}, " \
-                 "busy=#{stat[:busy_threads]}/#{stat[:thread_capacity]}, backlog=#{stat[:backlog]}, " \
-                 "#{status}, last_checkin=#{Time.at(stat[:last_checkin]).strftime("%H:%M:%S")}"
-      end
     end
 
     # Redirects `$stdout`, `$stderr`, and the access log to their configured
