@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-02
+
 - Add systemd `LISTEN_FDS` socket activation and `sd_notify` lifecycle messages
 - Add hot restart on `SIGUSR2`, inheriting listening sockets across the re-exec
 - Drop `SIGUSR1` stats logging and move phased restart from `SIGUSR2` to `SIGUSR1`

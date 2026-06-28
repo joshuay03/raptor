@@ -36,22 +36,23 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 
 ```
 > bundle exec raptor -w 4 -t 3 hello_world.ru
-[Raptor 91348|main|main] Cluster initializing:
-[Raptor 91348|main|main] ├─ Version: 0.7.0
-[Raptor 91348|main|main] ├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
-[Raptor 91348|main|main] ├─ Master PID: 91348
-[Raptor 91348|main|main] │  └─ 4 worker processes
-[Raptor 91348|main|main] │     ├─ 1 server thread
-[Raptor 91348|main|main] │     ├─ 1 reactor thread
-[Raptor 91348|main|main] │     ├─ 1 pipeline ractor
-[Raptor 91348|main|main] │     ├─ 1 pipeline collector thread
-[Raptor 91348|main|main] │     ├─ 3 worker threads
-[Raptor 91348|main|main] │     └─ 1 stats thread
-[Raptor 91348|main|main] └─ Listening on 0.0.0.0:9292
-[Raptor 91350|main|main] Worker 0 booted
-[Raptor 91351|main|main] Worker 1 booted
-[Raptor 91352|main|main] Worker 2 booted
-[Raptor 91353|main|main] Worker 3 booted
+[Raptor 76577|Main|Main] Cluster initializing:
+[Raptor 76577|Main|Main] ├─ Version: 0.8.0
+[Raptor 76577|Main|Main] ├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
+[Raptor 76577|Main|Main] ├─ Environment: development
+[Raptor 76577|Main|Main] ├─ Master PID: 76577
+[Raptor 76577|Main|Main] │  └─ 4 worker processes
+[Raptor 76577|Main|Main] │     ├─ 1 server thread
+[Raptor 76577|Main|Main] │     ├─ 1 reactor thread
+[Raptor 76577|Main|Main] │     ├─ 1 pipeline ractor
+[Raptor 76577|Main|Main] │     ├─ 1 pipeline collector thread
+[Raptor 76577|Main|Main] │     ├─ 3 worker threads
+[Raptor 76577|Main|Main] │     └─ 1 stats thread
+[Raptor 76577|Main|Main] └─ Listening on 0.0.0.0:9292
+[Raptor 76579|Main|Main] Worker 0 booted
+[Raptor 76580|Main|Main] Worker 1 booted
+[Raptor 76581|Main|Main] Worker 2 booted
+[Raptor 76582|Main|Main] Worker 3 booted
 ```
 
 ```
@@ -186,13 +187,13 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 
 ## (Micro) Benchmarks
 
-Raptor 0.7.0 vs Puma 8.0.2:
+Raptor 0.8.0 vs Puma 8.0.2:
 
 | Protocol              | Raptor      | Puma        |
 | --------------------- | ----------- | ----------- |
-| HTTP/1.1              | 17.9k req/s | 16.8k req/s |
-| HTTP/1.1 (keep-alive) | 60k req/s   | 29.6k req/s |
-| HTTP/2                | 57.2k req/s | N/A         |
+| HTTP/1.1              | 18.1k req/s | 15.8k req/s |
+| HTTP/1.1 (keep-alive) | 58.2k req/s | 29.5k req/s |
+| HTTP/2                | 57k req/s   | N/A         |
 
 > ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
 > 4 workers, 3 threads, 12 concurrent connections
