@@ -8,8 +8,8 @@ require "tempfile"
 require "atomic-ruby/atomic_boolean"
 require "rack"
 
+require_relative "http"
 require_relative "raptor_http"
-require_relative "version"
 
 module Raptor
   # Parses HTTP/1.x requests and dispatches them to the Rack
@@ -22,7 +22,6 @@ module Raptor
     FILE_CHUNK_SIZE = 64 * 1024
     MAX_CHUNK_OVERHEAD = 16 * 1024
     READ_BUFFER_SIZE = 64 * 1024
-    WRITE_TIMEOUT = 5
     KEEPALIVE_READ_TIMEOUT = 0.001
     MAX_KEEPALIVE_REQUESTS = 100
 
@@ -48,27 +47,15 @@ module Raptor
     EXPECT_100_CONTINUE = "100-continue"
     TRANSFER_ENCODING_CHUNKED = "chunked"
 
-    CONTENT_LENGTH = "CONTENT_LENGTH"
-    CONTENT_TYPE = "CONTENT_TYPE"
-    REMOTE_ADDR = "REMOTE_ADDR"
-    SERVER_SOFTWARE = "SERVER_SOFTWARE"
-    SERVER_SOFTWARE_VALUE = "Raptor/#{Raptor::VERSION}".freeze
     HTTP_CONNECTION = "HTTP_CONNECTION"
     HTTP_EXPECT = "HTTP_EXPECT"
     HTTP_TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING"
-    HTTP_VERSION = "HTTP_VERSION"
     RACK_HEADER_PREFIX = "rack."
     RACK_HIJACKED = "rack.hijacked"
     RACK_HIJACK_IO = "rack.hijack_io"
 
     ILLEGAL_HEADER_KEY_REGEX = /[\x00-\x20\(\)<>@,;:\\"\/\[\]\?=\{\}\x7F]/
     ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/
-
-    class Error < StandardError; end
-    class WriteError < Error
-      # @rbs () -> String
-      def message = "could not write response"
-    end
 
     # Returns true when the message framing shows a request-smuggling vector
     # per RFC 9112 section 6.3: a `Transfer-Encoding` where `chunked` is
@@ -82,7 +69,7 @@ module Raptor
     # @rbs (Hash[String, untyped] env) -> bool
     def self.request_smuggling?(env)
       transfer_encoding = env[HTTP_TRANSFER_ENCODING]
-      content_length = env[CONTENT_LENGTH]
+      content_length = env[Http::CONTENT_LENGTH]
 
       if transfer_encoding
         return true if content_length
@@ -133,32 +120,6 @@ module Raptor
       [decoded, :incomplete]
     end
 
-    # Writes `string` in full, retrying on partial writes. Bounded by
-    # `timeout` so a slow client can't pin the writing thread.
-    #
-    # @param socket [TCPSocket] the socket to write to
-    # @param string [String] the data to write
-    # @param timeout [Integer] seconds to wait for the socket to become writable on each partial write
-    # @return [void]
-    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
-    #
-    # @rbs (TCPSocket socket, String string, ?timeout: Integer) -> void
-    def self.socket_write(socket, string, timeout: WRITE_TIMEOUT)
-      bytes = 0
-      byte_size = string.bytesize
-
-      while bytes < byte_size
-        begin
-          bytes += socket.write_nonblock(bytes.zero? ? string : string.byteslice(bytes..-1))
-        rescue IO::WaitWritable
-          raise WriteError unless socket.wait_writable(timeout)
-          retry
-        rescue IOError
-          raise WriteError
-        end
-      end
-    end
-
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
     # @rbs @write_timeout: Integer
@@ -185,7 +146,7 @@ module Raptor
     def initialize(app, server_port, connection_options: {}, http1_options: {}, on_error: nil)
       @app = app
       @server_port = server_port
-      @write_timeout = connection_options[:write_timeout] || WRITE_TIMEOUT
+      @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
       @max_body_size = connection_options[:max_body_size]
       @body_spool_threshold = connection_options[:body_spool_threshold]
       @max_keepalive_requests = http1_options[:max_keepalive_requests] || MAX_KEEPALIVE_REQUESTS
@@ -193,17 +154,17 @@ module Raptor
       @running = AtomicBoolean.new(true)
     end
 
-    # Instance-level wrapper around {.socket_write} that applies the
+    # Instance-level wrapper around {Http.socket_write} that applies the
     # configured `write_timeout`.
     #
     # @param socket [TCPSocket] the socket to write to
     # @param string [String] the data to write
     # @return [void]
-    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    # @raise [Http::WriteError] if the socket is not writable within the timeout or raises IOError
     #
     # @rbs (TCPSocket socket, String string) -> void
     def socket_write(socket, string)
-      self.class.socket_write(socket, string, timeout: @write_timeout)
+      Http.socket_write(socket, string, timeout: @write_timeout)
     end
 
     # Signals eager keep-alive loops to stop processing further requests on
@@ -738,12 +699,12 @@ module Raptor
       env[Rack::QUERY_STRING] = "" unless env.key?(Rack::QUERY_STRING)
 
       if (content_length = parse_data[:content_length]).positive?
-        env[CONTENT_LENGTH] = content_length.to_s
+        env[Http::CONTENT_LENGTH] = content_length.to_s
       end
 
-      env[REMOTE_ADDR] = remote_addr
-      env[SERVER_SOFTWARE] = SERVER_SOFTWARE_VALUE
-      env[HTTP_VERSION] = env[Rack::SERVER_PROTOCOL]
+      env[Http::REMOTE_ADDR] = remote_addr
+      env[Http::SERVER_SOFTWARE] = Http::SERVER_SOFTWARE_VALUE
+      env[Http::HTTP_VERSION] = env[Rack::SERVER_PROTOCOL]
 
       behind_tls_proxy = (url_scheme == Server::HTTP_SCHEME) && forwarded_https?(env)
       env[Rack::RACK_URL_SCHEME] = behind_tls_proxy ? Server::HTTPS_SCHEME : url_scheme

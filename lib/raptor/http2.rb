@@ -6,7 +6,7 @@ require "stringio"
 require "atomic-ruby/atom"
 require "rack"
 
-require_relative "http1"
+require_relative "http"
 require_relative "raptor_http2"
 
 module Raptor
@@ -31,7 +31,7 @@ module Raptor
 
       # Creates a new Writer.
       #
-      # @param write_timeout [Integer] per-write socket timeout passed through to {Http1.socket_write}
+      # @param write_timeout [Integer] per-write socket timeout passed through to {Http.socket_write}
       # @return [void]
       #
       # @rbs (write_timeout: Integer) -> void
@@ -74,7 +74,7 @@ module Raptor
           break if pending.empty?
 
           pending.each do |frame|
-            Http1.socket_write(socket, frame, timeout: @write_timeout) rescue nil
+            Http.socket_write(socket, frame, timeout: @write_timeout) rescue nil
           end
         end
       end
@@ -273,7 +273,7 @@ module Raptor
     def initialize(app, server_port, connection_options: {}, http2_options: {}, on_error: nil)
       @app = app
       @server_port = server_port
-      @write_timeout = connection_options[:write_timeout] || Http1::WRITE_TIMEOUT
+      @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
       @on_error = on_error
 
       parser = Http2Parser.new
@@ -762,9 +762,9 @@ module Raptor
           when ":authority" then env[Rack::HTTP_HOST] = value
           end
         elsif name == "content-type"
-          env[Http1::CONTENT_TYPE] = value
+          env[Http::CONTENT_TYPE] = value
         elsif name == "content-length"
-          env[Http1::CONTENT_LENGTH] = value
+          env[Http::CONTENT_LENGTH] = value
         else
           rack_key = "HTTP_#{name.upcase.tr("-", "_")}"
           env[rack_key] = value
@@ -782,13 +782,13 @@ module Raptor
       env[Rack::PATH_INFO] = "" unless env.key?(Rack::PATH_INFO)
       env[Rack::QUERY_STRING] = "" unless env.key?(Rack::QUERY_STRING)
 
-      if body.bytesize.positive? && !env.key?(Http1::CONTENT_LENGTH)
-        env[Http1::CONTENT_LENGTH] = body.bytesize.to_s
+      if body.bytesize.positive? && !env.key?(Http::CONTENT_LENGTH)
+        env[Http::CONTENT_LENGTH] = body.bytesize.to_s
       end
 
-      env[Http1::REMOTE_ADDR] = remote_addr
-      env[Http1::SERVER_SOFTWARE] = Http1::SERVER_SOFTWARE_VALUE
-      env[Http1::HTTP_VERSION] = SERVER_PROTOCOL
+      env[Http::REMOTE_ADDR] = remote_addr
+      env[Http::SERVER_SOFTWARE] = Http::SERVER_SOFTWARE_VALUE
+      env[Http::HTTP_VERSION] = SERVER_PROTOCOL
 
       populate_server_name_and_port(env)
 

@@ -19,10 +19,10 @@ module Raptor
       client.setsockopt(Socket::SOL_SOCKET, Socket::SO_SNDBUF, 1024)
       accepted.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVBUF, 1024)
 
-      writer = Http2::Writer.new(write_timeout: Http1::WRITE_TIMEOUT)
+      writer = Http2::Writer.new(write_timeout: Http::WRITE_TIMEOUT)
       big_frame = "x" * (1024 * 1024)
 
-      Timeout.timeout(Http1::WRITE_TIMEOUT + 5) do
+      Timeout.timeout(Http::WRITE_TIMEOUT + 5) do
         writer.write_frames(client, [big_frame])
       end
 

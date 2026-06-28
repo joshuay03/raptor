@@ -1,0 +1,39 @@
+# Generated from lib/raptor/http.rb with RBS::Inline
+
+module Raptor
+  # Shared HTTP utilities used by both the HTTP/1.x and HTTP/2 handlers:
+  # Rack env keys that aren't provided by Rack itself and low-level socket
+  # writing.
+  module Http
+    WRITE_TIMEOUT: ::Integer
+
+    CONTENT_LENGTH: ::String
+
+    CONTENT_TYPE: ::String
+
+    HTTP_VERSION: ::String
+
+    REMOTE_ADDR: ::String
+
+    SERVER_SOFTWARE: ::String
+
+    SERVER_SOFTWARE_VALUE: untyped
+
+    class WriteError < StandardError
+      # @rbs () -> String
+      def message: () -> String
+    end
+
+    # Writes `string` in full, retrying on partial writes. Bounded by
+    # `timeout` so a slow client can't pin the writing thread.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param string [String] the data to write
+    # @param timeout [Integer] seconds to wait for the socket to become writable on each partial write
+    # @return [void]
+    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, String string, ?timeout: Integer) -> void
+    def self.socket_write: (TCPSocket socket, String string, ?timeout: Integer) -> void
+  end
+end

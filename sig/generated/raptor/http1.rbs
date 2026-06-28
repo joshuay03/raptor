@@ -14,8 +14,6 @@ module Raptor
 
     READ_BUFFER_SIZE: untyped
 
-    WRITE_TIMEOUT: ::Integer
-
     KEEPALIVE_READ_TIMEOUT: ::Float
 
     MAX_KEEPALIVE_REQUESTS: ::Integer
@@ -46,23 +44,11 @@ module Raptor
 
     TRANSFER_ENCODING_CHUNKED: ::String
 
-    CONTENT_LENGTH: ::String
-
-    CONTENT_TYPE: ::String
-
-    REMOTE_ADDR: ::String
-
-    SERVER_SOFTWARE: ::String
-
-    SERVER_SOFTWARE_VALUE: untyped
-
     HTTP_CONNECTION: ::String
 
     HTTP_EXPECT: ::String
 
     HTTP_TRANSFER_ENCODING: ::String
-
-    HTTP_VERSION: ::String
 
     RACK_HEADER_PREFIX: ::String
 
@@ -73,14 +59,6 @@ module Raptor
     ILLEGAL_HEADER_KEY_REGEX: ::Regexp
 
     ILLEGAL_HEADER_VALUE_REGEX: ::Regexp
-
-    class Error < StandardError
-    end
-
-    class WriteError < Error
-      # @rbs () -> String
-      def message: () -> String
-    end
 
     # Returns true when the message framing shows a request-smuggling vector
     # per RFC 9112 section 6.3: a `Transfer-Encoding` where `chunked` is
@@ -107,18 +85,6 @@ module Raptor
     #
     # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
     def self.decode_chunked: (String buffer, ?Integer? max_size) -> [ String, Symbol ]
-
-    # Writes `string` in full, retrying on partial writes. Bounded by
-    # `timeout` so a slow client can't pin the writing thread.
-    #
-    # @param socket [TCPSocket] the socket to write to
-    # @param string [String] the data to write
-    # @param timeout [Integer] seconds to wait for the socket to become writable on each partial write
-    # @return [void]
-    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
-    #
-    # @rbs (TCPSocket socket, String string, ?timeout: Integer) -> void
-    def self.socket_write: (TCPSocket socket, String string, ?timeout: Integer) -> void
 
     @running: AtomicBoolean
 
@@ -152,13 +118,13 @@ module Raptor
     # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
     def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
 
-    # Instance-level wrapper around {.socket_write} that applies the
+    # Instance-level wrapper around {Http.socket_write} that applies the
     # configured `write_timeout`.
     #
     # @param socket [TCPSocket] the socket to write to
     # @param string [String] the data to write
     # @return [void]
-    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    # @raise [Http::WriteError] if the socket is not writable within the timeout or raises IOError
     #
     # @rbs (TCPSocket socket, String string) -> void
     def socket_write: (TCPSocket socket, String string) -> void
