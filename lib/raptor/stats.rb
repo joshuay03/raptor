@@ -60,7 +60,7 @@ module Raptor
     # @rbs (Integer index, pid: Integer, phase: Integer, requests: Integer, backlog: Integer, busy_threads: Integer, thread_capacity: Integer, started_at: Float, last_checkin: Float, booted: bool) -> void
     def write(index, pid:, phase:, requests:, backlog:, busy_threads:, thread_capacity:, started_at:, last_checkin:, booted:)
       data = [pid, index, phase, requests, backlog, busy_threads, thread_capacity, started_at, last_checkin, booted ? 1 : 0].pack(SLOT_FORMAT)
-      @mmap.semlock { @mmap[index * SLOT_SIZE, SLOT_SIZE] = data }
+      @mmap[index * SLOT_SIZE, SLOT_SIZE] = data
     end
 
     # Returns stats for all worker slots.
