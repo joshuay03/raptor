@@ -68,6 +68,7 @@ implement HPACK compression.</p>
 <strong>Your application does not need to be Ractor-safe.</strong> Ractors handle protocol-level work only; your Rack application
 is invoked on a thread pool, so any thread-safe Rack app (including Rails) works as-is.</p>
 </blockquote>
+<p>Reference documentation is published at <a href="https://joshuay03.github.io/raptor">https://joshuay03.github.io/raptor</a>.</p>
 <h2 id="Installation">Installation</h2>
 <p>Install the gem and add to the application's Gemfile by executing:</p>
 <pre class="code bash"><code class="bash">bundle add raptor
@@ -192,6 +193,34 @@ automatically.</li>
 </tr>
 </tbody>
 </table>
+<h2 id="Restarts">Restarts</h2>
+<ul>
+<li><strong>Phased restart</strong> (<code>USR1</code>) replaces workers one at a time, waiting for each new worker to boot before retiring the
+previous one. The master process keeps running, so existing workers continue serving until they are individually
+replaced. Use to pick up code changes that don't affect the master's boot path.</li>
+<li><strong>Hot restart</strong> (<code>USR2</code>) re-execs the master process with its original command line, inheriting the listening sockets
+so accepted connections continue to be served across the swap. The successor master re-runs initialization from
+scratch. Use to pick up changes that affect master-level state (config layout, dependency upgrades, Raptor itself).</li>
+</ul>
+<h2 id="systemd">systemd</h2>
+<p>Raptor implements socket activation (<code>LISTEN_FDS</code>) and <code>sd_notify</code>, so it integrates cleanly with <code>Type=notify</code> units.
+When the socket unit is active, systemd hands the pre-bound listening file descriptors to Raptor, which serves them in
+place of <code>binds:</code>. <code>READY=1</code>, <code>STOPPING=1</code>, and <code>RELOADING=1</code> lifecycle messages are emitted automatically.</p>
+<pre class="code ini"><code class="ini"># /etc/systemd/system/myapp.socket
+[Socket]
+ListenStream=0.0.0.0:9292
+
+[Install]
+WantedBy=sockets.target
+</code></pre>
+<pre class="code ini"><code class="ini"># /etc/systemd/system/myapp.service
+[Service]
+Type=notify
+WorkingDirectory=/srv/myapp
+ExecStart=/usr/bin/bundle exec raptor
+ExecReload=/bin/kill -USR2 $MAINPID
+KillMode=mixed
+</code></pre>
 <h2 id="Stats">Stats</h2>
 <p>Each worker writes per-worker stats (request count, busy threads, backlog, last check-in) to shared memory and to a
 JSON file (default <code>tmp/raptor.json</code>; set via <code>stats_file</code>).</p>
@@ -249,7 +278,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Jun 28 22:36:32 2026 by
+  Generated on Sun Jun 28 22:43:21 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
