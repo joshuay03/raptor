@@ -588,7 +588,9 @@ positional argument (defaults to config.ru).</p>
 134
 135
 136
-137</pre>
+137
+138
+139</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 121</span>
@@ -602,6 +604,8 @@ positional argument (defaults to config.ru).</p>
   <span class='kw'>end</span>
   <span class='ivar'>@options</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#DEFAULT_OPTIONS-constant" title="Raptor::CLI::DEFAULT_OPTIONS (constant)">DEFAULT_OPTIONS</a></span></span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
   <span class='const'><span class='object_link'><a href="#NESTED_OPTION_KEYS-constant" title="Raptor::CLI::NESTED_OPTION_KEYS (constant)">NESTED_OPTION_KEYS</a></span></span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_key'>key</span><span class='op'>|</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='id identifier rubyid_key'>key</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='id identifier rubyid_key'>key</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span> <span class='rbrace'>}</span>
+  <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:launch_command</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='gvar'>$PROGRAM_NAME</span>
+  <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:launch_argv</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
 
   <span class='id identifier rubyid_apply_config_file'>apply_config_file</span><span class='lparen'>(</span><span class='id identifier rubyid_extract_config_path'>extract_config_path</span><span class='lparen'>(</span><span class='id identifier rubyid_argv'>argv</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_class'>class</span><span class='period'>.</span><span class='id identifier rubyid_default_config_path'>default_config_path</span><span class='rparen'>)</span>
 
@@ -846,8 +850,6 @@ of cluster options (the same keys accepted by <span class='object_link'><a href=
       <pre class="lines">
 
 
-202
-203
 204
 205
 206
@@ -857,10 +859,12 @@ of cluster options (the same keys accepted by <span class='object_link'><a href=
 210
 211
 212
-213</pre>
+213
+214
+215</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 202</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 204</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_apply_config_file'>apply_config_file</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_path'>path</span>
@@ -919,8 +923,6 @@ of cluster options (the same keys accepted by <span class='object_link'><a href=
       <pre class="lines">
 
 
-220
-221
 222
 223
 224
@@ -1041,10 +1043,12 @@ of cluster options (the same keys accepted by <span class='object_link'><a href=
 339
 340
 341
-342</pre>
+342
+343
+344</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 220</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 222</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_parser'>create_parser</span>
   <span class='const'>OptionParser</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_opts'>opts</span><span class='op'>|</span>
@@ -1236,18 +1240,18 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
       <pre class="lines">
 
 
-186
-187
 188
 189
 190
 191
 192
 193
-194</pre>
+194
+195
+196</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 186</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 188</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_extract_config_path'>extract_config_path</span><span class='lparen'>(</span><span class='id identifier rubyid_argv'>argv</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_arg'>arg</span><span class='comma'>,</span> <span class='id identifier rubyid_i'>i</span><span class='op'>|</span>
@@ -1287,12 +1291,12 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
       <pre class="lines">
 
 
-144
-145
-146</pre>
+146
+147
+148</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 144</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 146</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
   <span class='ivar'>@command</span> <span class='op'>==</span> <span class='symbol'>:stats</span> <span class='op'>?</span> <span class='id identifier rubyid_run_stats'>run_stats</span> <span class='op'>:</span> <span class='const'><span class='object_link'><a href="Cluster.html" title="Raptor::Cluster (class)">Cluster</a></span></span><span class='period'>.</span><span class='id identifier rubyid_run'><span class='object_link'><a href="Cluster.html#run-class_method" title="Raptor::Cluster.run (method)">run</a></span></span><span class='lparen'>(</span><span class='ivar'>@options</span><span class='rparen'>)</span>
@@ -1326,8 +1330,6 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
       <pre class="lines">
 
 
-155
-156
 157
 158
 159
@@ -1344,10 +1346,12 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
 170
 171
 172
-173</pre>
+173
+174
+175</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 155</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 157</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run_stats'>run_stats</span>
   <span class='id identifier rubyid_stats_file'>stats_file</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:stats_file</span><span class='rbracket'>]</span>
@@ -1378,7 +1382,7 @@ OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--
 </div>
 
       <div id="footer">
-  Generated on Sun Jun 28 00:27:05 2026 by
+  Generated on Sun Jun 28 01:04:48 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
