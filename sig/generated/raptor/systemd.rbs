@@ -1,0 +1,42 @@
+# Generated from lib/raptor/systemd.rb with RBS::Inline
+
+module Raptor
+  # Integration with systemd's service notification protocol and
+  # socket-activation file descriptors.
+  module Systemd
+    LISTEN_FDS_START: ::Integer
+
+    LISTEN_FDNAMES_ENV: ::String
+
+    LISTEN_FDS_ENV: ::String
+
+    LISTEN_PID_ENV: ::String
+
+    NOTIFY_SOCKET_ENV: ::String
+
+    # Sends `message` to the systemd notification socket, returning true on
+    # success and false when the socket is unset or the send fails.
+    #
+    # @param message [String] notify protocol payload, e.g. "READY=1"
+    # @return [Boolean]
+    #
+    # @rbs (String message) -> bool
+    def self.notify: (String message) -> bool
+
+    # Returns the file descriptors passed in via socket activation, or an
+    # empty array when systemd has not exported any.
+    #
+    # @return [Array<Integer>]
+    #
+    # @rbs () -> Array[Integer]
+    def self.listen_fds: () -> Array[Integer]
+
+    # Clears the socket-activation environment variables so children don't
+    # act on stale values.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def self.clear_listen_env: () -> void
+  end
+end

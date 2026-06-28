@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add systemd `LISTEN_FDS` socket activation and `sd_notify` lifecycle messages
 - Add hot restart on `SIGUSR2`, inheriting listening sockets across the re-exec
 - Drop `SIGUSR1` stats logging and move phased restart from `SIGUSR2` to `SIGUSR1`
 - Add `chdir` and `environment` for Rack app loading, with fallback to `RAILS_ENV` and `RACK_ENV`

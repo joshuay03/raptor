@@ -14,6 +14,7 @@ require_relative "reactor"
 require_relative "http1"
 require_relative "http2"
 require_relative "stats"
+require_relative "systemd"
 
 module Raptor
   # Multi-process web server cluster with advanced concurrency architecture.
@@ -151,7 +152,14 @@ module Raptor
 
       Dir.chdir(options[:chdir]) if options[:chdir]
 
-      inherited_fds = (raw = ENV.delete(INHERITED_FDS_ENV)) ? JSON.parse(raw) : {}
+      inherited_fds = if raw = ENV.delete(INHERITED_FDS_ENV)
+        JSON.parse(raw)
+      elsif (systemd_fds = Systemd.listen_fds).any?
+        Systemd.clear_listen_env
+        pair_systemd_fds(options[:binds], systemd_fds)
+      else
+        {}
+      end
       @binder = Binder.new(options[:binds], socket_backlog: options[:socket_backlog], inherited_fds: inherited_fds)
       @server_port = @binder.server_port
       @app = options[:app] || Rack::Builder.parse_file(options[:rackup])
@@ -206,6 +214,8 @@ module Raptor
         end
       end
 
+      Systemd.notify("READY=1\nMAINPID=#{Process.pid}")
+
       until @shutdown
         break if reap_workers == :no_children
 
@@ -216,6 +226,7 @@ module Raptor
         sleep 0.1
       end
 
+      Systemd.notify("STOPPING=1")
       stop_workers
       stats_file_thread&.join
       File.delete(@stats_file) rescue nil if @stats_file
@@ -234,6 +245,25 @@ module Raptor
     end
 
     private
+
+    # Returns the inherited-FDs hash for a systemd socket-activation handoff,
+    # pairing each bind URI with the FD systemd passed at the same index.
+    # The activation is skipped (with a warning) when the FD count doesn't
+    # match the number of bind URIs.
+    #
+    # @param bind_uris [Array<String>] the configured bind URIs
+    # @param filenos [Array<Integer>] file descriptors passed by systemd
+    # @return [Hash{String => Array<Integer>}]
+    #
+    # @rbs (Array[String] bind_uris, Array[Integer] filenos) -> Hash[String, Array[Integer]]
+    def pair_systemd_fds(bind_uris, filenos)
+      if bind_uris.length != filenos.length
+        Log.warn "Ignoring socket activation: #{filenos.length} fd(s) from systemd, #{bind_uris.length} bind(s) configured"
+        return {}
+      end
+
+      bind_uris.zip(filenos).to_h { |bind_uri, fileno| [bind_uri, [fileno]] }
+    end
 
     # Forks a new worker process and registers it at the given index.
     # The worker inherits the cluster's current phase.
@@ -376,6 +406,8 @@ module Raptor
       end
 
       Log.info "Hot restart starting"
+      monotonic_usec = (Process.clock_gettime(Process::CLOCK_MONOTONIC) * 1_000_000).to_i
+      Systemd.notify("RELOADING=1\nMONOTONIC_USEC=#{monotonic_usec}")
       @shutdown = true
       stop_workers
       @binder.clear_close_on_exec

@@ -40,6 +40,8 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
+    @http1_options: Hash[Symbol, untyped]
+
     @http2_options: Hash[Symbol, untyped]
 
     @worker_boot_timeout: Integer
@@ -89,8 +91,6 @@ module Raptor
     @phased_restarting: bool
 
     @hot_restart_requested: bool
-
-    @http1_options: Hash[Symbol, untyped]
 
     @connection_options: Hash[Symbol, untyped]
 
@@ -170,6 +170,18 @@ module Raptor
     def stats: () -> Array[Hash[Symbol, untyped]]
 
     private
+
+    # Returns the inherited-FDs hash for a systemd socket-activation handoff,
+    # pairing each bind URI with the FD systemd passed at the same index.
+    # The activation is skipped (with a warning) when the FD count doesn't
+    # match the number of bind URIs.
+    #
+    # @param bind_uris [Array<String>] the configured bind URIs
+    # @param filenos [Array<Integer>] file descriptors passed by systemd
+    # @return [Hash{String => Array<Integer>}]
+    #
+    # @rbs (Array[String] bind_uris, Array[Integer] filenos) -> Hash[String, Array[Integer]]
+    def pair_systemd_fds: (Array[String] bind_uris, Array[Integer] filenos) -> Hash[String, Array[Integer]]
 
     # Forks a new worker process and registers it at the given index.
     # The worker inherits the cluster's current phase.
