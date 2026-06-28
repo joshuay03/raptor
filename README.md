@@ -8,6 +8,8 @@ implement HPACK compression.
 > **Your application does not need to be Ractor-safe.** Ractors handle protocol-level work only; your Rack application
 > is invoked on a thread pool, so any thread-safe Rack app (including Rails) works as-is.
 
+Reference documentation is published at <https://joshuay03.github.io/raptor>.
+
 ## Installation
 
 Install the gem and add to the application's Gemfile by executing:
@@ -134,6 +136,40 @@ Send to the master process.
 | `HUP`  | Reopen `stdout_file`, `stderr_file`, and `access_log_file`  |
 | `USR1` | Phased restart (rolling worker replacement)                 |
 | `USR2` | Hot restart (re-exec master, inheriting listening sockets)  |
+
+## Restarts
+
+- **Phased restart** (`USR1`) replaces workers one at a time, waiting for each new worker to boot before retiring the
+  previous one. The master process keeps running, so existing workers continue serving until they are individually
+  replaced. Use to pick up code changes that don't affect the master's boot path.
+- **Hot restart** (`USR2`) re-execs the master process with its original command line, inheriting the listening sockets
+  so accepted connections continue to be served across the swap. The successor master re-runs initialization from
+  scratch. Use to pick up changes that affect master-level state (config layout, dependency upgrades, Raptor itself).
+
+## systemd
+
+Raptor implements socket activation (`LISTEN_FDS`) and `sd_notify`, so it integrates cleanly with `Type=notify` units.
+When the socket unit is active, systemd hands the pre-bound listening file descriptors to Raptor, which serves them in
+place of `binds:`. `READY=1`, `STOPPING=1`, and `RELOADING=1` lifecycle messages are emitted automatically.
+
+```ini
+# /etc/systemd/system/myapp.socket
+[Socket]
+ListenStream=0.0.0.0:9292
+
+[Install]
+WantedBy=sockets.target
+```
+
+```ini
+# /etc/systemd/system/myapp.service
+[Service]
+Type=notify
+WorkingDirectory=/srv/myapp
+ExecStart=/usr/bin/bundle exec raptor
+ExecReload=/bin/kill -USR2 $MAINPID
+KillMode=mixed
+```
 
 ## Stats
 
