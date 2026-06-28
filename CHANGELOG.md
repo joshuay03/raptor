@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add `access_log_file` for Common Log Format access logging, reopened on `SIGHUP`
 - Add `stdout_file` and `stderr_file` for redirecting stdout/stderr, reopened on `SIGHUP`
 - Add `drain_accept_queue` for dispatching every queued connection on shutdown
 - Add `worker_drain_timeout` for force-killing hung app threads during worker shutdown

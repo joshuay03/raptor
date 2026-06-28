@@ -58,6 +58,7 @@ module Raptor
       pid_file: nil,
       stdout_file: nil,
       stderr_file: nil,
+      access_log_file: nil,
     }.freeze
 
     DEFAULT_CONFIG_PATHS = ["raptor.rb", "config/raptor.rb"].freeze
@@ -312,6 +313,10 @@ module Raptor
 
         opts.on("--stderr-file PATH", String, "Redirect stderr to PATH; reopened on SIGHUP (default: none)") do |path|
           @options[:stderr_file] = path
+        end
+
+        opts.on("--access-log-file PATH", String, "Write Common Log Format access logs to PATH; reopened on SIGHUP (default: none)") do |path|
+          @options[:access_log_file] = path
         end
 
         opts.on("--help", "Show this help") do

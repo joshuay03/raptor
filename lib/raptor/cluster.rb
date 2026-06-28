@@ -71,6 +71,8 @@ module Raptor
     # @rbs @pid_file: String?
     # @rbs @stdout_file: String?
     # @rbs @stderr_file: String?
+    # @rbs @access_log_file: String?
+    # @rbs @access_log_io: IO?
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @binder: Binder
     # @rbs @server_port: Integer
@@ -109,6 +111,7 @@ module Raptor
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
     # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
     # @option options [String, nil] :stderr_file path to redirect stderr to, reopened on SIGHUP, or nil to disable
+    # @option options [String, nil] :access_log_file path to write Common Log Format access logs to, reopened on SIGHUP, or nil to disable
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
@@ -129,6 +132,8 @@ module Raptor
       @pid_file = options[:pid_file]
       @stdout_file = options[:stdout_file]
       @stderr_file = options[:stderr_file]
+      @access_log_file = options[:access_log_file]
+      @access_log_io = nil
       @on_error = options[:on_error]
 
       @binder = Binder.new(options[:binds], socket_backlog: options[:socket_backlog])
@@ -382,6 +387,7 @@ module Raptor
         @server_port,
         connection_options: @connection_options,
         http1_options: @http1_options,
+        access_log_io: @access_log_io,
         on_error: @on_error
       )
       http2 = Http2.new(
@@ -389,6 +395,7 @@ module Raptor
         @server_port,
         connection_options: @connection_options,
         http2_options: @http2_options,
+        access_log_io: @access_log_io,
         on_error: @on_error
       )
       ractor_pool = RactorPool.new(
@@ -538,8 +545,8 @@ module Raptor
       end
     end
 
-    # Redirects `$stdout` and `$stderr` to `stdout_file` and `stderr_file`
-    # when configured. No-op for either stream when its target is nil.
+    # Redirects `$stdout`, `$stderr`, and the access log to their configured
+    # paths. No-op for any stream whose target path is nil.
     #
     # @return [void]
     #
@@ -547,6 +554,11 @@ module Raptor
     def reopen_logs
       $stdout.reopen(@stdout_file, "a").sync = true if @stdout_file
       $stderr.reopen(@stderr_file, "a").sync = true if @stderr_file
+      return unless @access_log_file
+
+      @access_log_io ||= File.open(@access_log_file, "a")
+      @access_log_io.reopen(@access_log_file, "a")
+      @access_log_io.sync = true
     end
 
     # Reopens the master's log files and forwards SIGHUP to each worker so

@@ -2,8 +2,8 @@
 
 module Raptor
   # Shared HTTP utilities used by both the HTTP/1.x and HTTP/2 handlers:
-  # Rack env keys that aren't provided by Rack itself and low-level socket
-  # writing.
+  # Rack env keys that aren't provided by Rack itself, low-level socket
+  # writing, and Common Log Format access-log formatting.
   module Http
     WRITE_TIMEOUT: ::Integer
 
@@ -35,5 +35,18 @@ module Raptor
     #
     # @rbs (TCPSocket socket, String string, ?timeout: Integer) -> void
     def self.socket_write: (TCPSocket socket, String string, ?timeout: Integer) -> void
+
+    # Writes a Common Log Format entry to `io`. Write failures are silently
+    # ignored.
+    #
+    # @param io [IO] the destination IO
+    # @param env [Hash] the Rack environment
+    # @param status [Integer] the response status code
+    # @param size [String] the response body size in bytes, or `-` if unknown
+    # @param remote_addr [String] the client IP address
+    # @return [void]
+    #
+    # @rbs (IO io, Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
+    def self.write_access_log: (IO io, Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
   end
 end

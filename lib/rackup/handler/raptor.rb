@@ -97,6 +97,7 @@ module Rackup
         result[:pid_file] = config[:pid_file] if config.key?(:pid_file)
         result[:stdout_file] = config[:stdout_file] if config.key?(:stdout_file)
         result[:stderr_file] = config[:stderr_file] if config.key?(:stderr_file)
+        result[:access_log_file] = config[:access_log_file] if config.key?(:access_log_file)
         result[:on_error] = config[:on_error] if config.key?(:on_error)
         result
       end

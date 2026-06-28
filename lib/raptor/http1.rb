@@ -126,6 +126,7 @@ module Raptor
     # @rbs @max_body_size: Integer?
     # @rbs @body_spool_threshold: Integer?
     # @rbs @max_keepalive_requests: Integer
+    # @rbs @access_log_io: IO?
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @running: AtomicBoolean
 
@@ -139,17 +140,19 @@ module Raptor
     # @option connection_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
     # @param http1_options [Hash] HTTP/1.1-specific settings
     # @option http1_options [Integer] :max_keepalive_requests maximum requests per HTTP/1.1 keep-alive connection
+    # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize(app, server_port, connection_options: {}, http1_options: {}, on_error: nil)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize(app, server_port, connection_options: {}, http1_options: {}, access_log_io: nil, on_error: nil)
       @app = app
       @server_port = server_port
       @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
       @max_body_size = connection_options[:max_body_size]
       @body_spool_threshold = connection_options[:body_spool_threshold]
       @max_keepalive_requests = http1_options[:max_keepalive_requests] || MAX_KEEPALIVE_REQUESTS
+      @access_log_io = access_log_io
       @on_error = on_error
       @running = AtomicBoolean.new(true)
     end
@@ -471,10 +474,12 @@ module Raptor
           hijacked = headers.is_a?(Hash) && !!headers[Rack::RACK_HIJACK]
           streaming = body.respond_to?(:call) && !body.respond_to?(:each)
           keep_alive = (hijacked || streaming) ? false : keep_alive?(rack_env, request_count)
+          response_size = response_size(headers, body) unless hijacked
           response_started = true
           write_response(socket, rack_env, status, headers, body, keep_alive: keep_alive)
         end
 
+        write_access_log(rack_env, status, response_size, remote_addr) if @access_log_io && !hijacked
         call_response_finished(rack_env, status, headers, nil)
         keep_alive && !hijacked
       rescue => error
@@ -1249,6 +1254,33 @@ module Raptor
       env[Rack::RACK_RESPONSE_FINISHED].reverse_each do |callable|
         callable.call(env, status, headers, error) rescue nil
       end
+    end
+
+    # Instance-level wrapper around {Http.write_access_log} that routes to
+    # the configured `@access_log_io`.
+    #
+    # @param env [Hash] the Rack environment
+    # @param status [Integer] the response status code
+    # @param size [String] the response body size in bytes, or `-` if unknown
+    # @param remote_addr [String] the client IP address
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
+    def write_access_log(env, status, size, remote_addr)
+      Http.write_access_log(@access_log_io, env, status, size, remote_addr)
+    end
+
+    # Returns the response body size as a String for the access log, taken
+    # from the `content-length` header when set, computed from the body
+    # otherwise, or `-` when the size cannot be determined upfront.
+    #
+    # @param headers [Hash] the response headers
+    # @param body [Object] the response body
+    # @return [String]
+    #
+    # @rbs (Hash[String, String | Array[String]] headers, untyped body) -> String
+    def response_size(headers, body)
+      headers[Rack::CONTENT_LENGTH] || calculate_content_length(body)&.to_s || "-"
     end
 
     if Socket.const_defined?(:TCP_CORK)

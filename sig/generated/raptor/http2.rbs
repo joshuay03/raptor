@@ -149,6 +149,8 @@ module Raptor
 
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
+    @access_log_io: IO?
+
     @write_timeout: Integer
 
     @server_port: Integer
@@ -168,11 +170,12 @@ module Raptor
     # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
     # @param http2_options [Hash] HTTP/2-specific settings
     # @option http2_options [Integer] :max_concurrent_streams maximum HTTP/2 concurrent streams per connection
+    # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
 
     # Creates a per-connection {Writer} configured with the handler's write timeout.
     #
@@ -289,10 +292,10 @@ module Raptor
     # @param status [Integer] HTTP status code
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body responding to each
-    # @return [void]
+    # @return [String] the response body size in bytes
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
-    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> String
+    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> String
 
     # Writes a 500 error response as HTTP/2 frames.
     #
@@ -303,6 +306,18 @@ module Raptor
     #
     # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
     def write_http2_error_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
+
+    # Instance-level wrapper around {Http.write_access_log} that routes to
+    # the configured `@access_log_io`.
+    #
+    # @param env [Hash] the Rack environment
+    # @param status [Integer] the response status code
+    # @param size [String] the response body size in bytes, or `-` if unknown
+    # @param remote_addr [String] the client IP address
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
+    def write_access_log: (Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
 
     # Builds a Rack environment hash from HTTP/2 headers and body.
     #

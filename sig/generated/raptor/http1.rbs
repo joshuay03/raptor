@@ -90,6 +90,8 @@ module Raptor
 
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
+    @access_log_io: IO?
+
     @max_keepalive_requests: Integer
 
     @body_spool_threshold: Integer?
@@ -112,11 +114,12 @@ module Raptor
     # @option connection_options [Integer, nil] :body_spool_threshold spool bodies larger than this to a tempfile
     # @param http1_options [Hash] HTTP/1.1-specific settings
     # @option http1_options [Integer] :max_keepalive_requests maximum requests per HTTP/1.1 keep-alive connection
+    # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
 
     # Instance-level wrapper around {Http.socket_write} that applies the
     # configured `write_timeout`.
@@ -575,6 +578,29 @@ module Raptor
     #
     # @rbs (Hash[String, untyped] env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
     def call_response_finished: (Hash[String, untyped] env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
+
+    # Instance-level wrapper around {Http.write_access_log} that routes to
+    # the configured `@access_log_io`.
+    #
+    # @param env [Hash] the Rack environment
+    # @param status [Integer] the response status code
+    # @param size [String] the response body size in bytes, or `-` if unknown
+    # @param remote_addr [String] the client IP address
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
+    def write_access_log: (Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
+
+    # Returns the response body size as a String for the access log, taken
+    # from the `content-length` header when set, computed from the body
+    # otherwise, or `-` when the size cannot be determined upfront.
+    #
+    # @param headers [Hash] the response headers
+    # @param body [Object] the response body
+    # @return [String]
+    #
+    # @rbs (Hash[String, String | Array[String]] headers, untyped body) -> String
+    def response_size: (Hash[String, String | Array[String]] headers, untyped body) -> String
 
     # Enables TCP_CORK on the socket to batch outgoing packets into fewer segments.
     #

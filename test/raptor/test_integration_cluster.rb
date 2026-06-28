@@ -846,6 +846,23 @@ module Raptor
       rackup_file&.unlink
     end
 
+    def test_access_log_file_receives_clf_entries
+      log_path = "/tmp/raptor_test_access_#{Process.pid}.log"
+      File.delete(log_path) rescue nil
+
+      @options[:access_log_file] = log_path
+
+      with_server do |uri|
+        Net::HTTP.get_response(uri)
+
+        Timeout.timeout(5) { sleep 0.05 until File.exist?(log_path) && !File.read(log_path).empty? }
+      end
+
+      assert_match(%r(^127\.0\.0\.1 - - \[[^\]]+\] "GET / HTTP/1\.1" 200 \d+$), File.read(log_path))
+    ensure
+      File.delete(log_path) rescue nil
+    end
+
     def test_sighup_reopens_stdout_file
       log_path = "/tmp/raptor_test_stdout_#{Process.pid}.log"
       rotated_path = "#{log_path}.1"

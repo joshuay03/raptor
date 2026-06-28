@@ -7,8 +7,8 @@ require_relative "version"
 
 module Raptor
   # Shared HTTP utilities used by both the HTTP/1.x and HTTP/2 handlers:
-  # Rack env keys that aren't provided by Rack itself and low-level socket
-  # writing.
+  # Rack env keys that aren't provided by Rack itself, low-level socket
+  # writing, and Common Log Format access-log formatting.
   #
   module Http
     WRITE_TIMEOUT = 5
@@ -49,6 +49,27 @@ module Raptor
           raise WriteError
         end
       end
+    end
+
+    # Writes a Common Log Format entry to `io`. Write failures are silently
+    # ignored.
+    #
+    # @param io [IO] the destination IO
+    # @param env [Hash] the Rack environment
+    # @param status [Integer] the response status code
+    # @param size [String] the response body size in bytes, or `-` if unknown
+    # @param remote_addr [String] the client IP address
+    # @return [void]
+    #
+    # @rbs (IO io, Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
+    def self.write_access_log(io, env, status, size, remote_addr)
+      timestamp = Time.now.strftime("%d/%b/%Y:%H:%M:%S %z")
+      method = env[Rack::REQUEST_METHOD]
+      query = env[Rack::QUERY_STRING]
+      path = query.empty? ? env[Rack::PATH_INFO] : "#{env[Rack::PATH_INFO]}?#{query}"
+      protocol = env[Rack::SERVER_PROTOCOL]
+
+      io.puts(%(#{remote_addr} - - [#{timestamp}] "#{method} #{path} #{protocol}" #{status} #{size})) rescue nil
     end
   end
 end

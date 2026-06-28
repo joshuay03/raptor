@@ -250,6 +250,7 @@ module Raptor
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
     # @rbs @write_timeout: Integer
+    # @rbs @access_log_io: IO?
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @initial_settings_frame: String
 
@@ -266,14 +267,16 @@ module Raptor
     # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
     # @param http2_options [Hash] HTTP/2-specific settings
     # @option http2_options [Integer] :max_concurrent_streams maximum HTTP/2 concurrent streams per connection
+    # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize(app, server_port, connection_options: {}, http2_options: {}, on_error: nil)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize(app, server_port, connection_options: {}, http2_options: {}, access_log_io: nil, on_error: nil)
       @app = app
       @server_port = server_port
       @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
+      @access_log_io = access_log_io
       @on_error = on_error
 
       parser = Http2Parser.new
@@ -645,7 +648,8 @@ module Raptor
       env = build_rack_env(headers, body, remote_addr: remote_addr)
       status, response_headers, response_body = @app.call(env)
 
-      write_http2_response(socket, writer, flow_control, stream_id, status, response_headers, response_body)
+      response_size = write_http2_response(socket, writer, flow_control, stream_id, status, response_headers, response_body)
+      write_access_log(env, status, response_size, remote_addr) if @access_log_io
     rescue => error
       write_http2_error_response(socket, writer, stream_id)
 
@@ -671,9 +675,9 @@ module Raptor
     # @param status [Integer] HTTP status code
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body responding to each
-    # @return [void]
+    # @return [String] the response body size in bytes
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> void
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> String
     def write_http2_response(socket, writer, flow_control, stream_id, status, headers, body)
       parser = Http2Parser.new
 
@@ -692,11 +696,16 @@ module Raptor
 
       encoded_headers = parser.encode_headers(header_pairs)
       body_chunks = []
-      body.each { |chunk| body_chunks << chunk unless chunk.empty? }
+      body_bytes = 0
+      body.each do |chunk|
+        next if chunk.empty?
+        body_chunks << chunk
+        body_bytes += chunk.bytesize
+      end
 
       if body_chunks.empty?
         writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers)])
-        return
+        return "0"
       end
 
       frames = [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)]
@@ -716,6 +725,7 @@ module Raptor
       end
 
       writer.write_frames(socket, frames)
+      body_bytes.to_s
     end
 
     # Writes a 500 error response as HTTP/2 frames.
@@ -734,6 +744,20 @@ module Raptor
         socket,
         [parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded)]
       )
+    end
+
+    # Instance-level wrapper around {Http.write_access_log} that routes to
+    # the configured `@access_log_io`.
+    #
+    # @param env [Hash] the Rack environment
+    # @param status [Integer] the response status code
+    # @param size [String] the response body size in bytes, or `-` if unknown
+    # @param remote_addr [String] the client IP address
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
+    def write_access_log(env, status, size, remote_addr)
+      Http.write_access_log(@access_log_io, env, status, size, remote_addr)
     end
 
     # Builds a Rack environment hash from HTTP/2 headers and body.

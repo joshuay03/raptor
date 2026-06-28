@@ -38,8 +38,6 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @connection_options: Hash[Symbol, untyped]
-
     @http1_options: Hash[Symbol, untyped]
 
     @http2_options: Hash[Symbol, untyped]
@@ -59,6 +57,10 @@ module Raptor
     @stdout_file: String?
 
     @stderr_file: String?
+
+    @access_log_file: String?
+
+    @access_log_io: IO?
 
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
@@ -81,6 +83,8 @@ module Raptor
     @phased_restart_requested: bool
 
     @phased_restarting: bool
+
+    @connection_options: Hash[Symbol, untyped]
 
     @thread_count: Integer
 
@@ -116,6 +120,7 @@ module Raptor
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
     # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
     # @option options [String, nil] :stderr_file path to redirect stderr to, reopened on SIGHUP, or nil to disable
+    # @option options [String, nil] :access_log_file path to write Common Log Format access logs to, reopened on SIGHUP, or nil to disable
     # @option options [#call] :on_error callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
@@ -251,8 +256,8 @@ module Raptor
     # @rbs () -> void
     def log_stats: () -> void
 
-    # Redirects `$stdout` and `$stderr` to `stdout_file` and `stderr_file`
-    # when configured. No-op for either stream when its target is nil.
+    # Redirects `$stdout`, `$stderr`, and the access log to their configured
+    # paths. No-op for any stream whose target path is nil.
     #
     # @return [void]
     #
