@@ -229,7 +229,7 @@ module Raptor
         end
 
         opts.on("-b", "--bind URI", String, "Bind address (default: tcp://0.0.0.0:9292)") do |bind|
-          if @options[:binds] == DEFAULT_OPTIONS[:binds]
+          if @options[:binds].equal?(DEFAULT_OPTIONS[:binds])
             @options[:binds] = [bind]
           else
             @options[:binds] << bind

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Preserve the first `--bind` when it equals the default
+
 ## [0.8.0] - 2026-07-02
 
 - Add systemd `LISTEN_FDS` socket activation and `sd_notify` lifecycle messages
