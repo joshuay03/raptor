@@ -1,36 +1,94 @@
 steps:
-  - label: ":ruby: Ruby 4.0"
-    image: "ruby:4.0"
-    commands:
-      - ruby -v
-      - bundle install
-      - bundle exec rake ci
+  - group: ":linux: Linux"
+    key: linux
+    steps:
+      - label: ":ruby: Ruby 4.0"
+        image: "ruby:4.0"
+        commands:
+          - ruby -v
+          - bundle install
+          - bundle exec rake ci
 
-  - label: ":ruby: Ruby 4.0 +YJIT"
-    image: "ruby:4.0"
-    env:
-      RUBY_YJIT_ENABLE: "1"
-    commands:
-      - ruby -v
-      - bundle install
-      - bundle exec rake ci
+      - label: ":ruby: Ruby 4.0 +YJIT"
+        image: "ruby:4.0"
+        env:
+          RUBY_YJIT_ENABLE: "1"
+        commands:
+          - ruby -v
+          - bundle install
+          - bundle exec rake ci
 
-  - label: ":ruby: Ruby head"
-    soft_fail: true
-    image: "rubylang/ruby:master-dev"
-    commands:
-      - apt-get update && apt-get install -y libyaml-dev
-      - ruby -v
-      - bundle install
-      - bundle exec rake ci
+      - label: ":ruby: Ruby head"
+        soft_fail: true
+        image: "rubylang/ruby:master-dev"
+        commands:
+          - apt-get update && apt-get install -y libyaml-dev
+          - ruby -v
+          - bundle install
+          - bundle exec rake ci
 
-  - label: ":ruby: Ruby head +YJIT"
-    soft_fail: true
-    image: "rubylang/ruby:master-dev"
-    env:
-      RUBY_YJIT_ENABLE: "1"
-    commands:
-      - apt-get update && apt-get install -y libyaml-dev
-      - ruby -v
-      - bundle install
-      - bundle exec rake ci
+      - label: ":ruby: Ruby head +YJIT"
+        soft_fail: true
+        image: "rubylang/ruby:master-dev"
+        env:
+          RUBY_YJIT_ENABLE: "1"
+        commands:
+          - apt-get update && apt-get install -y libyaml-dev
+          - ruby -v
+          - bundle install
+          - bundle exec rake ci
+
+  - group: ":mac: macOS"
+    key: macos
+    steps:
+      - label: ":ruby: Ruby 4.0"
+        agents:
+          queue: macos
+        commands:
+          - brew install --quiet ruby@4.0
+          - export PATH="$(brew --prefix ruby@4.0)/bin:$PATH"
+          - bundle config set --local path .bundle
+          - ruby -v
+          - bundle install
+          - bundle exec rake ci
+
+      - label: ":ruby: Ruby 4.0 +YJIT"
+        agents:
+          queue: macos
+        env:
+          RUBY_YJIT_ENABLE: "1"
+        commands:
+          - brew install --quiet ruby@4.0
+          - export PATH="$(brew --prefix ruby@4.0)/bin:$PATH"
+          - bundle config set --local path .bundle
+          - ruby -v
+          - bundle install
+          - bundle exec rake ci
+
+      - label: ":ruby: Ruby head"
+        soft_fail: true
+        agents:
+          queue: macos
+        commands:
+          - brew unlink ruby
+          - brew install --HEAD --quiet ruby
+          - export PATH="$(brew --prefix ruby)/bin:$PATH"
+          - bundle config set --local path .bundle
+          - ruby -v
+          - bundle install
+          - bundle exec rake ci
+
+      - label: ":ruby: Ruby head +YJIT"
+        soft_fail: true
+        agents:
+          queue: macos
+        env:
+          RUBY_YJIT_ENABLE: "1"
+        commands:
+          - brew unlink ruby
+          - brew install --HEAD --quiet ruby
+          - export PATH="$(brew --prefix ruby)/bin:$PATH"
+          - bundle config set --local path .bundle
+          - ruby -v
+          - bundle install
+          - bundle exec rake ci
