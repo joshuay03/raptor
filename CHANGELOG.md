@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-07
+
 - Reuse a per-thread response buffer for status lines and headers
 - Pin each worker to a distinct CPU when workers fit 1:1
 - Batch response header and body writes into a single `writev(2)` syscall

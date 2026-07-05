@@ -1,6 +1,6 @@
 # Raptor vs Puma: A Design Comparison
 
-Raptor is a Ruby web server designed around Ruby 4's Ractors. On the workload every keep-alive HTTP/1.1 API spends most of its time doing, Raptor is roughly twice as fast as the latest Puma release on the same hardware. It also speaks HTTP/2 natively, which Puma does not. This document is a systems-design walkthrough of how it manages both.
+Raptor is a Ruby web server designed around Ruby 4's Ractors. On CPU-bound HTTP/1.1 workloads it holds a real edge over the latest Puma release on the same hardware; on IO-bound work where the request sleep dominates, both servers land close to parity. It also speaks HTTP/2 natively, which Puma does not. This document is a systems-design walkthrough of how it manages both.
 
 ## Why this document exists
 
@@ -12,11 +12,12 @@ This document walks through both servers at systems-design depth. By the end you
 
 ## The shape of the benchmark
 
-The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma release, run on the same hardware with the same Rack app, 4 workers, 3 threads, 12 concurrent connections, on a recent Ruby with YJIT enabled. Rather than pin specific numbers into this document (they drift with Ruby versions and hardware), the shape of the result is what matters:
+The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma release, run on the same hardware with the same Rack app, 4 workers, 3 threads, 24 concurrent connections, on a recent Ruby with YJIT enabled. Two workload profiles are measured: **IO-bound** (each request sleeps for a random 5-50ms then returns a small JSON response) and **CPU-bound** (each request serialises a JSON array of 20-200 items). Rather than pin specific numbers into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
 
-- On plain HTTP/1.1 with no keep-alive, Raptor holds a modest lead in the mid teens of a percent.
-- On HTTP/1.1 with keep-alive, Raptor is roughly twice as fast.
-- On HTTP/2, there is no comparison: Puma does not implement it.
+- On IO-bound work, both servers land near parity across all protocols; throughput is bounded by the per-request sleep and the benchmark client's concurrency, not by anything the server does.
+- On CPU-bound HTTP/1.1 without keep-alive, Raptor holds a meaningful lead; per-request parsing and response-writing overhead is a real fraction of the work.
+- On CPU-bound HTTP/1.1 with keep-alive, Raptor still leads but by a smaller margin; the app thread's JSON-building work dominates.
+- On HTTP/2 there is no comparison, since Puma does not implement it.
 
 The rest of this doc explains why the shape looks like that.
 
@@ -29,6 +30,7 @@ The rest of this doc explains why the shape looks like that.
 | Threading model        | `ThreadPool` with `Mutex` + `ConditionVariable`; autoscaling min/max, or fixed when min == max | Fixed-size `AtomicThreadPool` (CAS-based queue)                              |
 | True parallelism       | None inside a worker (GVL); parser runs on the app thread | Ractors parse HTTP in parallel with the app; each Ractor has its own GVL     |
 | I/O multiplexing       | `nio4r` reactor for keep-alive idle and slow reads      | `nio4r` reactor for the same, plus a red-black tree for O(log n) timeouts    |
+| Reuseport dispatch     | Four-tuple hash (kernel default)                        | Load-aware via an attached BPF program (Linux)                               |
 | Work queue             | `Mutex` + `ConditionVariable` + waiter list                 | Lock-free CAS on an `Atom` (Banker's queue)                                  |
 | HTTP/2                 | Not implemented                                         | Native C parser + HPACK, lock-free per-connection frame writer               |
 | Keep-alive fast path   | Same-thread inline dispatch when spare threads exist    | Same-thread inline plus a `wait_readable(1ms)` micro-poll on the app thread  |
@@ -171,6 +173,8 @@ Systemd socket activation is a native feature and slots straight into this model
 
 Master-to-worker communication does not use pipes. Every worker writes its stats (pid, request count, backlog, busy threads, last checkin timestamp, booted flag) into a fixed-size slot in an anonymous shared-memory region allocated with `mmap-ruby` before the fork. The master reads the region directly. There is no serialisation, no pipe drain, no signal to trigger the read; it is 49 bytes per worker of native memory. `bundle exec raptor stats` prints the region as JSON.
 
+On Linux, each worker pins itself to a distinct CPU via `sched_setaffinity` when the worker count fits within the process's allowed CPU set, so it stays on one core and its L1/L2 caches stay warm. When workers outnumber available CPUs the pin is skipped and the kernel scheduler manages placement.
+
 ### Per-worker threading model
 
 This is where Raptor diverges dramatically. Inside a worker there are five kinds of concurrent activity:
@@ -202,15 +206,17 @@ The knock-on effect is that reading pool state to make backpressure decisions is
 
 ### I/O model
 
-The server accept loop is a simple `IO.select` + `accept_nonblock` loop, exactly like Puma. What is different is the check right before `accept`:
+The server accept loop is an `IO.select` + `accept_nonblock` loop, similar to Puma. What is different is the check right before `accept`:
 
 ```ruby
-next if @reactor.backlog >= [(@thread_pool.size * 1.2).ceil, MIN_BACKPRESSURE_THRESHOLD].max
+backpressure_threshold = [(@thread_pool.size * 1.2).ceil, MIN_BACKPRESSURE_THRESHOLD].max
+# ...
+next if @reactor.backlog >= backpressure_threshold
 ```
 
-where `@reactor.backlog` is `thread_pool.queue_size + thread_pool.active_count`. If the total load on the thread pool is at 120% of the pool size, this worker stops accepting until it drains. Since `MIN_BACKPRESSURE_THRESHOLD` is 64, a very small pool (say, 3 threads) still accepts up to 64 concurrent items before backing off; this prevents backpressure from firing spuriously in normal traffic.
+where `@reactor.backlog` is `thread_pool.queue_size + thread_pool.active_count`. If the total load on the thread pool is at 120% of the pool size, this worker stops accepting until it drains. `MIN_BACKPRESSURE_THRESHOLD` is 8, so small pools (say, 3 threads) trip backpressure at 8 concurrent items rather than at 120% of a very small number; the floor keeps saturated workers signaling early so the load-aware dispatcher (below) has time to route around them.
 
-Because Raptor is always in cluster mode and every worker listens on the same socket via `SO_REUSEPORT`, load balancing across workers happens naturally at the kernel level. If this worker is saturated and stops calling `accept`, other workers pick up the slack.
+Because Raptor is always in cluster mode and every worker listens in the same `SO_REUSEPORT` group, load balancing across workers happens at the kernel level. On Linux, Raptor attaches a small BPF program to the reuseport group. Each worker binds its own listener registered in a sockmap, and a dedicated reporter thread publishes the worker's current reactor backlog into a loads map at 100 Hz. The BPF program consults the map on every incoming connection and routes it to the least-loaded worker, with a random tie-break when loads are equal. If the `libbpf-ruby` gem is not installed or the BPF object has not been compiled, Raptor falls back silently to the default four-tuple-hash routing; if the kernel refuses the program, startup raises. Either way, if a worker is saturated and stops calling `accept`, other workers pick up the slack.
 
 The reactor is again an NIO::Selector loop. Two things make it different from Puma's:
 
@@ -230,25 +236,25 @@ On timeout, the reactor writes `HTTP/1.1 408 Request Timeout` and closes.
 
 ### HTTP/1.1 request lifecycle
 
-The path of a single HTTP/1.1 request from `accept` to response:
+An HTTP/1.1 request takes one of two paths. The **fast path** fires when the first `read_nonblock` on the accepted socket produces the complete request. `eager_accept` on the server thread reads, parses the request inline, and pushes it straight to the thread pool, bypassing both the reactor and the Ractor pool. An app thread then builds the Rack env, calls the app, and writes the response.
 
-1. Server thread `IO.select` returns a readable listener.
-2. Server thread `accept_nonblock` produces a client socket. It creates a state hash containing the socket, an empty buffer, and metadata (remote address, URL scheme).
-3. Server thread pushes the state into the reactor by calling `@reactor.add(state)`.
-4. Reactor thread registers the socket with the NIO selector, adds a `TimeoutClient` node to the RBT with `first_data_timeout`, and moves on.
-5. Bytes arrive. Selector wakes. Reactor calls `read_nonblock(64KB)` on the socket, appends to the state's buffer.
-6. Reactor calls `Ractor.make_shareable(state)` and pushes the state onto the Ractor pool via `ractor_pool << shareable_state`.
-7. Pipeline Ractor parses the buffer using the C extension. If the request has a chunked body, chunk decoding runs inline in the pipeline Ractor as a pure function. The parser returns a result including whether the request is complete.
-8. Result travels through `Ractor::Port` to the collector thread.
-9. Collector thread receives the parsed result. If incomplete, state goes back into the reactor to await more data. If complete, the socket is deregistered from the reactor and a proc is pushed to the `AtomicThreadPool`.
-10. An app thread pops the proc. The proc builds a Rack env, calls `@app.call(env)`, and writes the response back to the socket.
-11. If the response signals keep-alive (HTTP/1.1 default without `Connection: close`), the app thread enters the **eager keep-alive loop**.
+The **pipeline path** fires when the first read returns `WaitReadable` (bytes have not arrived yet) or leaves the request incomplete. It goes:
 
-That eager keep-alive loop is the difference maker for the 2x benchmark gap. Rather than immediately returning the connection to the reactor after a response, the app thread does:
+1. `eager_accept` calls `@reactor.add(state)` with the socket, an empty buffer, and metadata (remote address, URL scheme).
+2. Reactor thread registers the socket with the NIO selector and adds a `TimeoutClient` node to the RBT with `first_data_timeout`.
+3. Bytes arrive. Selector wakes. Reactor calls `read_nonblock(64KB)`, appends to the state's buffer.
+4. Reactor calls `Ractor.make_shareable(state)` and pushes the state onto the Ractor pool via `ractor_pool << shareable_state`.
+5. Pipeline Ractor parses the buffer using the C extension. If the request has a chunked body, chunk decoding runs inline in the pipeline Ractor as a pure function. The parser returns a result including whether the request is complete.
+6. Result travels through `Ractor::Port` to the collector thread.
+7. Collector thread receives the parsed result. If incomplete, state goes back into the reactor to await more data. If complete, the socket is deregistered from the reactor and a proc is pushed to the `AtomicThreadPool`.
+8. An app thread pops the proc, builds a Rack env, calls `@app.call(env)`, and writes the response.
+9. If the response signals keep-alive (HTTP/1.1 default without `Connection: close`), the app thread enters the **eager keep-alive loop**.
+
+That eager keep-alive loop is the biggest single contributor to Raptor's keep-alive edge. Rather than immediately returning the connection to the reactor after a response, the app thread does:
 
 ```ruby
 loop do
-  unless socket.wait_readable(KEEPALIVE_READ_TIMEOUT)  # 0.001 s
+  unless socket.wait_readable(KEEPALIVE_READ_TIMEOUT) # 0.001 s
     reactor.persist(socket, id, request_count, ...)
     return
   end
@@ -267,7 +273,7 @@ The `reactor.persist` call re-registers the socket with the reactor using `persi
 
 Raptor speaks HTTP/2 on TLS connections where the client negotiates it via ALPN. The binder sets `alpn_protocols = ["h2", "http/1.1"]` on the SSL context and the ALPN callback picks h2 whenever the client offers it. Puma does not do this. Puma's SSL context does not advertise `h2` in ALPN, so clients transparently fall back to HTTP/1.1.
 
-Once ALPN selects h2, the server thread sends the initial `SETTINGS` frame, then registers the socket in the reactor with `protocol: :http2` plus a fresh `Writer` and `FlowControl` for the connection.
+Once ALPN selects h2, the initial `SETTINGS` frame is written and the socket is registered in the reactor with `protocol: :http2` plus a fresh `Writer` and `FlowControl` for the connection.
 
 From there the shape is similar to HTTP/1.1:
 
@@ -285,7 +291,7 @@ So under contention, only one thread does socket I/O at a time (because a socket
 
 Flow control uses similar CAS-protected atoms. The connection-level window and the per-stream windows live in separate `Atom` cells so the common case (connection window has capacity) doesn't require per-stream book-keeping. `acquire` on the `FlowControl` atomically deducts from the connection window; if that succeeds it also deducts from the stream window. If either window is exhausted, the caller sleeps 1ms and retries. Under real traffic this practically never happens because the peer's window is refilled proactively via `WINDOW_UPDATE` frames as we drain the client's buffered body bytes.
 
-Frame processing also has an eager loop. After processing one batch of frames, the reactor tries to `read_nonblock` one more time to see if the next batch is already available. Up to four rounds are consumed inline before handing back to the reactor. This is the same principle as the HTTP/1.1 eager keep-alive: amortise the reactor round-trip when the client is actively sending.
+Frame processing also has an eager loop. After processing one batch of frames, the h2 handler tries to `read_nonblock` one more time to see if the next batch is already available. Up to four rounds are consumed inline before handing back to the reactor. This is the same principle as the HTTP/1.1 eager keep-alive: amortise the reactor round-trip when the client is actively sending.
 
 ### Raptor request flow diagram
 
@@ -325,7 +331,8 @@ flowchart TB
         KA{"Keep-alive?"}
         EAG{"wait_readable<br/>1ms"}
 
-        SRV -->|"new socket, reactor.add"| RCT
+        SRV -->|"eager_accept, parse inline, push proc"| ATP
+        SRV -->|"data not ready or incomplete, reactor.add"| RCT
         RCT -->|"Ractor.make_shareable state"| RP
         RP -->|"result via Ractor::Port"| COL
         COL --> CHK
@@ -395,13 +402,13 @@ Under moderate load these look equivalent. Under high concurrency (many threads 
 
 The difference is subtle but the numbers show it up. Real-world clients pipelining requests often send the next request 100-500 microseconds after the previous response completes. Puma's `eagerly_finish` catches the case where bytes are already in the socket buffer; Raptor's `wait_readable(1ms)` catches both the "already buffered" case and the "arriving very shortly" case. And Raptor never has to hand the socket back to a different thread; the response-writing thread parses the next request itself.
 
-This is where most of the 2x keep-alive gap comes from. Under the benchmark load, with a small number of concurrent connections all doing keep-alive, every connection is issuing back-to-back requests, and Raptor's app threads are essentially processing a single connection each in a tight loop until the connection stops. Puma's app threads do the same when they can, but the coordination overhead between thread pool and reactor for the transitions costs meaningfully more.
+This is where most of Raptor's keep-alive edge comes from. Under the benchmark load, with a small number of concurrent connections all doing keep-alive, every connection is issuing back-to-back requests, and Raptor's app threads are essentially processing a single connection each in a tight loop until the connection stops. Puma's app threads do the same when they can, but the coordination overhead between thread pool and reactor for the transitions costs meaningfully more.
 
 ### Backpressure
 
 **Puma.** Cluster mode uses `accept_loop_delay` (sleep proportional to busy ratio) to prevent thundering herd across workers. Single-worker backpressure is implicit: if all threads are busy and the queue is growing, new accepts pile up in the kernel accept queue. Puma does have `queue_requests` (default true) which pushes partial requests into the reactor, freeing the accept loop, but there is no explicit "stop accepting" signal from the worker.
 
-**Raptor.** Explicit backpressure formula, read every iteration of the accept loop: `if backlog >= max(pool_size * 1.2, 64), skip accept`. When a worker is saturated, other workers (all listening via `SO_REUSEPORT`) pick up the traffic. There is no coordination between workers; the kernel does the balancing.
+**Raptor.** Explicit backpressure formula, read every iteration of the accept loop: `if backlog >= max(pool_size * 1.2, 8), skip accept`. When a worker is saturated, other workers pick up the traffic. On Linux, an eBPF program attached to the reuseport group actively routes new connections to the least-loaded worker (see the I/O model section); elsewhere Raptor relies on the kernel's default four-tuple-hash routing.
 
 ### Shared state (worker ↔ master)
 
@@ -421,11 +428,15 @@ At the throughput numbers the benchmark shows, with only a handful of concurrent
 
 ### Response writing
 
-Both servers do the same fundamental things: `TCP_CORK` on Linux to batch small responses, `IO.copy_stream` for File bodies (which invokes the sendfile syscall on Linux), non-blocking writes with `wait_writable(timeout)` on EAGAIN, chunked transfer encoding for enumerable bodies without a known length. There is no meaningful performance difference here.
+Both servers do the same fundamental things: `TCP_CORK` on Linux to batch small responses, `IO.copy_stream` for File bodies (which invokes the sendfile syscall on Linux), non-blocking writes with `wait_writable(timeout)` on EAGAIN, chunked transfer encoding for enumerable bodies without a known length.
+
+On the HTTP/1.1 path, Raptor has a small `writev(2)` C extension (`Raptor::VectorIO`) that scatter-writes the status line, headers, and body in a single syscall for non-chunked responses. Puma sends the same content over multiple `write` calls batched by `TCP_CORK` at the kernel; Raptor collapses that to one syscall in userspace. The saving is a few microseconds per response, but it stacks on top of every h1 response.
+
+HTTP/1.1 responses also reuse a per-thread String buffer for the status line and headers rather than allocating one per response. The buffer grows once to fit the largest response the thread has served and stays that size afterwards, so subsequent responses on that thread skip the allocation entirely.
 
 ### Keep-alive request by request
 
-Because the keep-alive fast path is where the 2x gap actually shows up, here is each server processing three back-to-back requests on the same connection. Drawn separately so the participant columns stay wide enough to read. Compare the number of boundaries each request has to cross.
+Because the keep-alive fast path is where Raptor's throughput edge shows up, here is each server processing three back-to-back requests on the same connection. Drawn separately so the participant columns stay wide enough to read. Compare the number of boundaries each request has to cross.
 
 **Puma, three keep-alive requests:**
 
@@ -495,34 +506,27 @@ Puma has to bounce Request 3 through the reactor and back through the mutex-prot
 
 ## Part IV: What Raptor's design buys you
 
-### HTTP/1.1 without keep-alive: the modest lead
+### IO-bound work, close to parity
 
-Every request opens a new TCP connection, does one round-trip, and closes. In this scenario the app-thread cost dominates (accept, parse, app call, write, close). Raptor's parallel parsing helps some, but the parse is a small fraction of the total time.
+On the IO-bound benchmark profile, each request sleeps for a random 5-50ms then returns a small JSON payload. Throughput is bounded by the per-request sleep and the benchmark client's 24-connection concurrency; both servers push those requests through their pipelines faster than the sleep completes, so what shows up in the numbers is the workload cost itself, not the server cost. Raptor and Puma land within a few percent of each other in both keep-alive modes because there is nothing to differentiate.
 
-The mid-teens percentage gap here is mostly the sum of small wins:
+Real applications that spend most of their time waiting on a database or an upstream service look like this. The choice between Raptor and Puma there is not throughput-driven.
 
-- Backpressure check is a lock-free read in Raptor, a slightly more expensive check in Puma.
-- Reactor timeout tree traversal is O(log n) in Raptor, O(n) in Puma. At a handful of concurrent connections both are cheap, but the tree is cheaper.
-- Work queue enqueue is a CAS in Raptor, a mutex acquire in Puma.
-- Ractor parsing runs on a separate GVL, so the app thread is not competing with the parser for CPU cycles.
+### CPU-bound HTTP/1.1, where the edge shows up
 
-None of these individually is a game-changer, but stacked they add up to a modest edge.
+On the CPU-bound benchmark profile, each request serialises a JSON array of 20-200 items. Per-request cost is real Ruby work, and the coordination overhead of pushing a request through the server matters.
 
-### HTTP/1.1 with keep-alive: the 2x
+**Without keep-alive**, every request opens a fresh TCP connection, gets parsed, dispatched, served, and closes. Raptor lands materially ahead of Puma. The wins that individually add a few percent (writev-batched response writes, CAS-based work queue, per-worker CPU affinity) stack more prominently here because per-request coordination is a larger fraction of total time than under keep-alive.
 
-This is where the architecture pays for itself. Every connection is doing back-to-back requests, so the marginal cost of each request is essentially "parse, call app, write response, do it again". The connection setup cost has amortised to zero.
+**With keep-alive**, Raptor still leads but by a smaller margin. Every connection amortises accept and TCP-setup costs to zero, and the app thread's JSON-building work dominates the per-request budget. The eager keep-alive loop keeps both servers close to their pool ceiling, and Raptor's coordination-overhead advantages become a smaller relative slice.
 
-Raptor's eager keep-alive loop keeps the socket on the same app thread for the entire burst. Once the response is written, the same thread waits 1ms and, if bytes arrive, parses the next request inline without going anywhere near the Ractor pool or the reactor. There is essentially no thread pool churn, no reactor round-trip, and no mutex contention on the connection or the queue.
+Raptor's eager keep-alive loop is still doing real work here; it keeps the socket on the same app thread for the entire burst, avoiding the reactor round-trip Puma has to make between requests. But when the work per request is large enough, that round-trip is a smaller share of the total.
 
-Puma has to move the socket between thread pool and reactor between requests in most cases. Even the fast inline path (`has_back_to_back_requests?`) has to check pool waiting threads under a mutex before deciding to loop. And every enqueue and dequeue on the pool costs the mutex.
-
-At high request frequency, where each request is only tens of microseconds of real work, these coordination overheads become the dominant cost. Raptor pays roughly half as much of them, hence roughly twice the throughput.
-
-### HTTP/2: a category to itself
+### HTTP/2, a category to itself
 
 Puma does not implement HTTP/2. Raptor does, natively, with a Ractor-safe parser, HPACK, per-stream flow control, and a lock-free frame writer. If your clients default to h2 (most browsers, `curl --http2`, gRPC-flavoured stacks, most modern SDKs), or if you terminate TLS at your app rather than upstream, this alone is decisive: on Puma you silently fall back to HTTP/1.1 and lose multiplexing, header compression, and prioritisation.
 
-Beyond parity, Raptor's HTTP/2 throughput in the benchmark is on the same order as its HTTP/1.1 keep-alive throughput, despite each connection multiplexing dozens of concurrent streams into a single socket. That only happens if the per-stream coordination is essentially free. The lock-free `Writer` and flow-control atoms are doing real work here. If they used mutexes, throughput would be capped by lock contention rather than by CPU.
+Beyond parity, Raptor's HTTP/2 CPU-bound throughput in the benchmark is on the same order as its HTTP/1.1 keep-alive throughput on the same profile, despite each connection multiplexing dozens of concurrent streams into a single socket. That only happens if the per-stream coordination is essentially free. The lock-free `Writer` and flow-control atoms are doing real work here. If they used mutexes, throughput would be capped by lock contention rather than by CPU.
 
 ## Part V: What Raptor gives up
 
@@ -532,7 +536,7 @@ No design comes free. Two disclosures matter most.
 
 **Ruby version.** Raptor requires Ruby 4.0 because it depends on `Ractor::Port` and on Ractor internals having stabilised. Puma works on 3.0 and up. If you need to support older Ruby, Puma wins by default.
 
-A handful of smaller trade-offs are worth naming briefly. Raptor pays some minimum-latency overhead per request because of the Ractor crossing, so at extremely low concurrency Puma's simpler flow can edge ahead; the eager-parse path on the server thread hides most of this in practice. Raptor's core dependencies (`ractor-pool`, `atomic-ruby`, `red-black-tree`, `mmap-ruby`) are libraries I wrote specifically to make it work, which is either "purpose-built" or "narrower testing surface" depending on how you look at it. Debugging is harder because control flow crosses Ractor and thread boundaries, so tracing a request end-to-end means stitching several stack traces together. Raptor has no single-process mode; on a single-CPU container it wastes a small amount of coordination overhead. And Puma's `fork_worker: true` refork mode is a genuinely clever answer to CoW decay over time that Raptor has no equivalent for.
+A handful of smaller trade-offs are worth naming briefly. Raptor pays some minimum-latency overhead per request because of the Ractor crossing, so at extremely low concurrency Puma's simpler flow can edge ahead; the eager-parse path on the server thread hides most of this in practice. Raptor's core dependencies (`ractor-pool`, `atomic-ruby`, `red-black-tree`, `mmap-ruby`, `libbpf-ruby`) are libraries I wrote specifically to make it work, which is either "purpose-built" or "narrower testing surface" depending on how you look at it. Debugging is harder because control flow crosses Ractor and thread boundaries, so tracing a request end-to-end means stitching several stack traces together. Raptor has no single-process mode; on a single-CPU container it wastes a small amount of coordination overhead. And Puma's `fork_worker: true` refork mode is a genuinely clever answer to CoW decay over time that Raptor has no equivalent for.
 
 ## Part VI: The design in one line each
 
@@ -546,43 +550,8 @@ If you had to compress this whole document into a handful of one-line framings, 
 
 - **"Lock-free is not always faster, but it is always less variable."** A CAS-based queue does not out-perform a mutex in every scenario, but its worst-case latency is much better. Under contention, mutex-based code can suffer thundering herd wakeups and cache-line bouncing that a CAS design avoids.
 
-- **"The 2x on keep-alive is not one big win, it is many small wins that stack."** Eager keep-alive, RBT timeouts, CAS work queue, Ractor parsing, lock-free backpressure. Each is 10-20%; multiplied out you get 2x.
+- **"The keep-alive edge is not one big win, it is many small wins that stack."** Eager keep-alive, RBT timeouts, CAS work queue, Ractor parsing, lock-free backpressure. Each adds a few percent and stacked they produce a measurable lead.
 
 - **"HTTP/2 is not a nice-to-have; it changes the arithmetic."** With HTTP/2, one client connection can be doing dozens of requests concurrently. Suddenly every serialisation point in the server becomes a bottleneck. The lock-free primitives Raptor uses for HTTP/1.1 are not optional for HTTP/2; they are structural.
 
 - **"This is what Ruby 4 lets you do."** `Ractor::Port`, `Ractor.shareable_proc`, `rb_ext_ractor_safe`, native-extension Ractor safety. These are all recent additions. Raptor is essentially a demo of what becomes practical when you have them.
-
-## Appendix: Key file references
-
-For anyone wanting to read the code that backs up the claims in this doc, the important files:
-
-**Raptor:**
-- `lib/raptor/cluster.rb`: master + worker orchestration
-- `lib/raptor/server.rb`: accept loop with backpressure
-- `lib/raptor/reactor.rb`: NIO loop plus RBT timeouts
-- `lib/raptor/http1.rb`: HTTP/1.1 parser dispatch, eager keep-alive loop, response writing
-- `lib/raptor/http2.rb`: HTTP/2 frame processing, lock-free `Writer`, `FlowControl` atoms
-- `lib/raptor/http.rb`: shared HTTP utilities
-- `lib/raptor/binder.rb`: TCP/Unix/SSL listener creation, hot-restart FD inheritance
-- `lib/raptor/stats.rb`: mmap slot format and read/write
-- `lib/raptor/systemd.rb`: `sd_notify` + `LISTEN_FDS`
-- `ext/raptor_http/raptor_http.c`: Ragel-generated Ractor-safe HTTP/1 parser
-- `ext/raptor_http2/raptor_http2.c`: HTTP/2 parser + HPACK
-- `.bundle/.../ractor-pool-0.4.0/lib/ractor-pool.rb`: coordinator + workers + `Ractor::Port`
-- `.bundle/.../atomic-ruby-0.13.0/lib/atomic-ruby/atomic_thread_pool.rb`: CAS work queue
-- `.bundle/.../red-black-tree-0.1.10/lib/red-black-tree.rb`: reactor timeout tree
-
-**Puma:**
-- `lib/puma/server.rb`: accept loop, `process_client`, keep-alive dispatch
-- `lib/puma/reactor.rb`: NIO loop, sorted timeout list
-- `lib/puma/thread_pool.rb`: autoscaling `Mutex`+`ConditionVariable` pool
-- `lib/puma/client.rb`: parser dispatch, chunked body, body spooling
-- `lib/puma/response.rb`: response writing, chunked/CL/sendfile paths
-- `lib/puma/cluster.rb`: master supervision
-- `lib/puma/cluster/worker.rb`: worker main loop
-- `lib/puma/binder.rb`: listener creation, `LISTEN_FDS`
-- `lib/puma/minissl.rb`: SSL wrapping
-- `lib/puma/plugin/systemd.rb`: `sd_notify`
-- `ext/puma_http11/puma_http11.c`: parser bindings
-- `ext/puma_http11/http11_parser.rl`: Ragel source
-- `ext/puma_http11/mini_ssl.c`: SSL engine
