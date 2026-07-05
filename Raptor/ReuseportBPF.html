@@ -384,6 +384,11 @@ program. Skips non-tcp URIs.</p>
       <pre class="lines">
 
 
+73
+74
+75
+76
+77
 78
 79
 80
@@ -400,15 +405,10 @@ program. Skips non-tcp URIs.</p>
 91
 92
 93
-94
-95
-96
-97
-98
-99</pre>
+94</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 78</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 73</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_create_worker_listeners'>create_worker_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='comma'>,</span> <span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='ivar'>@load_key</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -496,6 +496,8 @@ when the platform is unsupported or the kernel refused the program
       <pre class="lines">
 
 
+52
+53
 54
 55
 56
@@ -504,15 +506,10 @@ when the platform is unsupported or the kernel refused the program
 59
 60
 61
-62
-63
-64
-65
-66
-67</pre>
+62</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 54</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 52</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_setup'>setup</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_count'>worker_count</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>false</span> <span class='kw'>unless</span> <span class='id identifier rubyid_supported?'>supported?</span>
@@ -524,9 +521,6 @@ when the platform is unsupported or the kernel refused the program
 
   <span class='const'>LibBPFRuby</span><span class='period'>.</span><span class='id identifier rubyid_map_update'>map_update</span><span class='lparen'>(</span><span class='ivar'>@loads_fd</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='int'>0</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_count'>worker_count</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rparen'>)</span>
   <span class='kw'>true</span>
-<span class='kw'>rescue</span> <span class='const'>RuntimeError</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_error'>error</span>
-  <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_warn'><span class='object_link'><a href="Log.html#warn-class_method" title="Raptor::Log.warn (method)">warn</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>BPF-directed reuseport unavailable: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_error'>error</span><span class='period'>.</span><span class='id identifier rubyid_message'>message</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
-  <span class='kw'>false</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -572,12 +566,12 @@ call <code>setup</code> to initialise it.</p>
       <pre class="lines">
 
 
-39
-40
-41</pre>
+37
+38
+39</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 39</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 37</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_supported?'>supported?</span>
   <span class='const'><span class='object_link'><a href="#LIBBPF_LOADED-constant" title="Raptor::ReuseportBPF::LIBBPF_LOADED (constant)">LIBBPF_LOADED</a></span></span> <span class='op'>&amp;&amp;</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#BPF_OBJECT_PATH-constant" title="Raptor::ReuseportBPF::BPF_OBJECT_PATH (constant)">BPF_OBJECT_PATH</a></span></span><span class='rparen'>)</span>
@@ -629,16 +623,16 @@ call <code>setup</code> to initialise it.</p>
       <pre class="lines">
 
 
+102
+103
+104
+105
+106
 107
-108
-109
-110
-111
-112
-113</pre>
+108</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 107</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 102</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_load'>update_load</span><span class='lparen'>(</span><span class='id identifier rubyid_load'>load</span><span class='rparen'>)</span>
   <span class='ivar'>@load_value</span><span class='period'>.</span><span class='id identifier rubyid_setbyte'>setbyte</span><span class='lparen'>(</span><span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_load'>load</span> <span class='op'>&amp;</span> <span class='int'>0xff</span><span class='rparen'>)</span>
@@ -657,7 +651,7 @@ call <code>setup</code> to initialise it.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jul  5 05:35:34 2026 by
+  Generated on Sun Jul  5 05:49:27 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
