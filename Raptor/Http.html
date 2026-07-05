@@ -349,6 +349,28 @@ writing, and Common Log Format access-log formatting.</p>
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#socket_writev-class_method" title="socket_writev (class method)">.<strong>socket_writev</strong>(socket, strings, timeout: WRITE_TIMEOUT)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Writes <code>strings</code> in full via a single <code>writev(2)</code> syscall when possible, falling back to per-string writes on partial results.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#write_access_log-class_method" title="write_access_log (class method)">.<strong>write_access_log</strong>(io, env, status, size, remote_addr)  &#x21d2; void </a>
     
 
@@ -480,7 +502,6 @@ writing, and Common Log Format access-log formatting.</p>
       <pre class="lines">
 
 
-38
 39
 40
 41
@@ -494,10 +515,11 @@ writing, and Common Log Format access-log formatting.</p>
 49
 50
 51
-52</pre>
+52
+53</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 38</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 39</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_socket_write'>socket_write</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_string'>string</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='const'><span class='object_link'><a href="#WRITE_TIMEOUT-constant" title="Raptor::Http::WRITE_TIMEOUT (constant)">WRITE_TIMEOUT</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_bytes'>bytes</span> <span class='op'>=</span> <span class='int'>0</span>
@@ -511,6 +533,174 @@ writing, and Common Log Format access-log formatting.</p>
       <span class='kw'>retry</span>
     <span class='kw'>rescue</span> <span class='const'>IOError</span>
       <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="Http/WriteError.html" title="Raptor::Http::WriteError (class)">WriteError</a></span></span>
+    <span class='kw'>end</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="socket_writev-class_method">
+  
+    .<strong>socket_writev</strong>(socket, strings, timeout: WRITE_TIMEOUT)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Writes <code>strings</code> in full via a single <code>writev(2)</code> syscall when possible,
+falling back to per-string writes on partial results. Bounded by
+<code>timeout</code> so a slow client can't pin the writing thread.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>socket</span>
+      
+      
+        <span class='type'>(<tt>TCPSocket</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the socket to write to</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>strings</span>
+      
+      
+        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the buffers to write in order</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>timeout</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>WRITE_TIMEOUT</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>seconds to wait for the socket to become writable on each retry</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>timeout:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>WRITE_TIMEOUT</tt>)</em>
+      
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="Http/WriteError.html" title="Raptor::Http::WriteError (class)">WriteError</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>if the socket is not writable within the timeout or raises IOError</p></div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 66</span>
+
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_socket_writev'>socket_writev</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_strings'>strings</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='const'><span class='object_link'><a href="#WRITE_TIMEOUT-constant" title="Raptor::Http::WRITE_TIMEOUT (constant)">WRITE_TIMEOUT</a></span></span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_total'>total</span> <span class='op'>=</span> <span class='id identifier rubyid_strings'>strings</span><span class='period'>.</span><span class='id identifier rubyid_sum'>sum</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:bytesize</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_total'>total</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
+
+  <span class='kw'>begin</span>
+    <span class='id identifier rubyid_written'>written</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorIO.html" title="Raptor::VectorIO (module)">VectorIO</a></span></span><span class='period'>.</span><span class='id identifier rubyid_writev_nonblock'><span class='object_link'><a href="VectorIO.html#writev_nonblock-class_method" title="Raptor::VectorIO.writev_nonblock (method)">writev_nonblock</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_strings'>strings</span><span class='rparen'>)</span>
+  <span class='kw'>rescue</span> <span class='const'>IO</span><span class='op'>::</span><span class='const'>WaitWritable</span>
+    <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="Http/WriteError.html" title="Raptor::Http::WriteError (class)">WriteError</a></span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_wait_writable'>wait_writable</span><span class='lparen'>(</span><span class='id identifier rubyid_timeout'>timeout</span><span class='rparen'>)</span>
+    <span class='kw'>retry</span>
+  <span class='kw'>rescue</span> <span class='const'>IOError</span>
+    <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="Http/WriteError.html" title="Raptor::Http::WriteError (class)">WriteError</a></span></span>
+  <span class='kw'>end</span>
+
+  <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_written'>written</span> <span class='op'>==</span> <span class='id identifier rubyid_total'>total</span>
+
+  <span class='id identifier rubyid_offset'>offset</span> <span class='op'>=</span> <span class='int'>0</span>
+  <span class='id identifier rubyid_strings'>strings</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_string'>string</span><span class='op'>|</span>
+    <span class='id identifier rubyid_size'>size</span> <span class='op'>=</span> <span class='id identifier rubyid_string'>string</span><span class='period'>.</span><span class='id identifier rubyid_bytesize'>bytesize</span>
+    <span class='kw'>if</span> <span class='id identifier rubyid_written'>written</span> <span class='op'>&gt;=</span> <span class='id identifier rubyid_offset'>offset</span> <span class='op'>+</span> <span class='id identifier rubyid_size'>size</span>
+      <span class='id identifier rubyid_offset'>offset</span> <span class='op'>+=</span> <span class='id identifier rubyid_size'>size</span>
+    <span class='kw'>else</span>
+      <span class='id identifier rubyid_start'>start</span> <span class='op'>=</span> <span class='id identifier rubyid_written'>written</span> <span class='op'>-</span> <span class='id identifier rubyid_offset'>offset</span>
+      <span class='id identifier rubyid_socket_write'>socket_write</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_start'>start</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span> <span class='op'>?</span> <span class='id identifier rubyid_string'>string</span> <span class='op'>:</span> <span class='id identifier rubyid_string'>string</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='id identifier rubyid_start'>start</span><span class='op'>..</span><span class='op'>-</span><span class='int'>1</span><span class='rparen'>)</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='id identifier rubyid_timeout'>timeout</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_offset'>offset</span> <span class='op'>+=</span> <span class='id identifier rubyid_size'>size</span>
+      <span class='id identifier rubyid_written'>written</span> <span class='op'>=</span> <span class='id identifier rubyid_offset'>offset</span>
     <span class='kw'>end</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
@@ -618,18 +808,18 @@ ignored.</p>
       <pre class="lines">
 
 
-65
-66
-67
-68
-69
-70
-71
-72
-73</pre>
+106
+107
+108
+109
+110
+111
+112
+113
+114</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 65</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 106</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_write_access_log'>write_access_log</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_size'>size</span><span class='comma'>,</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_timestamp'>timestamp</span> <span class='op'>=</span> <span class='const'>Time</span><span class='period'>.</span><span class='id identifier rubyid_now'>now</span><span class='period'>.</span><span class='id identifier rubyid_strftime'>strftime</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>%d/%b/%Y:%H:%M:%S %z</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -650,7 +840,7 @@ ignored.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jul  5 10:54:30 2026 by
+  Generated on Sun Jul  5 11:21:28 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
