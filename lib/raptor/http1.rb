@@ -22,6 +22,7 @@ module Raptor
     FILE_CHUNK_SIZE = 64 * 1024
     MAX_CHUNK_OVERHEAD = 16 * 1024
     READ_BUFFER_SIZE = 64 * 1024
+    RESPONSE_BUFFER_CAPACITY = 4 * 1024
     KEEPALIVE_READ_TIMEOUT = 0.001
     MAX_KEEPALIVE_REQUESTS = 100
 
@@ -933,7 +934,8 @@ module Raptor
       end
     end
 
-    # Builds the HTTP status line string.
+    # Returns the HTTP status line for `status`. Callers must not retain the
+    # returned string across further calls on the same thread.
     #
     # @param http_version [String] "HTTP/1.1" or "HTTP/1.0"
     # @param status [Integer] HTTP status code
@@ -942,7 +944,10 @@ module Raptor
     # @rbs (String http_version, Integer status) -> String
     def build_status_line(http_version, status)
       cache = http_version == HTTP_11 ? STATUS_LINE_CACHE_11 : STATUS_LINE_CACHE_10
-      cache[status].dup
+      response = (Thread.current[:raptor_response_buffer] ||= String.new(capacity: RESPONSE_BUFFER_CAPACITY))
+      response.clear
+      response << cache[status]
+      response
     end
 
     # Writes response headers and delegates body writing to the hijack callback.

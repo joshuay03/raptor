@@ -14,6 +14,8 @@ module Raptor
 
     READ_BUFFER_SIZE: untyped
 
+    RESPONSE_BUFFER_CAPACITY: untyped
+
     KEEPALIVE_READ_TIMEOUT: ::Float
 
     MAX_KEEPALIVE_REQUESTS: ::Integer
@@ -417,7 +419,8 @@ module Raptor
     # @rbs (Hash[String, String | Array[String]] headers, Integer status) -> void
     def validate_headers: (Hash[String, String | Array[String]] headers, Integer status) -> void
 
-    # Builds the HTTP status line string.
+    # Returns the HTTP status line for `status`. Callers must not retain the
+    # returned string across further calls on the same thread.
     #
     # @param http_version [String] "HTTP/1.1" or "HTTP/1.0"
     # @param status [Integer] HTTP status code

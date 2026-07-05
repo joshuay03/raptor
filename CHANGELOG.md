@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reuse a per-thread response buffer for status lines and headers
 - Pin each worker to a distinct CPU when workers fit 1:1
 - Batch response header and body writes into a single `writev(2)` syscall
 - Close the binder as the last step of graceful shutdown
