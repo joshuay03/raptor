@@ -708,7 +708,7 @@ pipeline used by HTTP/1.1 connections.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#handle_parsed_request-instance_method" title="#handle_parsed_request (instance method)">#<strong>handle_parsed_request</strong>(result, reactor, thread_pool)  &#x21d2; void </a>
+      <a href="#handle_parsed_request-instance_method" title="#handle_parsed_request (instance method)">#<strong>handle_parsed_request</strong>(result, reactor, thread_pool, eager: true)  &#x21d2; void </a>
     
 
     
@@ -1591,8 +1591,6 @@ connection's <code>FlowControl</code>.</p>
       <pre class="lines">
 
 
-594
-595
 596
 597
 598
@@ -1603,10 +1601,12 @@ connection's <code>FlowControl</code>.</p>
 603
 604
 605
-606</pre>
+606
+607
+608</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 594</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 596</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_apply_flow_control_updates'>apply_flow_control_updates</span><span class='lparen'>(</span><span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_result'>result</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:window_updates</span><span class='rbracket'>]</span><span class='op'>&amp;.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_increment'>increment</span><span class='op'>|</span>
@@ -1725,8 +1725,6 @@ and populates all required Rack env entries.</p>
       <pre class="lines">
 
 
-774
-775
 776
 777
 778
@@ -1771,10 +1769,12 @@ and populates all required Rack env entries.</p>
 817
 818
 819
-820</pre>
+820
+821
+822</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 774</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 776</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_build_rack_env'>build_rack_env</span><span class='lparen'>(</span><span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='label'>remote_addr:</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_env'>env</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
@@ -2021,8 +2021,6 @@ the response back as HTTP/2 frames.</p>
       <pre class="lines">
 
 
-647
-648
 649
 650
 651
@@ -2038,10 +2036,12 @@ the response back as HTTP/2 frames.</p>
 661
 662
 663
-664</pre>
+664
+665
+666</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 647</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 649</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_dispatch_stream_request'>dispatch_stream_request</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='label'>remote_addr:</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_env'>env</span> <span class='op'>=</span> <span class='id identifier rubyid_build_rack_env'>build_rack_env</span><span class='lparen'>(</span><span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='label'>remote_addr:</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
@@ -2125,8 +2125,6 @@ returns nil if nothing arrives in time.</p>
       <pre class="lines">
 
 
-615
-616
 617
 618
 619
@@ -2142,10 +2140,12 @@ returns nil if nothing arrives in time.</p>
 629
 630
 631
-632</pre>
+632
+633
+634</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 615</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 617</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_eager_read_next_batch'>eager_read_next_batch</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_wait_readable'>wait_readable</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#EAGER_READ_TIMEOUT-constant" title="Raptor::Http2::EAGER_READ_TIMEOUT (constant)">EAGER_READ_TIMEOUT</a></span></span><span class='rparen'>)</span>
@@ -2173,7 +2173,7 @@ returns nil if nothing arrives in time.</p>
       <div class="method_details ">
   <h3 class="signature " id="handle_parsed_request-instance_method">
   
-    #<strong>handle_parsed_request</strong>(result, reactor, thread_pool)  &#x21d2; <tt>void</tt> 
+    #<strong>handle_parsed_request</strong>(result, reactor, thread_pool, eager: true)  &#x21d2; <tt>void</tt> 
   
 
   
@@ -2287,12 +2287,14 @@ the reactor and ractor pool hops while the connection is hot.</p>
 579
 580
 581
-582</pre>
+582
+583
+584</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 539</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_handle_parsed_request'>handle_parsed_request</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_handle_parsed_request'>handle_parsed_request</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='label'>eager:</span> <span class='kw'>true</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_socket_for'>socket_for</span><span class='lparen'>(</span><span class='id identifier rubyid_result'>result</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_socket'>socket</span>
 
@@ -2324,6 +2326,8 @@ the reactor and ractor pool hops while the connection is hot.</p>
         <span class='rparen'>)</span>
       <span class='kw'>end</span>
     <span class='kw'>end</span>
+
+    <span class='kw'>break</span> <span class='kw'>unless</span> <span class='id identifier rubyid_eager'>eager</span>
 
     <span class='id identifier rubyid_rounds'>rounds</span> <span class='op'>+=</span> <span class='int'>1</span>
     <span class='kw'>break</span> <span class='kw'>if</span> <span class='id identifier rubyid_rounds'>rounds</span> <span class='op'>&gt;=</span> <span class='const'><span class='object_link'><a href="#EAGER_MAX_ROUNDS-constant" title="Raptor::Http2::EAGER_MAX_ROUNDS (constant)">EAGER_MAX_ROUNDS</a></span></span>
@@ -2383,8 +2387,6 @@ the reactor and ractor pool hops while the connection is hot.</p>
       <pre class="lines">
 
 
-828
-829
 830
 831
 832
@@ -2399,10 +2401,12 @@ the reactor and ractor pool hops while the connection is hot.</p>
 841
 842
 843
-844</pre>
+844
+845
+846</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 828</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 830</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_populate_server_name_and_port'>populate_server_name_and_port</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_http_host'>http_host</span> <span class='op'>=</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>HTTP_HOST</span><span class='rbracket'>]</span>
@@ -2511,12 +2515,12 @@ the configured <code>@access_log_io</code>.</p>
       <pre class="lines">
 
 
-759
-760
-761</pre>
+761
+762
+763</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 759</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 761</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_access_log'>write_access_log</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_size'>size</span><span class='comma'>,</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
   <span class='const'><span class='object_link'><a href="Http.html" title="Raptor::Http (module)">Http</a></span></span><span class='period'>.</span><span class='id identifier rubyid_write_access_log'><span class='object_link'><a href="Http.html#write_access_log-class_method" title="Raptor::Http.write_access_log (method)">write_access_log</a></span></span><span class='lparen'>(</span><span class='ivar'>@access_log_io</span><span class='comma'>,</span> <span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_size'>size</span><span class='comma'>,</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
@@ -2596,18 +2600,18 @@ the configured <code>@access_log_io</code>.</p>
       <pre class="lines">
 
 
-739
-740
 741
 742
 743
 744
 745
 746
-747</pre>
+747
+748
+749</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 739</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 741</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_http2_error_response'>write_http2_error_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
@@ -2767,8 +2771,6 @@ within the peer's per-stream and connection windows.</p>
       <pre class="lines">
 
 
-681
-682
 683
 684
 685
@@ -2815,10 +2817,12 @@ within the peer's per-stream and connection windows.</p>
 726
 727
 728
-729</pre>
+729
+730
+731</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 681</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 683</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_http2_response'>write_http2_response</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
@@ -2879,7 +2883,7 @@ within the peer's per-stream and connection windows.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jul  5 10:32:54 2026 by
+  Generated on Sun Jul  5 10:54:31 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
