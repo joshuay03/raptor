@@ -4,7 +4,7 @@
     <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>
-  Module: Raptor::VectorIO
+  Module: Raptor::CPU
   
     &mdash; Documentation by YARD 0.9.44
   
@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="../css/common.css" type="text/css">
 
 <script type="text/javascript">
-  pathId = "Raptor::VectorIO";
+  pathId = "Raptor::CPU";
   relpath = '../';
 </script>
 
@@ -38,10 +38,10 @@
       <div id="header">
         <div id="menu">
   
-    <a href="../_index.html">Index (V)</a> &raquo;
+    <a href="../_index.html">Index (C)</a> &raquo;
     <span class='title'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span>
      &raquo; 
-    <span class="title">VectorIO</span>
+    <span class="title">CPU</span>
   
 </div>
 
@@ -61,7 +61,7 @@
         <div class="clear"></div>
       </div>
 
-      <div id="content"><h1>Module: Raptor::VectorIO
+      <div id="content"><h1>Module: Raptor::CPU
   
   
   
@@ -104,7 +104,29 @@
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#writev_nonblock-class_method" title="writev_nonblock (class method)">.<strong>writev_nonblock</strong>(io, strings)  &#x21d2; Object </a>
+      <a href="#count-class_method" title="count (class method)">.<strong>count</strong>  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#pin-class_method" title="pin (class method)">.<strong>pin</strong>(cpu)  &#x21d2; Object </a>
     
 
     
@@ -134,9 +156,9 @@
 
     
       <div class="method_details first">
-  <h3 class="signature first" id="writev_nonblock-class_method">
+  <h3 class="signature first" id="count-class_method">
   
-    .<strong>writev_nonblock</strong>(io, strings)  &#x21d2; <tt>Object</tt> 
+    .<strong>count</strong>  &#x21d2; <tt>Object</tt> 
   
 
   
@@ -148,59 +170,77 @@
       <pre class="lines">
 
 
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-30
-31
-32
-33
-34
-35
-36
-37
-38
-39</pre>
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 15</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 54</span>
 
-static VALUE raptor_native_writev_nonblock(VALUE self, VALUE io, VALUE strings) {
-  Check_Type(strings, T_ARRAY);
-  long len = RARRAY_LEN(strings);
-  if (len == 0) return LONG2NUM(0);
-  if (len &gt; IOV_MAX) len = IOV_MAX;
+static VALUE raptor_native_cpu_count(VALUE self) {
+#ifdef __linux__
+  cpu_set_t set;
+  CPU_ZERO(&amp;set);
+  if (sched_getaffinity(0, sizeof(set), &amp;set) &lt; 0) rb_sys_fail(&quot;sched_getaffinity&quot;);
+  return LONG2NUM((long)CPU_COUNT(&amp;set));
+#else
+  return LONG2NUM(0);
+#endif
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="pin-class_method">
+  
+    .<strong>pin</strong>(cpu)  &#x21d2; <tt>Object</tt> 
+  
 
-  int fd = rb_io_descriptor(io);
-  struct iovec *iov = alloca(len * sizeof(struct iovec));
+  
 
-  for (long i = 0; i &lt; len; i++) {
-    VALUE str = RARRAY_AREF(strings, i);
-    Check_Type(str, T_STRING);
-    iov[i].iov_base = RSTRING_PTR(str);
-    iov[i].iov_len = RSTRING_LEN(str);
-  }
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
 
-  ssize_t written;
-  while ((written = writev(fd, iov, (int)len)) &lt; 0) {
-    if (errno == EINTR) continue;
-    if (errno == EAGAIN || errno == EWOULDBLOCK) rb_raise(eEAGAINWaitWritable, &quot;writev would block&quot;);
-    rb_sys_fail(&quot;writev&quot;);
-  }
 
-  return LONG2NUM((long)written);
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 41</span>
+
+static VALUE raptor_native_pin_to_cpu(VALUE self, VALUE cpu) {
+#ifdef __linux__
+  int cpu_id = NUM2INT(cpu);
+  cpu_set_t set;
+  CPU_ZERO(&amp;set);
+  CPU_SET(cpu_id, &amp;set);
+  if (sched_setaffinity(0, sizeof(set), &amp;set) &lt; 0) rb_sys_fail(&quot;sched_setaffinity&quot;);
+  return Qtrue;
+#else
+  return Qfalse;
+#endif
 }</pre>
     </td>
   </tr>
