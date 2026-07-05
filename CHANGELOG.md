@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reuse per-thread read buffers across HTTP/1.1 requests
 - Preserve the first `--bind` when it equals the default
 
 ## [0.8.0] - 2026-07-02

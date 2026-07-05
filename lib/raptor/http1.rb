@@ -194,8 +194,10 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
     def eager_accept(socket, id, reactor, thread_pool, remote_addr, url_scheme)
-      data = begin
-        socket.read_nonblock(READ_BUFFER_SIZE)
+      buffer = (Thread.current[:raptor_read_buffer] ||= String.new(capacity: READ_BUFFER_SIZE))
+
+      begin
+        socket.read_nonblock(READ_BUFFER_SIZE, buffer)
       rescue IO::WaitReadable
         reactor.add(
           id: id,
@@ -208,9 +210,6 @@ module Raptor
         socket.close rescue nil
         return
       end
-
-      buffer = String.new
-      buffer << data
 
       while socket.respond_to?(:pending) && socket.pending > 0
         buffer << socket.read_nonblock(socket.pending)
@@ -530,8 +529,10 @@ module Raptor
           return
         end
 
-        data = begin
-          socket.read_nonblock(READ_BUFFER_SIZE)
+        buffer = (Thread.current[:raptor_read_buffer] ||= String.new(capacity: READ_BUFFER_SIZE))
+
+        begin
+          socket.read_nonblock(READ_BUFFER_SIZE, buffer)
         rescue IO::WaitReadable
           reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
           return
@@ -539,9 +540,6 @@ module Raptor
           socket.close rescue nil
           return
         end
-
-        buffer = String.new
-        buffer << data
 
         while socket.respond_to?(:pending) && socket.pending > 0
           buffer << socket.read_nonblock(socket.pending)
@@ -631,7 +629,7 @@ module Raptor
       reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
       state = {
         id: id,
-        buffer: buffer,
+        buffer: buffer.dup,
         env: env,
         request_count: request_count,
         parse_data: parse_data,
