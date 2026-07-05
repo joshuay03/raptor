@@ -236,6 +236,7 @@ module Raptor
       File.delete(@stats_file) rescue nil if @stats_file
       File.delete(@pid_file) rescue nil if @pid_file
       @stats.unmap
+      @binder.close
     end
 
     # Returns stats for all worker processes.

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Close the binder as the last step of graceful shutdown
 - Lower the backpressure floor for tighter load balancing on small pools
 - Add load-aware `SO_REUSEPORT` routing on Linux via an attached BPF program
 - Reuse per-thread read buffers across HTTP/1.1 requests
