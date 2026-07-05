@@ -38,7 +38,7 @@ module Raptor
     DEFAULT_REMOTE_ADDR = "127.0.0.1"
     DEFAULT_SERVER_NAME = "localhost"
 
-    MIN_BACKPRESSURE_THRESHOLD = 64
+    MIN_BACKPRESSURE_THRESHOLD = 8
 
     # @rbs @binder: Binder
     # @rbs @listeners: Array[TCPServer | UNIXServer | Binder::SslListener]
