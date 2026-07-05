@@ -1,38 +1,64 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "optparse"
+
+argv = ARGV.dup
+
+options = { fast: false, update_readme: false }
+OptionParser.new do |opts|
+  opts.banner = "Usage: bin/benchmark [--fast] [--update-readme]"
+  opts.on("--fast", "Use short warmup/measurement windows for quick iteration") do
+    options[:fast] = true
+  end
+  opts.on("--update-readme", "Replace the README's (Micro) Benchmarks section with the results") do
+    options[:update_readme] = true
+  end
+end.parse!
+
+unless File.exist?("/.dockerenv")
+  exec(File.expand_path("dev", __dir__), "bin/#{File.basename(__FILE__)}", *argv)
+end
+
 require "fileutils"
 require "open3"
-require "optparse"
 require "socket"
+require "tempfile"
+require "timeout"
 
 require_relative "../lib/raptor/version"
 
+system("bundle", "update", "puma", exception: true)
+system("bundle", "exec", "rake", "compile", exception: true)
+
 WORKERS = 4
 THREADS = 3
-RUNS_PER_MODE = 4
-WARMUP_SECONDS = 5
-WARMUP_GAP_SECONDS = 25
-MAIN_SECONDS = 10
-BETWEEN_RUNS_SECONDS = 30
-HEY_CONNECTIONS = 12
-H2LOAD_CONNECTIONS = 4
+HEY_CONNECTIONS = 24
+H2LOAD_CONNECTIONS = 8
 H2LOAD_STREAMS = 3
 H1_PORT = 9292
 H2_PORT = 9443
-RACKUP_PATH = "test/fixtures/hello_world.ru"
 CERT_PATH = "tmp/bench.crt"
 KEY_PATH = "tmp/bench.key"
 README_PATH = File.expand_path("../README.md", __dir__)
 BENCHMARKS_SECTION_PATTERN = /## \(Micro\) Benchmarks.*?(?=\n## |\z)/m
 
-options = { update_readme: false }
-OptionParser.new do |opts|
-  opts.banner = "Usage: bin/benchmark [--update-readme]"
-  opts.on("--update-readme", "Replace the README's (Micro) Benchmarks section with the results") do
-    options[:update_readme] = true
-  end
-end.parse!
+WORKLOADS = {
+  io: { label: "IO", fixture: "test/fixtures/bench_io.ru" },
+  cpu: { label: "CPU", fixture: "test/fixtures/bench_cpu.ru" }
+}
+
+if options[:fast]
+  RUNS_PER_MODE = 1
+  WARMUP_SECONDS = 2
+  MAIN_SECONDS = 5
+  BETWEEN_RUNS_SECONDS = 0
+else
+  RUNS_PER_MODE = 3
+  WARMUP_SECONDS = 3
+  MAIN_SECONDS = 10
+  BETWEEN_RUNS_SECONDS = 5
+end
 
 def require_tool(name)
   return if system("which #{name} > /dev/null 2>&1")
@@ -90,30 +116,43 @@ def wait_for_port_free(port, timeout: 30)
   end
 end
 
-def start_server(cmd, port)
-  pid = spawn(*cmd, out: File::NULL, err: File::NULL, pgroup: true)
-  wait_for_port(port)
-  pid
+def start_server(cmd, ports)
+  log_file = Tempfile.new(["server-", ".log"])
+  pid = spawn(*cmd, [:out, :err] => log_file.path, pgroup: true)
+  ports.each { |port| wait_for_port(port) }
+  [pid, log_file]
 rescue => error
   Process.kill("TERM", -pid) if pid
+  warn File.read(log_file.path)
+  log_file.close!
   raise error
 end
 
-def stop_server(pid, port)
-  Process.kill("TERM", -pid)
-  Process.wait(pid)
-rescue Errno::ESRCH, Errno::ECHILD
-ensure
-  wait_for_port_free(port)
+def stop_server(pid, ports, log_file)
+  Process.kill("TERM", -pid) rescue nil
+  begin
+    Timeout.timeout(5) { Process.wait(pid) }
+  rescue Timeout::Error
+    Process.kill("KILL", -pid) rescue nil
+    Process.wait(pid) rescue nil
+  rescue Errno::ESRCH, Errno::ECHILD
+  end
+  Process.kill("KILL", -pid) rescue nil
+  Process.waitall rescue nil
+  ports.each { |port| wait_for_port_free(port) }
+  log_file.close!
 end
 
-def with_server(label, cmd, port)
+def with_server(label, cmd, ports)
   log "Starting #{label}"
-  pid = start_server(cmd, port)
+  pid, log_file = start_server(cmd, ports)
   yield
+rescue => error
+  warn File.read(log_file.path) if pid
+  raise error
 ensure
   log "Stopping #{label}"
-  stop_server(pid, port) if pid
+  stop_server(pid, ports, log_file) if pid
 end
 
 def run_hey(url:, keep_alive:)
@@ -122,8 +161,6 @@ def run_hey(url:, keep_alive:)
   warmup_output, warmup_status = Open3.capture2(*warmup)
   abort_with_output "hey warmup failed", warmup_output unless warmup_status.success?
   check_hey_clean(warmup_output, "warmup")
-
-  sleep WARMUP_GAP_SECONDS
 
   measure = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{MAIN_SECONDS}s", keep_alive_flag, url].compact
   output, status = Open3.capture2(*measure)
@@ -151,8 +188,6 @@ def run_h2load(url:)
   warmup_output, warmup_status = Open3.capture2(*warmup)
   abort_with_output "h2load warmup failed", warmup_output unless warmup_status.success?
   check_h2load_clean(warmup_output, "warmup")
-
-  sleep WARMUP_GAP_SECONDS
 
   measure = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", MAIN_SECONDS.to_s, url]
   output, status = Open3.capture2(*measure)
@@ -194,10 +229,9 @@ def benchmark(label)
     log "  Run #{index + 1}/#{RUNS_PER_MODE}: #{result.round} req/s"
     sleep BETWEEN_RUNS_SECONDS if index < RUNS_PER_MODE - 1
   end
-  best_two = results.sort.last(2)
-  average = best_two.sum / 2.0
-  log "  Best 2 avg: #{average.round} req/s"
-  average
+  median = results.sort[results.length / 2]
+  log "  Median: #{median.round} req/s" if results.length > 1
+  median
 end
 
 def format_req_s(value)
@@ -210,6 +244,12 @@ def format_req_s(value)
   end
 end
 
+def format_delta(raptor_value, puma_value)
+  delta = ((raptor_value - puma_value) / puma_value) * 100
+  sign = delta >= 0 ? "+" : ""
+  "#{sign}#{format('%.1f', delta)}%"
+end
+
 def puma_version
   output, status = Open3.capture2("bundle", "exec", "ruby", "-e", "require 'puma/const'; puts Puma::Const::PUMA_VERSION")
   abort "could not read Puma version" unless status.success?
@@ -217,62 +257,102 @@ def puma_version
   output.strip
 end
 
+def raptor_cmd(fixture)
+  [
+    "bundle", "exec", "raptor",
+    "-w", WORKERS.to_s, "-t", THREADS.to_s,
+    "-b", "tcp://0.0.0.0:#{H1_PORT}",
+    "-b", "ssl://0.0.0.0:#{H2_PORT}?cert=#{CERT_PATH}&key=#{KEY_PATH}",
+    fixture
+  ]
+end
+
+def puma_cmd(fixture)
+  [
+    "bundle", "exec", "puma",
+    "-w", WORKERS.to_s, "-t", "#{THREADS}:#{THREADS}",
+    "-b", "tcp://0.0.0.0:#{H1_PORT}",
+    fixture
+  ]
+end
+
 generate_cert
 
 results = {}
 
-raptor_h1_cmd = ["bundle", "exec", "raptor", "-w", WORKERS.to_s, "-t", THREADS.to_s,
-                 "-b", "tcp://0.0.0.0:#{H1_PORT}", RACKUP_PATH]
-raptor_h2_cmd = ["bundle", "exec", "raptor", "-w", WORKERS.to_s, "-t", THREADS.to_s,
-                 "-b", "ssl://0.0.0.0:#{H2_PORT}?cert=#{CERT_PATH}&key=#{KEY_PATH}", RACKUP_PATH]
-puma_cmd = ["bundle", "exec", "puma", "-w", WORKERS.to_s, "-t", "#{THREADS}:#{THREADS}",
-            "-b", "tcp://0.0.0.0:#{H1_PORT}", RACKUP_PATH]
+WORKLOADS.each do |workload, config|
+  results[workload] = {}
+  fixture = config[:fixture]
+  label = config[:label]
 
-with_server("Raptor (HTTP/1.1)", raptor_h1_cmd, H1_PORT) do
-  results[:raptor_h1] = benchmark("Raptor HTTP/1.1") do
-    run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: false)
+  results[workload][:raptor_h1] = with_server("Raptor", raptor_cmd(fixture), [H1_PORT, H2_PORT]) do
+    benchmark("Raptor HTTP/1.1 (#{label})") do
+      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: false)
+    end
   end
-  results[:raptor_h1_ka] = benchmark("Raptor HTTP/1.1 (keep-alive)") do
-    run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: true)
+  results[workload][:raptor_h1_ka] = with_server("Raptor", raptor_cmd(fixture), [H1_PORT, H2_PORT]) do
+    benchmark("Raptor HTTP/1.1 keep-alive (#{label})") do
+      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: true)
+    end
+  end
+  results[workload][:raptor_h2] = with_server("Raptor", raptor_cmd(fixture), [H1_PORT, H2_PORT]) do
+    benchmark("Raptor HTTP/2 (#{label})") do
+      run_h2load(url: "https://127.0.0.1:#{H2_PORT}/")
+    end
+  end
+
+  results[workload][:puma_h1] = with_server("Puma", puma_cmd(fixture), [H1_PORT]) do
+    benchmark("Puma HTTP/1.1 (#{label})") do
+      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: false)
+    end
+  end
+  results[workload][:puma_h1_ka] = with_server("Puma", puma_cmd(fixture), [H1_PORT]) do
+    benchmark("Puma HTTP/1.1 keep-alive (#{label})") do
+      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: true)
+    end
   end
 end
 
-with_server("Raptor (HTTP/2)", raptor_h2_cmd, H2_PORT) do
-  results[:raptor_h2] = benchmark("Raptor HTTP/2") do
-    run_h2load(url: "https://127.0.0.1:#{H2_PORT}/")
+PROTOCOLS = [
+  { label: "HTTP/1.1", raptor_key: :raptor_h1, puma_key: :puma_h1 },
+  { label: "HTTP/1.1 (keep-alive)", raptor_key: :raptor_h1_ka, puma_key: :puma_h1_ka },
+  { label: "HTTP/2", raptor_key: :raptor_h2, puma_key: nil }
+]
+
+rows = []
+PROTOCOLS.each do |protocol|
+  WORKLOADS.each do |workload, config|
+    raptor_value = results[workload][protocol[:raptor_key]]
+    puma_value = protocol[:puma_key] ? results[workload][protocol[:puma_key]] : nil
+    rows << {
+      protocol: protocol[:label],
+      workload: config[:label],
+      raptor: format_req_s(raptor_value),
+      puma: puma_value ? format_req_s(puma_value) : "N/A",
+      delta: puma_value ? format_delta(raptor_value, puma_value) : "-"
+    }
   end
 end
 
-with_server("Puma (HTTP/1.1)", puma_cmd, H1_PORT) do
-  results[:puma_h1] = benchmark("Puma HTTP/1.1") do
-    run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: false)
-  end
-  results[:puma_h1_ka] = benchmark("Puma HTTP/1.1 (keep-alive)") do
-    run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: true)
-  end
+HEADERS = { protocol: "Protocol", workload: "Workload", raptor: "Raptor", puma: "Puma", delta: "+/- vs Puma" }
+widths = HEADERS.transform_values(&:length)
+rows.each do |row|
+  row.each { |key, value| widths[key] = [widths[key], value.length].max }
 end
 
-raptor = format_req_s(results[:raptor_h1])
-raptor_ka = format_req_s(results[:raptor_h1_ka])
-raptor_h2 = format_req_s(results[:raptor_h2])
-puma = format_req_s(results[:puma_h1])
-puma_ka = format_req_s(results[:puma_h1_ka])
-
-cell_width = [raptor, raptor_ka, raptor_h2, puma, puma_ka, "N/A"].map(&:length).max
-raptor_header_pad = " " * (cell_width - "Raptor".length)
-puma_header_pad = " " * (cell_width - "Puma".length)
-cell = ->(value) { value.ljust(cell_width) }
+table_lines = []
+table_lines << "| " + HEADERS.map { |key, header| header.ljust(widths[key]) }.join(" | ") + " |"
+table_lines << "| " + widths.map { |_, width| "-" * width }.join(" | ") + " |"
+rows.each do |row|
+  table_lines << "| " + row.map { |key, value| value.ljust(widths[key]) }.join(" | ") + " |"
+end
 
 section = <<~MD
   ## (Micro) Benchmarks
 
-  Raptor #{Raptor::VERSION} vs Puma #{puma_version}:
+  Raptor #{Raptor::VERSION} vs Puma #{puma_version}, median of #{RUNS_PER_MODE} runs across two workload profiles: IO-bound (sleep for a random 5-50ms then return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
 
-  | Protocol              | Raptor#{raptor_header_pad} | Puma#{puma_header_pad} |
-  | --------------------- | #{"-" * cell_width} | #{"-" * cell_width} |
-  | HTTP/1.1              | #{cell.call(raptor)} | #{cell.call(puma)} |
-  | HTTP/1.1 (keep-alive) | #{cell.call(raptor_ka)} | #{cell.call(puma_ka)} |
-  | HTTP/2                | #{cell.call(raptor_h2)} | #{cell.call("N/A")} |
+  #{table_lines.join("\n")}
 
   > #{RUBY_DESCRIPTION}
   > #{WORKERS} workers, #{THREADS} threads, #{HEY_CONNECTIONS} concurrent connections

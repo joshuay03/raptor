@@ -206,6 +206,10 @@ After checking out the repo, run `bin/setup` to install dependencies. Then, run 
 extensions and run the tests. You can also run `bin/console` for an interactive prompt that will allow you to
 experiment.
 
+On macOS (or any non-Linux host), `bin/dev` builds and drops you into a Docker image with Ruby and the required Linux
+toolchain preinstalled, mounting the repo at `/workspace`. Run `bin/dev` for an interactive shell, or
+`bin/dev <command>` for one-off commands like `bin/dev bundle exec rake` or `bin/dev bin/benchmark`.
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/joshuay03/raptor. This project is intended to

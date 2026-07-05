@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+IMAGE="raptor-dev:latest"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if ! docker image inspect "$IMAGE" > /dev/null 2>&1; then
+  docker build -t "$IMAGE" "$REPO_ROOT"
+fi
+
+TTY_FLAGS=()
+if [ -t 0 ] && [ -t 1 ]; then
+  TTY_FLAGS=(-it)
+fi
+
+docker run --rm "${TTY_FLAGS[@]}" \
+  --privileged \
+  --network host \
+  --ulimit nofile=65536:65536 \
+  -v "$REPO_ROOT:/workspace" \
+  -w /workspace \
+  "$IMAGE" \
+  "${@:-bash}"
