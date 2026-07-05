@@ -4,6 +4,7 @@
 require "rack"
 
 require_relative "version"
+require_relative "raptor_native"
 
 module Raptor
   # Shared HTTP utilities used by both the HTTP/1.x and HTTP/2 handlers:
@@ -47,6 +48,46 @@ module Raptor
           retry
         rescue IOError
           raise WriteError
+        end
+      end
+    end
+
+    # Writes `strings` in full via a single `writev(2)` syscall when possible,
+    # falling back to per-string writes on partial results. Bounded by
+    # `timeout` so a slow client can't pin the writing thread.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param strings [Array<String>] the buffers to write in order
+    # @param timeout [Integer] seconds to wait for the socket to become writable on each retry
+    # @return [void]
+    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, Array[String] strings, ?timeout: Integer) -> void
+    def self.socket_writev(socket, strings, timeout: WRITE_TIMEOUT)
+      total = strings.sum(&:bytesize)
+      return if total.zero?
+
+      begin
+        written = Raptor::VectorIO.writev_nonblock(socket, strings)
+      rescue IO::WaitWritable
+        raise WriteError unless socket.wait_writable(timeout)
+        retry
+      rescue IOError
+        raise WriteError
+      end
+
+      return if written == total
+
+      offset = 0
+      strings.each do |string|
+        size = string.bytesize
+        if written >= offset + size
+          offset += size
+        else
+          start = written - offset
+          socket_write(socket, start.zero? ? string : string.byteslice(start..-1), timeout: timeout)
+          offset += size
+          written = offset
         end
       end
     end

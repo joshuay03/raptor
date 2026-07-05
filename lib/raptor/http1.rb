@@ -170,6 +170,19 @@ module Raptor
       Http.socket_write(socket, string, timeout: @write_timeout)
     end
 
+    # Instance-level wrapper around {Http.socket_writev} that applies the
+    # configured `write_timeout`.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param strings [Array<String>] the buffers to write in order
+    # @return [void]
+    # @raise [Http::WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, Array[String] strings) -> void
+    def socket_writev(socket, strings)
+      Http.socket_writev(socket, strings, timeout: @write_timeout)
+    end
+
     # Signals eager keep-alive loops to stop processing further requests on
     # their connections. In-flight requests complete normally.
     #
@@ -1104,10 +1117,7 @@ module Raptor
       end
     end
 
-    # Writes a single-element array body, optionally buffering it with the headers.
-    #
-    # Small bodies are concatenated with the headers into one write to reduce
-    # system call overhead.
+    # Writes a single-element array body to the socket.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] headers already serialized, to be written before the body
@@ -1123,11 +1133,8 @@ module Raptor
       if use_chunked
         response << "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n"
         socket_write(socket, response)
-      elsif chunk.bytesize < BODY_BUFFER_THRESHOLD
-        socket_write(socket, response << chunk)
       else
-        socket_write(socket, response)
-        socket_write(socket, chunk)
+        socket_writev(socket, [response, chunk])
       end
     end
 
@@ -1154,10 +1161,8 @@ module Raptor
       else
         body_array.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
-
-          response << chunk
         end
-        socket_write(socket, response)
+        socket_writev(socket, [response, *body_array])
       end
     end
 

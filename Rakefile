@@ -16,6 +16,10 @@ Rake::ExtensionTask.new("raptor_http2", GEMSPEC) do |ext|
   ext.lib_dir = "lib/raptor"
 end
 
+Rake::ExtensionTask.new("raptor_native", GEMSPEC) do |ext|
+  ext.lib_dir = "lib/raptor"
+end
+
 namespace :bpf do
   task :compile do
     if RUBY_PLATFORM.include?("linux")

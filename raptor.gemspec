@@ -25,7 +25,7 @@ Gem::Specification.new do |spec|
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
-  spec.extensions = ["ext/raptor_http/extconf.rb", "ext/raptor_http2/extconf.rb"]
+  spec.extensions = ["ext/raptor_http/extconf.rb", "ext/raptor_http2/extconf.rb", "ext/raptor_native/extconf.rb"]
 
   spec.add_dependency "rack", ">= 3.2.0"
   spec.add_dependency "nio4r"

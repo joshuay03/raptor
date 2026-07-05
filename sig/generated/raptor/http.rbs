@@ -36,6 +36,19 @@ module Raptor
     # @rbs (TCPSocket socket, String string, ?timeout: Integer) -> void
     def self.socket_write: (TCPSocket socket, String string, ?timeout: Integer) -> void
 
+    # Writes `strings` in full via a single `writev(2)` syscall when possible,
+    # falling back to per-string writes on partial results. Bounded by
+    # `timeout` so a slow client can't pin the writing thread.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param strings [Array<String>] the buffers to write in order
+    # @param timeout [Integer] seconds to wait for the socket to become writable on each retry
+    # @return [void]
+    # @raise [WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, Array[String] strings, ?timeout: Integer) -> void
+    def self.socket_writev: (TCPSocket socket, Array[String] strings, ?timeout: Integer) -> void
+
     # Writes a Common Log Format entry to `io`. Write failures are silently
     # ignored.
     #

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Batch response header and body writes into a single `writev(2)` syscall
 - Close the binder as the last step of graceful shutdown
 - Lower the backpressure floor for tighter load balancing on small pools
 - Add load-aware `SO_REUSEPORT` routing on Linux via an attached BPF program

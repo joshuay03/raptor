@@ -132,6 +132,17 @@ module Raptor
     # @rbs (TCPSocket socket, String string) -> void
     def socket_write: (TCPSocket socket, String string) -> void
 
+    # Instance-level wrapper around {Http.socket_writev} that applies the
+    # configured `write_timeout`.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param strings [Array<String>] the buffers to write in order
+    # @return [void]
+    # @raise [Http::WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, Array[String] strings) -> void
+    def socket_writev: (TCPSocket socket, Array[String] strings) -> void
+
     # Signals eager keep-alive loops to stop processing further requests on
     # their connections. In-flight requests complete normally.
     #
@@ -499,10 +510,7 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
     def write_array_body: (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
 
-    # Writes a single-element array body, optionally buffering it with the headers.
-    #
-    # Small bodies are concatenated with the headers into one write to reduce
-    # system call overhead.
+    # Writes a single-element array body to the socket.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] headers already serialized, to be written before the body
