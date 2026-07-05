@@ -444,6 +444,8 @@ module Raptor
       trap("USR1", "IGNORE")
       trap("USR2", "IGNORE")
 
+      Raptor::CPU.pin(index) if Raptor::CPU.count >= @worker_count
+
       started_at = Process.clock_gettime(Process::CLOCK_REALTIME)
       request_count = 0
 
