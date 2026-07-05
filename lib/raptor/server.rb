@@ -5,6 +5,8 @@ require "socket"
 
 require "atomic-ruby/atomic_boolean"
 
+require_relative "reuseport_bpf"
+
 module Raptor
   # Accepts client connections and dispatches them into the request
   # pipeline. Skips acceptance when the reactor backlog is high so an
@@ -22,7 +24,7 @@ module Raptor
   #   reactor = Reactor.new(ractor_pool, thread_pool, connection_options: {}, http1_options: {})
   #   http1 = Http1.new(app, 3000)
   #   http2 = Http2.new(app, 3000)
-  #   server = Server.new(binder, reactor, thread_pool, http1, http2, connection_options: { first_data_timeout: 30 })
+  #   server = Server.new(binder, reactor, thread_pool, http1, http2, connection_options: { first_data_timeout: 30 }, listeners: binder.listeners)
   #   server.run
   #   # ... later
   #   server.shutdown
@@ -39,12 +41,14 @@ module Raptor
     MIN_BACKPRESSURE_THRESHOLD = 64
 
     # @rbs @binder: Binder
+    # @rbs @listeners: Array[TCPServer | UNIXServer | Binder::SslListener]
     # @rbs @reactor: Reactor
     # @rbs @thread_pool: AtomicThreadPool
     # @rbs @http1: Http1
     # @rbs @http2: Http2
     # @rbs @first_data_timeout: Integer
     # @rbs @drain_accept_queue: bool
+    # @rbs @bpf_active: bool
     # @rbs @running: AtomicBoolean
 
     # Creates a new Server instance.
@@ -55,44 +59,52 @@ module Raptor
     # @param http1 [Http1] the HTTP/1.1 handler
     # @param http2 [Http2] the HTTP/2 handler (provides the initial SETTINGS frame)
     # @param connection_options [Hash] per-connection timeout configuration, used to bound TLS handshakes
+    # @param listeners [Array] the per-worker listeners this server accepts on
     # @param drain_accept_queue [Boolean] whether to drain the kernel accept queue on shutdown
+    # @param worker_index [Integer, nil] the slot index for BPF load reporting
     # @return [void]
     #
-    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], ?drain_accept_queue: bool) -> void
-    def initialize(binder, reactor, thread_pool, http1, http2, connection_options:, drain_accept_queue: false)
+    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], listeners: Array[untyped], ?drain_accept_queue: bool, ?worker_index: Integer?) -> void
+    def initialize(binder, reactor, thread_pool, http1, http2, connection_options:, listeners:, drain_accept_queue: false, worker_index: nil)
       @binder = binder
+      @listeners = listeners
       @reactor = reactor
       @thread_pool = thread_pool
       @http1 = http1
       @http2 = http2
       @first_data_timeout = connection_options[:first_data_timeout]
       @drain_accept_queue = drain_accept_queue
+      @bpf_active = !!worker_index
       @running = AtomicBoolean.new(true)
     end
 
     # Starts the server's main accept loop in a new thread.
     #
     # The accept loop polls listening sockets for ready connections and accepts
-    # them when system capacity allows. It checks reactor backlog before accepting
-    # to prevent overload. This provides natural load balancing across multiple
-    # worker processes through backpressure control.
+    # them when the reactor backlog is under the backpressure threshold. On
+    # Linux with BPF-directed dispatch active, a companion thread publishes
+    # this worker's backlog to the BPF map.
     #
     # @return [Thread] the thread running the accept loop
     #
     # @rbs () -> Thread
     def run
+      spawn_load_reporter if @bpf_active
+
       Thread.new do
         Thread.current.name = "Server"
 
+        backpressure_threshold = [(@thread_pool.size * 1.2).ceil, MIN_BACKPRESSURE_THRESHOLD].max
+
         while @running.true?
           begin
-            ready_servers, _, _ = IO.select(@binder.listeners, nil, nil, 1)
+            ready_servers, _, _ = IO.select(@listeners, nil, nil, 1)
           rescue IOError, Errno::EBADF
             break
           end
 
           next unless ready_servers
-          next if @reactor.backlog >= [(@thread_pool.size * 1.2).ceil, MIN_BACKPRESSURE_THRESHOLD].max
+          next if @reactor.backlog >= backpressure_threshold
 
           ready_servers.each { |listener| accept_connection(listener) }
         end
@@ -111,10 +123,27 @@ module Raptor
     def shutdown
       @running.make_false
       drain_accept_queue if @drain_accept_queue
-      @binder.close
+      @listeners.each(&:close)
     end
 
     private
+
+    # Starts a background thread that publishes this worker's reactor
+    # backlog to the BPF map for load-aware dispatch.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def spawn_load_reporter
+      Thread.new do
+        Thread.current.name = "Load Reporter"
+
+        while @running.true?
+          ReuseportBPF.update_load(@reactor.backlog)
+          sleep 0.01
+        end
+      end
+    end
 
     # Dispatches every connection already in the kernel accept queue for each
     # listener until all are drained.
@@ -125,7 +154,7 @@ module Raptor
     def drain_accept_queue
       loop do
         accepted = false
-        @binder.listeners.each { |listener| accepted = true if accept_connection(listener) }
+        @listeners.each { |listener| accepted = true if accept_connection(listener) }
         break unless accepted
       end
     end

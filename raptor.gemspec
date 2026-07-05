@@ -33,4 +33,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "ractor-pool"
   spec.add_dependency "red-black-tree"
   spec.add_dependency "mmap-ruby"
+  spec.add_dependency "libbpf-ruby"
 end

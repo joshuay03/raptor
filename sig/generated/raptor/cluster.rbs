@@ -40,8 +40,6 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @http1_options: Hash[Symbol, untyped]
-
     @http2_options: Hash[Symbol, untyped]
 
     @worker_boot_timeout: Integer
@@ -91,6 +89,10 @@ module Raptor
     @phased_restarting: bool
 
     @hot_restart_requested: bool
+
+    @bpf_active: bool
+
+    @http1_options: Hash[Symbol, untyped]
 
     @connection_options: Hash[Symbol, untyped]
 

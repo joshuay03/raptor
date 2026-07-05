@@ -61,6 +61,16 @@ module Raptor
     # @rbs @listeners: Array[TCPServer | UNIXServer | SslListener]
     # @rbs @uri_listeners: Hash[String, Array[TCPServer | UNIXServer | SslListener]]
 
+    # Array of bind URIs.
+    #
+    # @return [Array<String>] the bind URIs
+    attr_reader :bind_uris
+
+    # Kernel listen() queue depth for TCP/SSL listeners.
+    #
+    # @return [Integer] the socket backlog
+    attr_reader :socket_backlog
+
     # Array of listening sockets.
     #
     # @return [Array<TCPServer, UNIXServer, SslListener>] the server sockets
@@ -244,11 +254,15 @@ module Raptor
 
       host = host[1..-2] if host&.start_with?("[")
 
-      tcp_server = TCPServer.new(host, port)
-      tcp_server.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
-      tcp_server.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) if Socket.const_defined?(:SO_REUSEPORT)
-      tcp_server.listen @socket_backlog
+      addrinfo = Addrinfo.tcp(host, port)
+      socket = Socket.new(addrinfo.afamily, Socket::SOCK_STREAM, 0)
+      socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
+      socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) if Socket.const_defined?(:SO_REUSEPORT)
+      socket.bind(addrinfo)
+      socket.listen(@socket_backlog)
 
+      tcp_server = TCPServer.for_fd(socket.fileno)
+      socket.autoclose = false
       [tcp_server]
     end
 

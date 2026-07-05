@@ -9,8 +9,9 @@ require "ractor-pool"
 
 require_relative "log"
 require_relative "binder"
-require_relative "server"
 require_relative "reactor"
+require_relative "server"
+require_relative "reuseport_bpf"
 require_relative "http1"
 require_relative "http2"
 require_relative "stats"
@@ -91,6 +92,7 @@ module Raptor
     # @rbs @phased_restart_requested: bool
     # @rbs @phased_restarting: bool
     # @rbs @hot_restart_requested: bool
+    # @rbs @bpf_active: bool
 
     # Creates a new Cluster with the specified configuration.
     #
@@ -203,6 +205,8 @@ module Raptor
       trap("USR2") { @hot_restart_requested = true }
 
       File.open(@pid_file, File::CREAT | File::EXCL | File::WRONLY) { |file| file.write(Process.pid.to_s) } if @pid_file
+
+      @bpf_active = ReuseportBPF.setup(@worker_count)
 
       @worker_count.times { |index| spawn_worker(index) }
 
@@ -501,7 +505,25 @@ module Raptor
       )
       reactor_thread = reactor.run
 
-      server = Server.new(@binder, reactor, thread_pool, http1, http2, connection_options: @connection_options, drain_accept_queue: @drain_accept_queue)
+      worker_listeners = if @bpf_active
+        bpf_listeners = ReuseportBPF.create_worker_listeners(@binder.bind_uris, index, @binder.socket_backlog)
+        non_tcp_listeners = @binder.listeners.reject { |listener| listener.is_a?(TCPServer) }
+        bpf_listeners + non_tcp_listeners
+      else
+        @binder.listeners
+      end
+
+      server = Server.new(
+        @binder,
+        reactor,
+        thread_pool,
+        http1,
+        http2,
+        connection_options: @connection_options,
+        drain_accept_queue: @drain_accept_queue,
+        listeners: worker_listeners,
+        worker_index: (index if @bpf_active)
+      )
       server_thread = server.run
 
       Log.info "Worker #{index} booted"

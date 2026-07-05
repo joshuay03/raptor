@@ -17,7 +17,7 @@ module Raptor
   #   reactor = Reactor.new(ractor_pool, thread_pool, connection_options: {}, http1_options: {})
   #   http1 = Http1.new(app, 3000)
   #   http2 = Http2.new(app, 3000)
-  #   server = Server.new(binder, reactor, thread_pool, http1, http2, connection_options: { first_data_timeout: 30 })
+  #   server = Server.new(binder, reactor, thread_pool, http1, http2, connection_options: { first_data_timeout: 30 }, listeners: binder.listeners)
   #   server.run
   #   # ... later
   #   server.shutdown
@@ -36,6 +36,8 @@ module Raptor
 
     @running: AtomicBoolean
 
+    @bpf_active: bool
+
     @drain_accept_queue: bool
 
     @first_data_timeout: Integer
@@ -48,6 +50,8 @@ module Raptor
 
     @reactor: Reactor
 
+    @listeners: Array[TCPServer | UNIXServer | Binder::SslListener]
+
     @binder: Binder
 
     # Creates a new Server instance.
@@ -58,18 +62,20 @@ module Raptor
     # @param http1 [Http1] the HTTP/1.1 handler
     # @param http2 [Http2] the HTTP/2 handler (provides the initial SETTINGS frame)
     # @param connection_options [Hash] per-connection timeout configuration, used to bound TLS handshakes
+    # @param listeners [Array] the per-worker listeners this server accepts on
     # @param drain_accept_queue [Boolean] whether to drain the kernel accept queue on shutdown
+    # @param worker_index [Integer, nil] the slot index for BPF load reporting
     # @return [void]
     #
-    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], ?drain_accept_queue: bool) -> void
-    def initialize: (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], ?drain_accept_queue: bool) -> void
+    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], listeners: Array[untyped], ?drain_accept_queue: bool, ?worker_index: Integer?) -> void
+    def initialize: (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], listeners: Array[untyped], ?drain_accept_queue: bool, ?worker_index: Integer?) -> void
 
     # Starts the server's main accept loop in a new thread.
     #
     # The accept loop polls listening sockets for ready connections and accepts
-    # them when system capacity allows. It checks reactor backlog before accepting
-    # to prevent overload. This provides natural load balancing across multiple
-    # worker processes through backpressure control.
+    # them when the reactor backlog is under the backpressure threshold. On
+    # Linux with BPF-directed dispatch active, a companion thread publishes
+    # this worker's backlog to the BPF map.
     #
     # @return [Thread] the thread running the accept loop
     #
@@ -88,6 +94,14 @@ module Raptor
     def shutdown: () -> void
 
     private
+
+    # Starts a background thread that publishes this worker's reactor
+    # backlog to the BPF map for load-aware dispatch.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def spawn_load_reporter: () -> void
 
     # Dispatches every connection already in the kernel accept queue for each
     # listener until all are drained.

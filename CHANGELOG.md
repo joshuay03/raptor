@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add load-aware `SO_REUSEPORT` routing on Linux via an attached BPF program
 - Reuse per-thread read buffers across HTTP/1.1 requests
 - Preserve the first `--bind` when it equals the default
 
