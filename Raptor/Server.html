@@ -393,7 +393,7 @@ registered with the reactor for frame processing.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(binder, reactor, thread_pool, http1, http2, connection_options:, drain_accept_queue: false, listeners:, worker_index: nil)  &#x21d2; Server </a>
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(binder, reactor, thread_pool, http1, http2, connection_options:, listeners:, drain_accept_queue: false, worker_index: nil)  &#x21d2; Server </a>
     
 
     
@@ -497,7 +497,7 @@ registered with the reactor for frame processing.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Publishes this worker's reactor backlog to the BPF map at 100 Hz on a dedicated thread.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Starts a background thread that publishes this worker's reactor backlog to the BPF map for load-aware dispatch.</p></div></span>
   
 </li>
 
@@ -534,7 +534,7 @@ registered with the reactor for frame processing.</p>
     <div class="method_details first">
   <h3 class="signature first" id="initialize-instance_method">
   
-    #<strong>initialize</strong>(binder, reactor, thread_pool, http1, http2, connection_options:, drain_accept_queue: false, listeners:, worker_index: nil)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Server (class)">Server</a></span></tt> 
+    #<strong>initialize</strong>(binder, reactor, thread_pool, http1, http2, connection_options:, listeners:, drain_accept_queue: false, worker_index: nil)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Server (class)">Server</a></span></tt> 
   
 
   
@@ -636,6 +636,20 @@ registered with the reactor for frame processing.</p>
   
     <li>
       
+        <span class='name'>listeners</span>
+      
+      
+        <span class='type'>(<tt>Array</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the per-worker listeners this server accepts on</p></div>
+      
+    </li>
+  
+    <li>
+      
         <span class='name'>drain_accept_queue</span>
       
       
@@ -647,20 +661,6 @@ registered with the reactor for frame processing.</p>
       
         &mdash;
         <div class='inline'><p>whether to drain the kernel accept queue on shutdown</p></div>
-      
-    </li>
-  
-    <li>
-      
-        <span class='name'>listeners</span>
-      
-      
-        <span class='type'>(<tt>Array</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>the per-worker listeners this server accepts on</p></div>
       
     </li>
   
@@ -753,7 +753,7 @@ registered with the reactor for frame processing.</p>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 68</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_binder'>binder</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_http1'>http1</span><span class='comma'>,</span> <span class='id identifier rubyid_http2'>http2</span><span class='comma'>,</span> <span class='label'>connection_options:</span><span class='comma'>,</span> <span class='label'>drain_accept_queue:</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='label'>listeners:</span><span class='comma'>,</span> <span class='label'>worker_index:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_binder'>binder</span><span class='comma'>,</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_http1'>http1</span><span class='comma'>,</span> <span class='id identifier rubyid_http2'>http2</span><span class='comma'>,</span> <span class='label'>connection_options:</span><span class='comma'>,</span> <span class='label'>listeners:</span><span class='comma'>,</span> <span class='label'>drain_accept_queue:</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='label'>worker_index:</span> <span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='ivar'>@binder</span> <span class='op'>=</span> <span class='id identifier rubyid_binder'>binder</span>
   <span class='ivar'>@listeners</span> <span class='op'>=</span> <span class='id identifier rubyid_listeners'>listeners</span>
   <span class='ivar'>@reactor</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span>
@@ -1363,8 +1363,8 @@ the kernel accept queue before closing the listeners.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Publishes this worker's reactor backlog to the BPF map at 100 Hz
-on a dedicated thread.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Starts a background thread that publishes this worker's reactor
+backlog to the BPF map for load-aware dispatch.</p>
 
   </div>
 </div>
@@ -1537,7 +1537,7 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Jul  6 21:22:28 2026 by
+  Generated on Mon Jul  6 21:55:01 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

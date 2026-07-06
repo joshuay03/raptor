@@ -2206,7 +2206,7 @@ critical component fails.</p>
   <span class='id identifier rubyid_reactor_thread'>reactor_thread</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_run'>run</span>
 
   <span class='id identifier rubyid_worker_listeners'>worker_listeners</span> <span class='op'>=</span> <span class='kw'>if</span> <span class='ivar'>@bpf_active</span>
-    <span class='id identifier rubyid_bpf_listeners'>bpf_listeners</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="ReuseportBPF.html" title="Raptor::ReuseportBPF (module)">ReuseportBPF</a></span></span><span class='period'>.</span><span class='id identifier rubyid_create_worker_listeners'><span class='object_link'><a href="ReuseportBPF.html#create_worker_listeners-class_method" title="Raptor::ReuseportBPF.create_worker_listeners (method)">create_worker_listeners</a></span></span><span class='lparen'>(</span><span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_bpf_listeners'>bpf_listeners</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="ReuseportBPF.html" title="Raptor::ReuseportBPF (module)">ReuseportBPF</a></span></span><span class='period'>.</span><span class='id identifier rubyid_create_worker_listeners'><span class='object_link'><a href="ReuseportBPF.html#create_worker_listeners-class_method" title="Raptor::ReuseportBPF.create_worker_listeners (method)">create_worker_listeners</a></span></span><span class='lparen'>(</span><span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_socket_backlog'>socket_backlog</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_non_tcp_listeners'>non_tcp_listeners</span> <span class='op'>=</span> <span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_listeners'>listeners</span><span class='period'>.</span><span class='id identifier rubyid_reject'>reject</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>TCPServer</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
     <span class='id identifier rubyid_bpf_listeners'>bpf_listeners</span> <span class='op'>+</span> <span class='id identifier rubyid_non_tcp_listeners'>non_tcp_listeners</span>
   <span class='kw'>else</span>
@@ -2624,7 +2624,7 @@ workers are then restarted by <code>reap_workers</code>.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Jul  6 21:22:28 2026 by
+  Generated on Mon Jul  6 21:55:01 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
