@@ -483,7 +483,7 @@ registered with the reactor for frame processing.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#start_load_reporter-instance_method" title="#start_load_reporter (instance method)">#<strong>start_load_reporter</strong>  &#x21d2; void </a>
+      <a href="#spawn_load_reporter-instance_method" title="#spawn_load_reporter (instance method)">#<strong>spawn_load_reporter</strong>  &#x21d2; void </a>
     
 
     
@@ -1280,7 +1280,7 @@ this worker's backlog to the BPF map.</p>
       <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 91</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
-  <span class='id identifier rubyid_start_load_reporter'>start_load_reporter</span> <span class='kw'>if</span> <span class='ivar'>@bpf_active</span>
+  <span class='id identifier rubyid_spawn_load_reporter'>spawn_load_reporter</span> <span class='kw'>if</span> <span class='ivar'>@bpf_active</span>
 
   <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span>
     <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_current'>current</span><span class='period'>.</span><span class='id identifier rubyid_name'>name</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Server</span><span class='tstring_end'>&quot;</span></span>
@@ -1353,9 +1353,9 @@ the kernel accept queue before closing the listeners.</p>
 </div>
     
       <div class="method_details ">
-  <h3 class="signature " id="start_load_reporter-instance_method">
+  <h3 class="signature " id="spawn_load_reporter-instance_method">
   
-    #<strong>start_load_reporter</strong>  &#x21d2; <tt>void</tt> 
+    #<strong>spawn_load_reporter</strong>  &#x21d2; <tt>void</tt> 
   
 
   
@@ -1391,7 +1391,7 @@ backlog to the BPF map for load-aware dispatch.</p>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 137</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_start_load_reporter'>start_load_reporter</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_spawn_load_reporter'>spawn_load_reporter</span>
   <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span>
     <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_current'>current</span><span class='period'>.</span><span class='id identifier rubyid_name'>name</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Load Reporter</span><span class='tstring_end'>&quot;</span></span>
 
@@ -1537,7 +1537,7 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Jul  6 23:25:33 2026 by
+  Generated on Tue Jul  7 00:57:04 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
