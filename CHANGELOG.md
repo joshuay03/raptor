@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Buffer chunked body writes up to 512KB before flushing
 - Add `QUERY_STRING` to the Rack env template
 - Skip intermediate array allocations when formatting response headers
 - Intern common HTTP header keys in the parser

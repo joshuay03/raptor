@@ -19,6 +19,7 @@ module Raptor
   #
   class Http1
     BODY_BUFFER_THRESHOLD = 256 * 1024
+    CHUNKED_WRITE_THRESHOLD = 512 * 1024
     FILE_CHUNK_SIZE = 64 * 1024
     MAX_CHUNK_OVERHEAD = 16 * 1024
     READ_BUFFER_SIZE = 64 * 1024
@@ -1049,8 +1050,6 @@ module Raptor
       else
         raise TypeError, "body must respond to each, to_ary, or to_path"
       end
-
-      socket_write(socket, "0\r\n\r\n") if use_chunked
     end
 
     # Calculates content length from an array or file body without consuming it.
@@ -1090,10 +1089,16 @@ module Raptor
     def write_file_body(socket, response, path, content_length, use_chunked)
       File.open(path, "rb") do |file|
         if use_chunked
-          socket_write(socket, response)
+          buffer = response
           while (chunk = file.read(FILE_CHUNK_SIZE))
-            socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+            buffer << chunk.bytesize.to_s(16) << "\r\n" << chunk << "\r\n"
+            if buffer.bytesize >= CHUNKED_WRITE_THRESHOLD
+              socket_write(socket, buffer)
+              buffer = +""
+            end
           end
+          buffer << "0\r\n\r\n"
+          socket_write(socket, buffer)
         elsif content_length && content_length < BODY_BUFFER_THRESHOLD
           response << file.read(content_length)
           socket_write(socket, response)
@@ -1137,7 +1142,7 @@ module Raptor
       raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
       if use_chunked
-        response << "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n"
+        response << chunk.bytesize.to_s(16) << "\r\n" << chunk << "\r\n0\r\n\r\n"
         socket_write(socket, response)
       else
         socket_writev(socket, [response, chunk])
@@ -1156,14 +1161,20 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Array[String] body_array, bool use_chunked) -> void
     def write_multiple_chunks(socket, response, body_array, use_chunked)
       if use_chunked
-        socket_write(socket, response)
+        buffer = response
         body_array.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
           next if chunk.empty?
 
-          socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+          buffer << chunk.bytesize.to_s(16) << "\r\n" << chunk << "\r\n"
+          if buffer.bytesize >= CHUNKED_WRITE_THRESHOLD
+            socket_write(socket, buffer)
+            buffer = +""
+          end
         end
+        buffer << "0\r\n\r\n"
+        socket_write(socket, buffer)
       else
         body_array.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
@@ -1192,6 +1203,7 @@ module Raptor
 
           socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
         end
+        socket_write(socket, "0\r\n\r\n")
       else
         body.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)

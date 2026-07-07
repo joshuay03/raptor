@@ -8,6 +8,8 @@ module Raptor
   class Http1
     BODY_BUFFER_THRESHOLD: untyped
 
+    CHUNKED_WRITE_THRESHOLD: untyped
+
     FILE_CHUNK_SIZE: untyped
 
     MAX_CHUNK_OVERHEAD: untyped
@@ -88,25 +90,25 @@ module Raptor
     # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
     def self.decode_chunked: (String buffer, ?Integer? max_size) -> [ String, Symbol ]
 
-    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
-
-    @server_port: Integer
-
-    @write_timeout: Integer
-
-    @max_body_size: Integer?
-
-    @body_spool_threshold: Integer?
-
-    @max_keepalive_requests: Integer
-
-    @access_log_io: IO?
-
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    @env_template: Hash[String, untyped]
 
     @running: AtomicBoolean
 
-    @env_template: Hash[String, untyped]
+    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+
+    @access_log_io: IO?
+
+    @max_keepalive_requests: Integer
+
+    @body_spool_threshold: Integer?
+
+    @max_body_size: Integer?
+
+    @write_timeout: Integer
+
+    @server_port: Integer
+
+    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
 
     # Creates a new Http1 handler.
     #
