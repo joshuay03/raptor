@@ -235,13 +235,9 @@ def benchmark(label)
 end
 
 def format_req_s(value)
-  rounded = (value / 100.0).round * 100
+  rounded = (value / 10.0).round * 10
   thousands = rounded / 1000.0
-  if thousands == thousands.to_i
-    "#{thousands.to_i}k req/s"
-  else
-    "#{format('%.1f', thousands)}k req/s"
-  end
+  "#{format('%.2f', thousands)}k req/s"
 end
 
 def format_delta(raptor_value, puma_value)
@@ -350,7 +346,8 @@ end
 section = <<~MD
   ## (Micro) Benchmarks
 
-  Raptor #{Raptor::VERSION} vs Puma #{puma_version}, median of #{RUNS_PER_MODE} runs across two workload profiles: IO-bound (sleep for a random 5-50ms then return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
+  Raptor #{Raptor::VERSION} vs Puma #{puma_version}, median of #{RUNS_PER_MODE} runs across two workload profiles: IO-bound (sleep for a random 5-50ms then
+  return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
 
   #{table_lines.join("\n")}
 

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-07
+
 - Memoize the server port string for the Rack env
 - Parse the Host header without regex
 - Apply `TCP_NODELAY` on the listener rather than each accepted socket

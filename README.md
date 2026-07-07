@@ -187,16 +187,17 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 
 ## (Micro) Benchmarks
 
-Raptor 0.9.0 vs Puma 8.0.2, median of 3 runs across two workload profiles: IO-bound (sleep for a random 5-50ms then return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
+Raptor 0.10.0 vs Puma 8.0.2, median of 3 runs across two workload profiles: IO-bound (sleep for a random 5-50ms then
+return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
 
-| Protocol              | Workload | Raptor      | Puma       | +/- vs Puma |
-| --------------------- | -------- | ----------- | ---------- | ----------- |
-| HTTP/1.1              | IO       | 0.4k req/s  | 0.4k req/s | +3.4%       |
-| HTTP/1.1              | CPU      | 11.5k req/s | 9k req/s   | +27.6%      |
-| HTTP/1.1 (keep-alive) | IO       | 0.4k req/s  | 0.4k req/s | +1.5%       |
-| HTTP/1.1 (keep-alive) | CPU      | 28.8k req/s | 26k req/s  | +10.9%      |
-| HTTP/2                | IO       | 0.3k req/s  | N/A        | -           |
-| HTTP/2                | CPU      | 29.6k req/s | N/A        | -           |
+| Protocol              | Workload | Raptor       | Puma         | +/- vs Puma |
+| --------------------- | -------- | ------------ | ------------ | ----------- |
+| HTTP/1.1              | IO       | 0.43k req/s  | 0.41k req/s  | +4.0%       |
+| HTTP/1.1              | CPU      | 10.99k req/s | 9.22k req/s  | +19.1%      |
+| HTTP/1.1 (keep-alive) | IO       | 0.41k req/s  | 0.40k req/s  | +2.6%       |
+| HTTP/1.1 (keep-alive) | CPU      | 27.42k req/s | 25.75k req/s | +6.5%       |
+| HTTP/2                | IO       | 0.31k req/s  | N/A          | -           |
+| HTTP/2                | CPU      | 26.28k req/s | N/A          | -           |
 
 > ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [aarch64-linux]
 > 4 workers, 3 threads, 24 concurrent connections
