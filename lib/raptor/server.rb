@@ -179,7 +179,6 @@ module Raptor
       end
 
       if tcp_client.is_a?(TCPSocket)
-        tcp_client.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
         remote_addr = tcp_client.remote_address.ip_address
       else
         remote_addr = DEFAULT_REMOTE_ADDR

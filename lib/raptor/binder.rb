@@ -258,6 +258,7 @@ module Raptor
       socket = Socket.new(addrinfo.afamily, Socket::SOCK_STREAM, 0)
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) if Socket.const_defined?(:SO_REUSEPORT)
+      socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
       socket.bind(addrinfo)
       socket.listen(@socket_backlog)
 

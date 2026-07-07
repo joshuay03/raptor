@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Apply `TCP_NODELAY` on the listener rather than each accepted socket
 - Buffer chunked body writes up to 512KB before flushing
 - Add `QUERY_STRING` to the Rack env template
 - Skip intermediate array allocations when formatting response headers
