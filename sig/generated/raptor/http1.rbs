@@ -578,6 +578,18 @@ module Raptor
     # @rbs (Hash[String, String | Array[String]] headers) -> String
     def format_headers: (Hash[String, String | Array[String]] headers) -> String
 
+    # Appends one or more `name: value` header lines to `result`. Newline-
+    # separated values are emitted as separate lines; empty values and values
+    # with illegal characters are skipped silently.
+    #
+    # @param result [String] the buffer to append to
+    # @param name [String] the header name
+    # @param value [Object] the header value (any object responding to `to_s`)
+    # @return [void]
+    #
+    # @rbs (String result, String name, untyped value) -> void
+    def append_header_value: (String result, String name, untyped value) -> void
+
     # Calls all rack.response_finished callbacks registered in the environment.
     #
     # Callbacks are called in reverse registration order. Individual callback

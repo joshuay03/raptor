@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Skip intermediate array allocations when formatting response headers
 - Intern common HTTP header keys in the parser
 - Reuse a Rack env template across HTTP/1.1 requests
 

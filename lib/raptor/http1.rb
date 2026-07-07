@@ -1236,13 +1236,40 @@ module Raptor
       headers.each do |name, value|
         next if illegal_header_key?(name)
 
-        Array(value).flat_map { |entry| entry.to_s.split("\n") }.each do |header_value|
-          next if illegal_header_value?(header_value)
-
-          result << "#{name}: #{header_value}\r\n"
+        if value.is_a?(Array)
+          value.each { |entry| append_header_value(result, name, entry) }
+        else
+          append_header_value(result, name, value)
         end
       end
       result
+    end
+
+    # Appends one or more `name: value` header lines to `result`. Newline-
+    # separated values are emitted as separate lines; empty values and values
+    # with illegal characters are skipped silently.
+    #
+    # @param result [String] the buffer to append to
+    # @param name [String] the header name
+    # @param value [Object] the header value (any object responding to `to_s`)
+    # @return [void]
+    #
+    # @rbs (String result, String name, untyped value) -> void
+    def append_header_value(result, name, value)
+      string_value = value.is_a?(String) ? value : value.to_s
+      return if string_value.empty?
+
+      if string_value.include?("\n")
+        string_value.split("\n").each do |line|
+          next if line.empty? || illegal_header_value?(line)
+
+          result << name << ": " << line << "\r\n"
+        end
+      else
+        return if illegal_header_value?(string_value)
+
+        result << name << ": " << string_value << "\r\n"
+      end
     end
 
     # Calls all rack.response_finished callbacks registered in the environment.
