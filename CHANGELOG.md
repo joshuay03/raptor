@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Memoize the server port string for the Rack env
 - Parse the Host header without regex
 - Apply `TCP_NODELAY` on the listener rather than each accepted socket
 - Buffer chunked body writes up to 512KB before flushing

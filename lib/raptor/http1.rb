@@ -124,6 +124,7 @@ module Raptor
 
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
+    # @rbs @server_port_string: String
     # @rbs @write_timeout: Integer
     # @rbs @max_body_size: Integer?
     # @rbs @body_spool_threshold: Integer?
@@ -151,6 +152,7 @@ module Raptor
     def initialize(app, server_port, connection_options: {}, http1_options: {}, access_log_io: nil, on_error: nil)
       @app = app
       @server_port = server_port
+      @server_port_string = server_port.to_s.freeze
       @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
       @max_body_size = connection_options[:max_body_size]
       @body_spool_threshold = connection_options[:body_spool_threshold]
@@ -727,7 +729,7 @@ module Raptor
 
       behind_tls_proxy = (url_scheme == Server::HTTP_SCHEME) && forwarded_https?(env)
       env[Rack::RACK_URL_SCHEME] = behind_tls_proxy ? Server::HTTPS_SCHEME : url_scheme
-      default_port = behind_tls_proxy ? "443" : @server_port.to_s
+      default_port = behind_tls_proxy ? "443" : @server_port_string
 
       http_host = env[Rack::HTTP_HOST]
       host = nil
