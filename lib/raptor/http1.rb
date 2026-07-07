@@ -161,6 +161,7 @@ module Raptor
         Rack::RACK_VERSION => Rack::VERSION,
         Rack::RACK_IS_HIJACK => true,
         Rack::SCRIPT_NAME => "",
+        Rack::QUERY_STRING => "",
         Http::SERVER_SOFTWARE => Http::SERVER_SOFTWARE_VALUE
       }.freeze
     end
@@ -716,7 +717,6 @@ module Raptor
 
       env[Rack::PATH_INFO] = env.delete(Rack::REQUEST_PATH) if env.key?(Rack::REQUEST_PATH)
       env[Rack::PATH_INFO] = "" unless env.key?(Rack::PATH_INFO)
-      env[Rack::QUERY_STRING] = "" unless env.key?(Rack::QUERY_STRING)
       if (content_length = parse_data[:content_length]).positive?
         env[Http::CONTENT_LENGTH] = content_length.to_s
       end
