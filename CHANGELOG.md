@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Reuse a Rack env template across HTTP/1.1 requests
+
 ## [0.9.0] - 2026-07-07
 
 - Reuse a per-thread response buffer for status lines and headers

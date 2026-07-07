@@ -130,6 +130,7 @@ module Raptor
     # @rbs @access_log_io: IO?
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @running: AtomicBoolean
+    # @rbs @env_template: Hash[String, untyped]
 
     # Creates a new Http1 handler.
     #
@@ -156,6 +157,12 @@ module Raptor
       @access_log_io = access_log_io
       @on_error = on_error
       @running = AtomicBoolean.new(true)
+      @env_template = {
+        Rack::RACK_VERSION => Rack::VERSION,
+        Rack::RACK_IS_HIJACK => true,
+        Rack::SCRIPT_NAME => "",
+        Http::SERVER_SOFTWARE => Http::SERVER_SOFTWARE_VALUE
+      }.freeze
     end
 
     # Instance-level wrapper around {Http.socket_write} that applies the
@@ -230,7 +237,7 @@ module Raptor
       end
 
       parser = HttpParser.new
-      env = {}
+      env = @env_template.dup
       nread = begin
         parser.execute(env, buffer, 0)
       rescue HttpParserError
@@ -291,12 +298,13 @@ module Raptor
     # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
     def http_parser_worker
       max_body_size = @max_body_size
+      env_template = @env_template
 
       proc do |data|
         next Raptor::Http2.process_frames(data) if data[:protocol] == :http2
 
         parser = Raptor::HttpParser.new
-        env = {}
+        env = env_template.dup
         nread = begin
           parser.execute(env, data[:buffer], 0)
         rescue Raptor::HttpParserError
@@ -560,7 +568,7 @@ module Raptor
         end
 
         parser = HttpParser.new
-        env = {}
+        env = @env_template.dup
         nread = begin
           parser.execute(env, buffer, 0)
         rescue HttpParserError
@@ -694,33 +702,26 @@ module Raptor
     #
     # @rbs (Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, TCPSocket socket, ?remote_addr: String, ?url_scheme: String) -> Hash[String, untyped]
     def build_rack_env(env, parse_data, body, socket, remote_addr: Server::DEFAULT_REMOTE_ADDR, url_scheme: Server::HTTP_SCHEME)
-      env[Rack::RACK_VERSION] = Rack::VERSION
       env[Rack::RACK_INPUT] = build_rack_input(body)
       env[Rack::RACK_ERRORS] = $stderr
       env[Rack::RACK_RESPONSE_FINISHED] = []
-
-      env[Rack::RACK_IS_HIJACK] = true
       env[Rack::RACK_HIJACK] = proc do
         env[RACK_HIJACKED] = true
         env[RACK_HIJACK_IO] = socket
         socket
       end
-
       env[Rack::RACK_EARLY_HINTS] = proc do |hints|
         send_early_hints(socket, hints) rescue nil
       end
 
-      env[Rack::SCRIPT_NAME] = "" unless env.key?(Rack::SCRIPT_NAME)
       env[Rack::PATH_INFO] = env.delete(Rack::REQUEST_PATH) if env.key?(Rack::REQUEST_PATH)
       env[Rack::PATH_INFO] = "" unless env.key?(Rack::PATH_INFO)
       env[Rack::QUERY_STRING] = "" unless env.key?(Rack::QUERY_STRING)
-
       if (content_length = parse_data[:content_length]).positive?
         env[Http::CONTENT_LENGTH] = content_length.to_s
       end
 
       env[Http::REMOTE_ADDR] = remote_addr
-      env[Http::SERVER_SOFTWARE] = Http::SERVER_SOFTWARE_VALUE
       env[Http::HTTP_VERSION] = env[Rack::SERVER_PROTOCOL]
 
       behind_tls_proxy = (url_scheme == Server::HTTP_SCHEME) && forwarded_https?(env)
