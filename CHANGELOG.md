@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Intern common HTTP header keys in the parser
 - Reuse a Rack env template across HTTP/1.1 requests
 
 ## [0.9.0] - 2026-07-07

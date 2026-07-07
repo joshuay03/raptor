@@ -4,6 +4,7 @@
  */
 
 #include "ruby.h"
+#include "ruby/encoding.h"
 #include <assert.h>
 #include <string.h>
 #include <ctype.h>
@@ -43,6 +44,75 @@ static VALUE global_query_string;
 static VALUE global_server_protocol;
 static VALUE global_request_path;
 static VALUE global_fragment;
+
+struct common_field {
+  const char *name;
+  size_t len;
+  VALUE interned;
+};
+
+#define FIELD(name) { name, sizeof(name) - 1, Qnil }
+
+static struct common_field common_fields[] = {
+  FIELD("HTTP_HOST"),
+  FIELD("HTTP_USER_AGENT"),
+  FIELD("HTTP_CONNECTION"),
+  FIELD("HTTP_ACCEPT"),
+  FIELD("HTTP_ACCEPT_ENCODING"),
+  FIELD("HTTP_ACCEPT_LANGUAGE"),
+  FIELD("HTTP_ACCEPT_CHARSET"),
+  FIELD("HTTP_COOKIE"),
+  FIELD("HTTP_REFERER"),
+  FIELD("HTTP_CACHE_CONTROL"),
+  FIELD("HTTP_PRAGMA"),
+
+  FIELD("CONTENT_LENGTH"),
+  FIELD("CONTENT_TYPE"),
+  FIELD("HTTP_TRANSFER_ENCODING"),
+
+  FIELD("HTTP_AUTHORIZATION"),
+  FIELD("HTTP_ORIGIN"),
+  FIELD("HTTP_EXPECT"),
+
+  FIELD("HTTP_IF_MATCH"),
+  FIELD("HTTP_IF_NONE_MATCH"),
+  FIELD("HTTP_IF_MODIFIED_SINCE"),
+  FIELD("HTTP_IF_UNMODIFIED_SINCE"),
+  FIELD("HTTP_IF_RANGE"),
+  FIELD("HTTP_RANGE"),
+
+  FIELD("HTTP_UPGRADE"),
+  FIELD("HTTP_UPGRADE_INSECURE_REQUESTS"),
+
+  FIELD("HTTP_SEC_FETCH_DEST"),
+  FIELD("HTTP_SEC_FETCH_MODE"),
+  FIELD("HTTP_SEC_FETCH_SITE"),
+  FIELD("HTTP_SEC_FETCH_USER"),
+  FIELD("HTTP_SEC_CH_UA"),
+  FIELD("HTTP_SEC_CH_UA_MOBILE"),
+  FIELD("HTTP_SEC_CH_UA_PLATFORM"),
+  FIELD("HTTP_DNT"),
+
+  FIELD("HTTP_X_FORWARDED_FOR"),
+  FIELD("HTTP_X_FORWARDED_HOST"),
+  FIELD("HTTP_X_FORWARDED_PROTO"),
+  FIELD("HTTP_X_FORWARDED_SCHEME"),
+  FIELD("HTTP_X_FORWARDED_SSL"),
+  FIELD("HTTP_X_REAL_IP")
+};
+
+#undef FIELD
+
+#define NUM_COMMON_FIELDS (sizeof(common_fields) / sizeof(common_fields[0]))
+
+static VALUE raptor_http_intern_field(const char *buf, size_t len) {
+  for (size_t i = 0; i < NUM_COMMON_FIELDS; i++) {
+    if (common_fields[i].len == len && memcmp(common_fields[i].name, buf, len) == 0) {
+      return common_fields[i].interned;
+    }
+  }
+  return rb_enc_interned_str(buf, len, rb_utf8_encoding());
+}
 
 static inline void upcase_header_char(char *c) {
   if (*c >= 'a' && *c <= 'z')
@@ -294,16 +364,19 @@ tr26:
     else if (parser->field_len == 12 && memcmp(field_ptr, "CONTENT_TYPE", 12) == 0)
       needs_http_prefix = 0;
 
+    size_t key_len;
     if (needs_http_prefix) {
       memcpy(parser->buf, "HTTP_", 5);
       memcpy(parser->buf + 5, field_ptr, parser->field_len);
-      parser->buf[5 + parser->field_len] = '\0';
+      key_len = 5 + parser->field_len;
+      parser->buf[key_len] = '\0';
     } else {
       memcpy(parser->buf, field_ptr, parser->field_len);
-      parser->buf[parser->field_len] = '\0';
+      key_len = parser->field_len;
+      parser->buf[key_len] = '\0';
     }
 
-    VALUE key = rb_str_new2(parser->buf);
+    VALUE key = raptor_http_intern_field(parser->buf, key_len);
     VALUE value = rb_str_new(PTR_TO(mark), value_len);
 
     char *value_ptr = RSTRING_PTR(value);
@@ -351,16 +424,19 @@ tr29:
     else if (parser->field_len == 12 && memcmp(field_ptr, "CONTENT_TYPE", 12) == 0)
       needs_http_prefix = 0;
 
+    size_t key_len;
     if (needs_http_prefix) {
       memcpy(parser->buf, "HTTP_", 5);
       memcpy(parser->buf + 5, field_ptr, parser->field_len);
-      parser->buf[5 + parser->field_len] = '\0';
+      key_len = 5 + parser->field_len;
+      parser->buf[key_len] = '\0';
     } else {
       memcpy(parser->buf, field_ptr, parser->field_len);
-      parser->buf[parser->field_len] = '\0';
+      key_len = parser->field_len;
+      parser->buf[key_len] = '\0';
     }
 
-    VALUE key = rb_str_new2(parser->buf);
+    VALUE key = raptor_http_intern_field(parser->buf, key_len);
     VALUE value = rb_str_new(PTR_TO(mark), value_len);
 
     char *value_ptr = RSTRING_PTR(value);
@@ -1236,6 +1312,11 @@ RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   global_server_protocol = rb_str_new2("SERVER_PROTOCOL");
   global_request_path = rb_str_new2("PATH_INFO");
   global_fragment = rb_str_new2("FRAGMENT");
+
+  for (size_t i = 0; i < NUM_COMMON_FIELDS; i++) {
+    common_fields[i].interned = rb_enc_interned_str(common_fields[i].name, common_fields[i].len, rb_utf8_encoding());
+    rb_global_variable(&common_fields[i].interned);
+  }
 
   rb_define_alloc_func(cHttpParser, parser_alloc);
   rb_define_method(cHttpParser, "execute", parser_execute, 3);
