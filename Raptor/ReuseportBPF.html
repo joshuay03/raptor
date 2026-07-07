@@ -393,7 +393,8 @@ Skips non-tcp bind URIs.</p>
 89
 90
 91
-92</pre>
+92
+93</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 67</span>
@@ -413,6 +414,7 @@ Skips non-tcp bind URIs.</p>
     <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='period'>.</span><span class='id identifier rubyid_afamily'>afamily</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOCK_STREAM</span><span class='comma'>,</span> <span class='int'>0</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOL_SOCKET</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SO_REUSEADDR</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOL_SOCKET</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SO_REUSEPORT</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>IPPROTO_TCP</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>TCP_NODELAY</span><span class='comma'>,</span> <span class='int'>1</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_bind'>bind</span><span class='lparen'>(</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_listen'>listen</span><span class='lparen'>(</span><span class='id identifier rubyid_socket_backlog'>socket_backlog</span><span class='rparen'>)</span>
 
@@ -613,16 +615,16 @@ platform. Does not imply that the kernel will accept the program.</p>
       <pre class="lines">
 
 
-100
 101
 102
 103
 104
 105
-106</pre>
+106
+107</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 100</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 101</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_load'>update_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='ivar'>@load_value</span><span class='period'>.</span><span class='id identifier rubyid_setbyte'>setbyte</span><span class='lparen'>(</span><span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>&amp;</span> <span class='int'>0xff</span><span class='rparen'>)</span>
@@ -641,7 +643,7 @@ platform. Does not imply that the kernel will accept the program.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Jul  7 02:10:23 2026 by
+  Generated on Tue Jul  7 02:11:44 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>

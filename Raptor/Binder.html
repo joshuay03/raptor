@@ -1116,7 +1116,6 @@ HTTP/1.1 ALPN negotiation.</p>
       <pre class="lines">
 
 
-333
 334
 335
 336
@@ -1126,10 +1125,11 @@ HTTP/1.1 ALPN negotiation.</p>
 340
 341
 342
-343</pre>
+343
+344</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 333</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 334</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_build_ssl_context'>build_ssl_context</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_params'>ssl_params</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>openssl</span><span class='tstring_end'>&quot;</span></span>
@@ -1421,14 +1421,14 @@ certificate and private key files respectively.</p>
       <pre class="lines">
 
 
-320
 321
 322
 323
-324</pre>
+324
+325</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 320</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 321</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_ssl_listeners'>create_ssl_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='comma'>,</span> <span class='id identifier rubyid_ssl_params'>ssl_params</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tcp_servers'>tcp_servers</span> <span class='op'>=</span> <span class='id identifier rubyid_create_tcp_listeners'>create_tcp_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='rparen'>)</span>
@@ -1529,7 +1529,8 @@ certificate and private key files respectively.</p>
 264
 265
 266
-267</pre>
+267
+268</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 250</span>
@@ -1545,6 +1546,7 @@ certificate and private key files respectively.</p>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='period'>.</span><span class='id identifier rubyid_afamily'>afamily</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOCK_STREAM</span><span class='comma'>,</span> <span class='int'>0</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOL_SOCKET</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SO_REUSEADDR</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOL_SOCKET</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SO_REUSEPORT</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_const_defined?'>const_defined?</span><span class='lparen'>(</span><span class='symbol'>:SO_REUSEPORT</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>IPPROTO_TCP</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>TCP_NODELAY</span><span class='comma'>,</span> <span class='int'>1</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_bind'>bind</span><span class='lparen'>(</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_listen'>listen</span><span class='lparen'>(</span><span class='ivar'>@socket_backlog</span><span class='rparen'>)</span>
 
@@ -1634,7 +1636,6 @@ socket file on normal process exit.</p>
       <pre class="lines">
 
 
-280
 281
 282
 283
@@ -1647,10 +1648,11 @@ socket file on normal process exit.</p>
 290
 291
 292
-293</pre>
+293
+294</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 280</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 281</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_unix_listeners'>create_unix_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
@@ -1765,16 +1767,16 @@ process via the <code>inherited_fds:</code> constructor argument.</p>
       <pre class="lines">
 
 
-350
 351
 352
 353
 354
 355
-356</pre>
+356
+357</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 350</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 351</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_loopback_addresses'>loopback_addresses</span>
   <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_ip_address_list'>ip_address_list</span><span class='period'>.</span><span class='id identifier rubyid_filter_map'>filter_map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='op'>|</span>
@@ -1902,13 +1904,13 @@ forked workers won't delete a socket their master still owns.</p>
       <pre class="lines">
 
 
-303
 304
 305
-306</pre>
+306
+307</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 303</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 304</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_register_unix_socket_cleanup'>register_unix_socket_cleanup</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_master_pid'>master_pid</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span>
@@ -2112,7 +2114,7 @@ if no TCP or SSL listener is configured (e.g., Unix socket only).</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Jul  7 02:10:24 2026 by
+  Generated on Tue Jul  7 02:11:45 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
