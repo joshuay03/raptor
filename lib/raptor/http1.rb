@@ -730,19 +730,28 @@ module Raptor
       default_port = behind_tls_proxy ? "443" : @server_port.to_s
 
       http_host = env[Rack::HTTP_HOST]
-      if http_host
+      host = nil
+      port = nil
+      if http_host && !http_host.empty?
         if http_host.start_with?("[")
-          host = http_host[/\A\[([^\]]+)\]/, 1]
-          port = http_host[/\]:(\d+)\z/, 1]
+          bracket_end = http_host.index("]")
+          if bracket_end
+            host = http_host.byteslice(1, bracket_end - 1)
+            port_colon = http_host.index(":", bracket_end + 1)
+            port = port_colon && http_host.byteslice(port_colon + 1, http_host.bytesize - port_colon - 1)
+          end
         else
-          host, port = http_host.split(":", 2)
+          colon = http_host.index(":")
+          if colon
+            host = http_host.byteslice(0, colon)
+            port = http_host.byteslice(colon + 1, http_host.bytesize - colon - 1)
+          else
+            host = http_host
+          end
         end
-        env[Rack::SERVER_NAME] ||= host
-        env[Rack::SERVER_PORT] ||= port || default_port
-      else
-        env[Rack::SERVER_NAME] ||= Server::DEFAULT_SERVER_NAME
-        env[Rack::SERVER_PORT] ||= default_port
       end
+      env[Rack::SERVER_NAME] ||= host || Server::DEFAULT_SERVER_NAME
+      env[Rack::SERVER_PORT] ||= port || default_port
 
       env
     end
