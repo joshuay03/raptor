@@ -118,6 +118,15 @@ module Raptor
       end
     end
 
+    def test_chunked_request_body_decoded_case_insensitively
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri, "POST / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nTransfer-Encoding: Chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n")
+
+        assert_match(/200 OK/, response)
+        assert_match(/hello world/, response)
+      end
+    end
+
     def test_expect_100_continue_sent_before_body
       with_server("rack_input.ru") do |uri|
         socket = TCPSocket.new(uri.host, uri.port)

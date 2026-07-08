@@ -121,6 +121,21 @@ static inline void upcase_header_char(char *c) {
     *c = '_';
 }
 
+static int contains_chunked(const char *value, long len) {
+  static const char chunked[] = "chunked";
+  static const long chunked_len = sizeof(chunked) - 1;
+
+  if (len < chunked_len) return 0;
+  for (long start = 0; start + chunked_len <= len; start++) {
+    long i;
+    for (i = 0; i < chunked_len; i++) {
+      if ((char)tolower((unsigned char)value[start + i]) != chunked[i]) break;
+    }
+    if (i == chunked_len) return 1;
+  }
+  return 0;
+}
+
 static const int raptor_parser_start = 1;
 static const int raptor_parser_first_final = 46;
 static const int raptor_parser_error = 0;
@@ -392,7 +407,7 @@ tr26:
         parser->flags |= FLAG_HAS_BODY;
     } else if (needs_http_prefix && parser->field_len == 17 &&
                memcmp(field_ptr, "TRANSFER_ENCODING", 17) == 0) {
-      if (strstr(RSTRING_PTR(value), "chunked")) {
+      if (contains_chunked(value_ptr, value_real_len)) {
         parser->flags |= FLAG_CHUNKED | FLAG_HAS_BODY;
         parser->content_len = 0;
       }
@@ -452,7 +467,7 @@ tr29:
         parser->flags |= FLAG_HAS_BODY;
     } else if (needs_http_prefix && parser->field_len == 17 &&
                memcmp(field_ptr, "TRANSFER_ENCODING", 17) == 0) {
-      if (strstr(RSTRING_PTR(value), "chunked")) {
+      if (contains_chunked(value_ptr, value_real_len)) {
         parser->flags |= FLAG_CHUNKED | FLAG_HAS_BODY;
         parser->content_len = 0;
       }
@@ -1267,6 +1282,12 @@ static VALUE parser_has_body_p(VALUE self) {
   return raptor_parser_has_body(parser) ? Qtrue : Qfalse;
 }
 
+static VALUE parser_chunked_p(VALUE self) {
+  raptor_parser *parser;
+  TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
+  return raptor_parser_is_chunked(parser) ? Qtrue : Qfalse;
+}
+
 static VALUE parser_content_length(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
@@ -1322,6 +1343,7 @@ RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   rb_define_method(cHttpParser, "execute", parser_execute, 3);
   rb_define_method(cHttpParser, "finished?", parser_finished_p, 0);
   rb_define_method(cHttpParser, "has_body?", parser_has_body_p, 0);
+  rb_define_method(cHttpParser, "chunked?", parser_chunked_p, 0);
   rb_define_method(cHttpParser, "content_length", parser_content_length, 0);
   rb_define_method(cHttpParser, "nread", parser_nread, 0);
   rb_define_method(cHttpParser, "reset", parser_reset, 0);

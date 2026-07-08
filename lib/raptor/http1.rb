@@ -280,7 +280,7 @@ module Raptor
 
         body = buffer.byteslice(nread..-1) || ""
 
-        if env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
+        if parser.chunked?
           body, chunked_state = Http1.decode_chunked(body, @max_body_size)
           case chunked_state
           when :complete
@@ -344,7 +344,7 @@ module Raptor
 
             if max_body_size && parser.content_length > max_body_size
               data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
-            elsif env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
+            elsif parser.chunked?
               decoded_body, chunked_state = Raptor::Http1.decode_chunked(body_buffer, max_body_size)
 
               case chunked_state
@@ -603,8 +603,7 @@ module Raptor
         elsif parser.has_body?
           body = buffer.byteslice(nread..-1) || ""
 
-          chunked = env[HTTP_TRANSFER_ENCODING]&.include?(TRANSFER_ENCODING_CHUNKED)
-          if chunked || parser.content_length > body.bytesize
+          if parser.chunked? || parser.content_length > body.bytesize
             fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
             return
           end
