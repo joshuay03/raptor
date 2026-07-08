@@ -58,6 +58,7 @@ module Raptor
 
     ILLEGAL_HEADER_KEY_REGEX = /[\x00-\x20\(\)<>@,;:\\"\/\[\]\?=\{\}\x7F]/
     ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/
+    CHUNK_SIZE_REGEX = /\A[0-9A-Fa-f]+\z/
 
     # Returns true when an HTTP/1.1 request lacks a valid `Host` header per
     # RFC 9112 section 3.2, where a valid value is a non-empty single-value
@@ -105,8 +106,9 @@ module Raptor
     #
     # Returns the decoded bytes and a state symbol: `:complete` when the
     # terminating zero-length chunk was found, `:too_large` when the decoded
-    # size would exceed `max_size`, `:malformed` when chunk framing overhead
-    # exceeds `MAX_CHUNK_OVERHEAD`, or `:incomplete` otherwise.
+    # size would exceed `max_size`, `:malformed` when a chunk-size line is
+    # not valid hex or chunk framing overhead exceeds `MAX_CHUNK_OVERHEAD`,
+    # or `:incomplete` otherwise.
     #
     # @param buffer [String] the raw body buffer to decode
     # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited
@@ -122,7 +124,12 @@ module Raptor
         crlf = buffer.index("\r\n", offset)
         return [decoded, :incomplete] unless crlf
 
-        chunk_size = buffer.byteslice(offset, crlf - offset).to_i(16)
+        size_line = buffer.byteslice(offset, crlf - offset)
+        semicolon = size_line.index(";")
+        size_part = semicolon ? size_line.byteslice(0, semicolon) : size_line
+        return [decoded, :malformed] unless size_part.match?(CHUNK_SIZE_REGEX)
+
+        chunk_size = size_part.to_i(16)
         return [decoded, :complete] if chunk_size == 0
         return [decoded, :too_large] if max_size && (decoded.bytesize + chunk_size) > max_size
 

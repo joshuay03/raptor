@@ -713,6 +713,20 @@ module Raptor
       end
     end
 
+    def test_non_hex_chunk_size_returns_400
+      with_server("rack_input.ru") do |uri|
+        response = raw_request(uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Transfer-Encoding: chunked\r\n" \
+          "Connection: close\r\n\r\n" \
+          "GG\r\ndata\r\n0\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
     def test_excessive_chunk_overhead_returns_400
       with_server("rack_input.ru") do |uri|
         bloated_extension = "A" * (Raptor::Http1::MAX_CHUNK_OVERHEAD + 1)

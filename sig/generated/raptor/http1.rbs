@@ -64,6 +64,8 @@ module Raptor
 
     ILLEGAL_HEADER_VALUE_REGEX: ::Regexp
 
+    CHUNK_SIZE_REGEX: ::Regexp
+
     # Returns true when an HTTP/1.1 request lacks a valid `Host` header per
     # RFC 9112 section 3.2, where a valid value is a non-empty single-value
     # line.
@@ -90,8 +92,9 @@ module Raptor
     #
     # Returns the decoded bytes and a state symbol: `:complete` when the
     # terminating zero-length chunk was found, `:too_large` when the decoded
-    # size would exceed `max_size`, `:malformed` when chunk framing overhead
-    # exceeds `MAX_CHUNK_OVERHEAD`, or `:incomplete` otherwise.
+    # size would exceed `max_size`, `:malformed` when a chunk-size line is
+    # not valid hex or chunk framing overhead exceeds `MAX_CHUNK_OVERHEAD`,
+    # or `:incomplete` otherwise.
     #
     # @param buffer [String] the raw body buffer to decode
     # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited
