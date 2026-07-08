@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Reject HTTP/1.1 requests without a valid `Host` header with 400
+
 ## [0.10.0] - 2026-07-07
 
 - Memoize the server port string for the Rack env

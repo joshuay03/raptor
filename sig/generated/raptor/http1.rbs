@@ -64,6 +64,16 @@ module Raptor
 
     ILLEGAL_HEADER_VALUE_REGEX: ::Regexp
 
+    # Returns true when an HTTP/1.1 request lacks a valid `Host` header per
+    # RFC 9112 section 3.2, where a valid value is a non-empty single-value
+    # line.
+    #
+    # @param env [Hash] the Rack environment after header parsing
+    # @return [Boolean]
+    #
+    # @rbs (Hash[String, untyped] env) -> bool
+    def self.invalid_host?: (Hash[String, untyped] env) -> bool
+
     # Returns true when the message framing shows a request-smuggling vector
     # per RFC 9112 section 6.3: a `Transfer-Encoding` where `chunked` is
     # missing, not the final encoding, or duplicated; a `Transfer-Encoding`

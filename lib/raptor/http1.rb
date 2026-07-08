@@ -59,6 +59,21 @@ module Raptor
     ILLEGAL_HEADER_KEY_REGEX = /[\x00-\x20\(\)<>@,;:\\"\/\[\]\?=\{\}\x7F]/
     ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/
 
+    # Returns true when an HTTP/1.1 request lacks a valid `Host` header per
+    # RFC 9112 section 3.2, where a valid value is a non-empty single-value
+    # line.
+    #
+    # @param env [Hash] the Rack environment after header parsing
+    # @return [Boolean]
+    #
+    # @rbs (Hash[String, untyped] env) -> bool
+    def self.invalid_host?(env)
+      return false unless env[Rack::SERVER_PROTOCOL] == HTTP_11
+
+      http_host = env[Rack::HTTP_HOST]
+      !http_host || http_host.empty? || http_host.include?(",")
+    end
+
     # Returns true when the message framing shows a request-smuggling vector
     # per RFC 9112 section 6.3: a `Transfer-Encoding` where `chunked` is
     # missing, not the final encoding, or duplicated; a `Transfer-Encoding`
@@ -254,7 +269,7 @@ module Raptor
       if !parser.finished?
         fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
         return
-      elsif Http1.request_smuggling?(env)
+      elsif Http1.invalid_host?(env) || Http1.request_smuggling?(env)
         reject_malformed(socket)
         return
       elsif parser.has_body?
@@ -322,7 +337,7 @@ module Raptor
         parse_data[:parse_count] += 1
 
         message = if parser.finished?
-          if Raptor::Http1.request_smuggling?(env)
+          if Raptor::Http1.invalid_host?(env) || Raptor::Http1.request_smuggling?(env)
             data.merge(env: env, body: nil, parse_data: parse_data, complete: true, malformed: true)
           elsif parser.has_body?
             body_buffer = data[:buffer].byteslice(nread..-1) || ""

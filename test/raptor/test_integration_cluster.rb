@@ -538,6 +538,91 @@ module Raptor
       end
     end
 
+    def test_too_long_uri_returns_400
+      with_server do |uri|
+        long_path = "/" + "a" * (13 * 1024)
+        response = raw_request(uri, "GET #{long_path} HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
+
+        assert_match(/400 Bad Request/, response)
+
+        assert_equal 200, Net::HTTP.get_response(uri).code.to_i
+      end
+    end
+
+    def test_too_long_uri_on_keepalive_returns_400
+      with_server do |uri|
+        socket = TCPSocket.new(uri.host, uri.port)
+        long_path = "/" + "a" * (13 * 1024)
+        socket.write("GET / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
+        first_response = String.new
+        Timeout.timeout(5) do
+          first_response << socket.readpartial(1024) until first_response.include?("Hello, World!")
+        end
+
+        socket.write("GET #{long_path} HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
+        response = Timeout.timeout(5) { socket.read }
+
+        assert_match(/200 OK/, first_response)
+        assert_match(/400 Bad Request/, response)
+
+        assert_equal 200, Net::HTTP.get_response(uri).code.to_i
+      ensure
+        socket&.close
+      end
+    end
+
+    def test_too_long_uri_via_slow_path_returns_400
+      with_server do |uri|
+        socket = TCPSocket.new(uri.host, uri.port)
+        socket.write("GET /aa")
+        sleep 0.1
+        socket.write("#{"a" * (13 * 1024)} HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
+        response = Timeout.timeout(5) { socket.read }
+
+        assert_match(/400 Bad Request/, response)
+
+        assert_equal 200, Net::HTTP.get_response(uri).code.to_i
+      ensure
+        socket&.close
+      end
+    end
+
+    def test_missing_host_returns_400
+      with_server do |uri|
+        response = raw_request(uri,
+          "GET / HTTP/1.1\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
+    def test_empty_host_returns_400
+      with_server do |uri|
+        response = raw_request(uri,
+          "GET / HTTP/1.1\r\n" \
+          "Host: \r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
+    def test_duplicate_host_returns_400
+      with_server do |uri|
+        response = raw_request(uri,
+          "GET / HTTP/1.1\r\n" \
+          "Host: a\r\n" \
+          "Host: b\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
     def test_transfer_encoding_with_content_length_returns_400
       with_server("rack_input.ru") do |uri|
         response = raw_request(uri,
@@ -631,55 +716,6 @@ module Raptor
         )
 
         assert_match(/400 Bad Request/, response)
-      end
-    end
-
-    def test_too_long_uri_returns_400
-      with_server do |uri|
-        long_path = "/" + "a" * (13 * 1024)
-        response = raw_request(uri, "GET #{long_path} HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
-
-        assert_match(/400 Bad Request/, response)
-
-        assert_equal 200, Net::HTTP.get_response(uri).code.to_i
-      end
-    end
-
-    def test_too_long_uri_on_keepalive_returns_400
-      with_server do |uri|
-        socket = TCPSocket.new(uri.host, uri.port)
-        long_path = "/" + "a" * (13 * 1024)
-        socket.write("GET / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
-        first_response = String.new
-        Timeout.timeout(5) do
-          first_response << socket.readpartial(1024) until first_response.include?("Hello, World!")
-        end
-
-        socket.write("GET #{long_path} HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
-        response = Timeout.timeout(5) { socket.read }
-
-        assert_match(/200 OK/, first_response)
-        assert_match(/400 Bad Request/, response)
-
-        assert_equal 200, Net::HTTP.get_response(uri).code.to_i
-      ensure
-        socket&.close
-      end
-    end
-
-    def test_too_long_uri_via_slow_path_returns_400
-      with_server do |uri|
-        socket = TCPSocket.new(uri.host, uri.port)
-        socket.write("GET /aa")
-        sleep 0.1
-        socket.write("#{"a" * (13 * 1024)} HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
-        response = Timeout.timeout(5) { socket.read }
-
-        assert_match(/400 Bad Request/, response)
-
-        assert_equal 200, Net::HTTP.get_response(uri).code.to_i
-      ensure
-        socket&.close
       end
     end
 
