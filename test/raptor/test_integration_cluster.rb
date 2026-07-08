@@ -596,6 +596,21 @@ module Raptor
       end
     end
 
+    def test_too_long_headers_returns_400
+      with_server do |uri|
+        big = "X" * 60_000
+        response = raw_request(uri,
+          "GET / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Big1: #{big}\r\n" \
+          "Big2: #{big}\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/400 Bad Request/, response)
+      end
+    end
+
     def test_missing_host_returns_400
       with_server do |uri|
         response = raw_request(uri,

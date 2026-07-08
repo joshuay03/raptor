@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reject request headers larger than 112KB with 400
 - Reject chunk sizes containing non-hex characters with 400
 - Advance the parser's `nread` past the request header terminator
 - Detect chunked `Transfer-Encoding` case-insensitively

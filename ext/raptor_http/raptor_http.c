@@ -1177,6 +1177,9 @@ done:
   parser->cs = cs;
   parser->nread = (parser->flags & FLAG_FINISHED) ? parser->body_start : (size_t)(p - buffer);
 
+  if (parser->nread > MAX_HEADER_LENGTH)
+    rb_raise(eHttpParserError, "request header too long");
+
   assert(p <= pe && "buffer overflow after parsing execute");
   assert(parser->nread <= len && "nread longer than length");
   assert(parser->body_start <= len && "body starts after buffer end");
