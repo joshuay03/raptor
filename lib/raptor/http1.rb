@@ -105,10 +105,10 @@ module Raptor
     # Decodes a chunked transfer-encoded body buffer.
     #
     # Returns the decoded bytes and a state symbol: `:complete` when the
-    # terminating zero-length chunk was found, `:too_large` when the decoded
-    # size would exceed `max_size`, `:malformed` when a chunk-size line is
-    # not valid hex or chunk framing overhead exceeds `MAX_CHUNK_OVERHEAD`,
-    # or `:incomplete` otherwise.
+    # terminating zero-length chunk and trailer section were fully consumed,
+    # `:too_large` when the decoded size would exceed `max_size`, `:malformed`
+    # when a chunk-size line is not valid hex or chunk framing overhead exceeds
+    # `MAX_CHUNK_OVERHEAD`, or `:incomplete` otherwise.
     #
     # @param buffer [String] the raw body buffer to decode
     # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited
@@ -130,7 +130,18 @@ module Raptor
         return [decoded, :malformed] unless size_part.match?(CHUNK_SIZE_REGEX)
 
         chunk_size = size_part.to_i(16)
-        return [decoded, :complete] if chunk_size == 0
+
+        if chunk_size == 0
+          trailer_offset = crlf + 2
+          loop do
+            trailer_crlf = buffer.index("\r\n", trailer_offset)
+            return [decoded, :incomplete] unless trailer_crlf
+            return [decoded, :complete] if trailer_crlf == trailer_offset
+
+            trailer_offset = trailer_crlf + 2
+          end
+        end
+
         return [decoded, :too_large] if max_size && (decoded.bytesize + chunk_size) > max_size
 
         overhead += (crlf - offset) + 4
