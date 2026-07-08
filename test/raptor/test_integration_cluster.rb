@@ -53,6 +53,21 @@ module Raptor
       end
     end
 
+    def test_query_request_method
+      with_server("request_method.ru") do |uri|
+        response = raw_request(
+          uri,
+          "QUERY /search HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Content-Length: 5\r\n" \
+          "Connection: close\r\n\r\nhello"
+        )
+
+        assert_match(/200 OK/, response)
+        assert_match(/QUERY/, response)
+      end
+    end
+
     def test_path_info
       with_server("path_info.ru") do |uri|
         uri.path = "/foo/bar"
