@@ -84,7 +84,7 @@ Puma stores its reactor timeouts in a Ruby array of `Client` objects. New client
 
 Cross-thread waking is done through a pipe. When work needs to enter the reactor from another thread (a Client being registered), a byte is written to a pipe that the selector is also watching; the selector wakes, drains the input queue, and gets on with it.
 
-### Request lifecycle (HTTP/1.1)
+### HTTP/1.1 request lifecycle
 
 Putting the pieces together, a request through Puma looks like this:
 
@@ -104,16 +104,17 @@ Response writing is done from the app thread. Puma sets `TCP_CORK` on Linux, wri
 ```mermaid
 flowchart TB
     subgraph Master["Master process, cluster mode"]
-        M["Master loop"]
-        M -->|fork| W1["Worker 0"]
-        M -->|fork| W2["Worker 1"]
-        M -->|fork| W3["Worker N"]
+        MM["Master loop<br/>Reads worker pipes for<br/>per-worker vitals<br/>Handles signals"]
+        MM -->|"fork"| W1["Worker 0"]
+        MM -->|"fork"| W2["Worker 1"]
+        MM -->|"fork"| W3["Worker N"]
+        MM -.->|"SIGUSR2<br/>exec with argv"| MM
     end
 
-    subgraph Worker["Puma worker process"]
-        A["Server thread<br/>IO.select on listeners<br/>accept_nonblock"]
+    subgraph Worker["Puma worker process, one of N"]
+        SRV["Server thread<br/>IO.select on listeners<br/>accept_nonblock"]
 
-        R["Reactor thread<br/>NIO::Selector<br/>sorted timeout array"]
+        RCT["Reactor thread<br/>NIO::Selector<br/>sorted timeout array"]
 
         subgraph TP["Thread pool, Mutex + CondVar"]
             T1["Thread 1"]
@@ -121,37 +122,45 @@ flowchart TB
             T3["Thread N"]
         end
 
+        STA["Stat thread<br/>writes to worker pipe<br/>on worker_check_interval"]
+
         C1{"Complete<br/>request<br/>on accept?"}
         C2{"Complete<br/>request<br/>after read?"}
         KA{"Keep-alive?"}
         BB{"Back-to-back<br/>data in buffer?"}
 
-        A -->|"push new socket"| TP
+        SRV -->|"push new socket"| TP
         TP -->|"eagerly_finish"| C1
         C1 -->|"complete, app.call"| APP["Rack app"]
-        C1 -->|"incomplete, register"| R
-        R -->|"socket readable"| C2
+        C1 -->|"incomplete, register"| RCT
+        RCT -->|"socket readable"| C2
         C2 -->|"complete, push"| TP
-        C2 -->|"incomplete, keep waiting"| R
-        R -->|"timeout"| CLOSE1["write 408, close"]
+        C2 -->|"incomplete, keep waiting"| RCT
+        RCT -->|"timeout"| TO["write 408, close"]
         APP -->|"write response"| KA
-        KA -->|"no"| CLOSE2["close socket"]
+        KA -->|"no"| CLS["close socket"]
         KA -->|"yes"| BB
         BB -->|"yes, reprocess"| TP
-        BB -->|"no, back to reactor"| R
+        BB -->|"no, back to reactor"| RCT
+
+        STA -.->|"writes ping"| PIPE[("worker→master pipe")]
     end
+
+    MM -.->|"reads ping"| PIPE
 
     classDef accept fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef reactor fill:#fecdd3,stroke:#e11d48,color:#881337
     classDef pool fill:#fef3c7,stroke:#d97706,color:#78350f
     classDef app fill:#d1fae5,stroke:#059669,color:#064e3b
-    class A accept
-    class R reactor
+    classDef storage fill:#e5e7eb,stroke:#6b7280,color:#374151
+    class SRV accept
+    class RCT reactor
     class TP pool
     class APP app
+    class PIPE storage
 ```
 
-The key thing to notice: the parser runs inside an app thread. Puma's concurrency model is "many app threads, each doing one full request (parse plus app plus write) at a time". Under MRI's GVL this is genuine concurrency but not parallelism; at any given moment at most one of those threads is executing Ruby, and the others are either blocked on I/O (which releases the GVL and lets another thread proceed) or waiting their turn. Puma leans on the fact that most Rack apps spend most of their time blocked on the database or an external API, where threads do effectively overlap.
+Notably, the parser runs inside an app thread. Puma's concurrency model is "many app threads, each doing one full request (parse plus app plus write) at a time". Under MRI's GVL this is genuine concurrency but not parallelism; at any given moment at most one of those threads is executing Ruby, and the others are either blocked on I/O (which releases the GVL and lets another thread proceed) or waiting their turn. Puma leans on the fact that most Rack apps spend most of their time blocked on the database or an external API, where threads do effectively overlap.
 
 ## Part II: Raptor
 
@@ -175,7 +184,7 @@ Master-to-worker communication does not use pipes. Every worker writes its stats
 
 On Linux, each worker pins itself to a distinct CPU via `sched_setaffinity` when the worker count fits within the process's allowed CPU set, so it stays on one core and its L1/L2 caches stay warm. When workers outnumber available CPUs the pin is skipped and the kernel scheduler manages placement.
 
-### Per-worker threading model
+### Threading model
 
 This is where Raptor diverges dramatically. Inside a worker there are five kinds of concurrent activity:
 
@@ -188,13 +197,13 @@ This is where Raptor diverges dramatically. Inside a worker there are five kinds
 
 That is a lot of moving parts. Let us go through why.
 
-**Why Ractors for parsing.** Ractors are Ruby's answer to true parallelism. Multiple Ractors can execute Ruby code simultaneously on different OS threads, each with its own GVL. But Ractors are heavily restricted: they can only share frozen data, they cannot access most global mutable state, and code inside a Ractor cannot use most existing gems (which universally assume shared-state semantics).
+**Why Ractors for parsing.** Ractors are Ruby's answer to true parallelism. Multiple Ractors can execute Ruby code simultaneously on different OS threads, each with its own GVL. But Ractors are heavily restricted. They can only share frozen data, they cannot access most global mutable state, and code inside a Ractor cannot use most existing gems (which universally assume shared-state semantics).
 
 For a web server, this restriction turns out to be almost exactly right for HTTP parsing. Parsing a request is CPU-bound (tokenising bytes, uppercasing header names, decoding chunked bodies), it does not need to touch any global state, and it produces a result (a hash) that can be safely frozen and handed off. The native HTTP/1 parser (`raptor_http.c`) is declared `rb_ext_ractor_safe(true)`: it holds no per-parser Ruby state in the extension itself, and it writes only into the caller-supplied env hash. Same for the HTTP/2 parser plus HPACK.
 
 The HTTP/1 parser also pre-interns the ~40 most common header keys (`HTTP_HOST`, `HTTP_USER_AGENT`, the `HTTP_ACCEPT_*` family, `CONTENT_LENGTH`, `HTTP_X_FORWARDED_*`, the `HTTP_SEC_FETCH_*` client hints, and so on) once at load time. During parsing, a `memcmp` lookup against that table returns the shared frozen `VALUE` for known keys and falls back to `rb_enc_interned_str` for the rest. Every request's env hash therefore reuses the same String object for its header names, which both skips per-request allocation and lets Ruby's hash lookup use the interned key's cached hash code.
 
-The upshot: while your Rack app runs on regular threads under the GVL (so your app does not need to be Ractor-safe), the protocol-level work runs in parallel across Ractors. Under heavy load with lots of small requests, the GVL contention that would otherwise dominate parsing simply is not there.
+The upshot is that while your Rack app runs on regular threads under the GVL (so your app does not need to be Ractor-safe), the protocol-level work runs in parallel across Ractors. Under heavy load with lots of small requests, the GVL contention that would otherwise dominate parsing simply is not there.
 
 **How the Ractor pool actually works.** Raptor uses the `ractor-pool` gem, which is another one of my libraries. The pool has one coordinator Ractor and M pipeline Ractors. When a pipeline Ractor is idle, it sends itself back to the coordinator via `coordinator.send(Ractor.current, move: true)`. When work arrives at the coordinator, it either forwards it to a waiting Ractor (if any) or queues it. This coordinator-dispatch pattern guarantees that no Ractor sits idle while there is work. Results flow back through a shared `Ractor::Port` (a many-to-one channel added in recent Ruby versions and stable in 4.0) to a Ruby-side collector thread. If `M == 1` the coordinator is skipped and work goes straight to the single pipeline Ractor; this is the default because a single Ractor already parses in parallel with the app threads and adds enough headroom for typical workloads.
 
@@ -343,7 +352,7 @@ flowchart TB
         ATP -->|"app.call + write"| KA
         KA -->|"no, close"| CLS["close socket"]
         KA -->|"yes"| EAG
-        EAG -->|"bytes within 1ms"| ATP
+        EAG -.->|"bytes within 1ms, parse+dispatch on same thread"| ATP
         EAG -->|"no bytes, reactor.persist"| RCT
         RCT -->|"timeout expired"| TO["write 408, close"]
 
@@ -366,7 +375,7 @@ flowchart TB
     class SHM storage
 ```
 
-The critical structural difference from Puma: parsing is not on the app thread. It is on the Ractor pool. The app thread only does the Rack call and the response write. This decouples the two costs and lets Ruby actually use more than one CPU for the protocol work.
+The critical structural difference from Puma is that parsing is not on the app thread. It is on the Ractor pool. The app thread only does the Rack call and the response write. This decouples the two costs and lets Ruby actually use more than one CPU for the protocol work.
 
 ## Part III: Head to head
 
@@ -482,16 +491,12 @@ sequenceDiagram
     autonumber
     participant Client
     participant RS as Server thread
-    participant RR as Reactor thread
-    participant RC as Pipeline Ractor
     participant RP as App thread
 
     Note over Client,RP: Request 1, initial
     Client->>RS: SYN, request bytes
-    RS->>RR: reactor.add
-    RR->>RC: shareable state
-    RC->>RC: parse on own Ractor GVL
-    RC->>RP: dispatch complete request
+    RS->>RS: eager_accept, read + parse inline
+    RS->>RP: push proc to thread pool
     RP->>Client: response 1
 
     Note over Client,RP: Request 2, pipelined a few hundred us later
