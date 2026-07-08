@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Advance the parser's `nread` past the request header terminator
 - Detect chunked `Transfer-Encoding` case-insensitively
 - Reject HTTP/1.1 requests without a valid `Host` header with 400
 

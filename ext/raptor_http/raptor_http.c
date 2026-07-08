@@ -1175,7 +1175,7 @@ case 45:
 
 done:
   parser->cs = cs;
-  parser->nread = p - buffer;
+  parser->nread = (parser->flags & FLAG_FINISHED) ? parser->body_start : (size_t)(p - buffer);
 
   assert(p <= pe && "buffer overflow after parsing execute");
   assert(parser->nread <= len && "nread longer than length");
