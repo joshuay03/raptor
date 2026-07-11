@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Populate `PATH_INFO` from absolute-form request targets
 - Consume the trailer section after the chunked-body terminator
 - Reject request headers larger than 112KB with 400
 - Reject chunk sizes containing non-hex characters with 400

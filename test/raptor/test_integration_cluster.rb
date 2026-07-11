@@ -78,6 +78,20 @@ module Raptor
       end
     end
 
+    def test_absolute_uri_populates_path_info
+      with_server("path_info.ru") do |uri|
+        response = raw_request(
+          uri,
+          "GET http://#{uri.host}:#{uri.port}/foo/bar HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/200 OK/, response)
+        assert_match(%r{/foo/bar\z}, response)
+      end
+    end
+
     def test_query_string_with_parameters
       with_server("query_string.ru") do |uri|
         uri.query = "foo=bar&baz=qux"

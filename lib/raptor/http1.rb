@@ -750,8 +750,23 @@ module Raptor
         send_early_hints(socket, hints) rescue nil
       end
 
-      env[Rack::PATH_INFO] = env.delete(Rack::REQUEST_PATH) if env.key?(Rack::REQUEST_PATH)
-      env[Rack::PATH_INFO] = "" unless env.key?(Rack::PATH_INFO)
+      unless env.key?(Rack::PATH_INFO)
+        request_uri = env[Http::REQUEST_URI]
+        scheme_end = request_uri&.index("://")
+        if scheme_end
+          authority_end = request_uri.index("/", scheme_end + 3) || request_uri.bytesize
+          path_and_query = request_uri.byteslice(authority_end..-1) || ""
+          if query_delim = path_and_query.index("?")
+            env[Rack::PATH_INFO] = query_delim.zero? ? "/" : path_and_query.byteslice(0, query_delim)
+            env[Rack::QUERY_STRING] = path_and_query.byteslice(query_delim + 1..-1)
+          else
+            env[Rack::PATH_INFO] = path_and_query.empty? ? "/" : path_and_query
+          end
+        else
+          env[Rack::PATH_INFO] = ""
+        end
+      end
+
       if (content_length = parse_data[:content_length]).positive?
         env[Http::CONTENT_LENGTH] = content_length.to_s
       end
