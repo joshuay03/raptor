@@ -273,7 +273,8 @@ module Raptor
         buffer << socket.read_nonblock(socket.pending)
       end
 
-      parser = HttpParser.new
+      parser = (Thread.current[:raptor_http_parser] ||= HttpParser.new)
+      parser.reset
       env = @env_template.dup
       nread = begin
         parser.execute(env, buffer, 0)
@@ -604,7 +605,8 @@ module Raptor
           buffer << socket.read_nonblock(socket.pending)
         end
 
-        parser = HttpParser.new
+        parser = (Thread.current[:raptor_http_parser] ||= HttpParser.new)
+        parser.reset
         env = @env_template.dup
         nread = begin
           parser.execute(env, buffer, 0)

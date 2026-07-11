@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reuse a per-thread HTTP/1.1 parser across requests
 - Skip a per-response allocation when formatting response headers
 - Reject HTTP/2 streams with malformed pseudo-headers with `RST_STREAM`
 - Populate `PATH_INFO` from absolute-form request targets
