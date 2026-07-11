@@ -253,6 +253,33 @@ writing, and Common Log Format access-log formatting.</p>
         </dt>
         <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>REMOTE_ADDR</span><span class='tstring_end'>&quot;</span></span></pre></dd>
       
+        <dt id="REQUEST_URI-constant" class="">REQUEST_URI =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::String</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>REQUEST_URI</span><span class='tstring_end'>&quot;</span></span></pre></dd>
+      
         <dt id="SERVER_SOFTWARE-constant" class="">SERVER_SOFTWARE =
           <div class="docstring">
   <div class="discussion">
@@ -502,7 +529,6 @@ writing, and Common Log Format access-log formatting.</p>
       <pre class="lines">
 
 
-39
 40
 41
 42
@@ -516,10 +542,11 @@ writing, and Common Log Format access-log formatting.</p>
 50
 51
 52
-53</pre>
+53
+54</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 39</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 40</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_socket_write'>socket_write</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_string'>string</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='const'><span class='object_link'><a href="#WRITE_TIMEOUT-constant" title="Raptor::Http::WRITE_TIMEOUT (constant)">WRITE_TIMEOUT</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_bytes'>bytes</span> <span class='op'>=</span> <span class='int'>0</span>
@@ -644,7 +671,6 @@ falling back to per-string writes on partial results. Bounded by
       <pre class="lines">
 
 
-66
 67
 68
 69
@@ -671,10 +697,11 @@ falling back to per-string writes on partial results. Bounded by
 90
 91
 92
-93</pre>
+93
+94</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 66</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 67</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_socket_writev'>socket_writev</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_strings'>strings</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='const'><span class='object_link'><a href="#WRITE_TIMEOUT-constant" title="Raptor::Http::WRITE_TIMEOUT (constant)">WRITE_TIMEOUT</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_total'>total</span> <span class='op'>=</span> <span class='id identifier rubyid_strings'>strings</span><span class='period'>.</span><span class='id identifier rubyid_sum'>sum</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:bytesize</span><span class='rparen'>)</span>
@@ -808,7 +835,6 @@ ignored.</p>
       <pre class="lines">
 
 
-106
 107
 108
 109
@@ -816,10 +842,11 @@ ignored.</p>
 111
 112
 113
-114</pre>
+114
+115</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 106</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 107</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_write_access_log'>write_access_log</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_size'>size</span><span class='comma'>,</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_timestamp'>timestamp</span> <span class='op'>=</span> <span class='const'>Time</span><span class='period'>.</span><span class='id identifier rubyid_now'>now</span><span class='period'>.</span><span class='id identifier rubyid_strftime'>strftime</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>%d/%b/%Y:%H:%M:%S %z</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -840,7 +867,7 @@ ignored.</p>
 </div>
 
       <div id="footer">
-  Generated on Wed Jul  8 04:01:48 2026 by
+  Generated on Sat Jul 11 00:05:58 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
