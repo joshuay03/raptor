@@ -631,7 +631,7 @@ module Raptor
 
         request_count += 1
 
-        if thread_pool.queue_size > 0
+        if thread_pool.queue_size >= thread_pool.size
           thread_pool << proc do
             process_client(
               socket,
