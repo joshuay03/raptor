@@ -247,6 +247,39 @@ module Raptor
     RACK_HEADER_PREFIX = "rack."
     HOP_BY_HOP_HEADERS = ["connection", "transfer-encoding", "keep-alive", "upgrade", "proxy-connection"].freeze
 
+    REQUEST_PSEUDO_HEADERS = [":method", ":scheme", ":path", ":authority"].freeze
+    REQUIRED_REQUEST_PSEUDO_HEADERS = [":method", ":scheme", ":path"].freeze
+
+    # Returns true when a decoded header block violates the HTTP/2 pseudo-header
+    # rules from RFC 9113 section 8.3: an unknown pseudo-header, a duplicate
+    # pseudo-header, a pseudo-header appearing after any regular header, or a
+    # required pseudo-header (`:method`, `:scheme`, `:path`) missing on
+    # non-`CONNECT` requests.
+    #
+    # @param headers [Array<Array(String, String)>] decoded header pairs
+    # @return [Boolean]
+    #
+    # @rbs (Array[[String, String]] headers) -> bool
+    def self.invalid_pseudo_headers?(headers)
+      seen_pseudo = {}
+      seen_regular = false
+
+      headers.each do |name, _value|
+        if name.start_with?(":")
+          return true if seen_regular
+          return true unless REQUEST_PSEUDO_HEADERS.include?(name)
+          return true if seen_pseudo[name]
+          seen_pseudo[name] = true
+        else
+          seen_regular = true
+        end
+      end
+
+      return false if seen_pseudo[":method"] == true && headers.assoc(":method")&.last == "CONNECT"
+
+      REQUIRED_REQUEST_PSEUDO_HEADERS.any? { |name| !seen_pseudo[name] }
+    end
+
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
     # @rbs @write_timeout: Integer
@@ -370,7 +403,12 @@ module Raptor
 
           if (frame[:flags] & FLAG_END_HEADERS) != 0
             decoded_headers, hpack_table = parser.parse_headers(header_payload, hpack_table)
-            streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, end_stream)
+            if invalid_pseudo_headers?(decoded_headers)
+              streams.delete(stream_id)
+              outgoing_frames << parser.build_frame(:rst_stream, 0, stream_id, [ERROR_PROTOCOL_ERROR].pack("N"))
+            else
+              streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, end_stream)
+            end
           else
             pending_headers = { stream_id: stream_id, buffer: header_payload, end_stream: end_stream }
           end
@@ -386,7 +424,12 @@ module Raptor
           if (frame[:flags] & FLAG_END_HEADERS) != 0
             stream_id = pending_headers[:stream_id]
             decoded_headers, hpack_table = parser.parse_headers(pending_headers[:buffer], hpack_table)
-            streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, pending_headers[:end_stream])
+            if invalid_pseudo_headers?(decoded_headers)
+              streams.delete(stream_id)
+              outgoing_frames << parser.build_frame(:rst_stream, 0, stream_id, [ERROR_PROTOCOL_ERROR].pack("N"))
+            else
+              streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, pending_headers[:end_stream])
+            end
             pending_headers = nil
           end
 

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reject HTTP/2 streams with malformed pseudo-headers with `RST_STREAM`
 - Populate `PATH_INFO` from absolute-form request targets
 - Consume the trailer section after the chunked-body terminator
 - Reject request headers larger than 112KB with 400

@@ -145,6 +145,22 @@ module Raptor
 
     HOP_BY_HOP_HEADERS: untyped
 
+    REQUEST_PSEUDO_HEADERS: untyped
+
+    REQUIRED_REQUEST_PSEUDO_HEADERS: untyped
+
+    # Returns true when a decoded header block violates the HTTP/2 pseudo-header
+    # rules from RFC 9113 section 8.3: an unknown pseudo-header, a duplicate
+    # pseudo-header, a pseudo-header appearing after any regular header, or a
+    # required pseudo-header (`:method`, `:scheme`, `:path`) missing on
+    # non-`CONNECT` requests.
+    #
+    # @param headers [Array<Array(String, String)>] decoded header pairs
+    # @return [Boolean]
+    #
+    # @rbs (Array[[String, String]] headers) -> bool
+    def self.invalid_pseudo_headers?: (Array[[ String, String ]] headers) -> bool
+
     @initial_settings_frame: String
 
     @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil

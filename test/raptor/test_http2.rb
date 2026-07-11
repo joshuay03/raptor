@@ -9,6 +9,7 @@ module Raptor
     parallelize_me!
 
     GOAWAY_FRAME_TYPE = 0x7
+    RST_STREAM_FRAME_TYPE = 0x3
 
     def test_flow_control_acquire_caps_grant_at_max_frame_size
       flow_control = Http2::FlowControl.new
@@ -119,6 +120,42 @@ module Raptor
       assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
     end
 
+    def test_process_frames_resets_stream_with_missing_pseudo_header
+      parser = Http2Parser.new
+      encoded = parser.encode_headers([[":method", "GET"], [":scheme", "https"], [":authority", "x"]])
+      headers = parser.build_frame(:headers, Http2::FLAG_END_STREAM | Http2::FLAG_END_HEADERS, 1, encoded)
+
+      result = process_frames_with(headers)
+
+      refute result[:close_connection]
+      assert_empty result[:completed_requests]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, rst_stream_error_code(result, stream_id: 1)
+    end
+
+    def test_process_frames_resets_stream_with_unknown_pseudo_header
+      parser = Http2Parser.new
+      encoded = parser.encode_headers([[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "x"], [":unknown", "y"]])
+      headers = parser.build_frame(:headers, Http2::FLAG_END_STREAM | Http2::FLAG_END_HEADERS, 1, encoded)
+
+      result = process_frames_with(headers)
+
+      refute result[:close_connection]
+      assert_empty result[:completed_requests]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, rst_stream_error_code(result, stream_id: 1)
+    end
+
+    def test_process_frames_resets_stream_with_pseudo_header_after_regular
+      parser = Http2Parser.new
+      encoded = parser.encode_headers([[":method", "GET"], [":path", "/"], [":scheme", "https"], ["x-custom", "y"], [":authority", "x"]])
+      headers = parser.build_frame(:headers, Http2::FLAG_END_STREAM | Http2::FLAG_END_HEADERS, 1, encoded)
+
+      result = process_frames_with(headers)
+
+      refute result[:close_connection]
+      assert_empty result[:completed_requests]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, rst_stream_error_code(result, stream_id: 1)
+    end
+
     def test_process_frames_extracts_window_updates
       parser = Http2Parser.new
       connection_update = parser.build_frame(:window_update, 0, 0, [1000].pack("N"))
@@ -163,6 +200,15 @@ module Raptor
 
       _last_stream_id, error_code = goaway.byteslice(9, 8).unpack("NN")
       error_code
+    end
+
+    def rst_stream_error_code(result, stream_id:)
+      rst = result[:outgoing_frames].find do |frame|
+        frame.getbyte(3) == RST_STREAM_FRAME_TYPE && frame.byteslice(5, 4).unpack1("N") == stream_id
+      end
+      return unless rst
+
+      rst.byteslice(9, 4).unpack1("N")
     end
 
     def drain_windows(flow_control, stream_id:)
