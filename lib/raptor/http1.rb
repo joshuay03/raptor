@@ -1023,7 +1023,7 @@ module Raptor
     #
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, ^(TCPSocket) -> void response_hijack) -> void
     def write_hijacked_response(socket, response, headers, response_hijack)
-      response << format_headers(headers)
+      format_headers(response, headers)
       response << "\r\n"
       socket_write(socket, response)
       uncork_socket(socket)
@@ -1048,7 +1048,7 @@ module Raptor
         headers[Rack::CONTENT_LENGTH] = "0" unless headers.key?(Rack::CONTENT_LENGTH) || headers.key?(Rack::TRANSFER_ENCODING)
       end
 
-      response << format_headers(headers)
+      format_headers(response, headers)
       response << "\r\n"
       socket_write(socket, response)
     end
@@ -1070,7 +1070,7 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
     def write_full_response(socket, response, headers, body, http_version)
       if body.respond_to?(:call)
-        response << format_headers(headers)
+        format_headers(response, headers)
         response << "\r\n"
         socket_write(socket, response)
         uncork_socket(socket)
@@ -1096,7 +1096,7 @@ module Raptor
         headers[Rack::TRANSFER_ENCODING] = TRANSFER_ENCODING_CHUNKED
       end
 
-      response << format_headers(headers)
+      format_headers(response, headers)
       response << "\r\n"
 
       if body.respond_to?(:to_path) && (path = body.to_path) && File.readable?(path)
@@ -1300,9 +1300,8 @@ module Raptor
     # @param headers [Hash] normalized response headers
     # @return [String] formatted header lines, each ending with CRLF
     #
-    # @rbs (Hash[String, String | Array[String]] headers) -> String
-    def format_headers(headers)
-      result = +""
+    # @rbs (String result, Hash[String, String | Array[String]] headers) -> void
+    def format_headers(result, headers)
       headers.each do |name, value|
         next if illegal_header_key?(name)
 
@@ -1312,7 +1311,6 @@ module Raptor
           append_header_value(result, name, value)
         end
       end
-      result
     end
 
     # Appends one or more `name: value` header lines to `result`. Newline-
