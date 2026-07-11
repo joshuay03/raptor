@@ -140,7 +140,14 @@ module Raptor
 
     def test_chunked_request_body_decoded
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri, "POST / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n")
+        response = raw_request(
+          uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Transfer-Encoding: chunked\r\n" \
+          "Connection: close\r\n\r\n" \
+          "5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"
+        )
 
         assert_match(/200 OK/, response)
         assert_match(/hello world/, response)
@@ -149,7 +156,14 @@ module Raptor
 
     def test_chunked_request_body_decoded_case_insensitively
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri, "POST / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nTransfer-Encoding: Chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n")
+        response = raw_request(
+          uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Transfer-Encoding: Chunked\r\n" \
+          "Connection: close\r\n\r\n" \
+          "5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"
+        )
 
         assert_match(/200 OK/, response)
         assert_match(/hello world/, response)
@@ -158,7 +172,14 @@ module Raptor
 
     def test_chunked_request_body_decoded_with_trailer_section
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri, "POST / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\nX-Trailer: yes\r\n\r\n")
+        response = raw_request(
+          uri,
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Transfer-Encoding: chunked\r\n" \
+          "Connection: close\r\n\r\n" \
+          "5\r\nhello\r\n6\r\n world\r\n0\r\nX-Trailer: yes\r\n\r\n"
+        )
 
         assert_match(/200 OK/, response)
         assert_match(/hello world/, response)
@@ -191,7 +212,8 @@ module Raptor
 
     def test_expect_100_continue_ignored_for_http10
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.0\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Content-Length: 5\r\n" \
@@ -637,7 +659,8 @@ module Raptor
     def test_too_long_headers_returns_400
       with_server do |uri|
         big = "X" * 60_000
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "GET / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Big1: #{big}\r\n" \
@@ -651,7 +674,8 @@ module Raptor
 
     def test_missing_host_returns_400
       with_server do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "GET / HTTP/1.1\r\n" \
           "Connection: close\r\n\r\n"
         )
@@ -662,7 +686,8 @@ module Raptor
 
     def test_empty_host_returns_400
       with_server do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "GET / HTTP/1.1\r\n" \
           "Host: \r\n" \
           "Connection: close\r\n\r\n"
@@ -674,7 +699,8 @@ module Raptor
 
     def test_duplicate_host_returns_400
       with_server do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "GET / HTTP/1.1\r\n" \
           "Host: a\r\n" \
           "Host: b\r\n" \
@@ -687,7 +713,8 @@ module Raptor
 
     def test_transfer_encoding_with_content_length_returns_400
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Transfer-Encoding: chunked\r\n" \
@@ -702,7 +729,8 @@ module Raptor
 
     def test_transfer_encoding_without_chunked_returns_400
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Transfer-Encoding: gzip\r\n" \
@@ -715,7 +743,8 @@ module Raptor
 
     def test_chunked_not_last_in_transfer_encoding_returns_400
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Transfer-Encoding: chunked, gzip\r\n" \
@@ -728,7 +757,8 @@ module Raptor
 
     def test_negative_content_length_returns_400
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Content-Length: -5\r\n" \
@@ -741,7 +771,8 @@ module Raptor
 
     def test_non_digit_content_length_returns_400
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Content-Length: 10abc\r\n" \
@@ -754,7 +785,8 @@ module Raptor
 
     def test_duplicate_content_length_returns_400
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Content-Length: 100\r\n" \
@@ -768,7 +800,8 @@ module Raptor
 
     def test_non_hex_chunk_size_returns_400
       with_server("rack_input.ru") do |uri|
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Transfer-Encoding: chunked\r\n" \
@@ -783,7 +816,8 @@ module Raptor
     def test_excessive_chunk_overhead_returns_400
       with_server("rack_input.ru") do |uri|
         bloated_extension = "A" * (Raptor::Http1::MAX_CHUNK_OVERHEAD + 1)
-        response = raw_request(uri,
+        response = raw_request(
+          uri,
           "POST / HTTP/1.1\r\n" \
           "Host: #{uri.host}:#{uri.port}\r\n" \
           "Transfer-Encoding: chunked\r\n" \

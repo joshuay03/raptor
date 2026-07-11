@@ -187,9 +187,9 @@ module Raptor
     #
     # @rbs (Array[String] argv) -> String?
     def extract_config_path(argv)
-      argv.each_with_index do |arg, i|
+      argv.each_with_index do |arg, index|
         case arg
-        when "-c", "--config" then return argv[i + 1]
+        when "-c", "--config" then return argv[index + 1]
         when /\A--config=(.*)\z/, /\A-c(.+)\z/ then return Regexp.last_match(1)
         end
       end

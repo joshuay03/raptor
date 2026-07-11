@@ -7,4 +7,5 @@ body = Class.new do
     yield "chunk"
   end
 end
+
 run proc { |_env| [200, { "content-type" => "text/plain" }, body.new] }

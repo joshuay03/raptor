@@ -275,7 +275,7 @@ module Raptor
         end
       end
 
-      return false if seen_pseudo[":method"] == true && headers.assoc(":method")&.last == "CONNECT"
+      return false if seen_pseudo[":method"] && headers.assoc(":method")&.last == "CONNECT"
 
       REQUIRED_REQUEST_PSEUDO_HEADERS.any? { |name| !seen_pseudo[name] }
     end
@@ -731,7 +731,7 @@ module Raptor
         next if HOP_BY_HOP_HEADERS.include?(lowered)
 
         if value.is_a?(Array)
-          value.each { |val| header_pairs << [lowered, val.to_s] }
+          value.each { |entry| header_pairs << [lowered, entry.to_s] }
         else
           header_pairs << [lowered, value.to_s]
         end
