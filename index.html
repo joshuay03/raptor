@@ -233,8 +233,8 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 <h2 id="_Micro__Benchmarks">(Micro) Benchmarks</h2>
 <p>Raptor 0.11.0 vs Puma 8.0.2 vs Falcon 0.55.5, median of 3 runs across two workload profiles: IO-bound (5-10 short sleeps
 interleaved with small CPU work per request, total sleep 2.5-15ms, simulating a request with several DB or cache calls)
-and CPU-bound (3-5 chunks of JSON item building interleaved with tiny sleeps per request, total items 60-400, simulating
-a request that does most of its work in Ruby with a few round-trips to a fast dependency).</p>
+and CPU-bound (3-5 chunks of JSON item building interleaved with sub-100µs sleeps per request, total items 450-1500,
+simulating a request that does most of its work in Ruby with a few near-zero-cost cache hits).</p>
 <table>
 <thead>
 <tr>
@@ -362,7 +362,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Jul 12 15:23:16 2026 by
+  Generated on Sun Jul 12 15:27:01 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
