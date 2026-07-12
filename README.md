@@ -37,7 +37,7 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 ```
 > bundle exec raptor -w 4 -t 3 hello_world.ru
 [Raptor 76577|Main|Main] Cluster initializing:
-[Raptor 76577|Main|Main] ├─ Version: 0.9.0
+[Raptor 76577|Main|Main] ├─ Version: 0.11.0
 [Raptor 76577|Main|Main] ├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
 [Raptor 76577|Main|Main] ├─ Environment: development
 [Raptor 76577|Main|Main] ├─ Master PID: 76577
@@ -187,20 +187,20 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 
 ## (Micro) Benchmarks
 
-Raptor 0.10.0 vs Puma 8.0.2, median of 3 runs across two workload profiles: IO-bound (sleep for a random 5-50ms then
+Raptor 0.11.0 vs Puma 8.0.2, median of 3 runs across two workload profiles: IO-bound (sleep for a random 1-10ms then
 return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
 
 | Protocol              | Workload | Raptor       | Puma         | +/- vs Puma |
 | --------------------- | -------- | ------------ | ------------ | ----------- |
-| HTTP/1.1              | IO       | 0.43k req/s  | 0.41k req/s  | +4.0%       |
-| HTTP/1.1              | CPU      | 10.99k req/s | 9.22k req/s  | +19.1%      |
-| HTTP/1.1 (keep-alive) | IO       | 0.41k req/s  | 0.40k req/s  | +2.6%       |
-| HTTP/1.1 (keep-alive) | CPU      | 27.42k req/s | 25.75k req/s | +6.5%       |
-| HTTP/2                | IO       | 0.31k req/s  | N/A          | -           |
-| HTTP/2                | CPU      | 26.28k req/s | N/A          | -           |
+| HTTP/1.1              | IO       | 2.05k req/s  | 1.94k req/s  | +5.7%       |
+| HTTP/1.1              | CPU      | 13.66k req/s | 9.21k req/s  | +48.3%      |
+| HTTP/1.1 (keep-alive) | IO       | 2.08k req/s  | 1.95k req/s  | +6.6%       |
+| HTTP/1.1 (keep-alive) | CPU      | 27.85k req/s | 27.47k req/s | +1.4%       |
+| HTTP/2                | IO       | 0.96k req/s  | N/A          | -           |
+| HTTP/2                | CPU      | 28.92k req/s | N/A          | -           |
 
 > ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [aarch64-linux]
-> 4 workers, 3 threads, 24 concurrent connections
+> 4 workers, 3 threads, 48 concurrent connections
 
 See [bin/benchmark](bin/benchmark) for more details.
 

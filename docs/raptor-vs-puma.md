@@ -12,7 +12,7 @@ This document walks through both servers at systems-design depth. By the end you
 
 ## The shape of the benchmark
 
-The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma release, run on the same hardware with the same Rack app, 4 workers, 3 threads, 24 concurrent connections, on a recent Ruby with YJIT enabled. Two workload profiles are measured: **IO-bound** (each request sleeps for a random 5-50ms then returns a small JSON response) and **CPU-bound** (each request serialises a JSON array of 20-200 items). Rather than pin specific numbers into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
+The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma release, run on the same hardware with the same Rack app, 4 workers, 3 threads, 48 concurrent connections, on a recent Ruby with YJIT enabled. Two workload profiles are measured: **IO-bound** (each request sleeps for a random 1-10ms then returns a small JSON response) and **CPU-bound** (each request serialises a JSON array of 20-200 items). Rather than pin specific numbers into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
 
 - On IO-bound work, both servers land near parity across all protocols; throughput is bounded by the per-request sleep and the benchmark client's concurrency, not by anything the server does.
 - On CPU-bound HTTP/1.1 without keep-alive, Raptor holds a meaningful lead; per-request parsing and response-writing overhead is a real fraction of the work.
@@ -409,11 +409,11 @@ Under moderate load these look equivalent. Under high concurrency (many threads 
 
 **Puma.** After a response, if the connection is keep-alive and there are already buffered bytes for the next request (`has_back_to_back_requests?`) and there is a spare app thread, loop inline. Otherwise, if `eagerly_finish` (a single non-blocking read attempt) returns true, either loop inline (if spare threads) or hand back to the thread pool (`@thread_pool << client`). Otherwise, back to the reactor with `@persistent_timeout`.
 
-**Raptor.** After a response, the app thread does `socket.wait_readable(0.001)`, waiting up to 1ms for bytes. If bytes arrive, parse and dispatch the next request inline on the same thread. Otherwise `reactor.persist` and return.
+**Raptor.** After a response, the app thread does `socket.wait_readable(0.001)`, waiting up to 1ms for bytes. If bytes arrive, it parses the next request inline. If the thread pool queue is at least as deep as the pool, the parsed request is handed back to the pool so other threads share the load; otherwise the same thread dispatches it inline. If no bytes arrive, `reactor.persist` and return.
 
-The difference is subtle but the numbers show it up. Real-world clients pipelining requests often send the next request 100-500 microseconds after the previous response completes. Puma's `eagerly_finish` catches the case where bytes are already in the socket buffer; Raptor's `wait_readable(1ms)` catches both the "already buffered" case and the "arriving very shortly" case. And Raptor never has to hand the socket back to a different thread; the response-writing thread parses the next request itself.
+The difference is subtle but the numbers show it up. Real-world clients pipelining requests often send the next request 100-500 microseconds after the previous response completes. Puma's `eagerly_finish` catches the case where bytes are already in the socket buffer; Raptor's `wait_readable(1ms)` catches both the "already buffered" case and the "arriving very shortly" case. And Raptor always parses the next request on the response-writing thread, so the parse itself never crosses a thread boundary.
 
-This is where most of Raptor's keep-alive edge comes from. Under the benchmark load, with a small number of concurrent connections all doing keep-alive, every connection is issuing back-to-back requests, and Raptor's app threads are essentially processing a single connection each in a tight loop until the connection stops. Puma's app threads do the same when they can, but the coordination overhead between thread pool and reactor for the transitions costs meaningfully more.
+This is where most of Raptor's keep-alive edge comes from. Subsequent requests are always parsed and dispatched without a reactor round-trip: the response-writing thread either continues serving that connection inline (when the pool queue is shallower than the pool) or hands the parsed request back to the pool for another thread to pick up (when it is not). Puma's app threads do the same when they can, but the coordination overhead between thread pool and reactor for the transitions costs meaningfully more.
 
 ### Backpressure
 
@@ -519,7 +519,7 @@ Puma has to bounce Request 3 through the reactor and back through the mutex-prot
 
 ### IO-bound work, close to parity
 
-On the IO-bound benchmark profile, each request sleeps for a random 5-50ms then returns a small JSON payload. Throughput is bounded by the per-request sleep and the benchmark client's 24-connection concurrency; both servers push those requests through their pipelines faster than the sleep completes, so what shows up in the numbers is the workload cost itself, not the server cost. Raptor and Puma land within a few percent of each other in both keep-alive modes because there is nothing to differentiate.
+On the IO-bound benchmark profile, each request sleeps for a random 1-10ms then returns a small JSON payload. Throughput is bounded by the per-request sleep and the benchmark client's 48-connection concurrency; both servers push those requests through their pipelines faster than the sleep completes, so what shows up in the numbers is the workload cost itself, not the server cost. Raptor and Puma land within a few percent of each other in both keep-alive modes because there is nothing to differentiate.
 
 Real applications that spend most of their time waiting on a database or an upstream service look like this. The choice between Raptor and Puma there is not throughput-driven.
 

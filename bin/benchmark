@@ -33,8 +33,8 @@ system("bundle", "exec", "rake", "compile", "bpf:compile", exception: true)
 
 WORKERS = 4
 THREADS = 3
-HEY_CONNECTIONS = 24
-H2LOAD_CONNECTIONS = 8
+HEY_CONNECTIONS = 48
+H2LOAD_CONNECTIONS = 16
 H2LOAD_STREAMS = 3
 H1_PORT = 9292
 H2_PORT = 9443
@@ -346,7 +346,7 @@ end
 section = <<~MD
   ## (Micro) Benchmarks
 
-  Raptor #{Raptor::VERSION} vs Puma #{puma_version}, median of #{RUNS_PER_MODE} runs across two workload profiles: IO-bound (sleep for a random 5-50ms then
+  Raptor #{Raptor::VERSION} vs Puma #{puma_version}, median of #{RUNS_PER_MODE} runs across two workload profiles: IO-bound (sleep for a random 1-10ms then
   return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
 
   #{table_lines.join("\n")}

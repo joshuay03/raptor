@@ -3,7 +3,7 @@
 require "json"
 
 RESPONSE = JSON.generate(status: "ok")
-SLEEPS = Random.new(0).then { |rng| 1024.times.map { rng.rand(5..50) / 1000.0 } }.freeze
+SLEEPS = Random.new(0).then { |rng| 1024.times.map { rng.rand(1..10) / 1000.0 } }.freeze
 MUTEX = Mutex.new
 
 counter = 0

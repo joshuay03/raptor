@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-12
+
 - Yield subsequent HTTP/1.1 keep-alive requests to the thread pool only under saturation
 - Reuse a per-thread HTTP/1.1 parser across requests
 - Skip a per-response allocation when formatting response headers
