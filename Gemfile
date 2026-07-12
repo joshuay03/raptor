@@ -14,6 +14,7 @@ gem "rackup"
 gem "http-2"
 
 gem "puma"
+gem "falcon"
 
 gem "vernier"
 

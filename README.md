@@ -187,17 +187,19 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 
 ## (Micro) Benchmarks
 
-Raptor 0.11.0 vs Puma 8.0.2, median of 3 runs across two workload profiles: IO-bound (sleep for a random 1-10ms then
-return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
+Raptor 0.11.0 vs Puma 8.0.2 vs Falcon 0.55.5, median of 5 runs across two workload profiles: IO-bound (5-10 short sleeps
+interleaved with small CPU work per request, total sleep 2.5-15ms, simulating a request with several DB or cache calls)
+and CPU-bound (3-5 chunks of JSON item building interleaved with sub-100µs sleeps per request, total items 450-1500,
+simulating a request that does most of its work in Ruby with a few near-zero-cost cache hits).
 
-| Protocol              | Workload | Raptor       | Puma         | +/- vs Puma |
-| --------------------- | -------- | ------------ | ------------ | ----------- |
-| HTTP/1.1              | IO       | 2.05k req/s  | 1.94k req/s  | +5.7%       |
-| HTTP/1.1              | CPU      | 13.66k req/s | 9.21k req/s  | +48.3%      |
-| HTTP/1.1 (keep-alive) | IO       | 2.08k req/s  | 1.95k req/s  | +6.6%       |
-| HTTP/1.1 (keep-alive) | CPU      | 27.85k req/s | 27.47k req/s | +1.4%       |
-| HTTP/2                | IO       | 0.96k req/s  | N/A          | -           |
-| HTTP/2                | CPU      | 28.92k req/s | N/A          | -           |
+| Protocol              | Workload | Raptor req/s | Raptor p95 | Puma req/s  | Puma p95 | vs Puma req/s | vs Puma p95 | Falcon req/s | Falcon p95 | vs Falcon req/s | vs Falcon p95 |
+| --------------------- | -------- | ------------ | ---------- | ----------- | -------- | ------------- | ----------- | ------------ | ---------- | --------------- | ------------- |
+| HTTP/1.1              | IO       | 1.36k req/s  | 52.90 ms   | 0.99k req/s | 62.20 ms | +37.7%        | -15.0%      | 4.68k req/s  | 14.50 ms   | -70.9%          | +264.8%       |
+| HTTP/1.1              | CPU      | 3.51k req/s  | 27.90 ms   | 3.69k req/s | 16.30 ms | -4.9%         | +71.2%      | 3.76k req/s  | 15.70 ms   | -6.7%           | +77.7%        |
+| HTTP/1.1 (keep-alive) | IO       | 1.28k req/s  | 35.90 ms   | 0.97k req/s | 62.50 ms | +32.8%        | -42.6%      | 4.08k req/s  | 16.80 ms   | -68.5%          | +113.7%       |
+| HTTP/1.1 (keep-alive) | CPU      | 4.07k req/s  | 11.90 ms   | 3.72k req/s | 18.30 ms | +9.5%         | -35.0%      | 3.89k req/s  | 16.90 ms   | +4.7%           | -29.6%        |
+| HTTP/2                | IO       | 0.70k req/s  | 112.74 ms  | N/A         | N/A      | -             | -           | N/A          | N/A        | -               | -             |
+| HTTP/2                | CPU      | 3.09k req/s  | 25.31 ms   | N/A         | N/A      | -             | -           | N/A          | N/A        | -               | -             |
 
 > ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [aarch64-linux]
 > 4 workers, 3 threads, 48 concurrent connections

@@ -1,6 +1,6 @@
 # Raptor vs Puma: A Design Comparison
 
-Raptor is a Ruby web server designed around Ruby 4's Ractors. On CPU-bound HTTP/1.1 workloads it holds a real edge over the latest Puma release on the same hardware; on IO-bound work where the request sleep dominates, both servers land close to parity. It also speaks HTTP/2 natively, which Puma does not. This document is a systems-design walkthrough of how it manages both.
+Raptor is a Ruby web server designed around Ruby 4's Ractors. On CPU-bound HTTP/1.1 with keep-alive it holds a real edge over the latest Puma release on the same hardware; on IO-heavy work fibers still win, and Falcon is the server to compare to there rather than Raptor or Puma. Raptor also speaks HTTP/2 natively, which Puma does not. This document is a systems-design walkthrough of how it manages both.
 
 ## Why this document exists
 
@@ -10,16 +10,22 @@ They did, but the more interesting result was structural. Once you commit to a R
 
 This document walks through both servers at systems-design depth. By the end you should be able to describe how Puma and Raptor each move a request from `accept()` to `app.call(env)` and back, why the two architectures make the design decisions they do, and where the performance delta actually comes from. No source code required.
 
+## A note on Falcon
+
+Falcon is the other next-generation Ruby web server worth naming. It takes a different bet than either Puma or Raptor: fiber-based concurrency via the `async` gem instead of threads, native HTTP/2, per-request lightweight tasks instead of a fixed thread pool. Its strengths show up on workloads with lots of concurrent long-lived connections (WebSockets, SSE, streaming), applications built end-to-end on the `async` ecosystem, and HTTP/2-heavy traffic. On a traditional Rails workload where most of the request budget is a synchronous DB round-trip through ActiveRecord, its advantages over Puma are less pronounced because the fiber scheduler only helps when the underlying I/O is fiber-aware. If your app fits that sweet spot, Falcon belongs in your evaluation.
+
+This document focuses on Puma because Puma is the incumbent that any new Ruby web server has to justify itself against; that is the comparison most readers actually need. Falcon appears in the benchmark table in the README as a third data point, but a full design comparison against Falcon would be its own document.
+
 ## The shape of the benchmark
 
 Raptor is a research project. It hasn't run production traffic. The numbers in the README come from a repeatable microbenchmark, not from a real deployment. The benchmark measures only the **server** work: accepting connections, parsing, dispatching, and writing responses. It does not measure your application. In a typical Rails app where most of a request's time goes to ActiveRecord and downstream services, the server accounts for maybe 5 to 15 percent of the total, so a +N% number in this table will show up as a much smaller improvement in production. The gap is real, but it isn't what a Rails app against a real database will report.
 
-The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma release, run on the same hardware with the same Rack app, 4 workers, 3 threads, 48 concurrent connections, on a recent Ruby with YJIT enabled. Two workload profiles are measured: **IO-bound** (each request sleeps for a random 1-10ms then returns a small JSON response) and **CPU-bound** (each request serialises a JSON array of 20-200 items). Rather than pin specific numbers into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
+The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma and Falcon releases, run on the same hardware with the same Rack app, 4 workers, 3 threads, 48 concurrent connections, on a recent Ruby with YJIT enabled. Two workload profiles are measured: **IO-bound** (each request does 5 to 10 short sleeps interleaved with small CPU work, simulating a request that makes several DB or cache calls throughout its lifetime) and **CPU-bound** (each request builds a JSON response in 3 to 5 chunks interleaved with sub-100µs sleeps, simulating a request that does most of its work in Ruby with a few near-zero-cost cache hits). The workloads are interleaved rather than a single bulk sleep or single bulk serialise so a fiber-per-connection server like Falcon doesn't look artificially good from one-shot IO. The CPU-bound workload is heavily CPU-dominated by design (roughly 95% CPU / 5% IO by wall time) so it actually measures CPU work rather than smuggling in enough IO for fibers to multiplex. Rather than pin specific numbers into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
 
-- On IO-bound work, both servers land near parity across all protocols; throughput is bounded by the per-request sleep and the benchmark client's concurrency, not by anything the server does.
-- On CPU-bound HTTP/1.1 without keep-alive, Raptor holds a meaningful lead; per-request parsing and response-writing overhead is a real fraction of the work.
-- On CPU-bound HTTP/1.1 with keep-alive, Raptor still leads but by a smaller margin; the app thread's JSON-building work dominates.
-- On HTTP/2 the comparison is Raptor-only; Puma doesn't implement it. This matters if you're terminating h2 at the app server, less so if nginx or another proxy in front is already handling it.
+- On IO-bound work, Falcon is roughly 3-4x ahead of both thread-based servers; the fiber-per-connection model can keep every one of the 48 client connections in flight at once, while Raptor and Puma cap out at their 12 threads. Between the two thread-based servers, Raptor holds a modest lead over Puma on throughput and p95.
+- On CPU-bound HTTP/1.1 without keep-alive, the three servers land close together on throughput. Raptor's p95 is meaningfully worse than Puma's and Falcon's here; the extra hop through the pipeline shows up as tail latency when connection setup and teardown are also on the critical path.
+- On CPU-bound HTTP/1.1 with keep-alive, Raptor pulls ahead of both on throughput and p95. Connection setup is amortised, the eager keep-alive loop keeps requests on the same app thread, and the Ractor-parallel parser earns its cost when many small requests are in flight.
+- On HTTP/2, Raptor and Falcon both implement it; Puma doesn't. This matters if you're terminating h2 at the app server, less so if nginx or another proxy in front is already handling it.
 
 The rest of this doc explains why the shape looks like that.
 
@@ -521,21 +527,21 @@ Puma has to bounce Request 3 through the reactor and back through the mutex-prot
 
 ## Part IV: What Raptor's design buys you
 
-### IO-bound work, close to parity
+### IO-bound work, where Falcon wins and Raptor edges Puma
 
-On the IO-bound benchmark profile, each request sleeps for a random 1-10ms then returns a small JSON payload. Throughput is bounded by the per-request sleep and the benchmark client's 48-connection concurrency; both servers push those requests through their pipelines faster than the sleep completes, so what shows up in the numbers is the workload cost itself, not the server cost. Raptor and Puma land within a few percent of each other in both keep-alive modes because there is nothing to differentiate.
+On the IO-bound benchmark profile, each request does 5 to 10 short sleeps interleaved with small CPU work, simulating a request that makes several DB or cache calls throughout its lifetime. The bottleneck is how many requests a worker can keep in flight while they wait on IO. Raptor and Puma cap out at their 12 total threads (4 workers × 3), so with 48 client connections the extra 36 sit in the pool queue at any given moment. Falcon spawns a fiber per connection and cooperatively yields on every sleep, so all 48 requests can be in flight simultaneously. That gap shows up as roughly 3-4x throughput and much lower p95 for Falcon.
 
-Real applications that spend most of their time waiting on a database or an upstream service look like this. The choice between Raptor and Puma there is not throughput-driven.
+Between the thread-based servers, Raptor holds a modest lead over Puma. The eager accept path, writev-batched responses, and lock-free work queue all shave a bit of per-request time, and those savings stack.
 
-### CPU-bound HTTP/1.1, where the edge shows up
+Real applications that spend most of their time waiting on a database or an upstream service look like this. If your app is IO-heavy and you're free to adopt the `async` ecosystem, Falcon is the interesting comparison there, not Raptor or Puma.
 
-On the CPU-bound benchmark profile, each request serialises a JSON array of 20-200 items. Per-request cost is real Ruby work, and the coordination overhead of pushing a request through the server matters.
+### CPU-bound HTTP/1.1, where the pool model earns its keep
 
-**Without keep-alive**, every request opens a fresh TCP connection, gets parsed, dispatched, served, and closes. Raptor lands materially ahead of Puma. The wins that individually add a few percent (writev-batched response writes, CAS-based work queue, per-worker CPU affinity) stack more prominently here because per-request coordination is a larger fraction of total time than under keep-alive.
+On the CPU-bound benchmark profile, each request builds a JSON response in 3 to 5 chunks totalling 450 to 1500 items, with sub-100µs sleeps between chunks. It's roughly 95% CPU by wall time, so fibers can't multiplex their way to an advantage. The CPU work happens under a single Ruby VM regardless of concurrency model.
 
-**With keep-alive**, Raptor still leads but by a smaller margin. Every connection amortises accept and TCP-setup costs to zero, and the app thread's JSON-building work dominates the per-request budget. The eager keep-alive loop keeps both servers close to their pool ceiling, and Raptor's coordination-overhead advantages become a smaller relative slice.
+**Without keep-alive**, every request opens a fresh TCP connection, gets parsed, dispatched, served, and closes. All three servers land within a few percent of each other on throughput. Raptor's p95 is meaningfully worse than Puma's and Falcon's here; the extra hop through the Ractor pipeline shows up as tail latency when connection setup and teardown are also on the critical path.
 
-Raptor's eager keep-alive loop is still doing real work here; it keeps the socket on the same app thread for the entire burst, avoiding the reactor round-trip Puma has to make between requests. But when the work per request is large enough, that round-trip is a smaller share of the total.
+**With keep-alive**, Raptor pulls ahead of both Puma and Falcon on throughput and p95. Connection setup is amortised, the eager keep-alive loop keeps subsequent requests on the same app thread, and the Ractor-parallel parser earns its cost when many small requests are in flight. This is the shape of workload Raptor's design was optimised for.
 
 ### HTTP/2, when it matters
 

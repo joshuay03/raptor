@@ -28,7 +28,7 @@ require "timeout"
 
 require_relative "../lib/raptor/version"
 
-system("bundle", "update", "puma", exception: true)
+system("bundle", "update", "puma", "falcon", exception: true)
 system("bundle", "exec", "rake", "compile", "bpf:compile", exception: true)
 
 WORKERS = 4
@@ -54,9 +54,9 @@ if options[:fast]
   MAIN_SECONDS = 5
   BETWEEN_RUNS_SECONDS = 0
 else
-  RUNS_PER_MODE = 3
+  RUNS_PER_MODE = 5
   WARMUP_SECONDS = 3
-  MAIN_SECONDS = 10
+  MAIN_SECONDS = 20
   BETWEEN_RUNS_SECONDS = 5
 end
 
@@ -167,10 +167,13 @@ def run_hey(url:, keep_alive:)
   abort_with_output "hey failed", output unless status.success?
   check_hey_clean(output, "measurement")
 
-  match = output.match(/Requests\/sec:\s+([\d.]+)/)
-  abort_with_output "could not parse hey output", output unless match
+  req_s_match = output.match(/Requests\/sec:\s+([\d.]+)/)
+  abort_with_output "could not parse hey req/s", output unless req_s_match
 
-  match[1].to_f
+  p95_match = output.match(/95%+\s+in\s+([\d.]+)/)
+  abort_with_output "could not parse hey p95", output unless p95_match
+
+  { req_s: req_s_match[1].to_f, p95_ms: p95_match[1].to_f * 1000 }
 end
 
 def check_hey_clean(output, phase)
@@ -189,15 +192,26 @@ def run_h2load(url:)
   abort_with_output "h2load warmup failed", warmup_output unless warmup_status.success?
   check_h2load_clean(warmup_output, "warmup")
 
-  measure = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", MAIN_SECONDS.to_s, url]
-  output, status = Open3.capture2(*measure)
-  abort_with_output "h2load failed", output unless status.success?
-  check_h2load_clean(output, "measurement")
+  log_file = Tempfile.new(["h2load", ".log"])
+  log_file.close
+  begin
+    measure = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", MAIN_SECONDS.to_s, "--log-file", log_file.path, url]
+    output, status = Open3.capture2(*measure)
+    abort_with_output "h2load failed", output unless status.success?
+    check_h2load_clean(output, "measurement")
 
-  match = output.match(/finished in [\d.]+s,\s+([\d.]+) req\/s/)
-  abort_with_output "could not parse h2load output", output unless match
+    req_s_match = output.match(/finished in [\d.]+s,\s+([\d.]+) req\/s/)
+    abort_with_output "could not parse h2load req/s", output unless req_s_match
 
-  match[1].to_f
+    latencies_us = File.readlines(log_file.path).map { |line| line.split[2].to_i }.sort
+    abort_with_output "h2load log file empty", output if latencies_us.empty?
+    p95_index = (latencies_us.length * 0.95).ceil - 1
+    p95_ms = latencies_us[p95_index] / 1000.0
+
+    { req_s: req_s_match[1].to_f, p95_ms: p95_ms }
+  ensure
+    log_file.unlink
+  end
 end
 
 def check_h2load_clean(output, phase)
@@ -226,12 +240,19 @@ def benchmark(label)
   RUNS_PER_MODE.times do |index|
     result = yield
     results << result
-    log "  Run #{index + 1}/#{RUNS_PER_MODE}: #{result.round} req/s"
+    log "  Run #{index + 1}/#{RUNS_PER_MODE}: #{result[:req_s].round} req/s, p95 #{format('%.2f', result[:p95_ms])} ms"
     sleep BETWEEN_RUNS_SECONDS if index < RUNS_PER_MODE - 1
   end
-  median = results.sort[results.length / 2]
-  log "  Median: #{median.round} req/s" if results.length > 1
+  median = {
+    req_s: median_of(results.map { |result| result[:req_s] }),
+    p95_ms: median_of(results.map { |result| result[:p95_ms] })
+  }
+  log "  Median: #{median[:req_s].round} req/s, p95 #{format('%.2f', median[:p95_ms])} ms" if results.length > 1
   median
+end
+
+def median_of(values)
+  values.sort[values.length / 2]
 end
 
 def format_req_s(value)
@@ -240,15 +261,30 @@ def format_req_s(value)
   "#{format('%.2f', thousands)}k req/s"
 end
 
-def format_delta(raptor_value, puma_value)
-  delta = ((raptor_value - puma_value) / puma_value) * 100
+def format_p95_ms(value)
+  "#{format('%.2f', value)} ms"
+end
+
+def format_delta(subject, baseline)
+  delta = ((subject - baseline) / baseline) * 100
   sign = delta >= 0 ? "+" : ""
   "#{sign}#{format('%.1f', delta)}%"
+end
+
+def render_markdown_row(cells, widths)
+  "| " + cells.map { |key, value| value.ljust(widths[key]) }.join(" | ") + " |"
 end
 
 def puma_version
   output, status = Open3.capture2("bundle", "exec", "ruby", "-e", "require 'puma/const'; puts Puma::Const::PUMA_VERSION")
   abort "could not read Puma version" unless status.success?
+
+  output.strip
+end
+
+def falcon_version
+  output, status = Open3.capture2("bundle", "exec", "ruby", "-e", "require 'falcon/version'; puts Falcon::VERSION")
+  abort "could not read Falcon version" unless status.success?
 
   output.strip
 end
@@ -272,47 +308,57 @@ def puma_cmd(fixture)
   ]
 end
 
+def falcon_cmd(fixture)
+  [
+    "bundle", "exec", "falcon", "serve",
+    "--count", WORKERS.to_s,
+    "--bind", "http://0.0.0.0:#{H1_PORT}",
+    "--config", fixture
+  ]
+end
+
+def bench_h1(server_label, cmd, ports, workload_label, keep_alive:)
+  with_server(server_label, cmd, ports) do
+    benchmark("#{server_label} HTTP/1.1#{keep_alive ? ' keep-alive' : ''} (#{workload_label})") do
+      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: keep_alive)
+    end
+  end
+end
+
+def bench_h2(server_label, cmd, ports, workload_label)
+  with_server(server_label, cmd, ports) do
+    benchmark("#{server_label} HTTP/2 (#{workload_label})") do
+      run_h2load(url: "https://127.0.0.1:#{H2_PORT}/")
+    end
+  end
+end
+
 generate_cert
 
 results = {}
 
 WORKLOADS.each do |workload, config|
-  results[workload] = {}
   fixture = config[:fixture]
   label = config[:label]
+  raptor_ports = [H1_PORT, H2_PORT]
+  puma_ports = [H1_PORT]
+  falcon_ports = [H1_PORT]
 
-  results[workload][:raptor_h1] = with_server("Raptor", raptor_cmd(fixture), [H1_PORT, H2_PORT]) do
-    benchmark("Raptor HTTP/1.1 (#{label})") do
-      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: false)
-    end
-  end
-  results[workload][:raptor_h1_ka] = with_server("Raptor", raptor_cmd(fixture), [H1_PORT, H2_PORT]) do
-    benchmark("Raptor HTTP/1.1 keep-alive (#{label})") do
-      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: true)
-    end
-  end
-  results[workload][:raptor_h2] = with_server("Raptor", raptor_cmd(fixture), [H1_PORT, H2_PORT]) do
-    benchmark("Raptor HTTP/2 (#{label})") do
-      run_h2load(url: "https://127.0.0.1:#{H2_PORT}/")
-    end
-  end
-
-  results[workload][:puma_h1] = with_server("Puma", puma_cmd(fixture), [H1_PORT]) do
-    benchmark("Puma HTTP/1.1 (#{label})") do
-      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: false)
-    end
-  end
-  results[workload][:puma_h1_ka] = with_server("Puma", puma_cmd(fixture), [H1_PORT]) do
-    benchmark("Puma HTTP/1.1 keep-alive (#{label})") do
-      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: true)
-    end
-  end
+  results[workload] = {
+    raptor_h1: bench_h1("Raptor", raptor_cmd(fixture), raptor_ports, label, keep_alive: false),
+    raptor_h1_ka: bench_h1("Raptor", raptor_cmd(fixture), raptor_ports, label, keep_alive: true),
+    raptor_h2: bench_h2("Raptor", raptor_cmd(fixture), raptor_ports, label),
+    puma_h1: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, keep_alive: false),
+    puma_h1_ka: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, keep_alive: true),
+    falcon_h1: bench_h1("Falcon", falcon_cmd(fixture), falcon_ports, label, keep_alive: false),
+    falcon_h1_ka: bench_h1("Falcon", falcon_cmd(fixture), falcon_ports, label, keep_alive: true)
+  }
 end
 
 PROTOCOLS = [
-  { label: "HTTP/1.1", raptor_key: :raptor_h1, puma_key: :puma_h1 },
-  { label: "HTTP/1.1 (keep-alive)", raptor_key: :raptor_h1_ka, puma_key: :puma_h1_ka },
-  { label: "HTTP/2", raptor_key: :raptor_h2, puma_key: nil }
+  { label: "HTTP/1.1", raptor_key: :raptor_h1, puma_key: :puma_h1, falcon_key: :falcon_h1 },
+  { label: "HTTP/1.1 (keep-alive)", raptor_key: :raptor_h1_ka, puma_key: :puma_h1_ka, falcon_key: :falcon_h1_ka },
+  { label: "HTTP/2", raptor_key: :raptor_h2, puma_key: nil, falcon_key: nil }
 ]
 
 rows = []
@@ -320,34 +366,54 @@ PROTOCOLS.each do |protocol|
   WORKLOADS.each do |workload, config|
     raptor_value = results[workload][protocol[:raptor_key]]
     puma_value = protocol[:puma_key] ? results[workload][protocol[:puma_key]] : nil
+    falcon_value = protocol[:falcon_key] ? results[workload][protocol[:falcon_key]] : nil
     rows << {
       protocol: protocol[:label],
       workload: config[:label],
-      raptor: format_req_s(raptor_value),
-      puma: puma_value ? format_req_s(puma_value) : "N/A",
-      delta: puma_value ? format_delta(raptor_value, puma_value) : "-"
+      raptor_req_s: format_req_s(raptor_value[:req_s]),
+      raptor_p95: format_p95_ms(raptor_value[:p95_ms]),
+      puma_req_s: puma_value ? format_req_s(puma_value[:req_s]) : "N/A",
+      puma_p95: puma_value ? format_p95_ms(puma_value[:p95_ms]) : "N/A",
+      vs_puma_req_s: puma_value ? format_delta(raptor_value[:req_s], puma_value[:req_s]) : "-",
+      vs_puma_p95: puma_value ? format_delta(raptor_value[:p95_ms], puma_value[:p95_ms]) : "-",
+      falcon_req_s: falcon_value ? format_req_s(falcon_value[:req_s]) : "N/A",
+      falcon_p95: falcon_value ? format_p95_ms(falcon_value[:p95_ms]) : "N/A",
+      vs_falcon_req_s: falcon_value ? format_delta(raptor_value[:req_s], falcon_value[:req_s]) : "-",
+      vs_falcon_p95: falcon_value ? format_delta(raptor_value[:p95_ms], falcon_value[:p95_ms]) : "-"
     }
   end
 end
 
-HEADERS = { protocol: "Protocol", workload: "Workload", raptor: "Raptor", puma: "Puma", delta: "+/- vs Puma" }
+HEADERS = {
+  protocol: "Protocol",
+  workload: "Workload",
+  raptor_req_s: "Raptor req/s",
+  raptor_p95: "Raptor p95",
+  puma_req_s: "Puma req/s",
+  puma_p95: "Puma p95",
+  vs_puma_req_s: "vs Puma req/s",
+  vs_puma_p95: "vs Puma p95",
+  falcon_req_s: "Falcon req/s",
+  falcon_p95: "Falcon p95",
+  vs_falcon_req_s: "vs Falcon req/s",
+  vs_falcon_p95: "vs Falcon p95"
+}
 widths = HEADERS.transform_values(&:length)
 rows.each do |row|
   row.each { |key, value| widths[key] = [widths[key], value.length].max }
 end
 
-table_lines = []
-table_lines << "| " + HEADERS.map { |key, header| header.ljust(widths[key]) }.join(" | ") + " |"
-table_lines << "| " + widths.map { |_, width| "-" * width }.join(" | ") + " |"
-rows.each do |row|
-  table_lines << "| " + row.map { |key, value| value.ljust(widths[key]) }.join(" | ") + " |"
-end
+separator = HEADERS.to_h { |key, _| [key, "-" * widths[key]] }
+table_lines = [render_markdown_row(HEADERS, widths), render_markdown_row(separator, widths)]
+rows.each { |row| table_lines << render_markdown_row(row, widths) }
 
 section = <<~MD
   ## (Micro) Benchmarks
 
-  Raptor #{Raptor::VERSION} vs Puma #{puma_version}, median of #{RUNS_PER_MODE} runs across two workload profiles: IO-bound (sleep for a random 1-10ms then
-  return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).
+  Raptor #{Raptor::VERSION} vs Puma #{puma_version} vs Falcon #{falcon_version}, median of #{RUNS_PER_MODE} runs across two workload profiles: IO-bound (5-10 short sleeps
+  interleaved with small CPU work per request, total sleep 2.5-15ms, simulating a request with several DB or cache calls)
+  and CPU-bound (3-5 chunks of JSON item building interleaved with sub-100µs sleeps per request, total items 450-1500,
+  simulating a request that does most of its work in Ruby with a few near-zero-cost cache hits).
 
   #{table_lines.join("\n")}
 
