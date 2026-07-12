@@ -85,7 +85,7 @@ is invoked on a thread pool, so any thread-safe Rack app (including Rails) works
 </code></pre>
 <pre class="code ruby"><code class="ruby">&gt; bundle exec raptor -w 4 -t 3 hello_world.ru
 [Raptor 76577|Main|Main] Cluster initializing:
-[Raptor 76577|Main|Main] ├─ Version: 0.9.0
+[Raptor 76577|Main|Main] ├─ Version: 0.11.0
 [Raptor 76577|Main|Main] ├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
 [Raptor 76577|Main|Main] ├─ Environment: development
 [Raptor 76577|Main|Main] ├─ Master PID: 76577
@@ -231,7 +231,7 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 ...
 </code></pre>
 <h2 id="_Micro__Benchmarks">(Micro) Benchmarks</h2>
-<p>Raptor 0.10.0 vs Puma 8.0.2, median of 3 runs across two workload profiles: IO-bound (sleep for a random 5-50ms then
+<p>Raptor 0.11.0 vs Puma 8.0.2, median of 3 runs across two workload profiles: IO-bound (sleep for a random 1-10ms then
 return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).</p>
 <table>
 <thead>
@@ -247,42 +247,42 @@ return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).</p>
 <tr>
 <td>HTTP/1.1</td>
 <td>IO</td>
-<td>0.43k req/s</td>
-<td>0.41k req/s</td>
-<td>+4.0%</td>
+<td>2.05k req/s</td>
+<td>1.94k req/s</td>
+<td>+5.7%</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>CPU</td>
-<td>10.99k req/s</td>
-<td>9.22k req/s</td>
-<td>+19.1%</td>
+<td>13.66k req/s</td>
+<td>9.21k req/s</td>
+<td>+48.3%</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>IO</td>
-<td>0.41k req/s</td>
-<td>0.40k req/s</td>
-<td>+2.6%</td>
+<td>2.08k req/s</td>
+<td>1.95k req/s</td>
+<td>+6.6%</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>CPU</td>
-<td>27.42k req/s</td>
-<td>25.75k req/s</td>
-<td>+6.5%</td>
+<td>27.85k req/s</td>
+<td>27.47k req/s</td>
+<td>+1.4%</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>IO</td>
-<td>0.31k req/s</td>
+<td>0.96k req/s</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>CPU</td>
-<td>26.28k req/s</td>
+<td>28.92k req/s</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -290,7 +290,7 @@ return small JSON) and CPU-bound (serialise a JSON array of 20-200 items).</p>
 </table>
 <blockquote>
 <p>ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [aarch64-linux]
-4 workers, 3 threads, 24 concurrent connections</p>
+4 workers, 3 threads, 48 concurrent connections</p>
 </blockquote>
 <p>See <a href="bin/benchmark">bin/benchmark</a> for more details.</p>
 <h2 id="Development">Development</h2>
@@ -311,7 +311,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Jul 12 01:34:24 2026 by
+  Generated on Sun Jul 12 02:13:12 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
