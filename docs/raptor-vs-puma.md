@@ -12,12 +12,14 @@ This document walks through both servers at systems-design depth. By the end you
 
 ## The shape of the benchmark
 
+Raptor is a research project. It hasn't run production traffic. The numbers in the README come from a repeatable microbenchmark, not from a real deployment. The benchmark measures only the **server** work: accepting connections, parsing, dispatching, and writing responses. It does not measure your application. In a typical Rails app where most of a request's time goes to ActiveRecord and downstream services, the server accounts for maybe 5 to 15 percent of the total, so a +N% number in this table will show up as a much smaller improvement in production. The gap is real, but it isn't what a Rails app against a real database will report.
+
 The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma release, run on the same hardware with the same Rack app, 4 workers, 3 threads, 48 concurrent connections, on a recent Ruby with YJIT enabled. Two workload profiles are measured: **IO-bound** (each request sleeps for a random 1-10ms then returns a small JSON response) and **CPU-bound** (each request serialises a JSON array of 20-200 items). Rather than pin specific numbers into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
 
 - On IO-bound work, both servers land near parity across all protocols; throughput is bounded by the per-request sleep and the benchmark client's concurrency, not by anything the server does.
 - On CPU-bound HTTP/1.1 without keep-alive, Raptor holds a meaningful lead; per-request parsing and response-writing overhead is a real fraction of the work.
 - On CPU-bound HTTP/1.1 with keep-alive, Raptor still leads but by a smaller margin; the app thread's JSON-building work dominates.
-- On HTTP/2 there is no comparison, since Puma does not implement it.
+- On HTTP/2 the comparison is Raptor-only; Puma doesn't implement it. This matters if you're terminating h2 at the app server, less so if nginx or another proxy in front is already handling it.
 
 The rest of this doc explains why the shape looks like that.
 
@@ -431,9 +433,11 @@ The performance difference here is negligible. Stats writing is one syscall per 
 
 ### HTTP/2
 
-**Puma.** Not implemented. `alpn_protocols` is not advertised, so h2 clients fall back to h1.
+**Puma.** Not implemented. Puma's [position](https://github.com/puma/puma/issues/2697) is that HTTP/2 belongs at the edge (nginx, Caddy, ALB), which terminates it and speaks HTTP/1.1 to the app server. That's a reasonable call for the deployments Puma is aimed at, and it's where most Rails production actually sits.
 
 **Raptor.** Native C parser plus HPACK, per-stream flow control, lock-free frame writer, stream multiplexing over a single connection. Same request path as HTTP/1.1 once a request is complete: it enters the same thread pool. Under HTTP/2, a single client connection can be issuing many concurrent requests, and Raptor services all of them in parallel on the same thread pool.
+
+Whether that matters depends on your setup. If you terminate TLS at an edge proxy that already speaks HTTP/2, both servers see HTTP/1.1 and it doesn't matter which of them you pick on this axis. If you're building an all-Ruby stack with no proxy in front, running gRPC or similar all the way through, or measuring the app server itself, HTTP/2 support is where Raptor and Puma stop being comparable.
 
 At the throughput numbers the benchmark shows, with only a handful of concurrent connections each multiplexing many streams, Raptor is exercising the HTTP/2 multiplexing hard: many in-flight streams sharing one socket, all writing responses through the same connection. The writer's CAS-based coordination avoids the mutex contention that would otherwise cap throughput.
 
@@ -533,11 +537,13 @@ On the CPU-bound benchmark profile, each request serialises a JSON array of 20-2
 
 Raptor's eager keep-alive loop is still doing real work here; it keeps the socket on the same app thread for the entire burst, avoiding the reactor round-trip Puma has to make between requests. But when the work per request is large enough, that round-trip is a smaller share of the total.
 
-### HTTP/2, a category to itself
+### HTTP/2, when it matters
 
-Puma does not implement HTTP/2. Raptor does, natively, with a Ractor-safe parser, HPACK, per-stream flow control, and a lock-free frame writer. If your clients default to h2 (most browsers, `curl --http2`, gRPC-flavoured stacks, most modern SDKs), or if you terminate TLS at your app rather than upstream, this alone is decisive: on Puma you silently fall back to HTTP/1.1 and lose multiplexing, header compression, and prioritisation.
+Puma doesn't implement HTTP/2, and most Rails production terminates HTTP/2 at nginx or a similar edge proxy before it reaches the app server. If that describes your stack, Raptor's HTTP/2 support isn't going to help you. Both servers see HTTP/1.1 from the proxy and the throughput numbers above are what actually matter. Puma's [position](https://github.com/puma/puma/issues/2697) is that this is where h2 belongs, and it's a reasonable one.
 
-Beyond parity, Raptor's HTTP/2 CPU-bound throughput in the benchmark is on the same order as its HTTP/1.1 keep-alive throughput on the same profile, despite each connection multiplexing dozens of concurrent streams into a single socket. That only happens if the per-stream coordination is essentially free. The lock-free `Writer` and flow-control atoms are doing real work here. If they used mutexes, throughput would be capped by lock contention rather than by CPU.
+Where Raptor's HTTP/2 support does matter is the all-Ruby stack. No proxy in front, TLS terminated at the app, clients speaking h2 all the way through (`curl --http2`, gRPC-Ruby transports, HTTP/2-only SDKs, direct browser connections). In that setup, Puma silently falls back to HTTP/1.1 and you lose multiplexing, header compression, and prioritisation.
+
+Beyond that binary, Raptor's HTTP/2 CPU-bound throughput in the benchmark is on the same order as its HTTP/1.1 keep-alive throughput on the same profile, despite each connection multiplexing dozens of concurrent streams into a single socket. That only happens if the per-stream coordination is essentially free. The lock-free `Writer` and flow-control atoms are doing real work here. If they used mutexes, throughput would be capped by lock contention rather than by CPU.
 
 ## Part V: What Raptor gives up
 
@@ -553,7 +559,7 @@ A handful of smaller trade-offs are worth naming briefly. Raptor pays some minim
 
 If you had to compress this whole document into a handful of one-line framings, these are the ones that carry the most:
 
-- **"Puma is a thread pool with a reactor bolted on. Raptor is a pipeline with each stage on its own scheduling primitive."** Puma's core abstraction is the thread pool; the reactor exists to feed it. Raptor's core abstraction is the pipeline; the thread pool is one stage in it.
+- **"Puma centres on the thread pool. Raptor centres on the pipeline."** In Puma, a request lives on a single thread from parse through response write, and the reactor exists to feed the pool. In Raptor, each stage runs on its own primitive (accept loop, reactor, Ractor pool, thread pool) and the handoff between stages is the design's core concern.
 
 - **"The GVL is not the enemy. Serialising parsing behind the GVL is the enemy."** Ruby threads are fine for I/O-bound work; the app thread spends most of its time waiting on the database. What you cannot afford is spending CPU cycles under the GVL doing work that does not need the GVL, like tokenising HTTP headers.
 
