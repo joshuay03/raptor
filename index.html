@@ -231,7 +231,7 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 ...
 </code></pre>
 <h2 id="_Micro__Benchmarks">(Micro) Benchmarks</h2>
-<p>Raptor 0.11.0 vs Puma 8.0.2 vs Falcon 0.55.5, median of 3 runs across two workload profiles: IO-bound (5-10 short sleeps
+<p>Raptor 0.11.0 vs Puma 8.0.2 vs Falcon 0.55.5, median of 5 runs across two workload profiles: IO-bound (5-10 short sleeps
 interleaved with small CPU work per request, total sleep 2.5-15ms, simulating a request with several DB or cache calls)
 and CPU-bound (3-5 chunks of JSON item building interleaved with sub-100µs sleeps per request, total items 450-1500,
 simulating a request that does most of its work in Ruby with a few near-zero-cost cache hits).</p>
@@ -256,64 +256,64 @@ simulating a request that does most of its work in Ruby with a few near-zero-cos
 <tr>
 <td>HTTP/1.1</td>
 <td>IO</td>
-<td>1.35k req/s</td>
-<td>52.70 ms</td>
-<td>0.96k req/s</td>
-<td>64.70 ms</td>
-<td>+40.9%</td>
-<td>-18.5%</td>
+<td>1.36k req/s</td>
+<td>53.00 ms</td>
+<td>0.99k req/s</td>
+<td>62.80 ms</td>
+<td>+36.7%</td>
+<td>-15.6%</td>
 <td>4.66k req/s</td>
 <td>14.50 ms</td>
 <td>-70.9%</td>
-<td>+263.4%</td>
+<td>+265.5%</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>CPU</td>
-<td>4.27k req/s</td>
-<td>22.40 ms</td>
-<td>3.25k req/s</td>
-<td>18.00 ms</td>
-<td>+31.5%</td>
-<td>+24.4%</td>
-<td>12.35k req/s</td>
-<td>5.80 ms</td>
-<td>-65.4%</td>
-<td>+286.2%</td>
+<td>3.50k req/s</td>
+<td>28.20 ms</td>
+<td>3.68k req/s</td>
+<td>16.30 ms</td>
+<td>-4.8%</td>
+<td>+73.0%</td>
+<td>3.82k req/s</td>
+<td>15.20 ms</td>
+<td>-8.3%</td>
+<td>+85.5%</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>IO</td>
 <td>1.30k req/s</td>
-<td>34.80 ms</td>
-<td>0.98k req/s</td>
-<td>61.70 ms</td>
-<td>+32.5%</td>
-<td>-43.6%</td>
-<td>4.28k req/s</td>
-<td>15.80 ms</td>
-<td>-69.7%</td>
-<td>+120.3%</td>
+<td>40.10 ms</td>
+<td>0.99k req/s</td>
+<td>59.30 ms</td>
+<td>+31.2%</td>
+<td>-32.4%</td>
+<td>4.06k req/s</td>
+<td>16.80 ms</td>
+<td>-68.0%</td>
+<td>+138.7%</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>CPU</td>
-<td>4.96k req/s</td>
-<td>12.20 ms</td>
-<td>3.28k req/s</td>
-<td>17.70 ms</td>
-<td>+51.4%</td>
-<td>-31.1%</td>
-<td>13.56k req/s</td>
-<td>5.30 ms</td>
-<td>-63.4%</td>
-<td>+130.2%</td>
+<td>4.14k req/s</td>
+<td>11.70 ms</td>
+<td>3.75k req/s</td>
+<td>17.90 ms</td>
+<td>+10.5%</td>
+<td>-34.6%</td>
+<td>3.92k req/s</td>
+<td>17.10 ms</td>
+<td>+5.8%</td>
+<td>-31.6%</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>IO</td>
-<td>0.94k req/s</td>
-<td>92.76 ms</td>
+<td>0.73k req/s</td>
+<td>100.08 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
@@ -326,8 +326,8 @@ simulating a request that does most of its work in Ruby with a few near-zero-cos
 <tr>
 <td>HTTP/2</td>
 <td>CPU</td>
-<td>2.56k req/s</td>
-<td>31.12 ms</td>
+<td>3.01k req/s</td>
+<td>26.50 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
@@ -362,7 +362,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Jul 12 16:55:47 2026 by
+  Generated on Mon Jul 13 03:41:11 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.44 (ruby-4.0.5).
 </div>
