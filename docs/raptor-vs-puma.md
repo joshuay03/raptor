@@ -85,7 +85,7 @@ The server thread is straightforward. It calls `IO.select` on all listener socke
 
 What happens next depends on `queue_requests`. `queue_requests` defaults to true and is the mode almost everyone runs in. When it is true, a thread-pool worker picks up the client and calls `client.eagerly_finish`, which does one non-blocking read attempt and one attempt at parsing. If the request is complete after that single read, the worker proceeds to invoke the Rack app inline. If it is not complete, the worker hands the client to the reactor and returns to the pool. When `queue_requests` is false, the worker skips the eagerly_finish attempt and does a blocking `client.finish(first_data_timeout)`. The `queue_requests: false` path is fine for fast trusted clients but does not scale; a slow client will hold a thread indefinitely.
 
-The reactor is a separate thread running `Puma::Reactor`, which wraps an `NIO::Selector` from nio4r. Its job is to babysit two kinds of sockets:
+The reactor is a separate thread running `Puma::Reactor`, which wraps an `NIO::Selector` from `nio4r`. Its job is to babysit two kinds of sockets:
 
 1. **Sockets in the middle of a request.** A client sent some headers, was not yet complete, and needs more data before the app can be called.
 2. **Keep-alive sockets between requests.** The previous request finished, the connection is still alive, and we are waiting for the next request to start.
@@ -241,7 +241,7 @@ where `@reactor.backlog` is `thread_pool.queue_size + thread_pool.active_count`.
 
 Because Raptor is always in cluster mode and every worker listens in the same `SO_REUSEPORT` group, load balancing across workers happens at the kernel level. On Linux, Raptor attaches a small BPF program to the reuseport group. Each worker binds its own listener registered in a sockmap, and a dedicated reporter thread publishes the worker's current reactor backlog into a loads map at 100 Hz. The BPF program consults the map on every incoming connection and routes it to the least-loaded worker, with a random tie-break when loads are equal. If the `libbpf-ruby` gem is not installed or the BPF object has not been compiled, Raptor falls back silently to the default four-tuple-hash routing; if the kernel refuses the program, startup raises. Either way, if a worker is saturated and stops calling `accept`, other workers pick up the slack.
 
-The reactor is again an NIO::Selector loop. Two things make it different from Puma's:
+The reactor is again an `NIO::Selector` loop. Two things make it different from Puma's:
 
 1. **Read strategy.** When a socket is readable, the reactor does one `read_nonblock(64KB)` right there in the reactor thread, updates the buffered state for that connection, and only then decides what to do. If the request is not yet complete, the state stays in the reactor and awaits more data. If it is complete (headers parsed, body received), the state is pushed to the Ractor pool for parsing (or, for HTTP/2, straight to the parser). The reactor does not try to parse; it does the I/O and hands off the raw buffer.
 
@@ -302,10 +302,10 @@ From there the shape is similar to HTTP/1.1:
 
 1. Reactor reads frames.
 2. The HTTP/2 parser (native C, with an HPACK decoder using a static Huffman table) parses the frames in the Ractor pool.
-3. Completed requests (once HEADERS+DATA is complete for a stream) go to the thread pool as separate work items. **A single connection can be servicing many streams in parallel across the thread pool.**
+3. Completed requests (once `HEADERS` and `DATA` are complete for a stream) go to the thread pool as separate work items. **A single connection can be servicing many streams in parallel across the thread pool.**
 4. Each stream's response is written back through the connection's `Writer`, which serialises frame writes across threads without a mutex.
 
-The Writer is worth a paragraph. Naive per-connection writing would use a mutex: acquire, write, release. Contention grows with concurrent streams. Raptor's Writer stores the "pending frames" queue in an `Atom` whose value is either `:idle` (nobody is writing) or an array of frames waiting to go out. A thread that wants to write does a CAS:
+The `Writer` is worth a paragraph. Naive per-connection writing would use a mutex: acquire, write, release. Contention grows with concurrent streams. Raptor's `Writer` stores the "pending frames" queue in an `Atom` whose value is either `:idle` (nobody is writing) or an array of frames waiting to go out. A thread that wants to write does a CAS:
 
 - If current value is `:idle`, the thread claims the writer by CAS-ing to its own array of frames, then loops draining any additional frames other threads have appended.
 - If current value is an array (someone is already writing), the thread CAS-appends its frames and returns immediately; the current writer will pick them up and flush them.
@@ -411,7 +411,7 @@ At a moderate 100 concurrent connections this is a rounding error. At 1000+ (whi
 
 **Puma.** Standard `Mutex` + `ConditionVariable` + Array-as-queue. Every enqueue takes the mutex, wakes a waiter. Every dequeue takes the mutex to check the queue. Under contention, the mutex is a serialisation point.
 
-**Raptor.** CAS on an Atom holding a frozen `{in:, out:, count:}` hash (Banker's queue). Enqueue is a single CAS to prepend to the in-stack. Dequeue is a single CAS to pop from the out-stack (or, if empty, atomically flip in/out). Metrics (queue length, active count) are lock-free reads.
+**Raptor.** CAS on an `Atom` holding a frozen `{in:, out:, count:}` hash (Banker's queue). Enqueue is a single CAS to prepend to the in-stack. Dequeue is a single CAS to pop from the out-stack (or, if empty, atomically flip in/out). Metrics (queue length, active count) are lock-free reads.
 
 The condvar is still there for parking idle threads (spinning would burn CPU), but the hot path when the queue has items is lock-free.
 
@@ -568,21 +568,3 @@ No design comes free. Two disclosures matter most.
 **Ruby version.** Raptor requires Ruby 4.0 because it depends on `Ractor::Port` and on Ractor internals having stabilised. Puma works on 3.0 and up. If you need to support older Ruby, Puma wins by default.
 
 A handful of smaller trade-offs are worth naming briefly. Raptor pays some minimum-latency overhead per request because of the Ractor crossing, so at extremely low concurrency Puma's simpler flow can edge ahead; the eager-parse path on the server thread hides most of this in practice. Raptor's core dependencies (`ractor-pool`, `atomic-ruby`, `red-black-tree`, `mmap-ruby`, `libbpf-ruby`) are libraries I wrote specifically to make it work, which is either "purpose-built" or "narrower testing surface" depending on how you look at it. Debugging is harder because control flow crosses Ractor and thread boundaries, so tracing a request end-to-end means stitching several stack traces together. Raptor has no single-process mode; on a single-CPU container it wastes a small amount of coordination overhead. And Puma's `fork_worker: true` refork mode is a genuinely clever answer to CoW decay over time that Raptor has no equivalent for.
-
-## Part VI: The design in one line each
-
-If you had to compress this whole document into a handful of one-line framings, these are the ones that carry the most:
-
-- **"Puma centres on the thread pool. Raptor centres on the pipeline."** In Puma, a request lives on a single thread from parse through response write, and the reactor exists to feed the pool. In Raptor, each stage runs on its own primitive (accept loop, reactor, Ractor pool, thread pool) and the handoff between stages is the design's core concern.
-
-- **"The GVL is not the enemy. Serialising parsing behind the GVL is the enemy."** Ruby threads are fine for I/O-bound work; the app thread spends most of its time waiting on the database. What you cannot afford is spending CPU cycles under the GVL doing work that does not need the GVL, like tokenising HTTP headers.
-
-- **"Ractors are impractical for user code but perfect for protocol code."** The very things that make Ractors annoying for application code (frozen data only, no shared mutable state) are exactly what you want in a parser: a pure function from bytes to headers with no side effects.
-
-- **"Lock-free is not always faster, but it is always less variable."** A CAS-based queue does not out-perform a mutex in every scenario, but its worst-case latency is much better. Under contention, mutex-based code can suffer thundering herd wakeups and cache-line bouncing that a CAS design avoids.
-
-- **"The keep-alive edge is not one big win, it is many small wins that stack."** Eager keep-alive, RBT timeouts, CAS work queue, Ractor parsing, lock-free backpressure. Each adds a few percent and stacked they produce a measurable lead.
-
-- **"HTTP/2 is not a nice-to-have; it changes the arithmetic."** With HTTP/2, one client connection can be doing dozens of requests concurrently. Suddenly every serialisation point in the server becomes a bottleneck. The lock-free primitives Raptor uses for HTTP/1.1 are not optional for HTTP/2; they are structural.
-
-- **"This is what Ruby 4 lets you do."** `Ractor::Port`, `Ractor.shareable_proc`, `rb_ext_ractor_safe`, native-extension Ractor safety. These are all recent additions. Raptor is essentially a demo of what becomes practical when you have them.
