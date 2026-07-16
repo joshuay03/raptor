@@ -21,6 +21,7 @@ unless File.exist?("/.dockerenv")
 end
 
 require "fileutils"
+require "json"
 require "open3"
 require "socket"
 require "tempfile"
@@ -40,12 +41,21 @@ H1_PORT = 9292
 H2_PORT = 9443
 CERT_PATH = "tmp/bench.crt"
 KEY_PATH = "tmp/bench.key"
+POST_BODY_PATH = "tmp/bench-body.json"
 README_PATH = File.expand_path("../README.md", __dir__)
 BENCHMARKS_SECTION_PATTERN = /## \(Micro\) Benchmarks.*?(?=\n## |\z)/m
 
+POST_BODY = JSON.generate(
+  user_id: 42,
+  session_token: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0",
+  filters: { status: "active", tags: ["premium", "verified"], created_after: "2024-01-01" },
+  pagination: { page: 1, per_page: 50, sort: "created_at", direction: "desc" },
+  trace_id: "abc123def456ghi789jkl012mno345pqr678"
+)
+
 WORKLOADS = {
-  io: { label: "IO", fixture: "test/fixtures/bench_io.ru" },
-  cpu: { label: "CPU", fixture: "test/fixtures/bench_cpu.ru" }
+  io: { label: "IO", fixture: "test/fixtures/bench_io.ru", method: :get },
+  cpu: { label: "CPU", fixture: "test/fixtures/bench_cpu.ru", method: :post }
 }
 
 if options[:fast]
@@ -55,7 +65,7 @@ if options[:fast]
   BETWEEN_RUNS_SECONDS = 0
 else
   RUNS_PER_MODE = 5
-  WARMUP_SECONDS = 3
+  WARMUP_SECONDS = 5
   MAIN_SECONDS = 20
   BETWEEN_RUNS_SECONDS = 5
 end
@@ -86,6 +96,11 @@ def generate_cert
   return if system(*cmd, out: File::NULL, err: File::NULL)
 
   abort "Failed to generate TLS cert/key."
+end
+
+def write_post_body
+  FileUtils.mkdir_p(File.dirname(POST_BODY_PATH))
+  File.write(POST_BODY_PATH, POST_BODY)
 end
 
 def wait_for_port(port, timeout: 30)
@@ -155,14 +170,15 @@ ensure
   stop_server(pid, ports, log_file) if pid
 end
 
-def run_hey(url:, keep_alive:)
+def run_hey(url:, keep_alive:, method:)
   keep_alive_flag = keep_alive ? nil : "-disable-keepalive"
-  warmup = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{WARMUP_SECONDS}s", keep_alive_flag, url].compact
+  method_args = method == :post ? ["-m", "POST", "-T", "application/json", "-D", POST_BODY_PATH] : []
+  warmup = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{WARMUP_SECONDS}s", keep_alive_flag, *method_args, url].compact
   warmup_output, warmup_status = Open3.capture2(*warmup)
   abort_with_output "hey warmup failed", warmup_output unless warmup_status.success?
   check_hey_clean(warmup_output, "warmup")
 
-  measure = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{MAIN_SECONDS}s", keep_alive_flag, url].compact
+  measure = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{MAIN_SECONDS}s", keep_alive_flag, *method_args, url].compact
   output, status = Open3.capture2(*measure)
   abort_with_output "hey failed", output unless status.success?
   check_hey_clean(output, "measurement")
@@ -186,8 +202,9 @@ def check_hey_clean(output, phase)
   abort_with_output "hey #{phase} received non-2xx responses (#{non_2xx.uniq.join(', ')})", output if non_2xx.any?
 end
 
-def run_h2load(url:)
-  warmup = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", WARMUP_SECONDS.to_s, url]
+def run_h2load(url:, method:)
+  method_args = method == :post ? ["-d", POST_BODY_PATH] : []
+  warmup = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", WARMUP_SECONDS.to_s, *method_args, url]
   warmup_output, warmup_status = Open3.capture2(*warmup)
   abort_with_output "h2load warmup failed", warmup_output unless warmup_status.success?
   check_h2load_clean(warmup_output, "warmup")
@@ -195,7 +212,7 @@ def run_h2load(url:)
   log_file = Tempfile.new(["h2load", ".log"])
   log_file.close
   begin
-    measure = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", MAIN_SECONDS.to_s, "--log-file", log_file.path, url]
+    measure = ["h2load", "-c", H2LOAD_CONNECTIONS.to_s, "-m", H2LOAD_STREAMS.to_s, "-D", MAIN_SECONDS.to_s, "--log-file", log_file.path, *method_args, url]
     output, status = Open3.capture2(*measure)
     abort_with_output "h2load failed", output unless status.success?
     check_h2load_clean(output, "measurement")
@@ -243,16 +260,26 @@ def benchmark(label)
     log "  Run #{index + 1}/#{RUNS_PER_MODE}: #{result[:req_s].round} req/s, p95 #{format('%.2f', result[:p95_ms])} ms"
     sleep BETWEEN_RUNS_SECONDS if index < RUNS_PER_MODE - 1
   end
-  median = {
-    req_s: median_of(results.map { |result| result[:req_s] }),
-    p95_ms: median_of(results.map { |result| result[:p95_ms] })
-  }
-  log "  Median: #{median[:req_s].round} req/s, p95 #{format('%.2f', median[:p95_ms])} ms" if results.length > 1
-  median
+
+  req_s_stats = stats_of(results.map { |result| result[:req_s] })
+  p95_stats = stats_of(results.map { |result| result[:p95_ms] })
+
+  if results.length > 1
+    log "  req/s: median #{req_s_stats[:median].round}, range #{req_s_stats[:min].round}-#{req_s_stats[:max].round} (σ #{format('%.1f', req_s_stats[:stddev])}, ±#{format('%.1f', req_s_stats[:spread_pct])}%)"
+    log "  p95:   median #{format('%.2f', p95_stats[:median])} ms, range #{format('%.2f', p95_stats[:min])}-#{format('%.2f', p95_stats[:max])} ms (σ #{format('%.2f', p95_stats[:stddev])}, ±#{format('%.1f', p95_stats[:spread_pct])}%)"
+  end
+
+  { req_s: req_s_stats[:median], p95_ms: p95_stats[:median], req_s_stats: req_s_stats, p95_stats: p95_stats }
 end
 
-def median_of(values)
-  values.sort[values.length / 2]
+def stats_of(values)
+  sorted = values.sort
+  median = sorted[sorted.length / 2]
+  mean = values.sum / values.length.to_f
+  variance = values.sum { |value| (value - mean) ** 2 } / values.length
+  stddev = Math.sqrt(variance)
+  spread_pct = median == 0 ? 0.0 : ((sorted.last - sorted.first) / 2.0 / median) * 100
+  { min: sorted.first, max: sorted.last, median: median, mean: mean, stddev: stddev, spread_pct: spread_pct }
 end
 
 def format_req_s(value)
@@ -308,7 +335,7 @@ def puma_cmd(fixture)
   ]
 end
 
-def falcon_cmd(fixture)
+def falcon_h1_cmd(fixture)
   [
     "bundle", "exec", "falcon", "serve",
     "--count", WORKERS.to_s,
@@ -317,48 +344,62 @@ def falcon_cmd(fixture)
   ]
 end
 
-def bench_h1(server_label, cmd, ports, workload_label, keep_alive:)
-  with_server(server_label, cmd, ports) do
-    benchmark("#{server_label} HTTP/1.1#{keep_alive ? ' keep-alive' : ''} (#{workload_label})") do
-      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: keep_alive)
+def falcon_h2_cmd(fixture)
+  [
+    "bundle", "exec", "falcon", "serve",
+    "--count", WORKERS.to_s,
+    "--bind", "https://0.0.0.0:#{H2_PORT}",
+    "--hostname", "localhost",
+    "--config", fixture
+  ]
+end
+
+def bench_h1(server_label, cmd, ports, workload_label, method:, keep_alive:)
+  benchmark("#{server_label} HTTP/1.1#{keep_alive ? ' keep-alive' : ''} (#{workload_label})") do
+    with_server(server_label, cmd, ports) do
+      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: keep_alive, method: method)
     end
   end
 end
 
-def bench_h2(server_label, cmd, ports, workload_label)
-  with_server(server_label, cmd, ports) do
-    benchmark("#{server_label} HTTP/2 (#{workload_label})") do
-      run_h2load(url: "https://127.0.0.1:#{H2_PORT}/")
+def bench_h2(server_label, cmd, ports, workload_label, method:)
+  benchmark("#{server_label} HTTP/2 (#{workload_label})") do
+    with_server(server_label, cmd, ports) do
+      run_h2load(url: "https://127.0.0.1:#{H2_PORT}/", method: method)
     end
   end
 end
 
 generate_cert
+write_post_body
 
 results = {}
 
 WORKLOADS.each do |workload, config|
   fixture = config[:fixture]
   label = config[:label]
+  method = config[:method]
   raptor_ports = [H1_PORT, H2_PORT]
   puma_ports = [H1_PORT]
-  falcon_ports = [H1_PORT]
+  falcon_h1_ports = [H1_PORT]
+  falcon_h2_ports = [H2_PORT]
 
   results[workload] = {
-    raptor_h1: bench_h1("Raptor", raptor_cmd(fixture), raptor_ports, label, keep_alive: false),
-    raptor_h1_ka: bench_h1("Raptor", raptor_cmd(fixture), raptor_ports, label, keep_alive: true),
-    raptor_h2: bench_h2("Raptor", raptor_cmd(fixture), raptor_ports, label),
-    puma_h1: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, keep_alive: false),
-    puma_h1_ka: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, keep_alive: true),
-    falcon_h1: bench_h1("Falcon", falcon_cmd(fixture), falcon_ports, label, keep_alive: false),
-    falcon_h1_ka: bench_h1("Falcon", falcon_cmd(fixture), falcon_ports, label, keep_alive: true)
+    raptor_h1: bench_h1("Raptor", raptor_cmd(fixture), raptor_ports, label, method: method, keep_alive: false),
+    raptor_h1_ka: bench_h1("Raptor", raptor_cmd(fixture), raptor_ports, label, method: method, keep_alive: true),
+    raptor_h2: bench_h2("Raptor", raptor_cmd(fixture), raptor_ports, label, method: method),
+    puma_h1: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, method: method, keep_alive: false),
+    puma_h1_ka: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, method: method, keep_alive: true),
+    falcon_h1: bench_h1("Falcon", falcon_h1_cmd(fixture), falcon_h1_ports, label, method: method, keep_alive: false),
+    falcon_h1_ka: bench_h1("Falcon", falcon_h1_cmd(fixture), falcon_h1_ports, label, method: method, keep_alive: true),
+    falcon_h2: bench_h2("Falcon", falcon_h2_cmd(fixture), falcon_h2_ports, label, method: method)
   }
 end
 
 PROTOCOLS = [
   { label: "HTTP/1.1", raptor_key: :raptor_h1, puma_key: :puma_h1, falcon_key: :falcon_h1 },
   { label: "HTTP/1.1 (keep-alive)", raptor_key: :raptor_h1_ka, puma_key: :puma_h1_ka, falcon_key: :falcon_h1_ka },
-  { label: "HTTP/2", raptor_key: :raptor_h2, puma_key: nil, falcon_key: nil }
+  { label: "HTTP/2", raptor_key: :raptor_h2, puma_key: nil, falcon_key: :falcon_h2 }
 ]
 
 rows = []
@@ -407,18 +448,30 @@ separator = HEADERS.to_h { |key, _| [key, "-" * widths[key]] }
 table_lines = [render_markdown_row(HEADERS, widths), render_markdown_row(separator, widths)]
 rows.each { |row| table_lines << render_markdown_row(row, widths) }
 
+all_cells = results.values.flat_map(&:values)
+worst_req_s_spread = all_cells.map { |cell| cell[:req_s_stats][:spread_pct] }.max
+worst_p95_spread = all_cells.map { |cell| cell[:p95_stats][:spread_pct] }.max
+
 section = <<~MD
   ## (Micro) Benchmarks
 
-  Raptor #{Raptor::VERSION} vs Puma #{puma_version} vs Falcon #{falcon_version}, median of #{RUNS_PER_MODE} runs across two workload profiles: IO-bound (5-10 short sleeps
-  interleaved with small CPU work per request, total sleep 2.5-15ms, simulating a request with several DB or cache calls)
-  and CPU-bound (3-5 chunks of JSON item building interleaved with sub-100µs sleeps per request, total items 450-1500,
-  simulating a request that does most of its work in Ruby with a few near-zero-cost cache hits).
+  Raptor #{Raptor::VERSION} vs Puma #{puma_version} vs Falcon #{falcon_version} across two workload profiles. **IO-bound** is a GET endpoint that
+  interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
+  cache calls. **CPU-bound** is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of JSON item
+  building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
+  most of its work in Ruby with a few near-zero-cost cache hits.
+
+  Each cell reports the median throughput and median p95 latency independently across #{RUNS_PER_MODE} runs, so the two numbers in a row
+  may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
+  state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
+  ((max - min) / 2 / median) between runs of a single cell was ±#{format('%.1f', worst_req_s_spread)}% for throughput
+  and ±#{format('%.1f', worst_p95_spread)}% for p95.
 
   #{table_lines.join("\n")}
 
   > #{RUBY_DESCRIPTION}
-  > #{WORKERS} workers, #{THREADS} threads, #{HEY_CONNECTIONS} concurrent connections
+  > #{WORKERS} worker processes; Raptor and Puma run #{THREADS} threads per worker, Falcon runs unbounded fibers per worker;
+  > #{HEY_CONNECTIONS} concurrent HTTP/1.1 client connections; #{H2LOAD_CONNECTIONS} concurrent HTTP/2 client connections × #{H2LOAD_STREAMS} streams each
 
   See [bin/benchmark](bin/benchmark) for more details.
 MD
