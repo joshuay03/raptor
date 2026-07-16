@@ -20,7 +20,8 @@ struct {
 } loads SEC(".maps");
 
 // Routes each incoming connection to the worker with the lowest backlog,
-// with a random tie-break when loads are equal.
+// falling back to the connection's 4-tuple hash when loads are equal so
+// bursts of accepts spread across workers instead of clustering by chance.
 SEC("sk_reuseport")
 int select_least_loaded(struct sk_reuseport_md *ctx) {
   __u32 count_key = 0;
@@ -55,7 +56,7 @@ int select_least_loaded(struct sk_reuseport_md *ctx) {
     }
   }
 
-  __u32 chosen_idx = (min_load == max_load) ? (bpf_get_prandom_u32() % num_workers) : min_idx;
+  __u32 chosen_idx = (min_load == max_load) ? (ctx->hash % num_workers) : min_idx;
   bpf_sk_select_reuseport(ctx, &socks, &chosen_idx, 0);
   return SK_PASS;
 }

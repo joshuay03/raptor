@@ -196,16 +196,17 @@ most of its work in Ruby with a few near-zero-cost cache hits.
 Each cell reports the median throughput and median p95 latency independently across 5 runs, so the two numbers in a row
 may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
 state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
-((max - min) / 2 / median) between runs of a single cell was ±20.0% for throughput and ±31.7% for p95.
+((max - min) / 2 / median) between runs of a single cell was ±46.2% for throughput
+and ±38.2% for p95.
 
 | Protocol              | Workload | Raptor req/s | Raptor p95 | Puma req/s  | Puma p95 | vs Puma req/s | vs Puma p95 | Falcon req/s | Falcon p95 | vs Falcon req/s | vs Falcon p95 |
 | --------------------- | -------- | ------------ | ---------- | ----------- | -------- | ------------- | ----------- | ------------ | ---------- | --------------- | ------------- |
-| HTTP/1.1              | IO       | 1.36k req/s  | 52.80 ms   | 0.98k req/s | 64.20 ms | +39.2%        | -17.8%      | 4.55k req/s  | 15.00 ms   | -70.0%          | +252.0%       |
-| HTTP/1.1              | CPU      | 3.55k req/s  | 27.60 ms   | 3.66k req/s | 16.40 ms | -2.8%         | +68.3%      | 3.71k req/s  | 15.60 ms   | -4.3%           | +76.9%        |
-| HTTP/1.1 (keep-alive) | IO       | 1.34k req/s  | 34.00 ms   | 0.97k req/s | 60.70 ms | +38.3%        | -44.0%      | 4.31k req/s  | 15.70 ms   | -69.0%          | +116.6%       |
-| HTTP/1.1 (keep-alive) | CPU      | 4.25k req/s  | 11.30 ms   | 3.80k req/s | 17.60 ms | +11.9%        | -35.8%      | 3.84k req/s  | 17.10 ms   | +10.8%          | -33.9%        |
-| HTTP/2                | IO       | 0.98k req/s  | 81.11 ms   | N/A         | N/A      | -             | -           | 4.05k req/s  | 16.75 ms   | -75.8%          | +384.2%       |
-| HTTP/2                | CPU      | 4.14k req/s  | 18.60 ms   | N/A         | N/A      | -             | -           | 4.01k req/s  | 25.16 ms   | +3.2%           | -26.1%        |
+| HTTP/1.1              | IO       | 1.36k req/s  | 52.50 ms   | 0.98k req/s | 64.00 ms | +39.1%        | -18.0%      | 4.54k req/s  | 15.10 ms   | -70.0%          | +247.7%       |
+| HTTP/1.1              | CPU      | 3.54k req/s  | 27.70 ms   | 3.66k req/s | 16.50 ms | -3.2%         | +67.9%      | 3.76k req/s  | 15.50 ms   | -5.7%           | +78.7%        |
+| HTTP/1.1 (keep-alive) | IO       | 1.34k req/s  | 35.10 ms   | 0.96k req/s | 63.70 ms | +38.7%        | -44.9%      | 4.12k req/s  | 16.50 ms   | -67.5%          | +112.7%       |
+| HTTP/1.1 (keep-alive) | CPU      | 4.24k req/s  | 11.40 ms   | 3.80k req/s | 17.40 ms | +11.6%        | -34.5%      | 3.83k req/s  | 17.10 ms   | +10.8%          | -33.3%        |
+| HTTP/2                | IO       | 0.99k req/s  | 78.02 ms   | N/A         | N/A      | -             | -           | 3.88k req/s  | 17.57 ms   | -74.4%          | +344.1%       |
+| HTTP/2                | CPU      | 4.18k req/s  | 18.89 ms   | N/A         | N/A      | -             | -           | 2.96k req/s  | 29.16 ms   | +41.1%          | -35.2%        |
 
 > ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [aarch64-linux]
 > 4 worker processes; Raptor and Puma run 3 threads per worker, Falcon runs unbounded fibers per worker;

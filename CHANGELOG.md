@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Break reuseport routing ties by 4-tuple hash instead of a random draw
+
 ## [0.11.0] - 2026-07-12
 
 - Yield subsequent HTTP/1.1 keep-alive requests to the thread pool only under saturation
