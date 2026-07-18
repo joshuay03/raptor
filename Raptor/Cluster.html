@@ -3442,11 +3442,11 @@ replacement workers on master's request.</p>
 
   <span class='kw'>if</span> <span class='id identifier rubyid_promote_to_seed'>promote_to_seed</span>
     <span class='ivar'>@before_refork</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:call</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_stop_accepting'>stop_accepting</span>
   <span class='kw'>else</span>
     <span class='ivar'>@before_worker_shutdown</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:call</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='kw'>end</span>
-
-  <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_server_thread'>server_thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
   <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_reactor_thread'>reactor_thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
@@ -4002,7 +4002,7 @@ being promoted.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Jul 18 21:26:14 2026 by
+  Generated on Sat Jul 18 21:35:38 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

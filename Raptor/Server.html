@@ -475,7 +475,7 @@ registered with the reactor for frame processing.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Gracefully shuts down the server.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Gracefully shuts down the server, stopping the accept loop and closing all listening sockets.</p></div></span>
   
 </li>
 
@@ -498,6 +498,28 @@ registered with the reactor for frame processing.</p>
 
   
     <span class="summary_desc"><div class='inline'><p>Starts a background thread that publishes this worker's reactor backlog to the BPF map for load-aware dispatch.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#stop_accepting-instance_method" title="#stop_accepting (instance method)">#<strong>stop_accepting</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Stops the accept loop and, when <code>drain_accept_queue</code> is enabled, dispatches every connection already in the kernel accept queue.</p></div></span>
   
 </li>
 
@@ -840,14 +862,6 @@ follow the HTTP/1.1 path.</p>
       <pre class="lines">
 
 
-174
-175
-176
-177
-178
-179
-180
-181
 182
 183
 184
@@ -869,10 +883,18 @@ follow the HTTP/1.1 path.</p>
 200
 201
 202
-203</pre>
+203
+204
+205
+206
+207
+208
+209
+210
+211</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 174</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 182</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_accept_connection'>accept_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_listener'>listener</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tcp_client'>tcp_client</span> <span class='op'>=</span> <span class='kw'>begin</span>
@@ -981,14 +1003,6 @@ it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
       <pre class="lines">
 
 
-215
-216
-217
-218
-219
-220
-221
-222
 223
 224
 225
@@ -1010,10 +1024,18 @@ it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
 241
 242
 243
-244</pre>
+244
+245
+246
+247
+248
+249
+250
+251
+252</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 215</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 223</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_dispatch_ssl_connection'>dispatch_ssl_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_listener'>listener</span><span class='comma'>,</span> <span class='id identifier rubyid_tcp_client'>tcp_client</span><span class='comma'>,</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_ssl_socket'>ssl_socket</span> <span class='op'>=</span> <span class='const'>OpenSSL</span><span class='op'>::</span><span class='const'>SSL</span><span class='op'>::</span><span class='const'>SSLSocket</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_tcp_client'>tcp_client</span><span class='comma'>,</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_ssl_context'>ssl_context</span><span class='rparen'>)</span>
@@ -1075,16 +1097,16 @@ listener until all are drained.</p>
       <pre class="lines">
 
 
-154
-155
-156
-157
-158
-159
-160</pre>
+162
+163
+164
+165
+166
+167
+168</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 154</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 162</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_drain_accept_queue'>drain_accept_queue</span>
   <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
@@ -1158,14 +1180,6 @@ timeout or SSL error.</p>
       <pre class="lines">
 
 
-254
-255
-256
-257
-258
-259
-260
-261
 262
 263
 264
@@ -1177,10 +1191,18 @@ timeout or SSL error.</p>
 270
 271
 272
-273</pre>
+273
+274
+275
+276
+277
+278
+279
+280
+281</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 254</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 262</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_perform_ssl_handshake'>perform_ssl_handshake</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span> <span class='op'>+</span> <span class='ivar'>@first_data_timeout</span>
@@ -1315,10 +1337,8 @@ this worker's backlog to the BPF map.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Gracefully shuts down the server.</p>
-<p>Stops accepting new connections and closes all listening sockets. When
-<code>drain_accept_queue</code> is enabled, dispatches every connection already in
-the kernel accept queue before closing the listeners.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Gracefully shuts down the server, stopping the accept loop and closing
+all listening sockets.</p>
 
   </div>
 </div>
@@ -1331,18 +1351,16 @@ the kernel accept queue before closing the listeners.</p>
       <pre class="lines">
 
 
-123
-124
-125
-126
-127</pre>
+132
+133
+134
+135</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 123</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 132</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
-  <span class='ivar'>@running</span><span class='period'>.</span><span class='id identifier rubyid_make_false'>make_false</span>
-  <span class='id identifier rubyid_drain_accept_queue'>drain_accept_queue</span> <span class='kw'>if</span> <span class='ivar'>@drain_accept_queue</span>
+  <span class='id identifier rubyid_stop_accepting'>stop_accepting</span>
   <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:close</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -1375,19 +1393,19 @@ backlog to the BPF map for load-aware dispatch.</p>
       <pre class="lines">
 
 
-137
-138
-139
-140
-141
-142
-143
-144
 145
-146</pre>
+146
+147
+148
+149
+150
+151
+152
+153
+154</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 137</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 145</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_spawn_load_reporter'>spawn_load_reporter</span>
   <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span>
@@ -1398,6 +1416,49 @@ backlog to the BPF map for load-aware dispatch.</p>
       <span class='id identifier rubyid_sleep'>sleep</span> <span class='float'>0.01</span>
     <span class='kw'>end</span>
   <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="stop_accepting-instance_method">
+  
+    #<strong>stop_accepting</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Stops the accept loop and, when <code>drain_accept_queue</code> is enabled,
+dispatches every connection already in the kernel accept queue. Leaves
+the listening sockets open so they can be handed to replacement workers.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+121
+122
+123
+124</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 121</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_stop_accepting'>stop_accepting</span>
+  <span class='ivar'>@running</span><span class='period'>.</span><span class='id identifier rubyid_make_false'>make_false</span>
+  <span class='id identifier rubyid_drain_accept_queue'>drain_accept_queue</span> <span class='kw'>if</span> <span class='ivar'>@drain_accept_queue</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -1491,24 +1552,24 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
       <pre class="lines">
 
 
-284
-285
-286
-287
-288
-289
-290
-291
 292
 293
 294
 295
 296
 297
-298</pre>
+298
+299
+300
+301
+302
+303
+304
+305
+306</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 284</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 292</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_wait_for_handshake'>wait_for_handshake</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='comma'>,</span> <span class='id identifier rubyid_deadline'>deadline</span><span class='comma'>,</span> <span class='id identifier rubyid_direction'>direction</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_remaining'>remaining</span> <span class='op'>=</span> <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>-</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span>
@@ -1535,7 +1596,7 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Jul 18 21:26:14 2026 by
+  Generated on Sat Jul 18 21:35:38 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
