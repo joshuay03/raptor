@@ -4,7 +4,7 @@
     <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>
-  Module: Rackup::Handler
+  Module: Raptor::Subreaper
   
     &mdash; Documentation by YARD 0.9.45
   
@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="../css/common.css" type="text/css">
 
 <script type="text/javascript">
-  pathId = "Rackup::Handler";
+  pathId = "Raptor::Subreaper";
   relpath = '../';
 </script>
 
@@ -38,10 +38,10 @@
       <div id="header">
         <div id="menu">
   
-    <a href="../_index.html">Index (H)</a> &raquo;
-    <span class='title'><span class='object_link'><a href="../Rackup.html" title="Rackup (module)">Rackup</a></span></span>
+    <a href="../_index.html">Index (S)</a> &raquo;
+    <span class='title'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span>
      &raquo; 
-    <span class="title">Handler</span>
+    <span class="title">Subreaper</span>
   
 </div>
 
@@ -61,7 +61,7 @@
         <div class="clear"></div>
       </div>
 
-      <div id="content"><h1>Module: Rackup::Handler
+      <div id="content"><h1>Module: Raptor::Subreaper
   
   
   
@@ -80,32 +80,102 @@
   
   <dl>
     <dt>Defined in:</dt>
-    <dd>lib/rackup/handler/raptor.rb<span class="defines">,<br>
-  sig/generated/rackup/handler/raptor.rbs</span>
-
+    <dd>ext/raptor_native/raptor_native.c
 </dd>
   </dl>
   
 </div>
 
-<h2>Defined Under Namespace</h2>
-<p class="children">
+
+
+
+
+
+
+
   
+    <h2>
+      Class Method Summary
+      <small><a href="#" class="summary_toggle">collapse</a></small>
+    </h2>
+
+    <ul class="summary">
+      
+        <li class="public ">
+  <span class="summary_signature">
     
-      <strong class="modules">Modules:</strong> <span class='object_link'><a href="Handler/Raptor.html" title="Rackup::Handler::Raptor (module)">Raptor</a></span>
+      <a href="#enable-class_method" title="enable (class method)">.<strong>enable</strong>  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+    </ul>
     
   
+
+
+
+  <div id="class_method_details" class="method_details_list">
+    <h2>Class Method Details</h2>
+
     
+      <div class="method_details first">
+  <h3 class="signature first" id="enable-class_method">
   
-</p>
+    .<strong>enable</strong>  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
 
 
+86
+87
+88
+89
+90
+91
+92
+93
+94</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 86</span>
 
-
-
-
-
-
+static VALUE raptor_native_enable_subreaper(VALUE self) {
+  (void)self;
+#if defined(__linux__) &amp;&amp; defined(PR_SET_CHILD_SUBREAPER)
+  if (prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) &lt; 0) rb_sys_fail(&quot;prctl&quot;);
+  return Qtrue;
+#else
+  return Qfalse;
+#endif
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+  </div>
 
 </div>
 
