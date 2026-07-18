@@ -208,6 +208,28 @@ left to the binder's shared listeners.</p>
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#mark_unavailable-class_method" title="mark_unavailable (class method)">.<strong>mark_unavailable</strong>(worker_index)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Marks a worker's slot as unavailable by parking its load at the sentinel maximum so the BPF program's least-loaded pick skips it.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#setup-class_method" title="setup (class method)">.<strong>setup</strong>(worker_count)  &#x21d2; Boolean </a>
     
 
@@ -432,6 +454,68 @@ Skips non-tcp bind URIs.</p>
 </div>
     
       <div class="method_details ">
+  <h3 class="signature " id="mark_unavailable-class_method">
+  
+    .<strong>mark_unavailable</strong>(worker_index)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Marks a worker's slot as unavailable by parking its load at the
+sentinel maximum so the BPF program's least-loaded pick skips it.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>worker_index</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>slot index for the worker to mark</p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+116
+117
+118
+119
+120</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 116</span>
+
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_mark_unavailable'>mark_unavailable</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@loads_fd</span>
+
+  <span class='const'>LibBPFRuby</span><span class='period'>.</span><span class='id identifier rubyid_map_update'>map_update</span><span class='lparen'>(</span><span class='ivar'>@loads_fd</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='int'>0xffffffff</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
   <h3 class="signature " id="setup-class_method">
   
     .<strong>setup</strong>(worker_count)  &#x21d2; <tt>Boolean</tt> 
@@ -643,7 +727,7 @@ platform. Does not imply that the kernel will accept the program.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Jul 18 06:16:16 2026 by
+  Generated on Sat Jul 18 21:19:15 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
