@@ -56,9 +56,11 @@ module Raptor
       worker_timeout: 60,
       worker_drain_timeout: 25,
       worker_shutdown_timeout: 30,
+      refork_after: (RUBY_PLATFORM.include?("linux") ? 1000 : nil),
       before_fork: [].freeze,
       before_worker_boot: [].freeze,
       before_worker_shutdown: [].freeze,
+      before_refork: [].freeze,
       stats_file: "tmp/raptor.json",
       pid_file: nil,
       stdout_file: nil,
@@ -313,6 +315,10 @@ module Raptor
 
         opts.on("--worker-shutdown-timeout SECONDS", Integer, "Worker shutdown timeout in seconds (default: 30)") do |timeout|
           @options[:worker_shutdown_timeout] = timeout
+        end
+
+        opts.on("--refork-after NUM", Integer, "Refork workers from a warmed source after any worker crosses NUM requests; 0 disables (default: 1000)") do |num|
+          @options[:refork_after] = num
         end
 
         opts.on("--stats-file PATH", String, "Stats file path (default: tmp/raptor.json)") do |path|

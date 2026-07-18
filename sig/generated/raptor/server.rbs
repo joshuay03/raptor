@@ -82,11 +82,17 @@ module Raptor
     # @rbs () -> Thread
     def run: () -> Thread
 
-    # Gracefully shuts down the server.
+    # Stops the accept loop and, when `drain_accept_queue` is enabled,
+    # dispatches every connection already in the kernel accept queue. Leaves
+    # the listening sockets open so they can be handed to replacement workers.
     #
-    # Stops accepting new connections and closes all listening sockets. When
-    # `drain_accept_queue` is enabled, dispatches every connection already in
-    # the kernel accept queue before closing the listeners.
+    # @return [void]
+    #
+    # @rbs () -> void
+    def stop_accepting: () -> void
+
+    # Gracefully shuts down the server, stopping the accept loop and closing
+    # all listening sockets.
     #
     # @return [void]
     #

@@ -84,11 +84,11 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   binds: ["tcp://0.0.0.0:9292"],
   socket_backlog: 1024,
   drain_accept_queue: false,
-  workers: 4,
+  workers: 4, # `Etc.nprocessors`
   ractors: 1,
   threads: 3,
   chdir: nil,
-  environment: nil,
+  environment: nil, # falls back to `RAILS_ENV`, then `RACK_ENV`, then `"development"`
   connection: {
     first_data_timeout: 30,
     chunk_data_timeout: 10,
@@ -107,9 +107,11 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   worker_timeout: 60,
   worker_drain_timeout: 25,
   worker_shutdown_timeout: 30,
+  refork_after: 1000, # `nil` on non-Linux
   before_fork: [],
   before_worker_boot: [],
   before_worker_shutdown: [],
+  before_refork: [],
   stats_file: "tmp/raptor.json",
   pid_file: nil,
   stdout_file: nil,

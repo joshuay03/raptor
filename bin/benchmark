@@ -320,6 +320,7 @@ def raptor_cmd(fixture)
   [
     "bundle", "exec", "raptor",
     "-w", WORKERS.to_s, "-t", THREADS.to_s,
+    "--refork-after", "0",
     "-b", "tcp://0.0.0.0:#{H1_PORT}",
     "-b", "ssl://0.0.0.0:#{H2_PORT}?cert=#{CERT_PATH}&key=#{KEY_PATH}",
     fixture

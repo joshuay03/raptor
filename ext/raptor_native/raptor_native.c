@@ -10,6 +10,7 @@
 
 #ifdef __linux__
 #include <sched.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 #endif
 
@@ -82,17 +83,30 @@ static VALUE raptor_native_cpu_count(VALUE self) {
 #endif
 }
 
+static VALUE raptor_native_enable_subreaper(VALUE self) {
+  (void)self;
+#if defined(__linux__) && defined(PR_SET_CHILD_SUBREAPER)
+  if (prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) < 0) rb_sys_fail("prctl");
+  return Qtrue;
+#else
+  return Qfalse;
+#endif
+}
+
 RUBY_FUNC_EXPORTED void Init_raptor_native(void) {
   rb_ext_ractor_safe(true);
 
   VALUE mRaptor = rb_define_module("Raptor");
-  VALUE mVectorIO = rb_define_module_under(mRaptor, "VectorIO");
-  VALUE mCPU = rb_define_module_under(mRaptor, "CPU");
 
+  VALUE mVectorIO = rb_define_module_under(mRaptor, "VectorIO");
   rb_define_singleton_method(mVectorIO, "writev_nonblock", raptor_native_writev_nonblock, 2);
 
+  VALUE mCPU = rb_define_module_under(mRaptor, "CPU");
   rb_define_singleton_method(mCPU, "pin", raptor_native_pin_to_cpu, 1);
   rb_define_singleton_method(mCPU, "count", raptor_native_cpu_count, 0);
+
+  VALUE mSubreaper = rb_define_module_under(mRaptor, "Subreaper");
+  rb_define_singleton_method(mSubreaper, "enable", raptor_native_enable_subreaper, 0);
 
   eEAGAINWaitWritable = rb_const_get(rb_cIO, rb_intern("EAGAINWaitWritable"));
   rb_global_variable(&eEAGAINWaitWritable);

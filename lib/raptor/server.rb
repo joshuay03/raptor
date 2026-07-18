@@ -111,18 +111,26 @@ module Raptor
       end
     end
 
-    # Gracefully shuts down the server.
+    # Stops the accept loop and, when `drain_accept_queue` is enabled,
+    # dispatches every connection already in the kernel accept queue. Leaves
+    # the listening sockets open so they can be handed to replacement workers.
     #
-    # Stops accepting new connections and closes all listening sockets. When
-    # `drain_accept_queue` is enabled, dispatches every connection already in
-    # the kernel accept queue before closing the listeners.
+    # @return [void]
+    #
+    # @rbs () -> void
+    def stop_accepting
+      @running.make_false
+      drain_accept_queue if @drain_accept_queue
+    end
+
+    # Gracefully shuts down the server, stopping the accept loop and closing
+    # all listening sockets.
     #
     # @return [void]
     #
     # @rbs () -> void
     def shutdown
-      @running.make_false
-      drain_accept_queue if @drain_accept_queue
+      stop_accepting
       @listeners.each(&:close)
     end
 

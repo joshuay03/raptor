@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add `refork_after` and `before_refork` for reforking workers off a warmed source
 - Add `before_fork`, `before_worker_boot`, and `before_worker_shutdown` hooks
 - Sync `$stdout` and `$stderr` writes so info-level logs flush immediately
 - Break reuseport routing ties by 4-tuple hash instead of a random draw

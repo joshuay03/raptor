@@ -998,6 +998,56 @@ module Raptor
       end
     end
 
+    def test_refork_after_serves_requests_before_during_and_after_promotion
+      skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Raptor::Subreaper.enable
+
+      @options[:workers] = 2
+      @options[:refork_after] = 3
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      original_pids = descendant_pids(cluster_pid)
+      skip "could not find worker PIDs" if original_pids.empty?
+
+      before = 3.times.map { Net::HTTP.get_response(URI("http://127.0.0.1:#{server_port}/")) }
+
+      stop = false
+      during = []
+      during_thread = Thread.new do
+        until stop
+          during << (Net::HTTP.get_response(URI("http://127.0.0.1:#{server_port}/")) rescue nil)
+          sleep 0.01
+        end
+      end
+
+      Timeout.timeout(60) do
+        loop do
+          current = descendant_pids(cluster_pid)
+          break if (current - original_pids).length >= original_pids.length
+
+          sleep 0.1
+        end
+      end
+
+      stop = true
+      during_thread.join
+
+      after = 3.times.map { Net::HTTP.get_response(URI("http://127.0.0.1:#{server_port}/")) }
+
+      assert before.all? { |response| response.code.to_i == 200 }
+      assert during.any? { |response| response&.code&.to_i == 200 }
+      assert after.all? { |response| response.code.to_i == 200 }
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+    end
+
     def test_hot_restart_on_usr2_re_execs_master_and_inherits_listener
       sock_path = "/tmp/raptor_hot_test_#{Process.pid}.sock"
       stats_path = "/tmp/raptor_hot_stats_#{Process.pid}.json"
@@ -1117,6 +1167,39 @@ module Raptor
       cluster_pid = nil
 
       assert_equal worker_pid.to_s, File.read(marker)
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+      File.delete(marker) rescue nil
+    end
+
+    def test_before_refork_hooks_run_in_the_worker_being_promoted_to_seed
+      skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Raptor::Subreaper.enable
+
+      marker = "/tmp/raptor_test_before_refork_#{Process.pid}.marker"
+      File.delete(marker) rescue nil
+
+      @options[:workers] = 2
+      @options[:refork_after] = 3
+      @options[:before_refork] = [proc { File.write(marker, Process.pid.to_s) }]
+
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      original_pids = descendant_pids(cluster_pid)
+      skip "could not find worker PIDs" if original_pids.empty?
+
+      10.times { Net::HTTP.get_response(URI("http://127.0.0.1:#{server_port}/")) }
+
+      Timeout.timeout(60) { sleep 0.05 until File.exist?(marker) && !File.read(marker).empty? }
+
+      assert_includes original_pids, File.read(marker).to_i
     ensure
       if cluster_pid
         Process.kill("TERM", cluster_pid) rescue nil
@@ -1399,6 +1482,11 @@ module Raptor
       socket.read
     ensure
       socket&.close
+    end
+
+    def descendant_pids(pid)
+      direct = `pgrep -P #{pid}`.strip.split.map(&:to_i).reject(&:zero?)
+      (direct + direct.flat_map { |child| descendant_pids(child) }).sort
     end
 
     def wait_for_booted_worker_pid(stats_path, except: nil, timeout: 20)

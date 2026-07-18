@@ -105,5 +105,18 @@ module Raptor
       @load_value.setbyte(3, (backlog >> 24) & 0xff)
       LibBPFRuby.map_update(@loads_fd, @load_key, @load_value)
     end
+
+    # Marks a worker's slot as unavailable by parking its load at the
+    # sentinel maximum so the BPF program's least-loaded pick skips it.
+    #
+    # @param worker_index [Integer] slot index for the worker to mark
+    # @return [void]
+    #
+    # @rbs (Integer worker_index) -> void
+    def self.mark_unavailable(worker_index)
+      return unless @loads_fd
+
+      LibBPFRuby.map_update(@loads_fd, [worker_index + 1].pack("L"), [0xffffffff].pack("L"))
+    end
   end
 end

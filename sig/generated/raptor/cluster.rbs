@@ -40,61 +40,83 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @worker_boot_timeout: Integer
-
-    @worker_timeout: Integer
-
-    @worker_drain_timeout: Integer
-
-    @worker_shutdown_timeout: Integer
-
-    @before_fork: Array[Proc]
-
-    @before_worker_boot: Array[Proc]
-
-    @before_worker_shutdown: Array[Proc]
-
-    @stats_file: String?
-
-    @pid_file: String?
-
-    @stdout_file: String?
-
-    @stderr_file: String?
-
-    @access_log_file: String?
-
-    @access_log_io: IO?
-
-    @launch_command: String?
-
-    @launch_argv: Array[String]?
-
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
-
-    @binder: Binder
+    @bpf_active: bool
 
     @server_port: Integer
 
-    @app: untyped
+    @binder: Binder
 
-    @shutdown: bool
+    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
 
-    @workers: Hash[Integer, Integer]
+    @launch_argv: Array[String]?
 
-    @timed_out: Set[Integer]
+    @launch_command: String?
 
-    @stats: Stats
+    @access_log_io: IO?
 
-    @phase: Integer
+    @access_log_file: String?
 
-    @phased_restart_requested: bool
+    @stderr_file: String?
 
-    @phased_restarting: bool
+    @stdout_file: String?
+
+    @pid_file: String?
+
+    @stats_file: String?
+
+    @before_refork: Array[Proc]
+
+    @before_worker_shutdown: Array[Proc]
+
+    @before_worker_boot: Array[Proc]
+
+    @before_fork: Array[Proc]
+
+    @worker_shutdown_timeout: Integer
+
+    @worker_drain_timeout: Integer
+
+    @worker_timeout: Integer
+
+    @worker_boot_timeout: Integer
+
+    @resp_w: IO?
+
+    @resp_r: IO?
+
+    @fork_w: IO?
+
+    @fork_r: IO?
+
+    @seed_vacated_index: Integer?
+
+    @seed_ready: bool
+
+    @seed_pid: Integer?
+
+    @refork_threshold_idx: Integer
+
+    @refork_requested: bool
+
+    @refork_thresholds: Array[Integer]
 
     @hot_restart_requested: bool
 
-    @bpf_active: bool
+    @phased_restarting: bool
+
+    @phased_restart_requested: bool
+
+    @phase: Integer
+
+    @stats: Stats
+
+    @timed_out: Set[Integer]
+
+    @workers: Hash[Integer, Integer]
+
+    @shutdown: bool
+
+    @app: untyped
 
     @http2_options: Hash[Symbol, untyped]
 
@@ -136,9 +158,11 @@ module Raptor
     # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_drain_timeout seconds a worker waits for in-flight requests during shutdown before force-killing app threads
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
+    # @option options [Integer, Array<Integer>, nil] :refork_after request-count threshold(s) at which a warm worker is promoted to a fork source for phased refork; nil or 0 disables. Requires `PR_SET_CHILD_SUBREAPER` (Linux)
     # @option options [Array<Proc>] :before_fork procs called in the master before every worker fork
     # @option options [Array<Proc>] :before_worker_boot procs called in each worker before it begins serving
     # @option options [Array<Proc>] :before_worker_shutdown procs called in each worker before its graceful shutdown
+    # @option options [Array<Proc>] :before_refork procs called in a worker before it transitions to a seed
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
     # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
@@ -194,8 +218,18 @@ module Raptor
     # @rbs (Array[String] bind_uris, Array[Integer] filenos) -> Hash[String, Array[Integer]]
     def pair_systemd_fds: (Array[String] bind_uris, Array[Integer] filenos) -> Hash[String, Array[Integer]]
 
-    # Forks a new worker process and registers it at the given index.
-    # The worker inherits the cluster's current phase.
+    # Normalises the `refork_after` option into a sorted array of positive
+    # thresholds. Accepts nil, 0, an Integer, or an Array<Integer>; anything
+    # else falls back to an empty array (feature disabled).
+    #
+    # @param value [Integer, Array<Integer>, nil] the raw option value
+    # @return [Array<Integer>]
+    #
+    # @rbs (untyped value) -> Array[Integer]
+    def normalize_refork_thresholds: (untyped value) -> Array[Integer]
+
+    # Forks a new worker process and registers it at the given index,
+    # forking from the seed when one is active and off the master otherwise.
     #
     # @param index [Integer] slot index for this worker in the stats region
     # @return [void]
@@ -203,16 +237,87 @@ module Raptor
     # @rbs (Integer index) -> void
     def spawn_worker: (Integer index) -> void
 
+    # Asks the seed to fork a new worker at the given index, returning the
+    # child pid, or nil when the seed doesn't respond in time.
+    #
+    # @param index [Integer] slot index for the new worker
+    # @return [Integer, nil] the forked worker's pid, or nil on failure
+    #
+    # @rbs (Integer index) -> Integer?
+    def spawn_worker_via_seed: (Integer index) -> Integer?
+
+    # Checks whether a process with the given pid is currently alive.
+    #
+    # @param pid [Integer] the pid to probe
+    # @return [Boolean] true if the process exists
+    #
+    # @rbs (Integer pid) -> bool
+    def pid_alive?: (Integer pid) -> bool
+
     # Reaps any worker processes that have exited, respawning each one
     # unless the cluster is shutting down.
     #
-    # @return [Symbol] :no_children when there are no remaining children, otherwise :reaped
+    # @return [Symbol] :no_children when nothing is left to supervise, otherwise :reaped
     #
     # @rbs () -> Symbol
     def reap_workers: () -> Symbol
 
-    # Stops every worker, escalating from TERM to KILL if any fail to
-    # exit within `worker_shutdown_timeout`.
+    # Records a reaped pid, respawning its worker slot unless the cluster
+    # is shutting down. Clears the seed reference when the seed exits.
+    #
+    # @param pid [Integer] the reaped pid
+    # @param status [Process::Status] the exit status
+    # @return [void]
+    #
+    # @rbs (Integer pid, Process::Status status) -> void
+    def reap_pid: (Integer pid, Process::Status status) -> void
+
+    # Promotes the most-experienced worker to a seed and starts a phased
+    # refork when the next `refork_after` threshold is crossed or a manual
+    # refork was requested via `SIGURG`.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def check_refork_trigger: () -> void
+
+    # Picks the most-experienced booted worker in the current phase,
+    # returning its slot index and its request count. Returns nil when
+    # no worker qualifies.
+    #
+    # @return [Array<Integer>, nil]
+    #
+    # @rbs () -> Array[Integer]?
+    def pick_refork_candidate: () -> Array[Integer]?
+
+    # Retires the current seed and promotes the given worker into its place,
+    # queueing a phased refork for the remaining workers.
+    #
+    # @param index [Integer] slot index of the worker to promote
+    # @return [void]
+    #
+    # @rbs (Integer index) -> void
+    def promote_worker_to_seed: (Integer index) -> void
+
+    # Terminates the currently-active seed process, if any, and waits for
+    # it to exit. Its seed-forked workers stay attached to the master and
+    # keep serving.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def retire_current_seed: () -> void
+
+    # Records the seed's readiness when its ready marker has arrived.
+    # Non-blocking.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def poll_seed_ready: () -> void
+
+    # Stops every worker (and the seed if one is active), escalating
+    # from TERM to KILL if any fail to exit within `worker_shutdown_timeout`.
     #
     # @return [void]
     #
@@ -238,6 +343,23 @@ module Raptor
     # @rbs () -> void
     def perform_phased_restart: () -> void
 
+    # Blocks until the freshly-promoted seed has signalled readiness,
+    # or times out and clears the seed reference. No-op when no seed is
+    # being promoted.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def wait_for_seed_ready: () -> void
+
+    # Spawns a replacement worker for the slot the seed vacated when
+    # it was promoted, returning the slot index it filled.
+    #
+    # @return [Integer, nil] the filled slot index, or nil if none was vacated
+    #
+    # @rbs () -> Integer?
+    def fill_vacated_seed_slot: () -> Integer?
+
     # Re-execs the master process with a fresh boot of the same Raptor
     # invocation, handing the new master its listening sockets so accepted
     # connections continue to be served across the swap.
@@ -248,7 +370,9 @@ module Raptor
     def perform_hot_restart: () -> void
 
     # Runs a worker process's full server stack until a shutdown signal is
-    # received or a critical component fails.
+    # received or a critical component fails. On `SIGURG` the worker drains
+    # and transitions into a seed loop that forks replacement workers on
+    # master's request.
     #
     # @param index [Integer] slot index for this worker in the stats region
     # @param phase [Integer] the cluster phase this worker was forked at
@@ -256,6 +380,15 @@ module Raptor
     #
     # @rbs (Integer index, Integer phase) -> void
     def run_worker: (Integer index, Integer phase) -> void
+
+    # Runs the seed's fork loop, forking a replacement worker for each
+    # slot index the master asks for.
+    #
+    # @param index [Integer] the seed's original slot index
+    # @return [void]
+    #
+    # @rbs (Integer index) -> void
+    def run_seed_loop: (Integer index) -> void
 
     # Shuts down the worker's application thread pool, force-killing the
     # underlying threads if in-flight requests have not finished within
