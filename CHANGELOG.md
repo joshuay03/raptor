@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Sync `$stdout` and `$stderr` writes so info-level logs flush immediately
 - Break reuseport routing ties by 4-tuple hash instead of a random draw
 
 ## [0.11.0] - 2026-07-12

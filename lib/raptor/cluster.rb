@@ -196,6 +196,9 @@ module Raptor
     #
     # @rbs () -> void
     def run
+      $stdout.sync = true
+      $stderr.sync = true
+
       reopen_logs
 
       trap("INT") { shutdown }
