@@ -72,6 +72,9 @@ module Raptor
     # @rbs @worker_timeout: Integer
     # @rbs @worker_drain_timeout: Integer
     # @rbs @worker_shutdown_timeout: Integer
+    # @rbs @before_fork: Array[Proc]
+    # @rbs @before_worker_boot: Array[Proc]
+    # @rbs @before_worker_shutdown: Array[Proc]
     # @rbs @stats_file: String?
     # @rbs @pid_file: String?
     # @rbs @stdout_file: String?
@@ -118,6 +121,9 @@ module Raptor
     # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_drain_timeout seconds a worker waits for in-flight requests during shutdown before force-killing app threads
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
+    # @option options [Array<Proc>] :before_fork procs called in the master before every worker fork
+    # @option options [Array<Proc>] :before_worker_boot procs called in each worker before it begins serving
+    # @option options [Array<Proc>] :before_worker_shutdown procs called in each worker before its graceful shutdown
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
     # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
@@ -142,6 +148,9 @@ module Raptor
       @worker_timeout = options[:worker_timeout]
       @worker_drain_timeout = options[:worker_drain_timeout]
       @worker_shutdown_timeout = options[:worker_shutdown_timeout]
+      @before_fork = Array(options[:before_fork])
+      @before_worker_boot = Array(options[:before_worker_boot])
+      @before_worker_shutdown = Array(options[:before_worker_shutdown])
       @stats_file = options[:stats_file]
       @pid_file = options[:pid_file]
       @stdout_file = options[:stdout_file]
@@ -281,6 +290,7 @@ module Raptor
     #
     # @rbs (Integer index) -> void
     def spawn_worker(index)
+      @before_fork.each(&:call)
       pid = fork { run_worker(index, @phase) }
       @workers[index] = pid
     end
@@ -428,11 +438,8 @@ module Raptor
       exec(@launch_command, *@launch_argv)
     end
 
-    # Runs the full server stack inside a worker process.
-    #
-    # Sets up and coordinates the reactor, server, ractor pool, thread pool,
-    # and stats thread, running until a shutdown signal is received or a
-    # critical component fails.
+    # Runs a worker process's full server stack until a shutdown signal is
+    # received or a critical component fails.
     #
     # @param index [Integer] slot index for this worker in the stats region
     # @param phase [Integer] the cluster phase this worker was forked at
@@ -532,6 +539,8 @@ module Raptor
       )
       server_thread = server.run
 
+      @before_worker_boot.each(&:call)
+
       Log.info "Worker #{index} booted"
 
       stats_thread = Thread.new do
@@ -561,6 +570,8 @@ module Raptor
 
         sleep 0.5
       end
+
+      @before_worker_shutdown.each(&:call)
 
       server.shutdown
       server_thread.join

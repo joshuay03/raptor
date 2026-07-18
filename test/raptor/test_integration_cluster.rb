@@ -1038,6 +1038,93 @@ module Raptor
       File.delete(stats_path) rescue nil
     end
 
+    def test_before_fork_hooks_run_in_the_master_before_every_fork
+      marker = "/tmp/raptor_test_before_fork_#{Process.pid}.marker"
+      File.delete(marker) rescue nil
+
+      @options[:workers] = 2
+      @options[:before_fork] = [proc { File.open(marker, "a") { |file| file.puts Process.pid } }]
+
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      lines = Timeout.timeout(10) do
+        loop do
+          existing = File.exist?(marker) ? File.read(marker).lines.map(&:strip) : []
+          break existing if existing.length == 2
+
+          sleep 0.05
+        end
+      end
+
+      assert_equal [cluster_pid.to_s, cluster_pid.to_s], lines
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+      File.delete(marker) rescue nil
+    end
+
+    def test_before_worker_boot_hooks_run_in_each_worker_before_serving
+      marker = "/tmp/raptor_test_before_worker_boot_#{Process.pid}.marker"
+      File.delete(marker) rescue nil
+
+      @options[:workers] = 1
+      @options[:before_worker_boot] = [proc { File.write(marker, Process.pid.to_s) }]
+
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      Timeout.timeout(10) { sleep 0.05 until File.exist?(marker) && !File.read(marker).empty? }
+      worker_pid = `pgrep -P #{cluster_pid}`.strip.split.map(&:to_i).first
+
+      assert_equal worker_pid.to_s, File.read(marker)
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+      File.delete(marker) rescue nil
+    end
+
+    def test_before_worker_shutdown_hooks_run_in_each_worker_before_graceful_exit
+      marker = "/tmp/raptor_test_before_worker_shutdown_#{Process.pid}.marker"
+      File.delete(marker) rescue nil
+
+      @options[:workers] = 1
+      @options[:before_worker_shutdown] = [proc { File.write(marker, Process.pid.to_s) }]
+
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      worker_pid = `pgrep -P #{cluster_pid}`.strip.split.map(&:to_i).first
+
+      Process.kill("TERM", cluster_pid)
+      Process.wait(cluster_pid)
+      cluster_pid = nil
+
+      assert_equal worker_pid.to_s, File.read(marker)
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+      File.delete(marker) rescue nil
+    end
+
     def test_cluster_shuts_down_promptly_with_active_keepalive_pipeline
       fixture_content = <<~RUBY
         run proc { |_env| sleep 0.2; [200, { "content-type" => "text/plain" }, ["ok"]] }

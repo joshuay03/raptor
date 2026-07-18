@@ -40,8 +40,6 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def self.run: (Hash[Symbol, untyped] options) -> void
 
-    @http2_options: Hash[Symbol, untyped]
-
     @worker_boot_timeout: Integer
 
     @worker_timeout: Integer
@@ -49,6 +47,12 @@ module Raptor
     @worker_drain_timeout: Integer
 
     @worker_shutdown_timeout: Integer
+
+    @before_fork: Array[Proc]
+
+    @before_worker_boot: Array[Proc]
+
+    @before_worker_shutdown: Array[Proc]
 
     @stats_file: String?
 
@@ -92,6 +96,8 @@ module Raptor
 
     @bpf_active: bool
 
+    @http2_options: Hash[Symbol, untyped]
+
     @http1_options: Hash[Symbol, untyped]
 
     @connection_options: Hash[Symbol, untyped]
@@ -130,6 +136,9 @@ module Raptor
     # @option options [Integer] :worker_timeout seconds to wait for a booted worker to check in before killing it
     # @option options [Integer] :worker_drain_timeout seconds a worker waits for in-flight requests during shutdown before force-killing app threads
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
+    # @option options [Array<Proc>] :before_fork procs called in the master before every worker fork
+    # @option options [Array<Proc>] :before_worker_boot procs called in each worker before it begins serving
+    # @option options [Array<Proc>] :before_worker_shutdown procs called in each worker before its graceful shutdown
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
     # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
@@ -238,11 +247,8 @@ module Raptor
     # @rbs () -> void
     def perform_hot_restart: () -> void
 
-    # Runs the full server stack inside a worker process.
-    #
-    # Sets up and coordinates the reactor, server, ractor pool, thread pool,
-    # and stats thread, running until a shutdown signal is received or a
-    # critical component fails.
+    # Runs a worker process's full server stack until a shutdown signal is
+    # received or a critical component fails.
     #
     # @param index [Integer] slot index for this worker in the stats region
     # @param phase [Integer] the cluster phase this worker was forked at

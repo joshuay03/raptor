@@ -79,6 +79,7 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
 ```ruby
 # raptor.rb
 
+# Every key below is set to its default value; only include the ones you want to override.
 {
   binds: ["tcp://0.0.0.0:9292"],
   socket_backlog: 1024,
@@ -106,6 +107,9 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   worker_timeout: 60,
   worker_drain_timeout: 25,
   worker_shutdown_timeout: 30,
+  before_fork: [],
+  before_worker_boot: [],
+  before_worker_shutdown: [],
   stats_file: "tmp/raptor.json",
   pid_file: nil,
   stdout_file: nil,
