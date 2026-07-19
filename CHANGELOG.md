@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-19
+
 - Add `refork_after` and `before_refork` for reforking workers off a warmed source
 - Add `before_fork`, `before_worker_boot`, and `before_worker_shutdown` hooks
 - Sync `$stdout` and `$stderr` writes so info-level logs flush immediately

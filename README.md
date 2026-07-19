@@ -36,23 +36,23 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 
 ```
 > bundle exec raptor -w 4 -t 3 hello_world.ru
-[Raptor 76577|Main|Main] Cluster initializing:
-[Raptor 76577|Main|Main] ├─ Version: 0.11.0
-[Raptor 76577|Main|Main] ├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
-[Raptor 76577|Main|Main] ├─ Environment: development
-[Raptor 76577|Main|Main] ├─ Master PID: 76577
-[Raptor 76577|Main|Main] │  └─ 4 worker processes
-[Raptor 76577|Main|Main] │     ├─ 1 server thread
-[Raptor 76577|Main|Main] │     ├─ 1 reactor thread
-[Raptor 76577|Main|Main] │     ├─ 1 pipeline ractor
-[Raptor 76577|Main|Main] │     ├─ 1 pipeline collector thread
-[Raptor 76577|Main|Main] │     ├─ 3 worker threads
-[Raptor 76577|Main|Main] │     └─ 1 stats thread
-[Raptor 76577|Main|Main] └─ Listening on 0.0.0.0:9292
-[Raptor 76579|Main|Main] Worker 0 booted
-[Raptor 76580|Main|Main] Worker 1 booted
-[Raptor 76581|Main|Main] Worker 2 booted
-[Raptor 76582|Main|Main] Worker 3 booted
+[Raptor 59013|Main|Main] Cluster initializing:
+[Raptor 59013|Main|Main] ├─ Version: 0.12.0
+[Raptor 59013|Main|Main] ├─ Ruby Version: ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [arm64-darwin23]
+[Raptor 59013|Main|Main] ├─ Environment: development
+[Raptor 59013|Main|Main] ├─ Master PID: 59013
+[Raptor 59013|Main|Main] │  └─ 4 worker processes
+[Raptor 59013|Main|Main] │     ├─ 1 server thread
+[Raptor 59013|Main|Main] │     ├─ 1 reactor thread
+[Raptor 59013|Main|Main] │     ├─ 1 pipeline ractor
+[Raptor 59013|Main|Main] │     ├─ 1 pipeline collector thread
+[Raptor 59013|Main|Main] │     ├─ 3 worker threads
+[Raptor 59013|Main|Main] │     └─ 1 stats thread
+[Raptor 59013|Main|Main] └─ Listening on 0.0.0.0:9292
+[Raptor 59023|Main|Main] Worker 0 booted
+[Raptor 59024|Main|Main] Worker 1 booted
+[Raptor 59025|Main|Main] Worker 2 booted
+[Raptor 59026|Main|Main] Worker 3 booted
 ```
 
 ```
@@ -193,7 +193,7 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 
 ## (Micro) Benchmarks
 
-Raptor 0.11.0 vs Puma 8.0.2 vs Falcon 0.55.5 across two workload profiles. **IO-bound** is a GET endpoint that
+Raptor 0.12.0 vs Puma 8.0.2 vs Falcon 0.55.5 across two workload profiles. **IO-bound** is a GET endpoint that
 interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
 cache calls. **CPU-bound** is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of JSON item
 building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
@@ -202,17 +202,17 @@ most of its work in Ruby with a few near-zero-cost cache hits.
 Each cell reports the median throughput and median p95 latency independently across 5 runs, so the two numbers in a row
 may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
 state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
-((max - min) / 2 / median) between runs of a single cell was ±46.2% for throughput
-and ±38.2% for p95.
+((max - min) / 2 / median) between runs of a single cell was ±22.4% for throughput
+and ±31.1% for p95.
 
 | Protocol              | Workload | Raptor req/s | Raptor p95 | Puma req/s  | Puma p95 | vs Puma req/s | vs Puma p95 | Falcon req/s | Falcon p95 | vs Falcon req/s | vs Falcon p95 |
 | --------------------- | -------- | ------------ | ---------- | ----------- | -------- | ------------- | ----------- | ------------ | ---------- | --------------- | ------------- |
-| HTTP/1.1              | IO       | 1.36k req/s  | 52.50 ms   | 0.98k req/s | 64.00 ms | +39.1%        | -18.0%      | 4.54k req/s  | 15.10 ms   | -70.0%          | +247.7%       |
-| HTTP/1.1              | CPU      | 3.54k req/s  | 27.70 ms   | 3.66k req/s | 16.50 ms | -3.2%         | +67.9%      | 3.76k req/s  | 15.50 ms   | -5.7%           | +78.7%        |
-| HTTP/1.1 (keep-alive) | IO       | 1.34k req/s  | 35.10 ms   | 0.96k req/s | 63.70 ms | +38.7%        | -44.9%      | 4.12k req/s  | 16.50 ms   | -67.5%          | +112.7%       |
-| HTTP/1.1 (keep-alive) | CPU      | 4.24k req/s  | 11.40 ms   | 3.80k req/s | 17.40 ms | +11.6%        | -34.5%      | 3.83k req/s  | 17.10 ms   | +10.8%          | -33.3%        |
-| HTTP/2                | IO       | 0.99k req/s  | 78.02 ms   | N/A         | N/A      | -             | -           | 3.88k req/s  | 17.57 ms   | -74.4%          | +344.1%       |
-| HTTP/2                | CPU      | 4.18k req/s  | 18.89 ms   | N/A         | N/A      | -             | -           | 2.96k req/s  | 29.16 ms   | +41.1%          | -35.2%        |
+| HTTP/1.1              | IO       | 1.36k req/s  | 52.90 ms   | 0.94k req/s | 66.00 ms | +44.6%        | -19.8%      | 4.65k req/s  | 14.60 ms   | -70.8%          | +262.3%       |
+| HTTP/1.1              | CPU      | 3.46k req/s  | 28.10 ms   | 3.58k req/s | 16.70 ms | -3.3%         | +68.3%      | 3.57k req/s  | 16.30 ms   | -3.1%           | +72.4%        |
+| HTTP/1.1 (keep-alive) | IO       | 1.33k req/s  | 34.60 ms   | 0.94k req/s | 65.40 ms | +41.6%        | -47.1%      | 4.17k req/s  | 16.70 ms   | -68.1%          | +107.2%       |
+| HTTP/1.1 (keep-alive) | CPU      | 4.04k req/s  | 12.10 ms   | 3.73k req/s | 17.50 ms | +8.4%         | -30.9%      | 3.70k req/s  | 17.90 ms   | +9.1%           | -32.4%        |
+| HTTP/2                | IO       | 0.69k req/s  | 87.49 ms   | N/A         | N/A      | -             | -           | 4.04k req/s  | 17.11 ms   | -83.0%          | +411.3%       |
+| HTTP/2                | CPU      | 3.23k req/s  | 22.63 ms   | N/A         | N/A      | -             | -           | 3.85k req/s  | 24.38 ms   | -16.2%          | -7.2%         |
 
 > ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +YJIT +PRISM [aarch64-linux]
 > 4 worker processes; Raptor and Puma run 3 threads per worker, Falcon runs unbounded fibers per worker;
