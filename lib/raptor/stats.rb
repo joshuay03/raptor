@@ -4,12 +4,8 @@
 require "mmap-ruby"
 
 module Raptor
-  # Shared memory store for per-worker process statistics.
-  #
-  # Stats uses an anonymous mmap (MAP_ANON | MAP_SHARED) created before
-  # forking so that worker processes can write their stats and the master
-  # process can read them without any pipes or signals. Each worker is
-  # assigned a fixed-size slot in the shared region.
+  # Shared-memory store for per-worker process statistics. Each worker
+  # holds a fixed-size slot in an anonymous mmap region.
   #
   # Binary layout per slot (native byte order):
   #   pid               uint32    4 bytes
@@ -31,8 +27,7 @@ module Raptor
     # @rbs @num_workers: Integer
     # @rbs @mmap: untyped
 
-    # Allocates the shared mmap region. Must be called before forking
-    # workers so the mapping is inherited by every child process.
+    # Allocates the shared mmap region for `num_workers` slots.
     #
     # @param num_workers [Integer] number of worker slots to allocate
     # @return [void]

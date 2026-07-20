@@ -5,25 +5,10 @@ require "nio"
 require "red-black-tree"
 
 module Raptor
-  # High-performance I/O reactor for managing client connections and timeouts.
-  #
-  # Reactor uses NIO selectors for efficient I/O multiplexing and implements
-  # client timeouts using a red-black tree for O(log n) timeout management.
-  # It coordinates between ractor pools for CPU-intensive HTTP parsing and
-  # thread pools for blocking operations, and provides backlog metrics that
-  # the server uses for backpressure control to prevent overload.
-  #
-  # @example
-  #   reactor = Reactor.new(
-  #     ractor_pool,
-  #     thread_pool,
-  #     connection_options: { first_data_timeout: 30, chunk_data_timeout: 10 },
-  #     http1_options: { persistent_data_timeout: 65 }
-  #   )
-  #   reactor.run
-  #   reactor.add(id: client.object_id, socket: client)
-  #   # ... later
-  #   reactor.shutdown
+  # Multiplexes client connections and closes them when they overrun
+  # their per-phase timeouts (first data, subsequent chunks, and
+  # keep-alive idle). Feeds ready bytes to the parser pipeline and hands
+  # completed requests back to the caller-provided handlers.
   #
   class Reactor
     # A client connection node ordered by absolute expiry time so the
@@ -33,7 +18,7 @@ module Raptor
       # @rbs attr_accessor timeout_at: Float
       attr_accessor :timeout_at
 
-      # Semantic alias for the inherited `data` slot.
+      # Returns the client connection state.
       #
       # @return [Hash] the client connection state
       #
@@ -112,11 +97,8 @@ module Raptor
       @id_to_flow_control = {}
     end
 
-    # Starts the reactor's main event loop in a new thread.
-    #
-    # The event loop handles I/O events, processes timeouts, manages
-    # the registration queue, and controls server connection acceptance.
-    # It continues until the queue is closed and emptied.
+    # Starts the reactor's main event loop in a new thread. Runs until
+    # the registration queue is closed and drained.
     #
     # @return [Thread] the thread running the reactor event loop
     #
@@ -185,10 +167,8 @@ module Raptor
       read_and_queue_for_parse(socket, state)
     end
 
-    # Updates the state of an existing client connection.
-    #
-    # Called when an incomplete HTTP request needs to be
-    # re-registered with the reactor for further processing.
+    # Updates the state of an existing client connection and re-registers
+    # it for further I/O.
     #
     # @param state [Hash] updated client connection state
     # @option state [Integer] :id client identifier
@@ -220,11 +200,8 @@ module Raptor
       end
     end
 
-    # Re-registers a kept-alive connection for the next request cycle.
-    #
-    # Called after successfully writing a response when keep-alive is active.
-    # Resets the connection state and re-queues the socket in the selector
-    # using the persistent data timeout.
+    # Re-registers a kept-alive connection for the next request cycle
+    # under the persistent-data timeout.
     #
     # @param socket [TCPSocket] the kept-alive client socket
     # @param id [Integer] the unique client identifier
@@ -253,9 +230,6 @@ module Raptor
 
     # Returns the socket for a given client identifier without removing it.
     #
-    # Used by HTTP/2 connections where the socket remains registered across
-    # multiple stream requests.
-    #
     # @param id [Integer] unique client identifier
     # @return [TCPSocket, nil] the socket, if found
     #
@@ -265,8 +239,7 @@ module Raptor
     end
 
     # Returns the writer object associated with a given connection, if one
-    # was supplied when the connection was added. Used by protocol handlers
-    # that need to coordinate concurrent socket writes.
+    # was supplied when the connection was added.
     #
     # @param id [Integer] unique client identifier
     # @return [Object, nil] the writer, if found
@@ -276,9 +249,8 @@ module Raptor
       @id_to_writer[id]
     end
 
-    # Returns the flow controller associated with a given connection, if one
-    # was supplied when the connection was added. Used by HTTP/2 stream
-    # dispatchers to honour the peer's flow-control windows.
+    # Returns the flow controller associated with a given connection, if
+    # one was supplied when the connection was added.
     #
     # @param id [Integer] unique client identifier
     # @return [Object, nil] the flow controller, if found
@@ -288,10 +260,8 @@ module Raptor
       @id_to_flow_control[id]
     end
 
-    # Updates connection state for an HTTP/2 connection after frame processing.
-    #
-    # Re-registers the socket with the selector for further reads and stores
-    # the updated HPACK table and stream states.
+    # Updates connection state for an HTTP/2 connection and re-registers
+    # the socket for further reads.
     #
     # @param state [Hash] updated connection state from the ractor pool
     # @return [void]
@@ -308,9 +278,8 @@ module Raptor
       socket.close
     end
 
-    # Closes the socket for the given connection and drops all reactor state
-    # associated with it. Used to terminate HTTP/2 connections after sending
-    # a GOAWAY frame.
+    # Closes the socket for the given connection and drops all reactor
+    # state associated with it.
     #
     # @param id [Integer] unique client identifier
     # @return [void]
@@ -386,8 +355,8 @@ module Raptor
       read_and_queue_for_parse(socket, state)
     end
 
-    # Reads data from a socket and either queues it for parsing,
-    # or for selector registration.
+    # Reads data from a socket and either queues it for parsing or
+    # returns it to the selector.
     #
     # @param socket [TCPSocket] the socket to read from and queue
     # @param state [Hash] current connection state
@@ -431,7 +400,7 @@ module Raptor
       socket.close
     end
 
-    # Checks if a request is complete i.e., processable.
+    # Returns true when the request has been fully parsed.
     #
     # @param state [Hash] connection state
     # @return [Boolean] true if the request is complete

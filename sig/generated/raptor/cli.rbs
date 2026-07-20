@@ -24,11 +24,9 @@ module Raptor
 
     DEFAULT_CONFIG_PATHS: untyped
 
-    # Loads a configuration file and returns the hash it evaluates to.
-    #
-    # The file is evaluated at the top level so constants like `Raptor::*` resolve
-    # the same as in a regular Ruby script. The final expression must be a Hash
-    # of cluster options (the same keys accepted by {Raptor::Cluster#initialize}).
+    # Loads a Ruby config file and returns the options hash it evaluates
+    # to. Evaluated at the top level so `Raptor::*` constants resolve the
+    # same as in a regular script.
     #
     # @param path [String] path to a Ruby file that evaluates to a Hash
     # @return [Hash{Symbol => untyped}] cluster options
@@ -39,9 +37,6 @@ module Raptor
 
     # Returns the first existing path in {DEFAULT_CONFIG_PATHS} resolved
     # against `root`, or nil if none exist.
-    #
-    # Used to pick up a project-local config file when no `-c`/`--config`
-    # flag was supplied.
     #
     # @param root [String] directory to resolve the default paths against
     # @return [String, nil] the config path, or nil if no default file exists
@@ -55,21 +50,13 @@ module Raptor
 
     @parser: OptionParser
 
-    # Creates a new CLI instance and parses command-line arguments.
-    #
-    # Parses the provided command-line arguments and configures the server
-    # options accordingly. A rackup file can be provided as the first
-    # positional argument (defaults to config.ru).
+    # Creates a new CLI instance from `argv`. A rackup file may be given
+    # as the first positional argument; every other value is parsed as a
+    # flag.
     #
     # @param argv [Array<String>] command-line arguments to parse
     # @return [void]
     # @raise [OptionParser::ParseError] if invalid options are provided
-    #
-    # @example With rackup file
-    #   cli = CLI.new(["my_app.ru", "-w", "4"])
-    #
-    # @example With options only
-    #   cli = CLI.new(["-t", "8", "-r", "2"])
     #
     # @rbs (Array[String] argv) -> void
     def initialize: (Array[String] argv) -> void
@@ -90,12 +77,9 @@ module Raptor
     # @rbs () -> void
     def run_stats: () -> void
 
-    # Scans argv for a `-c`/`--config` flag and returns the configured path.
-    #
-    # The pre-scan runs before the main OptionParser pass so the config file
-    # can be applied as a base layer that CLI args then override. All four
-    # OptionParser-accepted forms (`-c PATH`, `-cPATH`, `--config PATH`,
-    # `--config=PATH`) are recognized.
+    # Returns the path from a `-c`/`--config` flag in `argv`, recognising
+    # all four OptionParser-accepted forms (`-c PATH`, `-cPATH`,
+    # `--config PATH`, `--config=PATH`).
     #
     # @param argv [Array<String>] command-line arguments to scan
     # @return [String, nil] the config path, or nil if no flag was supplied

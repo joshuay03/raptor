@@ -103,27 +103,41 @@ module Raptor
     # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
     def self.decode_chunked: (String buffer, ?Integer? max_size) -> [ String, Symbol ]
 
-    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
+    # Advances an HTTP/1.x request parse from the state hash's buffered
+    # bytes. A complete well-formed request returns with `:complete` set
+    # plus populated `:env` and `:body`; malformed or oversized input flips
+    # `:malformed` or `:too_large`; incomplete input returns the state
+    # so the reactor can wait for more.
+    #
+    # @param data [Hash] the current parse state
+    # @param env_template [Hash] the Rack env template to seed the request with
+    # @param max_body_size [Integer, nil] byte limit for the request body, or nil for no limit
+    # @return [Hash] the updated parse state, made shareable for cross-Ractor return
+    #
+    # @rbs (Hash[Symbol, untyped] data, Hash[String, untyped] env_template, Integer? max_body_size) -> Hash[Symbol, untyped]
+    def self.parse: (Hash[Symbol, untyped] data, Hash[String, untyped] env_template, Integer? max_body_size) -> Hash[Symbol, untyped]
 
-    @server_port: Integer
-
-    @server_port_string: String
-
-    @write_timeout: Integer
-
-    @max_body_size: Integer?
-
-    @body_spool_threshold: Integer?
-
-    @max_keepalive_requests: Integer
-
-    @access_log_io: IO?
-
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    @env_template: Hash[String, untyped]
 
     @running: AtomicBoolean
 
-    @env_template: Hash[String, untyped]
+    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+
+    @access_log_io: IO?
+
+    @max_keepalive_requests: Integer
+
+    @body_spool_threshold: Integer?
+
+    @max_body_size: Integer?
+
+    @write_timeout: Integer
+
+    @server_port_string: String
+
+    @server_port: Integer
+
+    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
 
     # Creates a new Http1 handler.
     #
@@ -141,6 +155,14 @@ module Raptor
     #
     # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
     def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+
+    # Instance-level wrapper around {Http.parser_worker} that binds this
+    # handler's env template and body-size limit into the worker proc.
+    #
+    # @return [Proc]
+    #
+    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+    def parser_worker: () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
 
     # Instance-level wrapper around {Http.socket_write} that applies the
     # configured `write_timeout`.
@@ -187,21 +209,8 @@ module Raptor
     # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
     def eager_accept: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
 
-    # Returns a Proc for HTTP parsing work in Ractor context.
-    #
-    # The returned Proc processes raw socket data through the appropriate
-    # HTTP parser and returns either a complete request state (ready for
-    # app processing) or incomplete request state (needs more data).
-    #
-    # @return [Proc] a Ractor-safe proc that accepts a state hash and returns an updated state hash
-    #
-    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
-    def http_parser_worker: () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
-
-    # Handles a parsed HTTP request by either continuing parsing or dispatching to the Rack app.
-    #
-    # For incomplete requests, updates reactor state and re-registers for more I/O.
-    # For complete requests, removes from reactor, builds Rack env, and dispatches to thread pool.
+    # Dispatches a parsed HTTP request to the thread pool when complete,
+    # or hands it back to the reactor for more I/O when incomplete.
     #
     # @param parsed_request [Hash] the parsed request state from the ractor pool
     # @param reactor [Reactor] the reactor managing the client connection
@@ -213,6 +222,42 @@ module Raptor
 
     private
 
+    # Reads pending bytes off `socket` into the thread-local read buffer,
+    # draining any additional SSL-buffered bytes so `pending` is empty on
+    # return. Raises `IO::WaitReadable`, `EOFError`, or `IOError` like the
+    # underlying `read_nonblock` does.
+    #
+    # @param socket [TCPSocket] the socket to read from
+    # @return [String] the thread-local buffer, freshly populated
+    #
+    # @rbs (TCPSocket socket) -> String
+    def read_into_thread_buffer: (TCPSocket socket) -> String
+
+    # Runs a fresh HTTP/1.x parse against `buffer`, returning
+    # `[env, parse_data, nread, parser]`. Raises `HttpParserError` on
+    # malformed input.
+    #
+    # @param buffer [String] the raw request bytes
+    # @return [Array(Hash, Hash, Integer, HttpParser)]
+    #
+    # @rbs (String buffer) -> [Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser]
+    def parse_next_request: (String buffer) -> [ Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser ]
+
+    # Resolves the request body for a finished parse. Returns the body
+    # `String` (or `nil` when the request has no body), or one of
+    # `:incomplete`, `:too_large`, `:malformed` when the caller must
+    # fall back or reject.
+    #
+    # @param buffer [String] the raw request bytes
+    # @param env [Hash] the Rack environment being built
+    # @param parser [HttpParser] the parser holding the finished parse state
+    # @param nread [Integer] the byte offset where the body begins in `buffer`
+    # @param decode_chunked [Boolean] whether to decode chunked bodies inline; when false chunked bodies signal `:incomplete`
+    # @return [String, nil, Symbol]
+    #
+    # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
+    def extract_body: (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
+
     # Returns true if the request expects a 100 Continue response per
     # RFC 7231 section 5.1.1.
     #
@@ -222,11 +267,9 @@ module Raptor
     # @rbs (Hash[String, untyped] env) -> bool
     def expects_100_continue?: (Hash[String, untyped] env) -> bool
 
-    # Sends an HTTP 100 Continue response when an HTTP/1.1 client requested
-    # `Expect: 100-continue` and the request body has not yet been received.
-    #
-    # Returns the state hash with `:continued` set when the response has been
-    # written. A write failure is silently ignored.
+    # Sends an HTTP 100 Continue response when the client requested
+    # `Expect: 100-continue`, returning the state hash with `:continued`
+    # set once written. A write failure is silently ignored.
     #
     # @param state [Hash] the partially-parsed connection state
     # @param reactor [Reactor] the reactor holding the connection's socket
@@ -253,9 +296,9 @@ module Raptor
     # @rbs (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
     def process_client: (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
 
-    # Builds the Rack env, calls the application, and writes the response.
-    # Returns true if the connection should be kept alive for further
-    # requests, false otherwise (including hijack and error cases).
+    # Processes a single request. Builds the Rack env, calls the app,
+    # writes the response, and returns whether the connection stays open
+    # for another request.
     #
     # @param socket [TCPSocket] the client socket
     # @param env [Hash] partial env hash from the HTTP parser
@@ -269,11 +312,26 @@ module Raptor
     # @rbs (TCPSocket socket, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Integer request_count, String remote_addr, String url_scheme) -> bool
     def process_request: (TCPSocket socket, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Integer request_count, String remote_addr, String url_scheme) -> bool
 
-    # Attempts to read and process subsequent requests inline on a
-    # kept-alive connection. Blocks briefly for the next request to avoid
-    # a full reactor round-trip. Falls back to the reactor when no data
-    # arrives within the timeout, when the thread pool has queued work
-    # (deprioritization), or when the request is incomplete.
+    # Handles an exception raised while processing a request. Fires the
+    # `rack.response_finished` callbacks with the error, writes a 500
+    # response when no bytes have gone to the socket yet, and routes the
+    # exception through the configured `on_error` handler (or re-raises).
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param rack_env [Hash, nil] the Rack environment, if it was built
+    # @param status [Integer, nil] the status returned by the app, if any
+    # @param headers [Hash, nil] the headers returned by the app, if any
+    # @param error [Exception] the exception raised
+    # @param response_started [Boolean] whether any response bytes have been written
+    # @param hijacked [Boolean] whether the app took over the socket
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Hash[String, untyped]? rack_env, Integer? status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
+    def handle_app_error: (TCPSocket socket, Hash[String, untyped]? rack_env, Integer? status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
+
+    # Reads and processes subsequent requests inline on a kept-alive
+    # connection. Falls back to the reactor when no data arrives within the
+    # timeout, the thread pool is saturated, or the request is incomplete.
     #
     # @param socket [TCPSocket] the client socket
     # @param id [Integer] unique client identifier
@@ -288,11 +346,7 @@ module Raptor
     def eager_keepalive: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
 
     # Re-registers a socket with the reactor for further processing when
-    # an incomplete request is received during eager accept or eager keep-alive.
-    #
-    # The persisted flag selects between persistent_data_timeout (for
-    # kept-alive connections awaiting the next request) and chunk_data_timeout
-    # (for fresh connections awaiting the rest of the first request).
+    # an incomplete request is received on the fast path.
     #
     # @param socket [TCPSocket] the client socket
     # @param id [Integer] unique client identifier
@@ -309,8 +363,7 @@ module Raptor
     # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
     def fallback_to_reactor: (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
 
-    # Writes a 413 response and closes the socket. Used when a request body
-    # exceeds the configured maximum size.
+    # Writes a 413 response and closes the socket.
     #
     # @param socket [TCPSocket] the client socket
     # @return [void]
@@ -318,8 +371,7 @@ module Raptor
     # @rbs (TCPSocket socket) -> void
     def reject_oversized: (TCPSocket socket) -> void
 
-    # Writes a 400 response and closes the socket. Used when the HTTP parser
-    # rejects the request line or headers.
+    # Writes a 400 response and closes the socket.
     #
     # @param socket [TCPSocket] the client socket
     # @return [void]
@@ -328,9 +380,6 @@ module Raptor
     def reject_malformed: (TCPSocket socket) -> void
 
     # Builds a Rack environment hash from parsed HTTP request data.
-    #
-    # Populates all required Rack env keys including rack.* keys, REMOTE_ADDR,
-    # SERVER_NAME, SERVER_PORT, and hijack support.
     #
     # @param env [Hash] partial env hash from the HTTP parser
     # @param parse_data [Hash] metadata from the parsing pass, including content_length
@@ -363,11 +412,8 @@ module Raptor
     # @rbs (Hash[String, untyped] env) -> bool
     def forwarded_https?: (Hash[String, untyped] env) -> bool
 
-    # Determines whether the connection should be kept alive after the response.
-    #
-    # Returns false if the request limit has been reached. For HTTP/1.1, keep-alive
-    # is the default unless the client sent Connection: close. For HTTP/1.0,
-    # keep-alive must be explicitly requested.
+    # Returns true when the connection should be kept alive after the
+    # current response.
     #
     # @param env [Hash] the Rack environment
     # @param request_count [Integer] number of requests handled on this connection
@@ -376,9 +422,8 @@ module Raptor
     # @rbs (Hash[String, untyped] env, Integer request_count) -> bool
     def keep_alive?: (Hash[String, untyped] env, Integer request_count) -> bool
 
-    # Sends an HTTP 103 Early Hints response to the client.
-    #
-    # Skips any hints with illegal header keys or values. No-ops if hints is empty.
+    # Sends an HTTP 103 Early Hints response, skipping any entries with
+    # illegal header keys or values. No-ops when `hints` is empty.
     #
     # @param socket [TCPSocket] the client socket to write to
     # @param hints [Hash] header name to value (or array of values) pairs
@@ -388,9 +433,6 @@ module Raptor
     def send_early_hints: (TCPSocket socket, Hash[String, String | Array[String]] hints) -> void
 
     # Writes a complete HTTP response to the socket.
-    #
-    # Handles header normalization, validation, connection management, TCP corking,
-    # and dispatches to the appropriate body write strategy.
     #
     # @param socket [TCPSocket] the client socket to write to
     # @param env [Hash] the Rack environment
@@ -413,10 +455,8 @@ module Raptor
     # @rbs (Integer status) -> void
     def validate_status: (Integer status) -> void
 
-    # Normalizes response headers by downcasing keys and filtering invalid entries.
-    #
-    # Removes headers with illegal keys, rack.* prefixed headers, and "status" headers.
-    # Raises if headers is not a Hash or contains non-String keys.
+    # Returns a normalised copy of the response headers with lowercased
+    # keys and illegal/`rack.*`/`status` entries dropped.
     #
     # @param headers [Hash] raw headers from the Rack application
     # @return [Hash] normalized headers with lowercased string keys
@@ -425,10 +465,8 @@ module Raptor
     # @rbs (Hash[String, String | Array[String]] headers) -> Hash[String, String | Array[String]]
     def normalize_headers: (Hash[String, String | Array[String]] headers) -> Hash[String, String | Array[String]]
 
-    # Validates that headers are appropriate for the given status code.
-    #
-    # Raises if content-type or content-length are present for status codes
-    # that must not have an entity body (204, 304, 1xx).
+    # Raises when the headers include entries forbidden for the response
+    # status (`content-type` or `content-length` on a 204, 304, or 1xx).
     #
     # @param headers [Hash] normalized response headers
     # @param status [Integer] HTTP status code
@@ -438,8 +476,7 @@ module Raptor
     # @rbs (Hash[String, String | Array[String]] headers, Integer status) -> void
     def validate_headers: (Hash[String, String | Array[String]] headers, Integer status) -> void
 
-    # Returns the HTTP status line for `status`. Callers must not retain the
-    # returned string across further calls on the same thread.
+    # Returns the HTTP status line for `status`.
     #
     # @param http_version [String] "HTTP/1.1" or "HTTP/1.0"
     # @param status [Integer] HTTP status code
@@ -448,10 +485,8 @@ module Raptor
     # @rbs (String http_version, Integer status) -> String
     def build_status_line: (String http_version, Integer status) -> String
 
-    # Writes response headers and delegates body writing to the hijack callback.
-    #
-    # Uncorks the socket before calling the hijack so the app has full control
-    # of the raw connection.
+    # Writes the response headers, uncorks the socket, and hands the raw
+    # socket to the hijack callback.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
@@ -462,11 +497,9 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, ^(TCPSocket) -> void response_hijack) -> void
     def write_hijacked_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, ^(TCPSocket) -> void response_hijack) -> void
 
-    # Writes a response with no entity body.
-    #
-    # Used for HEAD requests and status codes that must not carry a body
-    # (204, 304, 1xx). Adds a zero content-length for non-no-body statuses
-    # that did not supply one.
+    # Writes a response with no entity body, adding a zero
+    # `Content-Length` when the status may carry a body but none was
+    # supplied.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
@@ -477,12 +510,9 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, Integer status) -> void
     def write_no_body_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, Integer status) -> void
 
-    # Writes a complete response with a body.
-    #
-    # Selects the appropriate write strategy based on body type: callable (streaming),
-    # file (zero-copy), array, or generic enumerable. Automatically determines
-    # content-length where possible, falling back to chunked transfer encoding
-    # for HTTP/1.1 when the length cannot be determined upfront.
+    # Writes a complete response with a body. Emits a `Content-Length`
+    # when the total size is known upfront, otherwise chunked encoding on
+    # HTTP/1.1.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
@@ -494,9 +524,8 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
     def write_full_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
 
-    # Calculates content length from an array or file body without consuming it.
-    #
-    # Returns nil for enumerable bodies whose length cannot be determined upfront.
+    # Returns the byte length of the body when it can be determined
+    # upfront (array or file), otherwise nil.
     #
     # @param body [Object] the response body
     # @return [Integer, nil] the byte length, or nil if it cannot be determined
@@ -505,9 +534,6 @@ module Raptor
     def calculate_content_length: (untyped body) -> Integer?
 
     # Writes a file body to the socket.
-    #
-    # Uses zero-copy IO.copy_stream for large files, direct buffering for small ones,
-    # and chunked encoding when required.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] headers already serialized, to be written before the body
@@ -520,8 +546,6 @@ module Raptor
     def write_file_body: (TCPSocket socket, String response, String path, Integer? content_length, bool use_chunked) -> void
 
     # Writes an array body to the socket.
-    #
-    # Dispatches to the single-chunk or multi-chunk path based on array length.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] headers already serialized, to be written before the body
@@ -584,10 +608,8 @@ module Raptor
     # @rbs (String value) -> bool
     def illegal_header_value?: (String value) -> bool
 
-    # Formats a headers hash into an HTTP header string.
-    #
-    # Skips entries with illegal keys or values. Array values are written
-    # as separate header lines.
+    # Appends normalised header lines to `result`. Skips entries with
+    # illegal keys or values. Array values are written as separate lines.
     #
     # @param headers [Hash] normalized response headers
     # @return [String] formatted header lines, each ending with CRLF
@@ -595,9 +617,9 @@ module Raptor
     # @rbs (String result, Hash[String, String | Array[String]] headers) -> void
     def format_headers: (String result, Hash[String, String | Array[String]] headers) -> void
 
-    # Appends one or more `name: value` header lines to `result`. Newline-
-    # separated values are emitted as separate lines; empty values and values
-    # with illegal characters are skipped silently.
+    # Appends one or more `name: value` header lines to `result`, splitting
+    # newline-joined values across separate lines and skipping empty or
+    # illegal values.
     #
     # @param result [String] the buffer to append to
     # @param name [String] the header name
@@ -607,10 +629,8 @@ module Raptor
     # @rbs (String result, String name, untyped value) -> void
     def append_header_value: (String result, String name, untyped value) -> void
 
-    # Calls all rack.response_finished callbacks registered in the environment.
-    #
-    # Callbacks are called in reverse registration order. Individual callback
-    # failures are rescued so all callbacks are always attempted.
+    # Calls every `rack.response_finished` callback in reverse
+    # registration order, rescuing any that raise.
     #
     # @param env [Hash, nil] the Rack environment
     # @param status [Integer, nil] the response status code
@@ -644,10 +664,8 @@ module Raptor
     # @rbs (Hash[String, String | Array[String]] headers, untyped body) -> String
     def response_size: (Hash[String, String | Array[String]] headers, untyped body) -> String
 
-    # Enables TCP_CORK on the socket to batch outgoing packets into fewer segments.
-    #
-    # Only applies to TCP sockets. No-op on non-TCP sockets.
-    # Available on Linux only; this method is not defined on other platforms.
+    # Enables `TCP_CORK` on the socket to batch outgoing packets into
+    # fewer segments. Linux-only; a no-op elsewhere.
     #
     # @param socket [TCPSocket] the socket to cork
     # @return [void]
@@ -655,10 +673,8 @@ module Raptor
     # @rbs (TCPSocket socket) -> void
     def cork_socket: (TCPSocket socket) -> void
 
-    # Disables TCP_CORK on the socket, flushing any buffered packets.
-    #
-    # Only applies to TCP sockets. No-op on non-TCP sockets.
-    # Available on Linux only; this method is not defined on other platforms.
+    # Disables `TCP_CORK` on the socket, flushing any buffered packets.
+    # Linux-only; a no-op elsewhere.
     #
     # @param socket [TCPSocket] the socket to uncork
     # @return [void]

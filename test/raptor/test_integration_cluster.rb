@@ -40,7 +40,7 @@ module Raptor
 
         assert_equal 200, response.code.to_i
         assert_equal "text/plain", response["content-type"]
-        assert response.body.nil? || response.body.empty?
+        assert !response.body || response.body.empty?
       end
     end
 
@@ -268,7 +268,7 @@ module Raptor
 
         assert_equal 204, response.code.to_i
         assert_nil response["content-type"]
-        assert response.body.nil? || response.body.empty?
+        assert !response.body || response.body.empty?
       end
     end
 
@@ -287,7 +287,7 @@ module Raptor
 
         assert_equal 304, response.code.to_i
         assert_nil response["content-type"]
-        assert response.body.nil? || response.body.empty?
+        assert !response.body || response.body.empty?
       end
     end
 
@@ -900,7 +900,7 @@ module Raptor
         assert_match(/\A\d+\z/, File.read(pid_file_path))
       end
 
-      assert !File.exist?(pid_file_path)
+      refute File.exist?(pid_file_path)
     ensure
       File.delete(pid_file_path) rescue nil
     end
@@ -1019,7 +1019,8 @@ module Raptor
       during = []
       during_thread = Thread.new do
         until stop
-          during << (Net::HTTP.get_response(URI("http://127.0.0.1:#{server_port}/")) rescue nil)
+          response = Net::HTTP.get_response(URI("http://127.0.0.1:#{server_port}/")) rescue nil
+          during << response
           sleep 0.01
         end
       end
@@ -1070,7 +1071,7 @@ module Raptor
       initial_worker_pid = wait_for_booted_worker_pid(stats_path)
 
       response = raw_unix_request(sock_path, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
-      assert_match %r{\AHTTP/1\.1 200 OK}, response
+      assert_match(%r{\AHTTP/1\.1 200 OK}, response)
 
       Process.kill("USR2", cluster_pid)
 
@@ -1080,7 +1081,7 @@ module Raptor
       assert_equal cluster_pid, JSON.parse(File.read(stats_path), symbolize_names: true)[:master_pid]
 
       response = raw_unix_request(sock_path, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
-      assert_match %r{\AHTTP/1\.1 200 OK}, response
+      assert_match(%r{\AHTTP/1\.1 200 OK}, response)
     ensure
       Process.kill("TERM", cluster_pid) rescue nil
       Process.wait(cluster_pid) rescue nil
@@ -1264,7 +1265,7 @@ module Raptor
         Timeout.timeout(5) { sleep 0.05 until File.exist?(log_path) && !File.read(log_path).empty? }
       end
 
-      assert_match(%r(^127\.0\.0\.1 - - \[[^\]]+\] "GET / HTTP/1\.1" 200 \d+$), File.read(log_path))
+      assert_match(%r{^127\.0\.0\.1 - - \[[^\]]+\] "GET / HTTP/1\.1" 200 \d+$}, File.read(log_path))
     ensure
       File.delete(log_path) rescue nil
     end

@@ -1,26 +1,10 @@
 # Generated from lib/raptor/server.rb with RBS::Inline
 
 module Raptor
-  # Accepts client connections and dispatches them into the request
-  # pipeline. Skips acceptance when the reactor backlog is high so an
-  # overloaded process leaves connections for peers that can absorb
-  # them (via shared `SO_REUSEPORT` listeners).
-  #
-  # Supports TCP, Unix, and SSL listeners. SSL handshakes are offloaded
-  # to the thread pool so a slow client can't pin the server thread.
-  # For HTTP/1.1 the first request is parsed inline and dispatched
-  # straight to the thread pool; HTTP/2 (negotiated via ALPN) is
-  # registered with the reactor for frame processing.
-  #
-  # @example
-  #   binder = Binder.new(["tcp://0.0.0.0:3000"])
-  #   reactor = Reactor.new(ractor_pool, thread_pool, connection_options: {}, http1_options: {})
-  #   http1 = Http1.new(app, 3000)
-  #   http2 = Http2.new(app, 3000)
-  #   server = Server.new(binder, reactor, thread_pool, http1, http2, connection_options: { first_data_timeout: 30 }, listeners: binder.listeners)
-  #   server.run
-  #   # ... later
-  #   server.shutdown
+  # Accepts client connections on TCP, Unix, and SSL listeners and
+  # dispatches them into the request pipeline. Backs off from accepting
+  # when the reactor backlog is high so an overloaded process leaves
+  # connections for peers to absorb.
   class Server
     HTTP_SCHEME: ::String
 
@@ -72,11 +56,6 @@ module Raptor
 
     # Starts the server's main accept loop in a new thread.
     #
-    # The accept loop polls listening sockets for ready connections and accepts
-    # them when the reactor backlog is under the backpressure threshold. On
-    # Linux with BPF-directed dispatch active, a companion thread publishes
-    # this worker's backlog to the BPF map.
-    #
     # @return [Thread] the thread running the accept loop
     #
     # @rbs () -> Thread
@@ -117,13 +96,8 @@ module Raptor
     # @rbs () -> void
     def drain_accept_queue: () -> void
 
-    # Accepts a connection from the given listener and dispatches it.
-    #
-    # For SSL listeners the TLS handshake is offloaded to the thread pool so
-    # a slow client cannot block the server thread. For SSL connections with
-    # h2 negotiated via ALPN, the server sends initial SETTINGS and adds the
-    # connection to the reactor as an HTTP/2 connection. All other connections
-    # follow the HTTP/1.1 path.
+    # Accepts a connection from the given listener and dispatches it into
+    # the HTTP/1.1 or SSL/HTTP-2 pipeline.
     #
     # @param listener [TCPServer, UNIXServer, Binder::SslListener] the ready listener
     # @return [Boolean] true if a connection was accepted, false if the listener had nothing to dispatch
@@ -131,9 +105,9 @@ module Raptor
     # @rbs (TCPServer | UNIXServer | Binder::SslListener listener) -> bool
     def accept_connection: (TCPServer | UNIXServer | Binder::SslListener listener) -> bool
 
-    # Performs the TLS handshake for an accepted SSL connection and dispatches
-    # it through the HTTP/2 or HTTP/1.1 path. The handshake is bounded by
-    # `:first_data_timeout` so a slow client cannot pin a worker thread.
+    # Performs the TLS handshake for an accepted SSL connection, bounded
+    # by `:first_data_timeout`, and dispatches it through the HTTP/2 or
+    # HTTP/1.1 path.
     #
     # @param listener [Binder::SslListener] the SSL listener that accepted the connection
     # @param tcp_client [TCPSocket] the accepted TCP socket

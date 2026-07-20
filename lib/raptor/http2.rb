@@ -12,16 +12,9 @@ require_relative "raptor_http2"
 module Raptor
   # Handles HTTP/2 request processing and Rack application integration.
   #
-  # Http2 manages the HTTP/2 protocol lifecycle including frame processing,
-  # HPACK header compression, stream management, and response writing.
-  # It integrates with the same reactor, ractor pool, and thread pool
-  # pipeline used by HTTP/1.1 connections.
-  #
   class Http2
-    # Lock-free per-connection frame writer.
-    #
-    # Serializes concurrent socket writes from multiple stream workers
-    # without blocking any of them.
+    # Serialises concurrent frame writes on a single HTTP/2 connection so
+    # exactly one thread is writing at any moment.
     #
     class Writer
       IDLE = :idle
@@ -49,7 +42,7 @@ module Raptor
       #
       # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String] frames) -> void
       def write_frames(socket, frames)
-        return if frames.nil? || frames.empty?
+        return if !frames || frames.empty?
 
         claimed = false
         @state.swap do |current|
@@ -80,14 +73,8 @@ module Raptor
       end
     end
 
-    # Per-connection outbound flow-control accounting.
-    #
     # Tracks the peer's connection-level and per-stream receive windows so
-    # outbound DATA frames respect RFC 7540 section 5.2. Threads dispatching stream
-    # responses call `acquire` to reserve send capacity; threads applying
-    # inbound WINDOW_UPDATE or SETTINGS frames call the mutating methods to
-    # replenish it. The connection window and per-stream windows live in
-    # separate `Atom`s so the common fast path skips per-stream tracking.
+    # outbound `DATA` frames respect RFC 7540 section 5.2.
     #
     class FlowControl
       ACQUIRE_POLL_INTERVAL = 0.001
@@ -97,6 +84,8 @@ module Raptor
       # @rbs @initial_stream_window: Atom
 
       # Creates a new FlowControl with the spec-default windows.
+      #
+      # @return [void]
       #
       # @rbs () -> void
       def initialize
@@ -108,12 +97,6 @@ module Raptor
       # Reserves outbound capacity on the given stream, polling until at
       # least one byte is available on both the connection and stream
       # windows. The returned size is capped at `MAX_FRAME_SIZE`.
-      #
-      # When `end_stream` is true, `max_bytes` fits within the peer's
-      # initial stream window, and no per-stream override has been
-      # recorded, only the connection window is consulted. The stream
-      # closes on this frame, so its remaining send window will not be
-      # consulted again and need not be tracked.
       #
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @param max_bytes [Integer] the largest size the caller would like to send
@@ -127,11 +110,7 @@ module Raptor
 
         if end_stream && capped <= initial && !@stream_windows.value.key?(stream_id)
           loop do
-            granted = 0
-            @connection_window.swap do |window|
-              granted = window > capped ? capped : window
-              granted > 0 ? window - granted : window
-            end
+            granted = reserve_connection(capped)
             return granted if granted > 0
 
             sleep ACQUIRE_POLL_INTERVAL
@@ -141,14 +120,7 @@ module Raptor
         loop do
           stream_window = @stream_windows.value[stream_id] || initial
           capped_full = capped < stream_window ? capped : stream_window
-
-          granted = 0
-          if capped_full > 0
-            @connection_window.swap do |window|
-              granted = window > capped_full ? capped_full : window
-              granted > 0 ? window - granted : window
-            end
-          end
+          granted = capped_full > 0 ? reserve_connection(capped_full) : 0
 
           if granted > 0
             @stream_windows.swap do |windows|
@@ -162,8 +134,7 @@ module Raptor
         end
       end
 
-      # Increments the connection-level send window. Called when the peer
-      # sends a WINDOW_UPDATE on stream 0.
+      # Increments the connection-level send window by `increment` bytes.
       #
       # @param increment [Integer] the byte count to add
       # @return [void]
@@ -173,8 +144,7 @@ module Raptor
         @connection_window.swap { |window| window + increment }
       end
 
-      # Increments the per-stream send window. Called when the peer sends
-      # a WINDOW_UPDATE on a specific stream.
+      # Increments the send window for the given stream by `increment` bytes.
       #
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @param increment [Integer] the byte count to add
@@ -207,9 +177,7 @@ module Raptor
         end
       end
 
-      # Discards any per-stream tracking for the given stream. Called
-      # after a stream closes so `@stream_windows` does not grow without
-      # bound across the lifetime of a connection.
+      # Discards any per-stream tracking for the given stream.
       #
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @return [void]
@@ -225,6 +193,25 @@ module Raptor
           pruned.delete(stream_id)
           pruned
         end
+      end
+
+      private
+
+      # Reserves up to `capped` bytes from the connection window,
+      # returning the number of bytes granted (0 when the window is
+      # exhausted).
+      #
+      # @param capped [Integer] the largest reservation the caller will accept
+      # @return [Integer]
+      #
+      # @rbs (Integer capped) -> Integer
+      def reserve_connection(capped)
+        granted = 0
+        @connection_window.swap do |window|
+          granted = window > capped ? capped : window
+          granted > 0 ? window - granted : window
+        end
+        granted
       end
     end
 
@@ -287,9 +274,10 @@ module Raptor
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @initial_settings_frame: String
 
-    # The initial server SETTINGS frame sent on every new HTTP/2 connection.
+    # Returns the initial server SETTINGS frame to send on every new
+    # HTTP/2 connection.
     #
-    # @return [String] the encoded SETTINGS frame
+    # @return [String]
     attr_reader :initial_settings_frame
 
     # Creates a new Http2 handler.
@@ -329,11 +317,9 @@ module Raptor
       Writer.new(write_timeout: @write_timeout)
     end
 
-    # Processes HTTP/2 frames from the connection buffer.
-    #
-    # Parses frames, handles HPACK decoding, tracks stream state, and returns
+    # Advances HTTP/2 frame parsing from the connection buffer, returning
     # updated connection state along with any outgoing protocol frames and
-    # completed stream requests. Ractor-safe.
+    # completed stream requests.
     #
     # @param data [Hash] the connection state including buffer and HPACK table
     # @return [Hash] updated state with outgoing_frames and completed_requests
@@ -414,7 +400,7 @@ module Raptor
           end
 
         when :continuation
-          if pending_headers.nil? || frame[:stream_id] != pending_headers[:stream_id]
+          if !pending_headers || frame[:stream_id] != pending_headers[:stream_id]
             goaway_error = ERROR_PROTOCOL_ERROR
             break
           end
@@ -566,12 +552,10 @@ module Raptor
     end
     private_class_method :build_result
 
-    # Handles a parsed HTTP/2 request from the ractor pool.
-    #
-    # Writes outgoing protocol frames to the socket, updates reactor state,
-    # and dispatches completed stream requests to the thread pool. Eagerly
-    # consumes subsequent frame batches that are already buffered, skipping
-    # the reactor and ractor pool hops while the connection is hot.
+    # Handles a parsed HTTP/2 result. Writes outgoing frames, dispatches
+    # completed stream requests to the thread pool, and eagerly consumes
+    # further buffered frame batches before returning control to the
+    # reactor.
     #
     # @param result [Hash] the parsed result from the ractor pool
     # @param reactor [Reactor] the reactor managing the connection
@@ -706,10 +690,8 @@ module Raptor
       flow_control.discard_stream(stream_id) if flow_control
     end
 
-    # Writes a Rack response as HTTP/2 frames to the socket.
-    #
-    # DATA frames are partitioned through `flow_control` so each write fits
-    # within the peer's per-stream and connection windows.
+    # Writes a Rack response as HTTP/2 frames to the socket, partitioning
+    # DATA frames through `flow_control` to fit within the peer's windows.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
     # @param writer [Writer] lock-free frame writer for the connection
@@ -804,9 +786,6 @@ module Raptor
     end
 
     # Builds a Rack environment hash from HTTP/2 headers and body.
-    #
-    # Translates HTTP/2 pseudo-headers into Rack-compatible environment keys
-    # and populates all required Rack env entries.
     #
     # @param headers [Array<Array(String, String)>] HTTP/2 header pairs
     # @param body [String] the request body

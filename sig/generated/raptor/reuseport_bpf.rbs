@@ -14,8 +14,8 @@ module Raptor
 
     BPF_OBJECT_PATH: untyped
 
-    # Whether the preconditions for BPF-directed reuseport are met on this
-    # platform. Does not imply that the kernel will accept the program.
+    # Returns true when the preconditions for BPF-directed reuseport are
+    # met on this platform.
     #
     # @return [Boolean]
     #
@@ -44,6 +44,15 @@ module Raptor
     #
     # @rbs (Array[String] bind_uris, Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
     def self.create_worker_listeners: (Array[String] bind_uris, Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
+
+    # Prepares this worker's load-reporting slot so subsequent
+    # {update_load} calls can publish its backlog.
+    #
+    # @param worker_index [Integer] slot index for this worker
+    # @return [void]
+    #
+    # @rbs (Integer worker_index) -> void
+    def self.enable_load_reporting: (Integer worker_index) -> void
 
     # Publishes this worker's current backlog to the BPF map.
     #

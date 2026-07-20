@@ -155,6 +155,69 @@ module Raptor
       [decoded, :incomplete]
     end
 
+    # Advances an HTTP/1.x request parse from the state hash's buffered
+    # bytes. A complete well-formed request returns with `:complete` set
+    # plus populated `:env` and `:body`; malformed or oversized input flips
+    # `:malformed` or `:too_large`; incomplete input returns the state
+    # so the reactor can wait for more.
+    #
+    # @param data [Hash] the current parse state
+    # @param env_template [Hash] the Rack env template to seed the request with
+    # @param max_body_size [Integer, nil] byte limit for the request body, or nil for no limit
+    # @return [Hash] the updated parse state, made shareable for cross-Ractor return
+    #
+    # @rbs (Hash[Symbol, untyped] data, Hash[String, untyped] env_template, Integer? max_body_size) -> Hash[Symbol, untyped]
+    def self.parse(data, env_template, max_body_size)
+      parser = Raptor::HttpParser.new
+      env = env_template.dup
+      nread = begin
+        parser.execute(env, data[:buffer], 0)
+      rescue Raptor::HttpParserError
+        return Ractor.make_shareable(data.merge(complete: true, malformed: true))
+      end
+      parse_data = if data[:parse_data]
+        data[:parse_data].dup
+      else
+        { parse_count: 0, content_length: parser.content_length }
+      end
+      parse_data[:parse_count] += 1
+
+      message = if parser.finished?
+        if invalid_host?(env) || request_smuggling?(env)
+          data.merge(env: env, body: nil, parse_data: parse_data, complete: true, malformed: true)
+        elsif parser.has_body?
+          body_buffer = data[:buffer].byteslice(nread..-1) || ""
+
+          if max_body_size && parser.content_length > max_body_size
+            data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
+          elsif parser.chunked?
+            decoded_body, chunked_state = decode_chunked(body_buffer, max_body_size)
+
+            case chunked_state
+            when :complete
+              env.delete(HTTP_TRANSFER_ENCODING)
+              data.merge(env: env, body: decoded_body, parse_data: parse_data, complete: true)
+            when :too_large
+              data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
+            when :malformed
+              data.merge(env: env, body: nil, parse_data: parse_data, complete: true, malformed: true)
+            else
+              data.merge(env: env, parse_data: parse_data)
+            end
+          elsif parser.content_length > body_buffer.bytesize
+            data.merge(env: env, parse_data: parse_data)
+          else
+            data.merge(env: env, body: body_buffer, parse_data: parse_data, complete: true)
+          end
+        else
+          data.merge(env: env, body: nil, parse_data: parse_data, complete: true)
+        end
+      else
+        data.merge(env: env, parse_data: parse_data)
+      end
+      Ractor.make_shareable(message)
+    end
+
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port: Integer
     # @rbs @server_port_string: String
@@ -200,6 +263,16 @@ module Raptor
         Rack::QUERY_STRING => "",
         Http::SERVER_SOFTWARE => Http::SERVER_SOFTWARE_VALUE
       }.freeze
+    end
+
+    # Instance-level wrapper around {Http.parser_worker} that binds this
+    # handler's env template and body-size limit into the worker proc.
+    #
+    # @return [Proc]
+    #
+    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+    def parser_worker
+      Http.parser_worker(@env_template, @max_body_size)
     end
 
     # Instance-level wrapper around {Http.socket_write} that applies the
@@ -252,72 +325,45 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
     def eager_accept(socket, id, reactor, thread_pool, remote_addr, url_scheme)
-      buffer = (Thread.current[:raptor_read_buffer] ||= String.new(capacity: READ_BUFFER_SIZE))
-
       begin
-        socket.read_nonblock(READ_BUFFER_SIZE, buffer)
+        buffer = read_into_thread_buffer(socket)
       rescue IO::WaitReadable
-        reactor.add(
-          id: id,
-          socket: socket,
-          remote_addr: remote_addr,
-          url_scheme: url_scheme
-        )
+        reactor.add(id: id, socket: socket, remote_addr: remote_addr, url_scheme: url_scheme)
         return
       rescue EOFError, IOError
         socket.close rescue nil
         return
       end
 
-      while socket.respond_to?(:pending) && socket.pending > 0
-        buffer << socket.read_nonblock(socket.pending)
-      end
-
-      parser = (Thread.current[:raptor_http_parser] ||= HttpParser.new)
-      parser.reset
-      env = @env_template.dup
-      nread = begin
-        parser.execute(env, buffer, 0)
+      env, parse_data, nread, parser = begin
+        parse_next_request(buffer)
       rescue HttpParserError
         reject_malformed(socket)
         return
       end
-      parse_data = { parse_count: 1, content_length: parser.content_length }
 
-      body = nil
       if !parser.finished?
         fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
         return
       elsif Http1.invalid_host?(env) || Http1.request_smuggling?(env)
         reject_malformed(socket)
         return
-      elsif parser.has_body?
-        if @max_body_size && parser.content_length > @max_body_size
-          reject_oversized(socket)
-          return
-        end
+      elsif parser.has_body? && @max_body_size && parser.content_length > @max_body_size
+        reject_oversized(socket)
+        return
+      end
 
-        body = buffer.byteslice(nread..-1) || ""
-
-        if parser.chunked?
-          body, chunked_state = Http1.decode_chunked(body, @max_body_size)
-          case chunked_state
-          when :complete
-            env.delete(HTTP_TRANSFER_ENCODING)
-          when :too_large
-            reject_oversized(socket)
-            return
-          when :malformed
-            reject_malformed(socket)
-            return
-          else
-            fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
-            return
-          end
-        elsif parser.content_length > body.bytesize
-          fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
-          return
-        end
+      body = extract_body(buffer, env, parser, nread, decode_chunked: true)
+      case body
+      when :incomplete
+        fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
+        return
+      when :too_large
+        reject_oversized(socket)
+        return
+      when :malformed
+        reject_malformed(socket)
+        return
       end
 
       thread_pool << proc do
@@ -325,77 +371,8 @@ module Raptor
       end
     end
 
-    # Returns a Proc for HTTP parsing work in Ractor context.
-    #
-    # The returned Proc processes raw socket data through the appropriate
-    # HTTP parser and returns either a complete request state (ready for
-    # app processing) or incomplete request state (needs more data).
-    #
-    # @return [Proc] a Ractor-safe proc that accepts a state hash and returns an updated state hash
-    #
-    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
-    def http_parser_worker
-      max_body_size = @max_body_size
-      env_template = @env_template
-
-      proc do |data|
-        next Raptor::Http2.process_frames(data) if data[:protocol] == :http2
-
-        parser = Raptor::HttpParser.new
-        env = env_template.dup
-        nread = begin
-          parser.execute(env, data[:buffer], 0)
-        rescue Raptor::HttpParserError
-          next Ractor.make_shareable(data.merge(complete: true, malformed: true))
-        end
-        parse_data = if data[:parse_data]
-          data[:parse_data].dup
-        else
-          { parse_count: 0, content_length: parser.content_length }
-        end
-        parse_data[:parse_count] += 1
-
-        message = if parser.finished?
-          if Raptor::Http1.invalid_host?(env) || Raptor::Http1.request_smuggling?(env)
-            data.merge(env: env, body: nil, parse_data: parse_data, complete: true, malformed: true)
-          elsif parser.has_body?
-            body_buffer = data[:buffer].byteslice(nread..-1) || ""
-
-            if max_body_size && parser.content_length > max_body_size
-              data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
-            elsif parser.chunked?
-              decoded_body, chunked_state = Raptor::Http1.decode_chunked(body_buffer, max_body_size)
-
-              case chunked_state
-              when :complete
-                env.delete(HTTP_TRANSFER_ENCODING)
-                data.merge(env: env, body: decoded_body, parse_data: parse_data, complete: true)
-              when :too_large
-                data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
-              when :malformed
-                data.merge(env: env, body: nil, parse_data: parse_data, complete: true, malformed: true)
-              else
-                data.merge(env: env, parse_data: parse_data)
-              end
-            elsif parser.content_length > body_buffer.bytesize
-              data.merge(env: env, parse_data: parse_data)
-            else
-              data.merge(env: env, body: body_buffer, parse_data: parse_data, complete: true)
-            end
-          else
-            data.merge(env: env, body: nil, parse_data: parse_data, complete: true)
-          end
-        else
-          data.merge(env: env, parse_data: parse_data)
-        end
-        Ractor.make_shareable(message)
-      end
-    end
-
-    # Handles a parsed HTTP request by either continuing parsing or dispatching to the Rack app.
-    #
-    # For incomplete requests, updates reactor state and re-registers for more I/O.
-    # For complete requests, removes from reactor, builds Rack env, and dispatches to thread pool.
+    # Dispatches a parsed HTTP request to the thread pool when complete,
+    # or hands it back to the reactor for more I/O when incomplete.
     #
     # @param parsed_request [Hash] the parsed request state from the ractor pool
     # @param reactor [Reactor] the reactor managing the client connection
@@ -444,6 +421,79 @@ module Raptor
 
     private
 
+    # Reads pending bytes off `socket` into the thread-local read buffer,
+    # draining any additional SSL-buffered bytes so `pending` is empty on
+    # return. Raises `IO::WaitReadable`, `EOFError`, or `IOError` like the
+    # underlying `read_nonblock` does.
+    #
+    # @param socket [TCPSocket] the socket to read from
+    # @return [String] the thread-local buffer, freshly populated
+    #
+    # @rbs (TCPSocket socket) -> String
+    def read_into_thread_buffer(socket)
+      buffer = (Thread.current[:raptor_read_buffer] ||= String.new(capacity: READ_BUFFER_SIZE))
+      socket.read_nonblock(READ_BUFFER_SIZE, buffer)
+
+      while socket.respond_to?(:pending) && socket.pending > 0
+        buffer << socket.read_nonblock(socket.pending)
+      end
+
+      buffer
+    end
+
+    # Runs a fresh HTTP/1.x parse against `buffer`, returning
+    # `[env, parse_data, nread, parser]`. Raises `HttpParserError` on
+    # malformed input.
+    #
+    # @param buffer [String] the raw request bytes
+    # @return [Array(Hash, Hash, Integer, HttpParser)]
+    #
+    # @rbs (String buffer) -> [Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser]
+    def parse_next_request(buffer)
+      parser = (Thread.current[:raptor_http_parser] ||= HttpParser.new)
+      parser.reset
+      env = @env_template.dup
+      nread = parser.execute(env, buffer, 0)
+      parse_data = { parse_count: 1, content_length: parser.content_length }
+      [env, parse_data, nread, parser]
+    end
+
+    # Resolves the request body for a finished parse. Returns the body
+    # `String` (or `nil` when the request has no body), or one of
+    # `:incomplete`, `:too_large`, `:malformed` when the caller must
+    # fall back or reject.
+    #
+    # @param buffer [String] the raw request bytes
+    # @param env [Hash] the Rack environment being built
+    # @param parser [HttpParser] the parser holding the finished parse state
+    # @param nread [Integer] the byte offset where the body begins in `buffer`
+    # @param decode_chunked [Boolean] whether to decode chunked bodies inline; when false chunked bodies signal `:incomplete`
+    # @return [String, nil, Symbol]
+    #
+    # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
+    def extract_body(buffer, env, parser, nread, decode_chunked:)
+      return nil unless parser.has_body?
+
+      body = buffer.byteslice(nread..-1) || ""
+
+      if parser.chunked?
+        return :incomplete unless decode_chunked
+
+        body, chunked_state = Http1.decode_chunked(body, @max_body_size)
+        case chunked_state
+        when :complete
+          env.delete(HTTP_TRANSFER_ENCODING)
+          body
+        else
+          chunked_state
+        end
+      elsif parser.content_length > body.bytesize
+        :incomplete
+      else
+        body
+      end
+    end
+
     # Returns true if the request expects a 100 Continue response per
     # RFC 7231 section 5.1.1.
     #
@@ -455,11 +505,9 @@ module Raptor
       (env[Rack::SERVER_PROTOCOL] == HTTP_11) && env[HTTP_EXPECT]&.casecmp?(EXPECT_100_CONTINUE)
     end
 
-    # Sends an HTTP 100 Continue response when an HTTP/1.1 client requested
-    # `Expect: 100-continue` and the request body has not yet been received.
-    #
-    # Returns the state hash with `:continued` set when the response has been
-    # written. A write failure is silently ignored.
+    # Sends an HTTP 100 Continue response when the client requested
+    # `Expect: 100-continue`, returning the state hash with `:continued`
+    # set once written. A write failure is silently ignored.
     #
     # @param state [Hash] the partially-parsed connection state
     # @param reactor [Reactor] the reactor holding the connection's socket
@@ -500,9 +548,9 @@ module Raptor
       eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme) if keep_alive
     end
 
-    # Builds the Rack env, calls the application, and writes the response.
-    # Returns true if the connection should be kept alive for further
-    # requests, false otherwise (including hijack and error cases).
+    # Processes a single request. Builds the Rack env, calls the app,
+    # writes the response, and returns whether the connection stays open
+    # for another request.
     #
     # @param socket [TCPSocket] the client socket
     # @param env [Hash] partial env hash from the HTTP parser
@@ -542,15 +590,8 @@ module Raptor
         call_response_finished(rack_env, status, headers, nil)
         keep_alive && !hijacked
       rescue => error
-        call_response_finished(rack_env, status, headers, error) if rack_env
-        socket.write(INTERNAL_SERVER_ERROR_RESPONSE) rescue nil unless response_started || hijacked
         keep_alive = false
-
-        if @on_error
-          @on_error.call(rack_env, error) rescue nil
-        else
-          raise
-        end
+        handle_app_error(socket, rack_env, status, headers, error, response_started: response_started, hijacked: hijacked)
       ensure
         rack_input = rack_env && rack_env[Rack::RACK_INPUT]
         rack_input.close! rescue nil if rack_input.respond_to?(:close!)
@@ -561,11 +602,35 @@ module Raptor
       end
     end
 
-    # Attempts to read and process subsequent requests inline on a
-    # kept-alive connection. Blocks briefly for the next request to avoid
-    # a full reactor round-trip. Falls back to the reactor when no data
-    # arrives within the timeout, when the thread pool has queued work
-    # (deprioritization), or when the request is incomplete.
+    # Handles an exception raised while processing a request. Fires the
+    # `rack.response_finished` callbacks with the error, writes a 500
+    # response when no bytes have gone to the socket yet, and routes the
+    # exception through the configured `on_error` handler (or re-raises).
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param rack_env [Hash, nil] the Rack environment, if it was built
+    # @param status [Integer, nil] the status returned by the app, if any
+    # @param headers [Hash, nil] the headers returned by the app, if any
+    # @param error [Exception] the exception raised
+    # @param response_started [Boolean] whether any response bytes have been written
+    # @param hijacked [Boolean] whether the app took over the socket
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Hash[String, untyped]? rack_env, Integer? status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
+    def handle_app_error(socket, rack_env, status, headers, error, response_started:, hijacked:)
+      call_response_finished(rack_env, status, headers, error) if rack_env
+      socket.write(INTERNAL_SERVER_ERROR_RESPONSE) rescue nil unless response_started || hijacked
+
+      if @on_error
+        @on_error.call(rack_env, error) rescue nil
+      else
+        raise error
+      end
+    end
+
+    # Reads and processes subsequent requests inline on a kept-alive
+    # connection. Falls back to the reactor when no data arrives within the
+    # timeout, the thread pool is saturated, or the request is incomplete.
     #
     # @param socket [TCPSocket] the client socket
     # @param id [Integer] unique client identifier
@@ -589,10 +654,8 @@ module Raptor
           return
         end
 
-        buffer = (Thread.current[:raptor_read_buffer] ||= String.new(capacity: READ_BUFFER_SIZE))
-
         begin
-          socket.read_nonblock(READ_BUFFER_SIZE, buffer)
+          buffer = read_into_thread_buffer(socket)
         rescue IO::WaitReadable
           reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
           return
@@ -601,32 +664,22 @@ module Raptor
           return
         end
 
-        while socket.respond_to?(:pending) && socket.pending > 0
-          buffer << socket.read_nonblock(socket.pending)
-        end
-
-        parser = (Thread.current[:raptor_http_parser] ||= HttpParser.new)
-        parser.reset
-        env = @env_template.dup
-        nread = begin
-          parser.execute(env, buffer, 0)
+        env, parse_data, nread, parser = begin
+          parse_next_request(buffer)
         rescue HttpParserError
           reject_malformed(socket)
           return
         end
-        parse_data = { parse_count: 1, content_length: parser.content_length }
 
-        body = nil
         if !parser.finished?
           fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
           return
-        elsif parser.has_body?
-          body = buffer.byteslice(nread..-1) || ""
+        end
 
-          if parser.chunked? || parser.content_length > body.bytesize
-            fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
-            return
-          end
+        body = extract_body(buffer, env, parser, nread, decode_chunked: false)
+        if body == :incomplete
+          fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
+          return
         end
 
         request_count += 1
@@ -663,11 +716,7 @@ module Raptor
     end
 
     # Re-registers a socket with the reactor for further processing when
-    # an incomplete request is received during eager accept or eager keep-alive.
-    #
-    # The persisted flag selects between persistent_data_timeout (for
-    # kept-alive connections awaiting the next request) and chunk_data_timeout
-    # (for fresh connections awaiting the rest of the first request).
+    # an incomplete request is received on the fast path.
     #
     # @param socket [TCPSocket] the client socket
     # @param id [Integer] unique client identifier
@@ -701,8 +750,7 @@ module Raptor
       reactor.update_state(Ractor.make_shareable(state))
     end
 
-    # Writes a 413 response and closes the socket. Used when a request body
-    # exceeds the configured maximum size.
+    # Writes a 413 response and closes the socket.
     #
     # @param socket [TCPSocket] the client socket
     # @return [void]
@@ -713,8 +761,7 @@ module Raptor
       socket.close rescue nil
     end
 
-    # Writes a 400 response and closes the socket. Used when the HTTP parser
-    # rejects the request line or headers.
+    # Writes a 400 response and closes the socket.
     #
     # @param socket [TCPSocket] the client socket
     # @return [void]
@@ -726,9 +773,6 @@ module Raptor
     end
 
     # Builds a Rack environment hash from parsed HTTP request data.
-    #
-    # Populates all required Rack env keys including rack.* keys, REMOTE_ADDR,
-    # SERVER_NAME, SERVER_PORT, and hijack support.
     #
     # @param env [Hash] partial env hash from the HTTP parser
     # @param parse_data [Hash] metadata from the parsing pass, including content_length
@@ -842,11 +886,8 @@ module Raptor
       env["HTTP_X_FORWARDED_SSL"]&.casecmp?("on") || false
     end
 
-    # Determines whether the connection should be kept alive after the response.
-    #
-    # Returns false if the request limit has been reached. For HTTP/1.1, keep-alive
-    # is the default unless the client sent Connection: close. For HTTP/1.0,
-    # keep-alive must be explicitly requested.
+    # Returns true when the connection should be kept alive after the
+    # current response.
     #
     # @param env [Hash] the Rack environment
     # @param request_count [Integer] number of requests handled on this connection
@@ -865,9 +906,8 @@ module Raptor
       end
     end
 
-    # Sends an HTTP 103 Early Hints response to the client.
-    #
-    # Skips any hints with illegal header keys or values. No-ops if hints is empty.
+    # Sends an HTTP 103 Early Hints response, skipping any entries with
+    # illegal header keys or values. No-ops when `hints` is empty.
     #
     # @param socket [TCPSocket] the client socket to write to
     # @param hints [Hash] header name to value (or array of values) pairs
@@ -894,9 +934,6 @@ module Raptor
     end
 
     # Writes a complete HTTP response to the socket.
-    #
-    # Handles header normalization, validation, connection management, TCP corking,
-    # and dispatches to the appropriate body write strategy.
     #
     # @param socket [TCPSocket] the client socket to write to
     # @param env [Hash] the Rack environment
@@ -949,10 +986,8 @@ module Raptor
       raise ArgumentError, "status must be >= 100" unless status >= 100
     end
 
-    # Normalizes response headers by downcasing keys and filtering invalid entries.
-    #
-    # Removes headers with illegal keys, rack.* prefixed headers, and "status" headers.
-    # Raises if headers is not a Hash or contains non-String keys.
+    # Returns a normalised copy of the response headers with lowercased
+    # keys and illegal/`rack.*`/`status` entries dropped.
     #
     # @param headers [Hash] raw headers from the Rack application
     # @return [Hash] normalized headers with lowercased string keys
@@ -977,10 +1012,8 @@ module Raptor
       normalized
     end
 
-    # Validates that headers are appropriate for the given status code.
-    #
-    # Raises if content-type or content-length are present for status codes
-    # that must not have an entity body (204, 304, 1xx).
+    # Raises when the headers include entries forbidden for the response
+    # status (`content-type` or `content-length` on a 204, 304, or 1xx).
     #
     # @param headers [Hash] normalized response headers
     # @param status [Integer] HTTP status code
@@ -996,8 +1029,7 @@ module Raptor
       end
     end
 
-    # Returns the HTTP status line for `status`. Callers must not retain the
-    # returned string across further calls on the same thread.
+    # Returns the HTTP status line for `status`.
     #
     # @param http_version [String] "HTTP/1.1" or "HTTP/1.0"
     # @param status [Integer] HTTP status code
@@ -1012,10 +1044,8 @@ module Raptor
       response
     end
 
-    # Writes response headers and delegates body writing to the hijack callback.
-    #
-    # Uncorks the socket before calling the hijack so the app has full control
-    # of the raw connection.
+    # Writes the response headers, uncorks the socket, and hands the raw
+    # socket to the hijack callback.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
@@ -1032,11 +1062,9 @@ module Raptor
       response_hijack.call(socket)
     end
 
-    # Writes a response with no entity body.
-    #
-    # Used for HEAD requests and status codes that must not carry a body
-    # (204, 304, 1xx). Adds a zero content-length for non-no-body statuses
-    # that did not supply one.
+    # Writes a response with no entity body, adding a zero
+    # `Content-Length` when the status may carry a body but none was
+    # supplied.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
@@ -1055,12 +1083,9 @@ module Raptor
       socket_write(socket, response)
     end
 
-    # Writes a complete response with a body.
-    #
-    # Selects the appropriate write strategy based on body type: callable (streaming),
-    # file (zero-copy), array, or generic enumerable. Automatically determines
-    # content-length where possible, falling back to chunked transfer encoding
-    # for HTTP/1.1 when the length cannot be determined upfront.
+    # Writes a complete response with a body. Emits a `Content-Length`
+    # when the total size is known upfront, otherwise chunked encoding on
+    # HTTP/1.1.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
@@ -1112,9 +1137,8 @@ module Raptor
       end
     end
 
-    # Calculates content length from an array or file body without consuming it.
-    #
-    # Returns nil for enumerable bodies whose length cannot be determined upfront.
+    # Returns the byte length of the body when it can be determined
+    # upfront (array or file), otherwise nil.
     #
     # @param body [Object] the response body
     # @return [Integer, nil] the byte length, or nil if it cannot be determined
@@ -1134,9 +1158,6 @@ module Raptor
     end
 
     # Writes a file body to the socket.
-    #
-    # Uses zero-copy IO.copy_stream for large files, direct buffering for small ones,
-    # and chunked encoding when required.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] headers already serialized, to be written before the body
@@ -1170,8 +1191,6 @@ module Raptor
     end
 
     # Writes an array body to the socket.
-    #
-    # Dispatches to the single-chunk or multi-chunk path based on array length.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] headers already serialized, to be written before the body
@@ -1294,10 +1313,8 @@ module Raptor
       value.match?(ILLEGAL_HEADER_VALUE_REGEX)
     end
 
-    # Formats a headers hash into an HTTP header string.
-    #
-    # Skips entries with illegal keys or values. Array values are written
-    # as separate header lines.
+    # Appends normalised header lines to `result`. Skips entries with
+    # illegal keys or values. Array values are written as separate lines.
     #
     # @param headers [Hash] normalized response headers
     # @return [String] formatted header lines, each ending with CRLF
@@ -1315,9 +1332,9 @@ module Raptor
       end
     end
 
-    # Appends one or more `name: value` header lines to `result`. Newline-
-    # separated values are emitted as separate lines; empty values and values
-    # with illegal characters are skipped silently.
+    # Appends one or more `name: value` header lines to `result`, splitting
+    # newline-joined values across separate lines and skipping empty or
+    # illegal values.
     #
     # @param result [String] the buffer to append to
     # @param name [String] the header name
@@ -1342,10 +1359,8 @@ module Raptor
       end
     end
 
-    # Calls all rack.response_finished callbacks registered in the environment.
-    #
-    # Callbacks are called in reverse registration order. Individual callback
-    # failures are rescued so all callbacks are always attempted.
+    # Calls every `rack.response_finished` callback in reverse
+    # registration order, rescuing any that raise.
     #
     # @param env [Hash, nil] the Rack environment
     # @param status [Integer, nil] the response status code
@@ -1390,10 +1405,8 @@ module Raptor
     end
 
     if Socket.const_defined?(:TCP_CORK)
-      # Enables TCP_CORK on the socket to batch outgoing packets into fewer segments.
-      #
-      # Only applies to TCP sockets. No-op on non-TCP sockets.
-      # Available on Linux only; this method is not defined on other platforms.
+      # Enables `TCP_CORK` on the socket to batch outgoing packets into
+      # fewer segments. Linux-only; a no-op elsewhere.
       #
       # @param socket [TCPSocket] the socket to cork
       # @return [void]
@@ -1403,10 +1416,8 @@ module Raptor
         socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_CORK, 1) if socket.is_a?(TCPSocket)
       end
 
-      # Disables TCP_CORK on the socket, flushing any buffered packets.
-      #
-      # Only applies to TCP sockets. No-op on non-TCP sockets.
-      # Available on Linux only; this method is not defined on other platforms.
+      # Disables `TCP_CORK` on the socket, flushing any buffered packets.
+      # Linux-only; a no-op elsewhere.
       #
       # @param socket [TCPSocket] the socket to uncork
       # @return [void]

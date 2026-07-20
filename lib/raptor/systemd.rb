@@ -24,7 +24,7 @@ module Raptor
     # @rbs (String message) -> bool
     def self.notify(message)
       socket_path = ENV[NOTIFY_SOCKET_ENV]
-      return false if socket_path.nil? || socket_path.empty?
+      return false if !socket_path || socket_path.empty?
 
       address = if socket_path.start_with?("@")
         Socket.pack_sockaddr_un("\0#{socket_path[1..]}")

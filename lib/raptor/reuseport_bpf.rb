@@ -23,8 +23,8 @@ module Raptor
     LIBBPF_LOADED = !!defined?(LibBPFRuby)
     BPF_OBJECT_PATH = File.expand_path("../../ext/raptor_bpf/reuseport_select.bpf.o", __dir__)
 
-    # Whether the preconditions for BPF-directed reuseport are met on this
-    # platform. Does not imply that the kernel will accept the program.
+    # Returns true when the preconditions for BPF-directed reuseport are
+    # met on this platform.
     #
     # @return [Boolean]
     #
@@ -65,9 +65,6 @@ module Raptor
     #
     # @rbs (Array[String] bind_uris, Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
     def self.create_worker_listeners(bind_uris, worker_index, socket_backlog)
-      @load_key = [worker_index + 1].pack("L")
-      @load_value = String.new("\x00\x00\x00\x00", encoding: Encoding::ASCII_8BIT)
-
       bind_uris.filter_map do |bind_uri|
         uri = URI(bind_uri)
         next unless uri.scheme == "tcp"
@@ -90,6 +87,18 @@ module Raptor
         socket.autoclose = false
         tcp_server
       end
+    end
+
+    # Prepares this worker's load-reporting slot so subsequent
+    # {update_load} calls can publish its backlog.
+    #
+    # @param worker_index [Integer] slot index for this worker
+    # @return [void]
+    #
+    # @rbs (Integer worker_index) -> void
+    def self.enable_load_reporting(worker_index)
+      @load_key = [worker_index + 1].pack("L")
+      @load_value = String.new("\x00\x00\x00\x00", encoding: Encoding::ASCII_8BIT)
     end
 
     # Publishes this worker's current backlog to the BPF map.

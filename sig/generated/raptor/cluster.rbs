@@ -1,38 +1,14 @@
 # Generated from lib/raptor/cluster.rb with RBS::Inline
 
 module Raptor
-  # Multi-process web server cluster with advanced concurrency architecture.
-  #
-  # Cluster manages multiple worker processes, each running a complete server
-  # stack including a ractor pool for HTTP parsing, a thread pool for
-  # application processing, plus dedicated reactor and server threads. It
-  # handles process forking, signal management, graceful shutdown, and
-  # automatic worker restart when a worker process unexpectedly exits.
-  #
-  # The architecture provides horizontal scaling through processes while
-  # maintaining efficient I/O and CPU utilization within each process
-  # through the combination of ractor-based parsing and thread pools on
-  # top of NIO reactors.
-  #
-  # Flow per worker process:
-  # 1. Server continuously accepts connections but skips acceptance when backlog is high
-  # 2. Reactor manages I/O multiplexing and provides backlog metrics for load control
-  # 3. Ractor pool handles CPU-intensive HTTP parsing in parallel
-  # 4. Thread pool processes Rack applications and handles response writing
-  # 5. Natural load balancing occurs through backpressure-based acceptance control
-  #
-  # @example Basic usage
-  #   options = {
-  #     workers: 4, ractors: 2, threads: 8,
-  #     binds: ["tcp://0.0.0.0:3000"],
-  #     rackup: "config.ru",
-  #     connection: { first_data_timeout: 30, chunk_data_timeout: 10 }
-  #   }
-  #   Cluster.run(options)
+  # Forks and supervises worker processes. Handles graceful shutdown on
+  # `INT` and `TERM`, phased restart on `USR1`, hot restart on `USR2`,
+  # and (on Linux) refork on `URG`. Restarts workers that exit
+  # unexpectedly or stop checking in.
   class Cluster
     INHERITED_FDS_ENV: ::String
 
-    # Convenience method to create and run a cluster with the given options.
+    # Creates and runs a cluster with the given options.
     #
     # @param options [Hash] cluster configuration options
     # @return [void]
@@ -134,11 +110,7 @@ module Raptor
 
     @drain_accept_queue: bool
 
-    # Creates a new Cluster with the specified configuration.
-    #
-    # Initializes the cluster with worker, ractor, and thread counts,
-    # sets up network binding, loads the Rack application, and prepares
-    # for multi-process operation.
+    # Creates a new Cluster with the given options.
     #
     # @param options [Hash] cluster configuration options
     # @option options [Array<String>] :binds array of bind URIs
@@ -176,20 +148,7 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] options) -> void
     def initialize: (Hash[Symbol, untyped] options) -> void
 
-    # Starts the multi-process cluster and manages worker processes.
-    #
-    # Forks the configured number of worker processes and monitors them,
-    # restarting any that exit unexpectedly or stop checking in. Handles
-    # graceful shutdown via INT or TERM signals, phased restart via USR1,
-    # and hot restart via USR2.
-    #
-    # Each worker process includes:
-    # - 1 server thread (continuously accepts connections with backpressure control)
-    # - 1 reactor thread (I/O multiplexing, timeout handling, backlog monitoring)
-    # - N pipeline ractors (parallel HTTP parsing)
-    # - 1 pipeline collector thread (coordinates parsing results)
-    # - M worker threads (Rack application processing and response writing)
-    # - 1 stats thread (writes per-worker metrics to shared memory every second)
+    # Runs the cluster until a graceful shutdown is signalled.
     #
     # @return [void]
     #
@@ -199,7 +158,8 @@ module Raptor
     # Returns stats for all worker processes.
     #
     # @return [Array<Hash>] array of per-worker stat hashes, each containing
-    #   :pid, :requests, :backlog, :started_at, :last_checkin, and :booted
+    #   :pid, :index, :phase, :requests, :backlog, :busy_threads,
+    #   :thread_capacity, :started_at, :last_checkin, and :booted
     #
     # @rbs () -> Array[Hash[Symbol, untyped]]
     def stats: () -> Array[Hash[Symbol, untyped]]
@@ -208,8 +168,7 @@ module Raptor
 
     # Returns the inherited-FDs hash for a systemd socket-activation handoff,
     # pairing each bind URI with the FD systemd passed at the same index.
-    # The activation is skipped (with a warning) when the FD count doesn't
-    # match the number of bind URIs.
+    # Returns an empty hash when the FD count doesn't match the bind count.
     #
     # @param bind_uris [Array<String>] the configured bind URIs
     # @param filenos [Array<Integer>] file descriptors passed by systemd
