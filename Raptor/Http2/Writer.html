@@ -390,7 +390,7 @@ so that exactly one thread is actively writing at any time.</p>
       <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 51</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_frames'>write_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_frames'>frames</span><span class='rparen'>)</span>
-  <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_frames'>frames</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>||</span> <span class='id identifier rubyid_frames'>frames</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
+  <span class='kw'>return</span> <span class='kw'>if</span> <span class='op'>!</span><span class='id identifier rubyid_frames'>frames</span> <span class='op'>||</span> <span class='id identifier rubyid_frames'>frames</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
 
   <span class='id identifier rubyid_claimed'>claimed</span> <span class='op'>=</span> <span class='kw'>false</span>
   <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_current'>current</span><span class='op'>|</span>
@@ -429,7 +429,7 @@ so that exactly one thread is actively writing at any time.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jul 19 15:17:02 2026 by
+  Generated on Mon Jul 20 00:49:26 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

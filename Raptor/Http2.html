@@ -1646,7 +1646,7 @@ completed stream requests. Ractor-safe.</p>
       <span class='kw'>end</span>
 
     <span class='kw'>when</span> <span class='symbol'>:continuation</span>
-      <span class='kw'>if</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='period'>.</span><span class='id identifier rubyid_nil?'>nil?</span> <span class='op'>||</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span> <span class='op'>!=</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span>
+      <span class='kw'>if</span> <span class='op'>!</span><span class='id identifier rubyid_pending_headers'>pending_headers</span> <span class='op'>||</span> <span class='id identifier rubyid_frame'>frame</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span> <span class='op'>!=</span> <span class='id identifier rubyid_pending_headers'>pending_headers</span><span class='lbracket'>[</span><span class='symbol'>:stream_id</span><span class='rbracket'>]</span>
         <span class='id identifier rubyid_goaway_error'>goaway_error</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#ERROR_PROTOCOL_ERROR-constant" title="Raptor::Http2::ERROR_PROTOCOL_ERROR (constant)">ERROR_PROTOCOL_ERROR</a></span></span>
         <span class='kw'>break</span>
       <span class='kw'>end</span>
@@ -3081,7 +3081,7 @@ within the peer's per-stream and connection windows.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Jul 19 15:17:02 2026 by
+  Generated on Mon Jul 20 00:49:26 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
