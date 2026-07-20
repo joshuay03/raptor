@@ -294,8 +294,8 @@ end
 
 def format_delta(subject, baseline)
   delta = ((subject - baseline) / baseline) * 100
-  sign = delta >= 0 ? "+" : ""
-  "#{sign}#{format('%.1f', delta)}%"
+  word = delta >= 0 ? "higher" : "lower"
+  "#{format('%.1f', delta.abs)}% #{word}"
 end
 
 def render_markdown_row(cells, widths)
