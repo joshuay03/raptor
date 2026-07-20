@@ -208,6 +208,28 @@ left to the binder's shared listeners.</p>
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#enable_load_reporting-class_method" title="enable_load_reporting (class method)">.<strong>enable_load_reporting</strong>(worker_index)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Prepares this worker's load-reporting slot so subsequent <span class='object_link'><a href="#update_load-class_method" title="Raptor::ReuseportBPF.update_load (method)">ReuseportBPF.update_load</a></span> calls can publish its backlog.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#mark_unavailable-class_method" title="mark_unavailable (class method)">.<strong>mark_unavailable</strong>(worker_index)  &#x21d2; void </a>
     
 
@@ -413,18 +435,12 @@ Skips non-tcp bind URIs.</p>
 87
 88
 89
-90
-91
-92
-93</pre>
+90</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 67</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_create_worker_listeners'>create_worker_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='comma'>,</span> <span class='id identifier rubyid_worker_index'>worker_index</span><span class='comma'>,</span> <span class='id identifier rubyid_socket_backlog'>socket_backlog</span><span class='rparen'>)</span>
-  <span class='ivar'>@load_key</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
-  <span class='ivar'>@load_value</span> <span class='op'>=</span> <span class='const'>String</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>\x00\x00\x00\x00</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>encoding:</span> <span class='const'>Encoding</span><span class='op'>::</span><span class='const'>ASCII_8BIT</span><span class='rparen'>)</span>
-
   <span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='period'>.</span><span class='id identifier rubyid_filter_map'>filter_map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='op'>|</span>
     <span class='id identifier rubyid_uri'>uri</span> <span class='op'>=</span> <span class='const'>URI</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='rparen'>)</span>
     <span class='kw'>next</span> <span class='kw'>unless</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_scheme'>scheme</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tcp</span><span class='tstring_end'>&quot;</span></span>
@@ -447,6 +463,66 @@ Skips non-tcp bind URIs.</p>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_autoclose'>autoclose</span> <span class='op'>=</span> <span class='kw'>false</span>
     <span class='id identifier rubyid_tcp_server'>tcp_server</span>
   <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="enable_load_reporting-class_method">
+  
+    .<strong>enable_load_reporting</strong>(worker_index)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Prepares this worker's load-reporting slot so subsequent
+<span class='object_link'><a href="#update_load-class_method" title="Raptor::ReuseportBPF.update_load (method)">update_load</a></span> calls can publish its backlog.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>worker_index</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>slot index for this worker</p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+99
+100
+101
+102</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 99</span>
+
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_enable_load_reporting'>enable_load_reporting</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
+  <span class='ivar'>@load_key</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+  <span class='ivar'>@load_value</span> <span class='op'>=</span> <span class='const'>String</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>\x00\x00\x00\x00</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>encoding:</span> <span class='const'>Encoding</span><span class='op'>::</span><span class='const'>ASCII_8BIT</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -496,14 +572,14 @@ sentinel maximum so the BPF program's least-loaded pick skips it.</p>
       <pre class="lines">
 
 
-116
-117
-118
-119
-120</pre>
+125
+126
+127
+128
+129</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 116</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 125</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_mark_unavailable'>mark_unavailable</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@loads_fd</span>
@@ -699,16 +775,16 @@ met on this platform.</p>
       <pre class="lines">
 
 
-101
-102
-103
-104
-105
-106
-107</pre>
+110
+111
+112
+113
+114
+115
+116</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 101</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 110</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_load'>update_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='ivar'>@load_value</span><span class='period'>.</span><span class='id identifier rubyid_setbyte'>setbyte</span><span class='lparen'>(</span><span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>&amp;</span> <span class='int'>0xff</span><span class='rparen'>)</span>
@@ -727,7 +803,7 @@ met on this platform.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Jul 20 01:49:34 2026 by
+  Generated on Mon Jul 20 02:10:50 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
