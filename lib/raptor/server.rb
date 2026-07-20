@@ -127,7 +127,7 @@ module Raptor
 
         while @running.true?
           ReuseportBPF.update_load(@reactor.backlog)
-          sleep 0.01
+          sleep 0.001
         end
       end
     end

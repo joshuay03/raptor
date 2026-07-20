@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Tune BPF reuseport routing to spread bursts across near-idle workers
+
 ## [0.12.0] - 2026-07-19
 
 - Add `refork_after` and `before_refork` for reforking workers off a warmed source

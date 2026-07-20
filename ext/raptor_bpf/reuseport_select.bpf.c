@@ -2,6 +2,7 @@
 #include <bpf/bpf_helpers.h>
 
 #define MAX_WORKERS 64
+#define LOAD_TIE_TOLERANCE 1
 
 // Per-worker listening sockets, keyed by worker index.
 struct {
@@ -19,9 +20,12 @@ struct {
   __uint(max_entries, MAX_WORKERS + 1);
 } loads SEC(".maps");
 
-// Routes each incoming connection to the worker with the lowest backlog,
-// falling back to the connection's 4-tuple hash when loads are equal so
-// bursts of accepts spread across workers instead of clustering by chance.
+// Routes each incoming connection to the least-loaded worker. When the
+// spread between the busiest and idlest worker is within
+// `LOAD_TIE_TOLERANCE`, all workers are treated as tied and the connection
+// is placed by 4-tuple hash so bursts of accepts spread across workers
+// instead of clustering on whichever worker most recently reported the
+// lowest load.
 SEC("sk_reuseport")
 int select_least_loaded(struct sk_reuseport_md *ctx) {
   __u32 count_key = 0;
@@ -56,7 +60,7 @@ int select_least_loaded(struct sk_reuseport_md *ctx) {
     }
   }
 
-  __u32 chosen_idx = (min_load == max_load) ? (ctx->hash % num_workers) : min_idx;
+  __u32 chosen_idx = (max_load - min_load <= LOAD_TIE_TOLERANCE) ? (ctx->hash % num_workers) : min_idx;
   bpf_sk_select_reuseport(ctx, &socks, &chosen_idx, 0);
   return SK_PASS;
 }
