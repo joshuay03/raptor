@@ -877,7 +877,11 @@ module Raptor
     #
     # @rbs (AtomicThreadPool thread_pool) -> void
     def drain_thread_pool(thread_pool)
-      drain = Thread.new { thread_pool.shutdown }
+      drain = Thread.new do
+        Thread.current.name = "Thread Pool Drain"
+
+        thread_pool.shutdown
+      end
       return if drain.join(@worker_drain_timeout)
 
       Log.warn "Force-killing in-flight app threads after #{@worker_drain_timeout}s drain timeout"
