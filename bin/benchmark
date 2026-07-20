@@ -131,29 +131,71 @@ def wait_for_port_free(port, timeout: 30)
   end
 end
 
+SPAWNED_SERVERS = []
+
+def descendants_of(pid)
+  discovered = []
+  frontier = [pid]
+  until frontier.empty?
+    parent = frontier.shift
+    children = `pgrep -P #{parent}`.split.map(&:to_i)
+    discovered.concat(children)
+    frontier.concat(children)
+  end
+  discovered
+end
+
+def kill_process_tree(pid, signal)
+  targets = descendants_of(pid).reverse + [pid]
+  targets.each do |target|
+    Process.kill(signal, target) rescue nil
+    Process.kill(signal, -target) rescue nil
+  end
+end
+
+def reap_all_spawned_servers
+  SPAWNED_SERVERS.each do |pid|
+    kill_process_tree(pid, "KILL")
+    Process.wait(pid) rescue nil
+  end
+  SPAWNED_SERVERS.clear
+end
+
+at_exit { reap_all_spawned_servers }
+
+%w[INT TERM].each do |signal|
+  Signal.trap(signal) { exit(1) }
+end
+
 def start_server(cmd, ports)
   log_file = Tempfile.new(["server-", ".log"])
-  pid = spawn(*cmd, [:out, :err] => log_file.path, pgroup: true)
+  pid = Thread.handle_interrupt(SystemExit => :never) do
+    child_pid = spawn(*cmd, [:out, :err] => log_file.path, pgroup: true)
+    SPAWNED_SERVERS << child_pid
+    child_pid
+  end
   ports.each { |port| wait_for_port(port) }
   [pid, log_file]
 rescue => error
-  Process.kill("TERM", -pid) if pid
+  kill_process_tree(pid, "TERM") if pid
+  SPAWNED_SERVERS.delete(pid) if pid
   warn File.read(log_file.path)
   log_file.close!
   raise error
 end
 
 def stop_server(pid, ports, log_file)
-  Process.kill("TERM", -pid) rescue nil
+  kill_process_tree(pid, "TERM")
   begin
     Timeout.timeout(5) { Process.wait(pid) }
   rescue Timeout::Error
-    Process.kill("KILL", -pid) rescue nil
+    kill_process_tree(pid, "KILL")
     Process.wait(pid) rescue nil
   rescue Errno::ESRCH, Errno::ECHILD
   end
-  Process.kill("KILL", -pid) rescue nil
+  kill_process_tree(pid, "KILL")
   Process.waitall rescue nil
+  SPAWNED_SERVERS.delete(pid)
   ports.each { |port| wait_for_port_free(port) }
   log_file.close!
 end
@@ -162,8 +204,10 @@ def with_server(label, cmd, ports)
   log "Starting #{label}"
   pid, log_file = start_server(cmd, ports)
   yield
-rescue => error
+rescue Exception => error
+  warn "===== #{label} server log ====="
   warn File.read(log_file.path) if pid
+  warn "===== end server log ====="
   raise error
 ensure
   log "Stopping #{label}"
