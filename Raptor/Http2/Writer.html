@@ -106,9 +106,8 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Lock-free per-connection frame writer.</p>
-<p>Serializes concurrent socket writes from multiple stream workers
-without blocking any of them.</p>
+    <p>Serialises concurrent frame writes on a single HTTP/2 connection so
+exactly one thread is writing at any moment.</p>
 
   </div>
 </div>
@@ -274,13 +273,13 @@ without blocking any of them.</p>
       <pre class="lines">
 
 
-38
-39
-40
-41</pre>
+31
+32
+33
+34</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 38</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 31</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='label'>write_timeout:</span><span class='rparen'>)</span>
   <span class='ivar'>@state</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#IDLE-constant" title="Raptor::Http2::Writer::IDLE (constant)">IDLE</a></span></span><span class='rparen'>)</span>
@@ -355,6 +354,13 @@ so that exactly one thread is actively writing at any time.</p>
       <pre class="lines">
 
 
+44
+45
+46
+47
+48
+49
+50
 51
 52
 53
@@ -377,17 +383,10 @@ so that exactly one thread is actively writing at any time.</p>
 70
 71
 72
-73
-74
-75
-76
-77
-78
-79
-80</pre>
+73</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 51</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 44</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_frames'>write_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_frames'>frames</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='op'>!</span><span class='id identifier rubyid_frames'>frames</span> <span class='op'>||</span> <span class='id identifier rubyid_frames'>frames</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -429,7 +428,7 @@ so that exactly one thread is actively writing at any time.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Jul 20 00:49:26 2026 by
+  Generated on Mon Jul 20 01:49:35 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

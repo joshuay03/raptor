@@ -106,13 +106,8 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Per-connection outbound flow-control accounting.</p>
-<p>Tracks the peer's connection-level and per-stream receive windows so
-outbound DATA frames respect RFC 7540 section 5.2. Threads dispatching stream
-responses call <code>acquire</code> to reserve send capacity; threads applying
-inbound WINDOW_UPDATE or SETTINGS frames call the mutating methods to
-replenish it. The connection window and per-stream windows live in
-separate <code>Atom</code>s so the common fast path skips per-stream tracking.</p>
+    <p>Tracks the peer's connection-level and per-stream receive windows so
+outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
 
   </div>
 </div>
@@ -211,7 +206,7 @@ separate <code>Atom</code>s so the common fast path skips per-stream tracking.</
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Increments the connection-level send window.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Increments the connection-level send window by <code>increment</code> bytes.</p></div></span>
   
 </li>
 
@@ -233,7 +228,7 @@ separate <code>Atom</code>s so the common fast path skips per-stream tracking.</
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Increments the per-stream send window.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Increments the send window for the given stream by <code>increment</code> bytes.</p></div></span>
   
 </li>
 
@@ -337,14 +332,14 @@ separate <code>Atom</code>s so the common fast path skips per-stream tracking.</
       <pre class="lines">
 
 
-102
-103
-104
-105
-106</pre>
+91
+92
+93
+94
+95</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 102</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 91</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span>
   <span class='ivar'>@connection_window</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="../Http2.html#DEFAULT_WINDOW_SIZE-constant" title="Raptor::Http2::DEFAULT_WINDOW_SIZE (constant)">DEFAULT_WINDOW_SIZE</a></span></span><span class='rparen'>)</span>
@@ -377,11 +372,6 @@ separate <code>Atom</code>s so the common fast path skips per-stream tracking.</
     <p>Reserves outbound capacity on the given stream, polling until at
 least one byte is available on both the connection and stream
 windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
-<p>When <code>end_stream</code> is true, <code>max_bytes</code> fits within the peer's
-initial stream window, and no per-stream override has been
-recorded, only the connection window is consulted. The stream
-closes on this frame, so its remaining send window will not be
-consulted again and need not be tracked.</p>
 
   </div>
 </div>
@@ -471,6 +461,23 @@ consulted again and need not be tracked.</p>
       <pre class="lines">
 
 
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
 124
 125
 126
@@ -493,27 +500,10 @@ consulted again and need not be tracked.</p>
 143
 144
 145
-146
-147
-148
-149
-150
-151
-152
-153
-154
-155
-156
-157
-158
-159
-160
-161
-162
-163</pre>
+146</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 124</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 107</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_acquire'>acquire</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_max_bytes'>max_bytes</span><span class='comma'>,</span> <span class='label'>end_stream:</span> <span class='kw'>false</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_initial'>initial</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -571,8 +561,7 @@ consulted again and need not be tracked.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Increments the connection-level send window. Called when the peer
-sends a WINDOW_UPDATE on stream 0.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Increments the connection-level send window by <code>increment</code> bytes.</p>
 
   </div>
 </div>
@@ -603,12 +592,12 @@ sends a WINDOW_UPDATE on stream 0.</p>
       <pre class="lines">
 
 
-172
-173
-174</pre>
+154
+155
+156</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 172</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 154</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_add_connection_window'>add_connection_window</span><span class='lparen'>(</span><span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='ivar'>@connection_window</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_window'>window</span><span class='op'>|</span> <span class='id identifier rubyid_window'>window</span> <span class='op'>+</span> <span class='id identifier rubyid_increment'>increment</span> <span class='rbrace'>}</span>
@@ -629,8 +618,7 @@ sends a WINDOW_UPDATE on stream 0.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Increments the per-stream send window. Called when the peer sends
-a WINDOW_UPDATE on a specific stream.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Increments the send window for the given stream by <code>increment</code> bytes.</p>
 
   </div>
 </div>
@@ -675,16 +663,16 @@ a WINDOW_UPDATE on a specific stream.</p>
       <pre class="lines">
 
 
-184
-185
-186
-187
-188
-189
-190</pre>
+165
+166
+167
+168
+169
+170
+171</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 184</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 165</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_add_stream_window'>add_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_initial'>initial</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -709,9 +697,7 @@ a WINDOW_UPDATE on a specific stream.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Discards any per-stream tracking for the given stream. Called
-after a stream closes so <code>@stream_windows</code> does not grow without
-bound across the lifetime of a connection.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Discards any per-stream tracking for the given stream.</p>
 
   </div>
 </div>
@@ -742,20 +728,20 @@ bound across the lifetime of a connection.</p>
       <pre class="lines">
 
 
-218
-219
-220
-221
-222
-223
-224
-225
-226
-227
-228</pre>
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 218</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 197</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_discard_stream'>discard_stream</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
@@ -816,19 +802,19 @@ existing stream window by the delta as required by RFC 7540 section 6.9.2.</p>
       <pre class="lines">
 
 
-199
-200
-201
-202
-203
-204
-205
-206
-207
-208</pre>
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 199</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 180</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_initial_stream_window'>set_initial_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_new_size'>new_size</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_old'>old</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -850,7 +836,7 @@ existing stream window by the delta as required by RFC 7540 section 6.9.2.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Jul 20 00:49:26 2026 by
+  Generated on Mon Jul 20 01:49:35 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

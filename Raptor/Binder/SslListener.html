@@ -108,10 +108,8 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Wraps a TCPServer with an SSL context for accepting SSL connections.</p>
-<p>Holds both the underlying TCP server and the SSL context together so
-the server thread can accept a TCP connection and then perform the SSL
-handshake in a single coordinated step.</p>
+    <p>Pairs a TCPServer with the SSL context to use for accepted
+connections.</p>
 
   </div>
 </div>
@@ -385,12 +383,12 @@ handshake in a single coordinated step.</p>
       <pre class="lines">
 
 
-47
-48
-49</pre>
+23
+24
+25</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 47</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 23</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_ssl_context'>ssl_context</span>
   <span class='ivar'>@ssl_context</span>
@@ -442,12 +440,12 @@ handshake in a single coordinated step.</p>
       <pre class="lines">
 
 
-47
-48
-49</pre>
+23
+24
+25</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 47</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 23</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_tcp_server'>tcp_server</span>
   <span class='ivar'>@tcp_server</span>
@@ -501,10 +499,10 @@ handshake in a single coordinated step.</p>
       <pre class="lines">
 
 
-49</pre>
+25</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'sig/generated/raptor/binder.rbs', line 49</span>
+      <pre class="code"><span class="info file"># File 'sig/generated/raptor/binder.rbs', line 25</span>
 
 def self.members: () -&gt; [ :tcp_server, :ssl_context ]</pre>
     </td>
@@ -653,11 +651,11 @@ def self.members: () -&gt; [ :tcp_server, :ssl_context ]</pre>
       <pre class="lines">
 
 
-46
-47</pre>
+22
+23</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'sig/generated/raptor/binder.rbs', line 46</span>
+      <pre class="code"><span class="info file"># File 'sig/generated/raptor/binder.rbs', line 22</span>
 
 def self.new: (untyped tcp_server, untyped ssl_context) -&gt; instance
 | (tcp_server: untyped, ssl_context: untyped) -&gt; instance</pre>
@@ -687,10 +685,10 @@ def self.new: (untyped tcp_server, untyped ssl_context) -&gt; instance
       <pre class="lines">
 
 
-55</pre>
+31</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 55</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 31</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close'>close</span> <span class='op'>=</span> <span class='id identifier rubyid_tcp_server'>tcp_server</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span></pre>
     </td>
@@ -713,10 +711,10 @@ def self.new: (untyped tcp_server, untyped ssl_context) -&gt; instance
       <pre class="lines">
 
 
-52</pre>
+28</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 52</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 28</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_local_address'>local_address</span> <span class='op'>=</span> <span class='id identifier rubyid_tcp_server'>tcp_server</span><span class='period'>.</span><span class='id identifier rubyid_local_address'>local_address</span></pre>
     </td>
@@ -761,10 +759,10 @@ def self.new: (untyped tcp_server, untyped ssl_context) -&gt; instance
       <pre class="lines">
 
 
-51</pre>
+27</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'sig/generated/raptor/binder.rbs', line 51</span>
+      <pre class="code"><span class="info file"># File 'sig/generated/raptor/binder.rbs', line 27</span>
 
 def members: () -&gt; [ :tcp_server, :ssl_context ]</pre>
     </td>
@@ -787,10 +785,10 @@ def members: () -&gt; [ :tcp_server, :ssl_context ]</pre>
       <pre class="lines">
 
 
-49</pre>
+25</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 49</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 25</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_to_io'>to_io</span> <span class='op'>=</span> <span class='id identifier rubyid_tcp_server'>tcp_server</span></pre>
     </td>
@@ -803,7 +801,7 @@ def members: () -&gt; [ :tcp_server, :ssl_context ]</pre>
 </div>
 
       <div id="footer">
-  Generated on Mon Jul 20 00:49:26 2026 by
+  Generated on Mon Jul 20 01:49:35 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
