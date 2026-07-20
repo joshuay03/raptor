@@ -1566,13 +1566,21 @@ underlying threads if in-flight requests have not finished within
 883
 884
 885
-886</pre>
+886
+887
+888
+889
+890</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 879</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_drain_thread_pool'>drain_thread_pool</span><span class='lparen'>(</span><span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_drain'>drain</span> <span class='op'>=</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span> <span class='rbrace'>}</span>
+  <span class='id identifier rubyid_drain'>drain</span> <span class='op'>=</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span>
+    <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_current'>current</span><span class='period'>.</span><span class='id identifier rubyid_name'>name</span> <span class='op'>=</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Thread Pool Drain</span><span class='tstring_end'>&quot;</span></span>
+
+    <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='kw'>end</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_drain'>drain</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='ivar'>@worker_drain_timeout</span><span class='rparen'>)</span>
 
   <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_warn'><span class='object_link'><a href="Log.html#warn-class_method" title="Raptor::Log.warn (method)">warn</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Force-killing in-flight app threads after </span><span class='embexpr_beg'>#{</span><span class='ivar'>@worker_drain_timeout</span><span class='embexpr_end'>}</span><span class='tstring_content'>s drain timeout</span><span class='tstring_end'>&quot;</span></span>
@@ -1642,18 +1650,18 @@ underlying threads if in-flight requests have not finished within
       <pre class="lines">
 
 
-894
-895
-896
-897
 898
 899
 900
 901
-902</pre>
+902
+903
+904
+905
+906</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 894</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 898</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_exit_description'>exit_description</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_exited?'>exited?</span>
@@ -1764,10 +1772,6 @@ and bind addresses.</p>
       <pre class="lines">
 
 
-921
-922
-923
-924
 925
 926
 927
@@ -1778,10 +1782,14 @@ and bind addresses.</p>
 932
 933
 934
-935</pre>
+935
+936
+937
+938
+939</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 921</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 925</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_log_initialization'>log_initialization</span>
   <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Cluster initializing:</span><span class='tstring_end'>&quot;</span></span>
@@ -2662,18 +2670,18 @@ paths. No-op for any stream whose target path is nil.</p>
       <pre class="lines">
 
 
-943
-944
-945
-946
 947
 948
 949
 950
-951</pre>
+951
+952
+953
+954
+955</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 943</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 947</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reopen_logs'>reopen_logs</span>
   <span class='gvar'>$stdout</span><span class='period'>.</span><span class='id identifier rubyid_reopen'>reopen</span><span class='lparen'>(</span><span class='ivar'>@stdout_file</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>a</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_sync'>sync</span> <span class='op'>=</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='ivar'>@stdout_file</span>
@@ -2714,13 +2722,13 @@ they reopen their own inherited file descriptors.</p>
       <pre class="lines">
 
 
-959
-960
-961
-962</pre>
+963
+964
+965
+966</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 959</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 963</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reopen_logs_and_signal_workers'>reopen_logs_and_signal_workers</span>
   <span class='id identifier rubyid_reopen_logs'>reopen_logs</span>
@@ -3443,14 +3451,14 @@ master's request.</p>
       <pre class="lines">
 
 
-909
-910
-911
-912
-913</pre>
+913
+914
+915
+916
+917</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 909</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 913</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@shutdown</span>
@@ -3927,18 +3935,18 @@ being promoted.</p>
       <pre class="lines">
 
 
-969
-970
-971
-972
 973
 974
 975
 976
-977</pre>
+977
+978
+979
+980
+981</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 969</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 973</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_stats_file_loop'>write_stats_file_loop</span>
   <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
@@ -3959,7 +3967,7 @@ being promoted.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Jul 20 02:44:55 2026 by
+  Generated on Mon Jul 20 03:53:27 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
