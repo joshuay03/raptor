@@ -245,8 +245,8 @@ most of its work in Ruby with a few near-zero-cost cache hits.</p>
 <p>Each cell reports the median throughput and median p95 latency independently across 5 runs, so the two numbers in a row
 may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
 state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
-((max - min) / 2 / median) between runs of a single cell was ±34.9% for throughput
-and ±24.5% for p95.</p>
+((max - min) / 2 / median) between runs of a single cell was ±30.0% for throughput
+and ±22.8% for p95.</p>
 <table>
 <thead>
 <tr>
@@ -269,85 +269,85 @@ and ±24.5% for p95.</p>
 <td>HTTP/1.1</td>
 <td>IO</td>
 <td>1.39k req/s</td>
-<td>51.00 ms</td>
-<td>0.90k req/s</td>
-<td>69.30 ms</td>
-<td>53.6% higher</td>
-<td>26.4% lower</td>
-<td>4.68k req/s</td>
-<td>14.50 ms</td>
-<td>70.3% lower</td>
-<td>251.7% higher</td>
+<td>50.20 ms</td>
+<td>0.96k req/s</td>
+<td>66.20 ms</td>
+<td>44.1% higher</td>
+<td>24.2% lower</td>
+<td>4.54k req/s</td>
+<td>15.00 ms</td>
+<td>69.4% lower</td>
+<td>234.7% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>CPU</td>
-<td>4.38k req/s</td>
-<td>19.00 ms</td>
-<td>3.59k req/s</td>
-<td>16.90 ms</td>
-<td>22.0% higher</td>
-<td>12.4% higher</td>
-<td>3.73k req/s</td>
-<td>15.70 ms</td>
-<td>17.4% higher</td>
-<td>21.0% higher</td>
+<td>4.55k req/s</td>
+<td>18.10 ms</td>
+<td>3.64k req/s</td>
+<td>16.50 ms</td>
+<td>24.9% higher</td>
+<td>9.7% higher</td>
+<td>3.87k req/s</td>
+<td>15.00 ms</td>
+<td>17.5% higher</td>
+<td>20.7% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>IO</td>
-<td>1.35k req/s</td>
-<td>33.20 ms</td>
-<td>0.87k req/s</td>
-<td>69.60 ms</td>
-<td>55.2% higher</td>
-<td>52.3% lower</td>
-<td>4.26k req/s</td>
-<td>15.90 ms</td>
-<td>68.2% lower</td>
-<td>108.8% higher</td>
+<td>1.42k req/s</td>
+<td>30.00 ms</td>
+<td>0.92k req/s</td>
+<td>65.80 ms</td>
+<td>54.8% higher</td>
+<td>54.4% lower</td>
+<td>4.08k req/s</td>
+<td>16.70 ms</td>
+<td>65.3% lower</td>
+<td>79.6% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>CPU</td>
-<td>4.43k req/s</td>
-<td>11.50 ms</td>
-<td>3.73k req/s</td>
-<td>17.70 ms</td>
-<td>18.6% higher</td>
-<td>35.0% lower</td>
-<td>3.72k req/s</td>
-<td>17.70 ms</td>
-<td>19.0% higher</td>
-<td>35.0% lower</td>
+<td>4.51k req/s</td>
+<td>11.20 ms</td>
+<td>3.77k req/s</td>
+<td>17.50 ms</td>
+<td>19.8% higher</td>
+<td>36.0% lower</td>
+<td>4.00k req/s</td>
+<td>16.50 ms</td>
+<td>12.9% higher</td>
+<td>32.1% lower</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>IO</td>
-<td>0.89k req/s</td>
-<td>77.54 ms</td>
+<td>0.71k req/s</td>
+<td>85.84 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>4.05k req/s</td>
-<td>16.69 ms</td>
-<td>78.0% lower</td>
-<td>364.5% higher</td>
+<td>3.88k req/s</td>
+<td>17.43 ms</td>
+<td>81.7% lower</td>
+<td>392.3% higher</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>CPU</td>
-<td>3.10k req/s</td>
-<td>25.38 ms</td>
+<td>4.07k req/s</td>
+<td>21.85 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>2.82k req/s</td>
-<td>34.37 ms</td>
-<td>10.2% higher</td>
-<td>26.2% lower</td>
+<td>4.33k req/s</td>
+<td>30.84 ms</td>
+<td>6.0% lower</td>
+<td>29.2% lower</td>
 </tr>
 </tbody>
 </table>
@@ -375,7 +375,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Tue Jul 21 00:30:33 2026 by
+  Generated on Tue Jul 21 01:12:15 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
