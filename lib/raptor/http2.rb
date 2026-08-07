@@ -111,7 +111,7 @@ module Raptor
         if end_stream && capped <= initial && !@stream_windows.value.key?(stream_id)
           loop do
             granted = reserve_connection(capped)
-            return granted if granted > 0
+            return granted if granted.positive?
 
             sleep ACQUIRE_POLL_INTERVAL
           end
@@ -120,9 +120,9 @@ module Raptor
         loop do
           stream_window = @stream_windows.value[stream_id] || initial
           capped_full = capped < stream_window ? capped : stream_window
-          granted = capped_full > 0 ? reserve_connection(capped_full) : 0
+          granted = capped_full.positive? ? reserve_connection(capped_full) : 0
 
-          if granted > 0
+          if granted.positive?
             @stream_windows.swap do |windows|
               current = windows[stream_id] || initial
               windows.merge(stream_id => current - granted)
@@ -209,7 +209,7 @@ module Raptor
         granted = 0
         @connection_window.swap do |window|
           granted = window > capped ? capped : window
-          granted > 0 ? window - granted : window
+          granted.positive? ? window - granted : window
         end
         granted
       end
@@ -363,7 +363,7 @@ module Raptor
 
         case frame[:type]
         when :settings
-          if (frame[:flags] & FLAG_ACK).zero?
+          if frame[:flags].nobits?(FLAG_ACK)
             parsed_settings = parser.parse_settings(frame[:payload])
             peer_initial_window_size = parsed_settings[:initial_window_size] if parsed_settings.key?(:initial_window_size)
             outgoing_frames << parser.build_frame(:settings, FLAG_ACK, 0, nil)
@@ -381,13 +381,13 @@ module Raptor
             last_client_stream_id = stream_id
           end
 
-          if (frame[:flags] & FLAG_PRIORITY) != 0
+          if frame[:flags].anybits?(FLAG_PRIORITY)
             header_payload = header_payload.byteslice(5..-1) || ""
           end
 
-          end_stream = (frame[:flags] & FLAG_END_STREAM) != 0
+          end_stream = frame[:flags].anybits?(FLAG_END_STREAM)
 
-          if (frame[:flags] & FLAG_END_HEADERS) != 0
+          if frame[:flags].anybits?(FLAG_END_HEADERS)
             decoded_headers, hpack_table = parser.parse_headers(header_payload, hpack_table)
             if invalid_pseudo_headers?(decoded_headers)
               streams.delete(stream_id)
@@ -407,7 +407,7 @@ module Raptor
 
           pending_headers = pending_headers.merge(buffer: pending_headers[:buffer] + frame[:payload])
 
-          if (frame[:flags] & FLAG_END_HEADERS) != 0
+          if frame[:flags].anybits?(FLAG_END_HEADERS)
             stream_id = pending_headers[:stream_id]
             decoded_headers, hpack_table = parser.parse_headers(pending_headers[:buffer], hpack_table)
             if invalid_pseudo_headers?(decoded_headers)
@@ -442,7 +442,7 @@ module Raptor
             end
           end
 
-          if (frame[:flags] & FLAG_END_STREAM) != 0
+          if frame[:flags].anybits?(FLAG_END_STREAM)
             stream_headers = stream[:headers] || []
             completed_requests << {
               stream_id: stream_id,
@@ -460,7 +460,7 @@ module Raptor
           window_updates << [frame[:stream_id], increment]
 
         when :ping
-          if (frame[:flags] & FLAG_ACK).zero?
+          if frame[:flags].nobits?(FLAG_ACK)
             outgoing_frames << parser.build_frame(:ping, FLAG_ACK, 0, frame[:payload])
           end
 
@@ -477,7 +477,7 @@ module Raptor
         outgoing_frames << parser.build_frame(:goaway, 0, 0, goaway_payload)
       end
 
-      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, !goaway_error.nil?)
+      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, !!goaway_error)
     end
 
     # Merges a decoded header block into the stream's accumulated state,
@@ -651,7 +651,7 @@ module Raptor
       buffer = String.new
       buffer << data
 
-      while socket.pending > 0
+      while socket.pending.positive?
         buffer << socket.read_nonblock(socket.pending)
       end
 
@@ -742,7 +742,7 @@ module Raptor
           remaining = chunk.bytesize - offset
           last_frame = chunk_index == last_chunk_index && remaining <= MAX_FRAME_SIZE
           granted = flow_control.acquire(stream_id, remaining, end_stream: last_frame)
-          slice = offset == 0 && granted == chunk.bytesize ? chunk : chunk.byteslice(offset, granted)
+          slice = offset.zero? && granted == chunk.bytesize ? chunk : chunk.byteslice(offset, granted)
           offset += granted
           end_stream = chunk_index == last_chunk_index && offset == chunk.bytesize
           frames << parser.build_frame(:data, end_stream ? FLAG_END_STREAM : 0, stream_id, slice)

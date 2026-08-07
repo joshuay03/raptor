@@ -131,7 +131,7 @@ module Raptor
 
         chunk_size = size_part.to_i(16)
 
-        if chunk_size == 0
+        if chunk_size.zero?
           trailer_offset = crlf + 2
           loop do
             trailer_crlf = buffer.index("\r\n", trailer_offset)
@@ -434,7 +434,7 @@ module Raptor
       buffer = (Thread.current[:raptor_read_buffer] ||= String.new(capacity: READ_BUFFER_SIZE))
       socket.read_nonblock(READ_BUFFER_SIZE, buffer)
 
-      while socket.respond_to?(:pending) && socket.pending > 0
+      while socket.respond_to?(:pending) && socket.pending.positive?
         buffer << socket.read_nonblock(socket.pending)
       end
 
@@ -472,7 +472,7 @@ module Raptor
     #
     # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
     def extract_body(buffer, env, parser, nread, decode_chunked:)
-      return nil unless parser.has_body?
+      return unless parser.has_body?
 
       body = buffer.byteslice(nread..-1) || ""
 
@@ -1108,7 +1108,7 @@ module Raptor
       content_length = headers[Rack::CONTENT_LENGTH]&.to_i
       use_chunked = false
 
-      if !content_length || content_length == 0
+      if !content_length || content_length.zero?
         calculated_length = calculate_content_length(body)
         if calculated_length
           content_length = calculated_length

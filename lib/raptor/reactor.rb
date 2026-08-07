@@ -117,7 +117,7 @@ module Raptor
             now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
             expired = []
             @timeouts.traverse do |to_client|
-              break unless to_client.timeout(now) == 0
+              break unless to_client.timeout(now).zero?
 
               expired << to_client
             end
@@ -378,7 +378,7 @@ module Raptor
       buffer = state[:buffer] ? state[:buffer].dup : String.new
       buffer << data
 
-      while socket.respond_to?(:pending) && socket.pending > 0
+      while socket.respond_to?(:pending) && socket.pending.positive?
         buffer << socket.read_nonblock(socket.pending)
       end
 

@@ -339,27 +339,9 @@ module Raptor
     end
 
     def test_environment_falls_back_to_rails_env_then_rack_env_then_development
-      original_rack_env = ENV["RACK_ENV"]
-      original_rails_env = ENV["RAILS_ENV"]
-      ENV.delete("RACK_ENV")
-      ENV.delete("RAILS_ENV")
-
-      cluster = without_output { Cluster.new(@options) }
-      assert_equal "development", cluster.instance_variable_get(:@environment)
-      cluster.instance_variable_get(:@binder).close
-
-      ENV["RACK_ENV"] = "rack_only"
-      cluster = without_output { Cluster.new(@options) }
-      assert_equal "rack_only", cluster.instance_variable_get(:@environment)
-      cluster.instance_variable_get(:@binder).close
-
-      ENV["RAILS_ENV"] = "rails_wins"
-      cluster = without_output { Cluster.new(@options) }
-      assert_equal "rails_wins", cluster.instance_variable_get(:@environment)
-    ensure
-      ENV["RACK_ENV"] = original_rack_env
-      ENV["RAILS_ENV"] = original_rails_env
-      cluster&.instance_variable_get(:@binder)&.close
+      assert_equal "development", environment_in_subprocess(rack_env: nil,        rails_env: nil)
+      assert_equal "rack_only",   environment_in_subprocess(rack_env: "rack_only", rails_env: nil)
+      assert_equal "rails_wins",  environment_in_subprocess(rack_env: "rack_only", rails_env: "rails_wins")
     end
 
     def test_chdir_option_changes_working_directory
@@ -1520,6 +1502,23 @@ module Raptor
       Timeout.timeout(5) { socket.read }
     ensure
       socket&.close
+    end
+
+    def environment_in_subprocess(rack_env:, rails_env:)
+      read, write = IO.pipe
+      pid = fork do
+        read.close
+        rack_env ? ENV["RACK_ENV"] = rack_env : ENV.delete("RACK_ENV")
+        rails_env ? ENV["RAILS_ENV"] = rails_env : ENV.delete("RAILS_ENV")
+        cluster = without_output { Cluster.new(@options) }
+        write.write(cluster.instance_variable_get(:@environment))
+        write.close
+        exit!(0)
+      end
+      write.close
+      value = read.read
+      Process.wait(pid)
+      value
     end
   end
 end

@@ -3,6 +3,8 @@
 require "test_helper"
 
 class TestRaptor < Raptor::TestCase
+  parallelize_me!
+
   def test_that_it_has_a_version_number
     refute_nil ::Raptor::VERSION
   end

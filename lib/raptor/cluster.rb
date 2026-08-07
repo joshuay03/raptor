@@ -326,10 +326,10 @@ module Raptor
     # @rbs (Integer index) -> Integer?
     def spawn_worker_via_seed(index)
       @fork_w.write([index, @phase].pack("LL"))
-      return nil unless @resp_r.wait_readable(5)
+      return unless @resp_r.wait_readable(5)
 
       bytes = @resp_r.read_nonblock(4, exception: false)
-      return nil unless bytes.is_a?(String) && bytes.bytesize == 4
+      return unless bytes.is_a?(String) && bytes.bytesize == 4
 
       bytes.unpack1("L")
     rescue Errno::EPIPE, IOError
@@ -501,7 +501,7 @@ module Raptor
       bytes = @resp_r.read_nonblock(4, exception: false)
       return unless bytes.is_a?(String) && bytes.bytesize == 4
 
-      @seed_ready = true if bytes.unpack1("L") == 0
+      @seed_ready = true if bytes.unpack1("L").zero?
     end
 
     # Stops every worker (and the seed if one is active), escalating
