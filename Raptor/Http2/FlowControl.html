@@ -523,7 +523,7 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
   <span class='kw'>if</span> <span class='id identifier rubyid_end_stream'>end_stream</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_capped'>capped</span> <span class='op'>&lt;=</span> <span class='id identifier rubyid_initial'>initial</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
       <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='id identifier rubyid_reserve_connection'>reserve_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_capped'>capped</span><span class='rparen'>)</span>
-      <span class='kw'>return</span> <span class='id identifier rubyid_granted'>granted</span> <span class='kw'>if</span> <span class='id identifier rubyid_granted'>granted</span> <span class='op'>&gt;</span> <span class='int'>0</span>
+      <span class='kw'>return</span> <span class='id identifier rubyid_granted'>granted</span> <span class='kw'>if</span> <span class='id identifier rubyid_granted'>granted</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span>
 
       <span class='id identifier rubyid_sleep'>sleep</span> <span class='const'><span class='object_link'><a href="#ACQUIRE_POLL_INTERVAL-constant" title="Raptor::Http2::FlowControl::ACQUIRE_POLL_INTERVAL (constant)">ACQUIRE_POLL_INTERVAL</a></span></span>
     <span class='kw'>end</span>
@@ -532,9 +532,9 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
   <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
     <span class='id identifier rubyid_stream_window'>stream_window</span> <span class='op'>=</span> <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
     <span class='id identifier rubyid_capped_full'>capped_full</span> <span class='op'>=</span> <span class='id identifier rubyid_capped'>capped</span> <span class='op'>&lt;</span> <span class='id identifier rubyid_stream_window'>stream_window</span> <span class='op'>?</span> <span class='id identifier rubyid_capped'>capped</span> <span class='op'>:</span> <span class='id identifier rubyid_stream_window'>stream_window</span>
-    <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='id identifier rubyid_capped_full'>capped_full</span> <span class='op'>&gt;</span> <span class='int'>0</span> <span class='op'>?</span> <span class='id identifier rubyid_reserve_connection'>reserve_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_capped_full'>capped_full</span><span class='rparen'>)</span> <span class='op'>:</span> <span class='int'>0</span>
+    <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='id identifier rubyid_capped_full'>capped_full</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span> <span class='op'>?</span> <span class='id identifier rubyid_reserve_connection'>reserve_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_capped_full'>capped_full</span><span class='rparen'>)</span> <span class='op'>:</span> <span class='int'>0</span>
 
-    <span class='kw'>if</span> <span class='id identifier rubyid_granted'>granted</span> <span class='op'>&gt;</span> <span class='int'>0</span>
+    <span class='kw'>if</span> <span class='id identifier rubyid_granted'>granted</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span>
       <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_windows'>windows</span><span class='op'>|</span>
         <span class='id identifier rubyid_current'>current</span> <span class='op'>=</span> <span class='id identifier rubyid_windows'>windows</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
         <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>-</span> <span class='id identifier rubyid_granted'>granted</span><span class='rparen'>)</span>
@@ -832,7 +832,7 @@ exhausted).</p>
   <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='int'>0</span>
   <span class='ivar'>@connection_window</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_window'>window</span><span class='op'>|</span>
     <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='id identifier rubyid_window'>window</span> <span class='op'>&gt;</span> <span class='id identifier rubyid_capped'>capped</span> <span class='op'>?</span> <span class='id identifier rubyid_capped'>capped</span> <span class='op'>:</span> <span class='id identifier rubyid_window'>window</span>
-    <span class='id identifier rubyid_granted'>granted</span> <span class='op'>&gt;</span> <span class='int'>0</span> <span class='op'>?</span> <span class='id identifier rubyid_window'>window</span> <span class='op'>-</span> <span class='id identifier rubyid_granted'>granted</span> <span class='op'>:</span> <span class='id identifier rubyid_window'>window</span>
+    <span class='id identifier rubyid_granted'>granted</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span> <span class='op'>?</span> <span class='id identifier rubyid_window'>window</span> <span class='op'>-</span> <span class='id identifier rubyid_granted'>granted</span> <span class='op'>:</span> <span class='id identifier rubyid_window'>window</span>
   <span class='kw'>end</span>
   <span class='id identifier rubyid_granted'>granted</span>
 <span class='kw'>end</span></pre>
@@ -918,7 +918,7 @@ existing stream window by the delta as required by RFC 7540 section 6.9.2.</p>
 </div>
 
       <div id="footer">
-  Generated on Fri Aug  7 21:28:57 2026 by
+  Generated on Sat Aug  8 00:03:41 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

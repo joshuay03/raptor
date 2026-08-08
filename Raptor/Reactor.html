@@ -1635,7 +1635,7 @@ returns it to the selector.</p>
   <span class='id identifier rubyid_buffer'>buffer</span> <span class='op'>=</span> <span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:buffer</span><span class='rbracket'>]</span> <span class='op'>?</span> <span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:buffer</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span> <span class='op'>:</span> <span class='const'>String</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
   <span class='id identifier rubyid_buffer'>buffer</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_data'>data</span>
 
-  <span class='kw'>while</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:pending</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_pending'>pending</span> <span class='op'>&gt;</span> <span class='int'>0</span>
+  <span class='kw'>while</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_respond_to?'>respond_to?</span><span class='lparen'>(</span><span class='symbol'>:pending</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_pending'>pending</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span>
     <span class='id identifier rubyid_buffer'>buffer</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_read_nonblock'>read_nonblock</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_pending'>pending</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 
@@ -1910,7 +1910,7 @@ the registration queue is closed and drained.</p>
         <span class='id identifier rubyid_now'>now</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span>
         <span class='id identifier rubyid_expired'>expired</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
         <span class='ivar'>@timeouts</span><span class='period'>.</span><span class='id identifier rubyid_traverse'>traverse</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_to_client'>to_client</span><span class='op'>|</span>
-          <span class='kw'>break</span> <span class='kw'>unless</span> <span class='id identifier rubyid_to_client'>to_client</span><span class='period'>.</span><span class='id identifier rubyid_timeout'>timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_now'>now</span><span class='rparen'>)</span> <span class='op'>==</span> <span class='int'>0</span>
+          <span class='kw'>break</span> <span class='kw'>unless</span> <span class='id identifier rubyid_to_client'>to_client</span><span class='period'>.</span><span class='id identifier rubyid_timeout'>timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_now'>now</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
 
           <span class='id identifier rubyid_expired'>expired</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_to_client'>to_client</span>
         <span class='kw'>end</span>
@@ -2366,7 +2366,7 @@ was supplied when the connection was added.</p>
 </div>
 
       <div id="footer">
-  Generated on Fri Aug  7 21:28:58 2026 by
+  Generated on Sat Aug  8 00:03:41 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
