@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=hey-builder /go/bin/hey /usr/local/bin/hey
+COPY --from=hey-builder /usr/local/go /usr/local/go
+ENV PATH=/usr/local/go/bin:${PATH}
 
 ENV BUNDLE_PATH=/workspace/.bundle
 ENV BUNDLE_APP_CONFIG=/workspace/.bundle
