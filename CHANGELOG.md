@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Bundle HTTP/2 frame writes into a single socket write
+
 ## [0.13.0] - 2026-07-21
 
 - Tune BPF reuseport routing to spread bursts across near-idle workers

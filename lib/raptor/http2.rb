@@ -66,9 +66,7 @@ module Raptor
 
           break if pending.empty?
 
-          pending.each do |frame|
-            Http.socket_write(socket, frame, timeout: @write_timeout) rescue nil
-          end
+          Http.socket_write(socket, pending.join, timeout: @write_timeout) rescue nil
         end
       end
     end

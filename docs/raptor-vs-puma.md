@@ -328,6 +328,8 @@ The `Writer` is worth a paragraph. Naive per-connection writing would need a mut
 
 So under contention, only one thread does socket I/O at a time (because a socket can only be written to serially anyway), but no thread ever blocks on a lock. The "loser" of the CAS hands its frames off to the "winner" and returns immediately to whatever it was doing next, whether that is starting another stream, waiting for the next work item, or servicing a different connection.
 
+Once the writer thread has claimed a batch of pending frames, it concatenates them into a single buffer and issues one socket write for the whole batch. For a typical response of a HEADERS frame plus several DATA frames, that is one SSL_write call rather than one per frame.
+
 Flow control uses similar CAS-protected atoms. The connection-level window and the per-stream windows live in separate `Atom` cells so the common case (connection window has capacity) doesn't require per-stream book-keeping. `acquire` on the `FlowControl` atomically deducts from the connection window; if that succeeds it also deducts from the stream window. If either window is exhausted, the caller sleeps 1ms and retries. Under real traffic this practically never happens because the peer's window is refilled proactively via `WINDOW_UPDATE` frames as we drain the client's buffered body bytes.
 
 Frame processing also has an eager loop. After processing one batch of frames, the h2 handler tries to `read_nonblock` one more time to see if the next batch is already available. Up to four rounds are consumed inline before handing back to the reactor. This is the same principle as the HTTP/1.1 eager keep-alive: amortise the reactor round-trip when the client is actively sending.
