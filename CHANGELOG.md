@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Cap eager HTTP/2 frame consumption at thread pool saturation
 - Bundle HTTP/2 frame writes into a single socket write
 
 ## [0.13.0] - 2026-07-21

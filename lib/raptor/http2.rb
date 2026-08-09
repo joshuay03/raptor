@@ -215,7 +215,7 @@ module Raptor
 
     EAGER_READ_TIMEOUT = 0.001
     EAGER_READ_BUFFER_SIZE = 64 * 1024
-    EAGER_MAX_ROUNDS = 4
+    EAGER_MAX_ROUNDS = 8
 
     FLAG_END_STREAM = 0x1
     FLAG_END_HEADERS = 0x4
@@ -596,6 +596,7 @@ module Raptor
 
         rounds += 1
         break if rounds >= EAGER_MAX_ROUNDS
+        break if thread_pool.queue_size >= thread_pool.size
 
         next_batch = eager_read_next_batch(socket)
         break unless next_batch
