@@ -381,9 +381,7 @@ so that exactly one thread is actively writing at any time.</p>
 68
 69
 70
-71
-72
-73</pre>
+71</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 44</span>
@@ -413,9 +411,7 @@ so that exactly one thread is actively writing at any time.</p>
 
     <span class='kw'>break</span> <span class='kw'>if</span> <span class='id identifier rubyid_pending'>pending</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
 
-    <span class='id identifier rubyid_pending'>pending</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_frame'>frame</span><span class='op'>|</span>
-      <span class='const'><span class='object_link'><a href="../Http.html" title="Raptor::Http (module)">Http</a></span></span><span class='period'>.</span><span class='id identifier rubyid_socket_write'><span class='object_link'><a href="../Http.html#socket_write-class_method" title="Raptor::Http.socket_write (method)">socket_write</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_frame'>frame</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='ivar'>@write_timeout</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
-    <span class='kw'>end</span>
+    <span class='const'><span class='object_link'><a href="../Http.html" title="Raptor::Http (module)">Http</a></span></span><span class='period'>.</span><span class='id identifier rubyid_socket_write'><span class='object_link'><a href="../Http.html#socket_write-class_method" title="Raptor::Http.socket_write (method)">socket_write</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_pending'>pending</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='ivar'>@write_timeout</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -428,7 +424,7 @@ so that exactly one thread is actively writing at any time.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Aug  9 00:18:13 2026 by
+  Generated on Sun Aug  9 08:13:44 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
