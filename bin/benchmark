@@ -23,6 +23,7 @@ end
 require "fileutils"
 require "json"
 require "open3"
+require "openssl"
 require "socket"
 require "tempfile"
 require "timeout"
@@ -107,12 +108,35 @@ def wait_for_port(port, timeout: 30)
   deadline = Time.now + timeout
   loop do
     begin
-      TCPSocket.new("127.0.0.1", port).close
+      probe_port(port)
       return
-    rescue Errno::ECONNREFUSED, Errno::ECONNRESET
+    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT, EOFError, IOError, OpenSSL::SSL::SSLError, Timeout::Error
       raise "Port #{port} never opened" if Time.now > deadline
 
       sleep 0.2
+    end
+  end
+end
+
+def probe_port(port)
+  if port == H2_PORT
+    tcp = TCPSocket.new("127.0.0.1", port)
+    context = OpenSSL::SSL::SSLContext.new
+    context.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    ssl = OpenSSL::SSL::SSLSocket.new(tcp, context)
+    ssl.sync_close = true
+    begin
+      Timeout.timeout(1) { ssl.connect }
+    ensure
+      ssl.close
+    end
+  else
+    socket = TCPSocket.new("127.0.0.1", port)
+    begin
+      socket.write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+      Timeout.timeout(1) { socket.readpartial(1) }
+    ensure
+      socket.close
     end
   end
 end
