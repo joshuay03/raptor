@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Default the worker count to the cgroup-aware available processor count
+
 ## [0.14.0] - 2026-08-09
 
 - Cap eager HTTP/2 frame consumption at thread pool saturation

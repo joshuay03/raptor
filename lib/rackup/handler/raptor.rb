@@ -1,7 +1,7 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
-require "etc"
+require "concurrent/utility/processor_counter"
 
 module Rackup
   module Handler
@@ -42,7 +42,7 @@ module Rackup
         {
           "Host=HOST"   => "Hostname to listen on (default: #{DEFAULT_OPTIONS[:Host]})",
           "Port=PORT"   => "Port to listen on (default: #{DEFAULT_OPTIONS[:Port]})",
-          "Workers=NUM" => "Number of worker processes (default: nprocessors)",
+          "Workers=NUM" => "Number of worker processes (default: available processor count)",
           "Ractors=NUM" => "Number of pipeline ractors per worker (default: 1)",
           "Threads=NUM" => "Number of threads per worker (default: 3)",
           "Config=PATH" => "Load additional configuration from PATH"
@@ -80,7 +80,7 @@ module Rackup
           end,
           socket_backlog: (config[:socket_backlog] || cli_defaults[:socket_backlog]).to_i,
           drain_accept_queue: config.key?(:drain_accept_queue) ? config[:drain_accept_queue] : cli_defaults[:drain_accept_queue],
-          workers: (options[:Workers] || config[:workers] || Etc.nprocessors).to_i,
+          workers: (options[:Workers] || config[:workers] || Concurrent.available_processor_count).to_i,
           ractors: (options[:Ractors] || config[:ractors] || cli_defaults[:ractors]).to_i,
           threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,
           app: app

@@ -30,6 +30,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rack", ">= 3.2.0"
   spec.add_dependency "nio4r"
   spec.add_dependency "atomic-ruby"
+  spec.add_dependency "concurrent-ruby"
   spec.add_dependency "ractor-pool"
   spec.add_dependency "red-black-tree"
   spec.add_dependency "mmap-ruby"

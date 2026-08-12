@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-require "etc"
+require "concurrent/utility/processor_counter"
 require "tempfile"
 
 require "rackup"
@@ -33,7 +33,7 @@ module Rackup
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:drain_accept_queue], opts[:drain_accept_queue]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:ractors], opts[:ractors]
-        assert_equal Etc.nprocessors, opts[:workers]
+        assert_equal Integer(Concurrent.available_processor_count), opts[:workers]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:connection], opts[:connection]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http1], opts[:http1]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http2], opts[:http2]

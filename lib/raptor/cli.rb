@@ -1,7 +1,7 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
-require "etc"
+require "concurrent/utility/processor_counter"
 require "json"
 require "optparse"
 
@@ -24,7 +24,7 @@ module Raptor
   #   cli.run
   #
   class CLI
-    DEFAULT_WORKER_COUNT = Etc.nprocessors
+    DEFAULT_WORKER_COUNT = Integer(Concurrent.available_processor_count)
 
     NESTED_OPTION_KEYS = [:connection, :http1, :http2].freeze
 
