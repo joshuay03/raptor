@@ -20,6 +20,11 @@ unless File.exist?("/.dockerenv")
   exec(File.expand_path("dev", __dir__), "bin/#{File.basename(__FILE__)}", *argv)
 end
 
+system("bundle", "update", "puma", "puma-plus", "falcon", exception: true)
+system("bundle", "exec", "rake", "compile", "bpf:compile", exception: true)
+
+require "bundler/setup"
+require "concurrent/utility/processor_counter"
 require "fileutils"
 require "json"
 require "open3"
@@ -30,14 +35,12 @@ require "timeout"
 
 require_relative "../lib/raptor/version"
 
-system("bundle", "update", "puma", "puma-plus", "falcon", exception: true)
-system("bundle", "exec", "rake", "compile", "bpf:compile", exception: true)
-
-WORKERS = 4
+WORKERS = Integer(Concurrent.available_processor_count)
 THREADS = 3
-HEY_CONNECTIONS = 48
-H2LOAD_CONNECTIONS = 16
+CLIENTS_PER_SERVER_THREAD = 4
+HEY_CONNECTIONS = WORKERS * THREADS * CLIENTS_PER_SERVER_THREAD
 H2LOAD_STREAMS = 3
+H2LOAD_CONNECTIONS = HEY_CONNECTIONS / H2LOAD_STREAMS
 H1_PORT = 9292
 H2_PORT = 9443
 CERT_PATH = "tmp/bench.crt"
