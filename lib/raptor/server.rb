@@ -9,9 +9,9 @@ require_relative "reuseport_bpf"
 
 module Raptor
   # Accepts client connections on TCP, Unix, and SSL listeners and
-  # dispatches them into the request pipeline. Backs off from accepting
-  # when the reactor backlog is high so an overloaded process leaves
-  # connections for peers to absorb.
+  # dispatches them into the request pipeline. Yields between accepts
+  # when the thread pool queue exceeds the pool size so overloaded
+  # workers stay responsive to in-flight requests.
   #
   class Server
     HTTP_SCHEME = "http"
@@ -22,6 +22,7 @@ module Raptor
     DEFAULT_REMOTE_ADDR = "127.0.0.1"
     DEFAULT_SERVER_NAME = "localhost"
 
+    BACKPRESSURE_THRESHOLD_MULTIPLIER = 1.2
     MIN_BACKPRESSURE_THRESHOLD = 8
 
     # @rbs @binder: Binder
@@ -73,7 +74,7 @@ module Raptor
       Thread.new do
         Thread.current.name = "Server"
 
-        backpressure_threshold = [(@thread_pool.size * 1.2).ceil, MIN_BACKPRESSURE_THRESHOLD].max
+        backpressure_threshold = [(@thread_pool.size * BACKPRESSURE_THRESHOLD_MULTIPLIER).ceil, MIN_BACKPRESSURE_THRESHOLD].max
 
         while @running.true?
           begin
@@ -84,6 +85,11 @@ module Raptor
 
           next unless ready_servers
           next if @reactor.backlog >= backpressure_threshold
+
+          if @thread_pool.queue_size > @thread_pool.size
+            Thread.pass
+            next
+          end
 
           ready_servers.each { |listener| accept_connection(listener) }
         end

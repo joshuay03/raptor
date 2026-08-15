@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Yield between accepts when the thread pool queue exceeds the pool size
 - Default the worker count to the cgroup-aware available processor count
 
 ## [0.14.0] - 2026-08-09
