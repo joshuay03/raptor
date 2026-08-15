@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.15.1] - 2026-08-16
+
 - Regenerate the server RBS signatures
 
 ## [0.15.0] - 2026-08-16
