@@ -1299,7 +1299,7 @@ timeout or SSL error.</p>
       <span class='kw'>next</span> <span class='kw'>unless</span> <span class='id identifier rubyid_ready_servers'>ready_servers</span>
       <span class='kw'>next</span> <span class='kw'>if</span> <span class='ivar'>@reactor</span><span class='period'>.</span><span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>&gt;=</span> <span class='id identifier rubyid_backpressure_threshold'>backpressure_threshold</span>
 
-      <span class='kw'>if</span> <span class='ivar'>@thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_queue_size'>queue_size</span> <span class='op'>&gt;</span> <span class='int'>0</span>
+      <span class='kw'>if</span> <span class='ivar'>@thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_queue_size'>queue_size</span> <span class='op'>&gt;</span> <span class='ivar'>@thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_size'>size</span>
         <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_pass'>pass</span>
         <span class='kw'>next</span>
       <span class='kw'>end</span>
@@ -1583,7 +1583,7 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 15 20:26:21 2026 by
+  Generated on Sat Aug 15 20:53:43 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
