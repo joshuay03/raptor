@@ -2,9 +2,9 @@
 
 module Raptor
   # Accepts client connections on TCP, Unix, and SSL listeners and
-  # dispatches them into the request pipeline. Backs off from accepting
-  # when the reactor backlog is high so an overloaded process leaves
-  # connections for peers to absorb.
+  # dispatches them into the request pipeline. Yields between accepts
+  # when the thread pool queue exceeds the pool size so overloaded
+  # workers stay responsive to in-flight requests.
   class Server
     HTTP_SCHEME: ::String
 
@@ -16,27 +16,29 @@ module Raptor
 
     DEFAULT_SERVER_NAME: ::String
 
+    BACKPRESSURE_THRESHOLD_MULTIPLIER: ::Float
+
     MIN_BACKPRESSURE_THRESHOLD: ::Integer
 
-    @running: AtomicBoolean
-
-    @bpf_active: bool
-
-    @drain_accept_queue: bool
-
-    @first_data_timeout: Integer
-
-    @http2: Http2
-
-    @http1: Http1
-
-    @thread_pool: AtomicThreadPool
-
-    @reactor: Reactor
+    @binder: Binder
 
     @listeners: Array[TCPServer | UNIXServer | Binder::SslListener]
 
-    @binder: Binder
+    @reactor: Reactor
+
+    @thread_pool: AtomicThreadPool
+
+    @http1: Http1
+
+    @http2: Http2
+
+    @first_data_timeout: Integer
+
+    @drain_accept_queue: bool
+
+    @bpf_active: bool
+
+    @running: AtomicBoolean
 
     # Creates a new Server instance.
     #

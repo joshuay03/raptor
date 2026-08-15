@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Regenerate the server RBS signatures
+
 ## [0.15.0] - 2026-08-16
 
 - Yield between accepts when the thread pool queue exceeds the pool size
