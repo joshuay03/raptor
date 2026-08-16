@@ -20,7 +20,7 @@ This document focuses on Puma because Puma is the incumbent that any new Ruby we
 
 Raptor is a research project. It hasn't run production traffic. The numbers in the README come from a repeatable microbenchmark, not from a real deployment. The benchmark measures only the **server** work: accepting connections, parsing, dispatching, and writing responses. It does not measure your application. In a typical Rails app where most of a request's time goes to ActiveRecord and downstream services, the server accounts for maybe 5 to 15 percent of the total, so a +N% number in this table will show up as a much smaller improvement in production. The gap is real, but it isn't what a Rails app against a real database will report.
 
-The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma and Falcon releases, run on the same hardware with the same Rack app on a recent Ruby with YJIT enabled. All three servers run four worker processes; Raptor and Puma use three threads per worker, and Falcon uses unbounded fibers per worker. Load generators use 48 concurrent HTTP/1.1 client connections, and 16 h2 connections × 3 streams each for the h2 rows.
+The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma and Falcon releases, run on the same hardware with the same Rack app on a recent Ruby with YJIT enabled. All servers run one worker process per available CPU; Raptor, Puma, and PumaPlus use three threads per worker, and Falcon uses unbounded fibers per worker. Load generators use four client connections per app thread, so on the 10-core machine that produced the current numbers that's 120 concurrent HTTP/1.1 client connections and 40 h2 connections × 3 streams each.
 
 Two workload profiles are measured. **IO-bound** is a GET endpoint that does 5 to 10 short sleeps interleaved with small CPU work per request, simulating a read path that makes several DB or cache calls throughout its lifetime. **CPU-bound** is a POST endpoint with a small JSON body that builds a JSON response in 3 to 5 chunks interleaved with sub-100µs sleeps, simulating a write path that does most of its work in Ruby with a few near-zero-cost cache hits. The workloads are interleaved rather than a single bulk sleep or single bulk serialise so a fiber-per-connection server like Falcon doesn't look artificially good from one-shot IO, and the CPU-bound workload is heavily CPU-dominated by design (roughly 95% CPU / 5% IO by wall time) so it actually measures CPU work rather than smuggling in enough IO for fibers to multiplex.
 
@@ -243,15 +243,22 @@ The knock-on effect is that reading pool state to make backpressure decisions is
 
 ### I/O model
 
-The server accept loop is an `IO.select` + `accept_nonblock` loop, similar to Puma. What is different is the check right before `accept`:
+The server accept loop is an `IO.select` + `accept_nonblock` loop, similar to Puma. What is different is the pair of checks right before `accept`:
 
 ```ruby
-backpressure_threshold = [(@thread_pool.size * 1.2).ceil, MIN_BACKPRESSURE_THRESHOLD].max
+backpressure_threshold = [(@thread_pool.size * BACKPRESSURE_THRESHOLD_MULTIPLIER).ceil, MIN_BACKPRESSURE_THRESHOLD].max
 # ...
 next if @reactor.backlog >= backpressure_threshold
+
+if @thread_pool.queue_size > @thread_pool.size
+  Thread.pass
+  next
+end
 ```
 
-where `@reactor.backlog` is `thread_pool.queue_size + thread_pool.active_count`. If the total load on the thread pool is at 120% of the pool size, this worker stops accepting until it drains. `MIN_BACKPRESSURE_THRESHOLD` is 8, so small pools (say, 3 threads) trip backpressure at 8 concurrent items rather than at 120% of a very small number; the floor keeps saturated workers signaling early so the load-aware dispatcher (below) has time to route around them.
+The first is a hard skip. `@reactor.backlog` is `thread_pool.queue_size + thread_pool.active_count`; when the total load reaches 120% of the pool size, this worker stops accepting until it drains. `MIN_BACKPRESSURE_THRESHOLD` is 8, so small pools (say, 3 threads) trip backpressure at 8 concurrent items rather than at 120% of a very small number; the floor keeps saturated workers signaling early so the load-aware dispatcher (below) has time to route around them.
+
+The second is a softer yield. When the queue alone exceeds the pool size — the app threads are all busy and there's a queue building on top of them — the accept loop yields the GVL via `Thread.pass` and re-checks the queue on the next iteration instead of accepting more work. This lets the app threads make progress before the server thread grabs another connection, and only fires under real pool pressure (queue depth greater than pool size), so IO-bound workloads where threads spend most of their time in `sleep` and rarely queue past the pool size aren't affected.
 
 Because Raptor is always in cluster mode and every worker listens in the same `SO_REUSEPORT` group, load balancing across workers happens at the kernel level. On Linux, Raptor attaches a small BPF program to the reuseport group. Each worker binds its own listener registered in a sockmap, and a dedicated reporter thread publishes the worker's current reactor backlog into a loads map every millisecond. The BPF program consults the map on every incoming connection. When the spread between the busiest and idlest worker is within one, it treats all workers as tied and hash-distributes the connection by its 4-tuple; otherwise it routes to the least-loaded worker. The tie band matters. Without it, a worker that briefly drained one request would attract every subsequent connection until the next load update, herding bursts onto whichever worker most recently reported the lowest load. If the `libbpf-ruby` gem is not installed or the BPF object has not been compiled, Raptor falls back silently to the default four-tuple-hash routing; if the kernel refuses the program, startup raises. Either way, if a worker is saturated and stops calling `accept`, other workers pick up the slack.
 
@@ -449,7 +456,7 @@ This is where most of Raptor's keep-alive edge comes from. Subsequent requests a
 
 **Puma.** Cluster mode uses `accept_loop_delay` (sleep proportional to busy ratio) to prevent thundering herd across workers. Single-worker backpressure is implicit; if all threads are busy and the queue is growing, new accepts pile up in the kernel accept queue. Puma does have `queue_requests` (default true) which pushes partial requests into the reactor, freeing the accept loop, but there is no explicit "stop accepting" signal from the worker.
 
-**Raptor.** Explicit backpressure formula, read every iteration of the accept loop: `if backlog >= max(pool_size * 1.2, 8), skip accept`. When a worker is saturated, other workers pick up the traffic. On Linux, an eBPF program attached to the reuseport group actively routes new connections to the least-loaded worker (see the I/O model section); elsewhere Raptor relies on the kernel's default four-tuple-hash routing.
+**Raptor.** Explicit backpressure, read every iteration of the accept loop: hard skip when `backlog >= max(pool_size * 1.2, 8)`, and a softer `Thread.pass` yield when the queue alone exceeds the pool size. When a worker is saturated, other workers pick up the traffic. On Linux, an eBPF program attached to the reuseport group actively routes new connections to the least-loaded worker (see the I/O model section); elsewhere Raptor relies on the kernel's default four-tuple-hash routing.
 
 ### Shared state (worker ↔ master)
 
@@ -551,7 +558,7 @@ Puma has to bounce Request 3 through the reactor and back through the mutex-prot
 
 ### IO-bound work, where Falcon wins and Raptor clearly beats Puma
 
-On the IO-bound benchmark profile, each request does 5 to 10 short sleeps interleaved with small CPU work, simulating a request that makes several DB or cache calls throughout its lifetime. The bottleneck is how many requests a worker can keep in flight while they wait on IO. Raptor and Puma cap out at their 12 total threads (4 workers × 3), so with 48 client connections the extra 36 sit in the pool queue at any given moment. Falcon spawns a fiber per connection and cooperatively yields on every sleep, so all 48 requests can be in flight simultaneously. That gap shows up as roughly 3-4x throughput and much lower p95 for Falcon.
+On the IO-bound benchmark profile, each request does 5 to 10 short sleeps interleaved with small CPU work, simulating a request that makes several DB or cache calls throughout its lifetime. The bottleneck is how many requests a worker can keep in flight while they wait on IO. Raptor and Puma cap out at three threads per worker, so the client connections beyond that (four per app thread, per the load generator's ratio) sit in the pool queue at any given moment. Falcon spawns a fiber per connection and cooperatively yields on every sleep, so every client connection can be in flight simultaneously. That gap shows up as roughly 3-4x throughput and much lower p95 for Falcon.
 
 Between the thread-based servers, Raptor holds a clear lead over Puma on both throughput and p95. The eager accept path, writev-batched responses, and lock-free work queue all shave a bit of per-request time, and those savings stack.
 
@@ -573,7 +580,7 @@ Where Raptor's HTTP/2 support does matter is the all-Ruby stack. No proxy in fro
 
 Falcon also speaks HTTP/2 natively, so it's the interesting comparison there rather than Puma. The shape of the h2 result follows the h1 shape. On CPU-bound h2 Raptor lands close to Falcon on throughput and holds a meaningful edge on p95, for the same reasons it wins CPU-bound h1 keep-alive. Parsing runs in parallel with the app, the lock-free writer serialises frames without a mutex, and per-stream flow-control atoms don't contend. On IO-bound h2 Falcon wins by a wide margin, again because fibers can keep every stream in flight simultaneously while Raptor's thread pool caps concurrency.
 
-Raptor's h2 IO numbers still show some run-to-run variance where h1 doesn't. With only 16 physical connections spread across four workers, even the BPF program's hash-based tie-break can leave one worker over-subscribed, and the concentrated worker becomes the bottleneck for that whole run. h2 CPU stays tight because once workers report distinguishable load the load-aware routing has enough signal to place new connections cleanly regardless of tie-break behaviour.
+Raptor's h2 IO numbers still show some run-to-run variance where h1 doesn't. With only four physical h2 connections per worker, even the BPF program's hash-based tie-break can leave one worker over-subscribed, and the concentrated worker becomes the bottleneck for that whole run. h2 CPU stays tight because once workers report distinguishable load the load-aware routing has enough signal to place new connections cleanly regardless of tie-break behaviour.
 
 Beyond that, Raptor's HTTP/2 CPU-bound throughput in the benchmark is on the same order as its HTTP/1.1 keep-alive throughput on the same profile, despite each connection multiplexing dozens of concurrent streams into a single socket. That only happens if the per-stream coordination is essentially free. The lock-free `Writer` and flow-control atoms are doing real work here. If they used mutexes, throughput would be capped by lock contention rather than by CPU.
 

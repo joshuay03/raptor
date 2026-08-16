@@ -2204,7 +2204,7 @@ I didn't set out to build a small library ecosystem. It's what happens when you 
 
 Real numbers are in the [README benchmarks section](../README.md#micro-benchmarks). The shape:
 
-- <big>**IO-bound work**: Falcon wins by a wide margin. Its fibers keep every one of the 48 client connections in flight at once. Thread-based servers cap out at their pool size.</big>
+- <big>**IO-bound work**: Falcon wins by a wide margin. Its fibers keep every client connection in flight at once. Thread-based servers cap out at their pool size.</big>
 - <big>**CPU-bound HTTP/1.1**: Raptor beats Puma on both throughput and tail latency.</big>
   - Tail latency ("p95") is the response time that 5% of requests exceed. It's what your slowest users see. Lower is better.
 - <big>**HTTP/2**: Raptor and Falcon both implement it. Puma doesn't.</big>
