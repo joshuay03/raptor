@@ -18,7 +18,6 @@ module Raptor
       assert_equal 1024, options(cli)[:socket_backlog]
       assert_equal false, options(cli)[:drain_accept_queue]
       assert_equal CLI::DEFAULT_WORKER_COUNT, options(cli)[:workers]
-      assert_equal 1, options(cli)[:ractors]
       assert_equal 3, options(cli)[:threads]
       assert_equal "config.ru", options(cli)[:rackup]
       assert_nil options(cli)[:chdir]
@@ -28,8 +27,10 @@ module Raptor
       assert_equal 5, options(cli)[:connection][:write_timeout]
       assert_nil options(cli)[:connection][:max_body_size]
       assert_equal 1024 * 1024, options(cli)[:connection][:body_spool_threshold]
+      assert_nil options(cli)[:http1][:ractors]
       assert_equal 65, options(cli)[:http1][:persistent_data_timeout]
       assert_equal 100, options(cli)[:http1][:max_keepalive_requests]
+      assert_nil options(cli)[:http2][:ractors]
       assert_equal 100, options(cli)[:http2][:max_concurrent_streams]
       assert_equal 25, options(cli)[:worker_drain_timeout]
       assert_equal "tmp/raptor.json", options(cli)[:stats_file]
@@ -46,11 +47,11 @@ module Raptor
     end
 
     def test_config_file_short_flag_layers_under_cli_args
-      with_config_file({ workers: 2, ractors: 4, threads: 8, connection: { first_data_timeout: 60 } }) do |path|
+      with_config_file({ workers: 2, threads: 8, http1: { ractors: 4 }, connection: { first_data_timeout: 60 } }) do |path|
         cli = CLI.new(["-c", path, "-w", "16"])
 
         assert_equal 16, options(cli)[:workers]
-        assert_equal 4, options(cli)[:ractors]
+        assert_equal 4, options(cli)[:http1][:ractors]
         assert_equal 8, options(cli)[:threads]
         assert_equal 60, options(cli)[:connection][:first_data_timeout]
         assert_equal 10, options(cli)[:connection][:chunk_data_timeout]
@@ -138,16 +139,16 @@ module Raptor
       assert_equal 2, options(cli)[:workers]
     end
 
-    def test_ractors_short_flag
-      cli = CLI.new(["-r", "4"])
+    def test_http1_ractors_long_flag
+      cli = CLI.new(["--http1-ractors", "4"])
 
-      assert_equal 4, options(cli)[:ractors]
+      assert_equal 4, options(cli)[:http1][:ractors]
     end
 
-    def test_ractors_long_flag
-      cli = CLI.new(["--ractors", "4"])
+    def test_http2_ractors_long_flag
+      cli = CLI.new(["--http2-ractors", "4"])
 
-      assert_equal 4, options(cli)[:ractors]
+      assert_equal 4, options(cli)[:http2][:ractors]
     end
 
     def test_threads_short_flag
@@ -271,11 +272,12 @@ module Raptor
     end
 
     def test_multiple_options_together
-      cli = CLI.new(["-w", "4", "-r", "2", "-t", "8", "app.ru"])
+      cli = CLI.new(["-w", "4", "-t", "8", "--http1-ractors", "2", "--http2-ractors", "3", "app.ru"])
 
       assert_equal 4, options(cli)[:workers]
-      assert_equal 2, options(cli)[:ractors]
       assert_equal 8, options(cli)[:threads]
+      assert_equal 2, options(cli)[:http1][:ractors]
+      assert_equal 3, options(cli)[:http2][:ractors]
       assert_equal "app.ru", options(cli)[:rackup]
     end
 

@@ -32,7 +32,6 @@ module Rackup
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:socket_backlog], opts[:socket_backlog]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:drain_accept_queue], opts[:drain_accept_queue]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
-        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:ractors], opts[:ractors]
         assert_equal Integer(Concurrent.available_processor_count), opts[:workers]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:connection], opts[:connection]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http1], opts[:http1]
@@ -59,12 +58,6 @@ module Rackup
         assert_equal 4, opts[:threads]
       end
 
-      def test_maps_ractors
-        opts = build(Ractors: 4)
-
-        assert_equal 4, opts[:ractors]
-      end
-
       def test_maps_workers
         opts = build(Workers: 2)
 
@@ -78,11 +71,11 @@ module Rackup
       end
 
       def test_config_file_layers_under_rack_options
-        with_config_file({ workers: 2, ractors: 4, threads: 8, connection: { first_data_timeout: 60 } }) do |path|
+        with_config_file({ workers: 2, threads: 8, http1: { ractors: 4 }, connection: { first_data_timeout: 60 } }) do |path|
           opts = build(Config: path, Workers: 16)
 
           assert_equal 16, opts[:workers]
-          assert_equal 4, opts[:ractors]
+          assert_equal 4, opts[:http1][:ractors]
           assert_equal 8, opts[:threads]
           assert_equal 60, opts[:connection][:first_data_timeout]
           assert_equal 10, opts[:connection][:chunk_data_timeout]

@@ -571,13 +571,17 @@ flowchart TB
         SRV["Server thread<br/>IO.select + accept_nonblock"]
         RCT["Reactor thread<br/>NIO::Selector<br/>red-black tree of timeouts"]
 
-        subgraph RP["Ractor pool"]
-            CRD["Coordinator Ractor"]
+        subgraph RP1["HTTP/1.1 Ractor pool"]
             RW1["Pipeline Ractor 1"]
             RWM["Pipeline Ractor M"]
         end
 
-        COL["Collector thread<br/>drains Ractor::Port"]
+        subgraph RP2["HTTP/2 Ractor pool"]
+            RW2["Pipeline Ractor 1"]
+            RWN["Pipeline Ractor N"]
+        end
+
+        COL["Collector threads<br/>drain Ractor::Ports"]
 
         subgraph ATP["Thread pool, lock-free CAS queue"]
             T1["App thread 1"]
@@ -588,8 +592,10 @@ flowchart TB
         STA["Stats thread<br/>writes 1 Hz"]
 
         SRV --> RCT
-        RCT --> RP
-        RP --> COL
+        RCT --> RP1
+        RCT --> RP2
+        RP1 --> COL
+        RP2 --> COL
         COL --> ATP
         STA --> SHM[("mmap")]
     end
@@ -620,9 +626,9 @@ Every part earns its keep. Let's walk it.
 <br>
 <br>
 
-## The Ractor pool
+## The Ractor pools
 
-The parser. This is where the parallelism actually kicks in.
+Parsing runs in dedicated Ractor pools, one per HTTP protocol. This is where the parallelism actually kicks in.
 
 ```mermaid
 flowchart LR
@@ -1271,8 +1277,8 @@ flowchart TB
     Client(["client"])
     Srv["Server thread<br/>accept_nonblock"]
     Rct["Reactor thread<br/>read_nonblock 64KB"]
-    RP["Ractor pool<br/>parses in own GVL"]
-    Col["Collector thread<br/>drains Ractor::Port"]
+    RP["Protocol-specific Ractor pool<br/>parses in own GVL"]
+    Col["Collector threads<br/>drain Ractor::Ports"]
     ATP["App thread pool<br/>calls Rack app<br/>writes response"]
 
     Client -->|"SYN"| Srv
@@ -1311,7 +1317,7 @@ flowchart TB
 **Fast path**
 
 - <big>First `read_nonblock` gives us a complete request</big>
-- <big>Server thread parses inline</big>
+- <big>Server thread (HTTP/1.1) or accepting pool worker (HTTP/2) parses inline</big>
 - <big>Pushes a proc to the app pool</big>
 - <big>No reactor. No Ractor pool.</big>
 - <big>Common for a normal request that fits in one TCP packet.</big>
@@ -1320,7 +1326,7 @@ flowchart TB
 
 - <big>Bytes not ready, or the request is incomplete</big>
 - <big>Reactor takes over, waits for more bytes</big>
-- <big>When bytes arrive: read up to 64KB per syscall, hand the buffer to the Ractor pool</big>
+- <big>When bytes arrive: read up to 64KB per syscall, hand the buffer to the protocol's Ractor pool</big>
   - 64KB is the per-read size, not a request size limit. Bigger requests just come in over more reads.
 - <big>Ractor parses on a **separate GVL**</big>
 - <big>Parsed env comes back via the collector, which pushes to the app pool</big>
@@ -1487,7 +1493,7 @@ Notable: a single HTTP/2 client connection in Raptor can have many streams in fl
 - <big>Each stream is a separate work item in the queue</big>
 - <big>Different streams from the same connection can end up on different app threads</big>
 - <big>Those threads still share the main GVL, so they overlap productively when the app is in I/O (the common Rails case), the same way Puma's keep-alive requests do</big>
-- <big>The parsing for each stream happens in the Ractor pool on its own GVL, actually in parallel with the app work</big>
+- <big>The parsing for each stream happens in the HTTP/2 Ractor pool on its own GVL, actually in parallel with the app work</big>
 
 <br>
 <br>

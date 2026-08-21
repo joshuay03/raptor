@@ -93,8 +93,8 @@ module Raptor
       end
     end
 
-    # Returns a Ractor-safe proc that routes each pipeline task to the
-    # HTTP/1.x or HTTP/2 handler based on the state hash's `:protocol` key.
+    # Returns a Ractor-safe proc that parses an HTTP/1.x request from
+    # the state hash's buffered bytes.
     #
     # @param env_template [Hash] the Rack env template to seed each HTTP/1.x request with
     # @param max_body_size [Integer, nil] byte limit for HTTP/1.x request bodies, or nil for no limit
@@ -103,11 +103,7 @@ module Raptor
     # @rbs (Hash[String, untyped] env_template, Integer? max_body_size) -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
     def self.parser_worker(env_template, max_body_size)
       proc do |data|
-        if data[:protocol] == :http2
-          Raptor::Http2.process_frames(data)
-        else
-          Raptor::Http1.parse(data, env_template, max_body_size)
-        end
+        Raptor::Http1.parse(data, env_template, max_body_size)
       end
     end
 

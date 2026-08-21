@@ -54,7 +54,8 @@ module Raptor
     TIMEOUT_RESPONSE = "HTTP/1.1 408 Request Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 
     # @rbs @thread_pool: untyped
-    # @rbs @ractor_pool: untyped
+    # @rbs @http1_ractor_pool: untyped
+    # @rbs @http2_ractor_pool: untyped
     # @rbs @first_data_timeout: Integer
     # @rbs @chunk_data_timeout: Integer
     # @rbs @persistent_data_timeout: Integer
@@ -69,7 +70,8 @@ module Raptor
 
     # Creates a new Reactor instance.
     #
-    # @param ractor_pool [RactorPool] ractor pool for HTTP parsing
+    # @param http1_ractor_pool [RactorPool] ractor pool for HTTP/1.x parsing
+    # @param http2_ractor_pool [RactorPool] ractor pool for HTTP/2 parsing
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param connection_options [Hash] per-connection timeout configuration
     # @option connection_options [Integer] :first_data_timeout timeout for initial data
@@ -78,9 +80,10 @@ module Raptor
     # @option http1_options [Integer] :persistent_data_timeout timeout for keep-alive idle connections
     # @return [void]
     #
-    # @rbs (untyped ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
-    def initialize(ractor_pool, thread_pool, connection_options:, http1_options:)
-      @ractor_pool = ractor_pool
+    # @rbs (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
+    def initialize(http1_ractor_pool, http2_ractor_pool, thread_pool, connection_options:, http1_options:)
+      @http1_ractor_pool = http1_ractor_pool
+      @http2_ractor_pool = http2_ractor_pool
       @thread_pool = thread_pool
       @first_data_timeout = connection_options[:first_data_timeout]
       @chunk_data_timeout = connection_options[:chunk_data_timeout]
@@ -260,6 +263,40 @@ module Raptor
       @id_to_flow_control[id]
     end
 
+    # Stores an HTTP/2 connection's socket, state, writer, and flow
+    # controller in the reactor's per-connection maps.
+    #
+    # @param id [Integer] unique client identifier
+    # @param socket [TCPSocket] the connection socket
+    # @param state [Hash] initial connection state
+    # @param writer [Http2::Writer] per-connection frame writer
+    # @param flow_control [Http2::FlowControl] per-connection outbound flow controller
+    # @return [void]
+    #
+    # @rbs (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped) -> void
+    def attach_http2(id:, socket:, state:, writer:, flow_control:)
+      @id_to_socket[id] = socket
+      @socket_to_state[socket] = state
+      @id_to_writer[id] = writer
+      @id_to_flow_control[id] = flow_control
+    end
+
+    # Registers an attached socket for future reactor-driven reads.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [void]
+    #
+    # @rbs (Integer id) -> void
+    def watch(id)
+      socket = @id_to_socket[id]
+      return unless socket
+
+      @queue << socket
+      @selector.wakeup
+    rescue ClosedQueueError
+      socket.close
+    end
+
     # Updates connection state for an HTTP/2 connection and re-registers
     # the socket for further reads.
     #
@@ -383,7 +420,8 @@ module Raptor
       end
 
       state = state.frozen? ? state.merge(buffer: buffer) : state.merge!(buffer: buffer)
-      @ractor_pool << Ractor.make_shareable(state)
+      pool = state[:protocol] == :http2 ? @http2_ractor_pool : @http1_ractor_pool
+      pool << Ractor.make_shareable(state)
     end
 
     # Cleans up a client connection by removing it from tracking and closing the socket.

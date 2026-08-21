@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+- Parse HTTP/2 requests in a dedicated ractor pool
+- Parse the first HTTP/2 frame batch inline on accept
+- Nest the `ractors` config under `http1` and `http2`, defaulting both to `round(cores / workers)` clamped to 1..3 for HTTP/1.1 and 1..2 for HTTP/2
+
 ## [0.15.1] - 2026-08-16
 
 - Regenerate the server RBS signatures

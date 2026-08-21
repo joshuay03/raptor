@@ -44,8 +44,9 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 [Raptor 33061|Main|Main] │  └─ 4 worker processes
 [Raptor 33061|Main|Main] │     ├─ 1 server thread
 [Raptor 33061|Main|Main] │     ├─ 1 reactor thread
-[Raptor 33061|Main|Main] │     ├─ 1 pipeline ractor
-[Raptor 33061|Main|Main] │     ├─ 1 pipeline collector thread
+[Raptor 33061|Main|Main] │     ├─ 2 HTTP/1.1 pipeline ractors
+[Raptor 33061|Main|Main] │     ├─ 1 HTTP/2 pipeline ractor
+[Raptor 33061|Main|Main] │     ├─ 2 pipeline collector threads
 [Raptor 33061|Main|Main] │     ├─ 3 worker threads
 [Raptor 33061|Main|Main] │     └─ 1 stats thread
 [Raptor 33061|Main|Main] └─ Listening on 0.0.0.0:9292
@@ -85,7 +86,6 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   socket_backlog: 1024,
   drain_accept_queue: false,
   workers: 4, # `Etc.nprocessors`
-  ractors: 1,
   threads: 3,
   chdir: nil,
   environment: nil, # falls back to `RAILS_ENV`, then `RACK_ENV`, then `"development"`
@@ -97,10 +97,12 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
     body_spool_threshold: 1024 * 1024,
   },
   http1: {
+    ractors: nil,
     persistent_data_timeout: 65,
     max_keepalive_requests: 100,
   },
   http2: {
+    ractors: nil,
     max_concurrent_streams: 100,
   },
   worker_boot_timeout: 60,

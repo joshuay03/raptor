@@ -315,6 +315,18 @@ module Raptor
       Writer.new(write_timeout: @write_timeout)
     end
 
+    # Returns a Ractor-safe proc that parses HTTP/2 frames from the
+    # state hash's buffered bytes.
+    #
+    # @return [Proc]
+    #
+    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+    def parser_worker
+      proc do |data|
+        Raptor::Http2.process_frames(data)
+      end
+    end
+
     # Advances HTTP/2 frame parsing from the connection buffer, returning
     # updated connection state along with any outgoing protocol frames and
     # completed stream requests.
@@ -550,12 +562,61 @@ module Raptor
     end
     private_class_method :build_result
 
+    # Sends the server SETTINGS frame on a freshly negotiated HTTP/2
+    # connection, then eagerly reads and parses the first client frame
+    # batch, dispatching completed streams directly to the thread pool.
+    # Falls back to the reactor when no initial data is ready.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param id [Integer] unique client identifier
+    # @param reactor [Reactor] the reactor managing the connection
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "https"
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
+    def eager_accept(socket, id, reactor, thread_pool, remote_addr, url_scheme)
+      writer = create_writer
+      flow_control = FlowControl.new
+      initial_state = {
+        id: id,
+        protocol: :http2,
+        remote_addr: remote_addr,
+        url_scheme: url_scheme
+      }
+
+      reactor.attach_http2(id: id, socket: socket, state: initial_state, writer: writer, flow_control: flow_control)
+
+      socket.write(@initial_settings_frame) rescue nil
+
+      buffer = begin
+        socket.read_nonblock(EAGER_READ_BUFFER_SIZE)
+      rescue IO::WaitReadable
+        reactor.watch(id)
+        return
+      rescue EOFError, IOError
+        reactor.close_connection(id)
+        return
+      end
+
+      while socket.pending.positive?
+        buffer << socket.read_nonblock(socket.pending)
+      end
+
+      result = Raptor::Http2.process_frames(initial_state.merge(buffer: buffer))
+      handle_parsed_request(result, reactor, thread_pool)
+    rescue => error
+      Log.rescued_error(error)
+      reactor.close_connection(id)
+    end
+
     # Handles a parsed HTTP/2 result. Writes outgoing frames, dispatches
     # completed stream requests to the thread pool, and eagerly consumes
     # further buffered frame batches before returning control to the
     # reactor.
     #
-    # @param result [Hash] the parsed result from the ractor pool
+    # @param result [Hash] the parsed result produced by {process_frames}
     # @param reactor [Reactor] the reactor managing the connection
     # @param thread_pool [AtomicThreadPool] thread pool for Rack app dispatch
     # @return [void]

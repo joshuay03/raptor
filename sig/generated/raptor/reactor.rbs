@@ -42,35 +42,38 @@ module Raptor
 
     TIMEOUT_RESPONSE: ::String
 
-    @id_to_flow_control: Hash[Integer, untyped]
+    @thread_pool: untyped
 
-    @id_to_writer: Hash[Integer, untyped]
+    @http1_ractor_pool: untyped
 
-    @id_to_timeout: Hash[Integer, TimeoutClient]
-
-    @socket_to_state: Hash[TCPSocket, Hash[Symbol, untyped]]
-
-    @id_to_socket: Hash[Integer, TCPSocket]
-
-    @timeouts: RedBlackTree[TimeoutClient]
-
-    @queue: Queue[TCPSocket]
-
-    @selector: NIO::Selector
-
-    @persistent_data_timeout: Integer
-
-    @chunk_data_timeout: Integer
+    @http2_ractor_pool: untyped
 
     @first_data_timeout: Integer
 
-    @ractor_pool: untyped
+    @chunk_data_timeout: Integer
 
-    @thread_pool: untyped
+    @persistent_data_timeout: Integer
+
+    @selector: NIO::Selector
+
+    @queue: Queue[TCPSocket]
+
+    @timeouts: RedBlackTree[TimeoutClient]
+
+    @id_to_socket: Hash[Integer, TCPSocket]
+
+    @socket_to_state: Hash[TCPSocket, Hash[Symbol, untyped]]
+
+    @id_to_timeout: Hash[Integer, TimeoutClient]
+
+    @id_to_writer: Hash[Integer, untyped]
+
+    @id_to_flow_control: Hash[Integer, untyped]
 
     # Creates a new Reactor instance.
     #
-    # @param ractor_pool [RactorPool] ractor pool for HTTP parsing
+    # @param http1_ractor_pool [RactorPool] ractor pool for HTTP/1.x parsing
+    # @param http2_ractor_pool [RactorPool] ractor pool for HTTP/2 parsing
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param connection_options [Hash] per-connection timeout configuration
     # @option connection_options [Integer] :first_data_timeout timeout for initial data
@@ -79,8 +82,8 @@ module Raptor
     # @option http1_options [Integer] :persistent_data_timeout timeout for keep-alive idle connections
     # @return [void]
     #
-    # @rbs (untyped ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
-    def initialize: (untyped ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
+    # @rbs (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
+    def initialize: (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
 
     # Starts the reactor's main event loop in a new thread. Runs until
     # the registration queue is closed and drained.
@@ -158,6 +161,27 @@ module Raptor
     #
     # @rbs (Integer id) -> untyped?
     def flow_control_for: (Integer id) -> untyped?
+
+    # Stores an HTTP/2 connection's socket, state, writer, and flow
+    # controller in the reactor's per-connection maps.
+    #
+    # @param id [Integer] unique client identifier
+    # @param socket [TCPSocket] the connection socket
+    # @param state [Hash] initial connection state
+    # @param writer [Http2::Writer] per-connection frame writer
+    # @param flow_control [Http2::FlowControl] per-connection outbound flow controller
+    # @return [void]
+    #
+    # @rbs (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped) -> void
+    def attach_http2: (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped) -> void
+
+    # Registers an attached socket for future reactor-driven reads.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [void]
+    #
+    # @rbs (Integer id) -> void
+    def watch: (Integer id) -> void
 
     # Updates connection state for an HTTP/2 connection and re-registers
     # the socket for further reads.

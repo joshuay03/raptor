@@ -212,14 +212,15 @@ The design is Pitchfork's, adapted for Raptor's process model. [Pitchfork](https
 
 ### Threading model
 
-This is where Raptor diverges dramatically. Inside a worker there are five kinds of concurrent activity:
+This is where Raptor diverges dramatically. Inside a worker there are six kinds of concurrent activity:
 
 1. **One server thread** running the accept loop.
 2. **One reactor thread** running the NIO event loop plus timeout tree.
-3. **A `RactorPool` of M pipeline Ractors** doing HTTP parsing in parallel. Default M is 1, but the interesting part is that this can be scaled up.
-4. **A collector thread** that receives parsed results from the pipeline Ractors via a `Ractor::Port`.
-5. **An `AtomicThreadPool` of T app threads** running the Rack app and writing responses.
-6. Plus one stats thread that writes the shared-memory slot every second.
+3. **A `RactorPool` for HTTP/1.1 parsing** sized by `http1.ractors`, defaulting to `round(cores / workers)` clamped to `[1, 3]`.
+4. **A `RactorPool` for HTTP/2 parsing** sized by `http2.ractors`, defaulting to `round(cores / workers)` clamped to `[1, 2]`.
+5. **A collector thread per Ractor pool** that receives parsed results via a `Ractor::Port`.
+6. **An `AtomicThreadPool` of T app threads** running the Rack app and writing responses.
+7. Plus one stats thread that writes the shared-memory slot every second.
 
 That is a lot of moving parts. Let us go through why.
 
@@ -231,7 +232,9 @@ The HTTP/1 parser also pre-interns the ~40 most common header keys (`HTTP_HOST`,
 
 The upshot is that while your Rack app runs on regular threads under the GVL (so your app does not need to be Ractor-safe), the protocol-level work runs in parallel across Ractors. Under heavy load with lots of small requests, the GVL contention that would otherwise dominate parsing simply is not there.
 
-**How the Ractor pool actually works.** Raptor uses the `ractor-pool` gem, which is another one of my libraries. The pool has one coordinator Ractor and M pipeline Ractors. When a pipeline Ractor is idle, it sends itself back to the coordinator via `coordinator.send(Ractor.current, move: true)`. When work arrives at the coordinator, it either forwards it to a waiting Ractor (if any) or queues it. This coordinator-dispatch pattern guarantees that no Ractor sits idle while there is work. Results flow back through a shared `Ractor::Port` (a many-to-one channel added in recent Ruby versions and stable in 4.0) to a Ruby-side collector thread. If `M == 1` the coordinator is skipped and work goes straight to the single pipeline Ractor; this is the default because a single Ractor already parses in parallel with the app threads and adds enough headroom for typical workloads.
+**How the Ractor pools actually work.** Raptor uses the `ractor-pool` gem, which is another one of my libraries. Each pool has one coordinator Ractor and M pipeline Ractors. When a pipeline Ractor is idle, it sends itself back to the coordinator via `coordinator.send(Ractor.current, move: true)`. When work arrives at the coordinator, it either forwards it to a waiting Ractor (if any) or queues it. This coordinator-dispatch pattern guarantees that no Ractor sits idle while there is work. Results flow back through a shared `Ractor::Port` (a many-to-one channel added in recent Ruby versions and stable in 4.0) to a Ruby-side collector thread. If `M == 1` the coordinator is skipped and work goes straight to the single pipeline Ractor.
+
+Raptor runs two independent pools per worker, one for HTTP/1.1 parsing and one for HTTP/2 parsing. Both defaults scale with headroom via `round(cores / workers)`, clamped to `[1, 3]` for `http1.ractors` and `[1, 2]` for `http2.ractors`. Splitting the pools means h1 and h2 parsing never share ractor slots, so a burst of small HTTP/1.1 requests cannot delay HTTP/2 frame handling on the same connection, and vice versa.
 
 Note that Ractors also have their own copy of the code, so booting them means loading dependencies inside each Ractor context. Raptor pre-loads only what the parser needs.
 
@@ -266,7 +269,7 @@ The BPF-based approach was inspired by [a comment](https://github.com/puma/puma/
 
 The reactor is again an `NIO::Selector` loop. Two things make it different from Puma's:
 
-1. **Read strategy.** When a socket is readable, the reactor does one `read_nonblock(64KB)` right there in the reactor thread, updates the buffered state for that connection, and only then decides what to do. If the request is not yet complete, the state stays in the reactor and awaits more data. If it is complete (headers parsed, body received), the state is pushed to the Ractor pool for parsing (or, for HTTP/2, straight to the parser). The reactor does not try to parse; it does the I/O and hands off the raw buffer.
+1. **Read strategy.** When a socket is readable, the reactor does one `read_nonblock(64KB)` right there in the reactor thread, updates the buffered state for that connection, and only then decides what to do. If the request is not yet complete, the state stays in the reactor and awaits more data. If it is complete (headers parsed, body received), the state is pushed to the protocol's Ractor pool for parsing. The reactor does not try to parse; it does the I/O and hands off the raw buffer.
 
 2. **Timeout data structure.** Instead of a sorted linked list, timeouts are stored in a red-black tree (`red-black-tree` gem, yes, also one of mine). Each connection is represented by a `TimeoutClient < RedBlackTree::Node` ordered by its `timeout_at` value. Insertion is O(log n), deletion by key (needed when a connection's timeout is updated mid-flight, which happens on every read) is O(log n), and in-order traversal is O(k) where k is the number of expired connections. After every selector poll, the reactor walks the tree in order and breaks on the first non-expired node.
 
@@ -319,12 +322,12 @@ The `reactor.persist` call re-registers the socket with the reactor using `persi
 
 Raptor speaks HTTP/2 on TLS connections where the client negotiates it via ALPN. The binder sets `alpn_protocols = ["h2", "http/1.1"]` on the SSL context and the ALPN callback picks h2 whenever the client offers it. Puma does not do this. Puma's SSL context does not advertise `h2` in ALPN, so clients transparently fall back to HTTP/1.1.
 
-Once ALPN selects h2, the initial `SETTINGS` frame is written and the socket is registered in the reactor with `protocol: :http2` plus a fresh `Writer` and `FlowControl` for the connection.
+Once ALPN selects h2, the pool worker that ran the TLS handshake calls `Http2#eager_accept`, which creates the per-connection `Writer` and `FlowControl`, attaches them to the reactor, writes the initial `SETTINGS` frame, and tries a non-blocking read on the socket. If bytes are already there, it parses the first frame batch inline via `Http2.process_frames` and dispatches completed streams to the thread pool without ever touching the ractor pool. If not, it hands the socket to the reactor to watch for the first bytes.
 
 From there the shape is similar to HTTP/1.1:
 
 1. Reactor reads frames.
-2. The HTTP/2 parser (native C, with an HPACK decoder using a static Huffman table) parses the frames in the Ractor pool.
+2. The HTTP/2 parser (native C, with an HPACK decoder using a static Huffman table) parses the frames in the HTTP/2 Ractor pool.
 3. Completed requests (once `HEADERS` and `DATA` are complete for a stream) go to the thread pool as separate work items. **A single connection can be servicing many streams in parallel across the thread pool.**
 4. Each stream's response is written back through the connection's `Writer`, which serialises frame writes across threads without a mutex.
 
@@ -357,15 +360,17 @@ flowchart TB
 
         RCT["Reactor thread<br/>NIO::Selector<br/>read_nonblock 64KB<br/>Red-Black-Tree timeouts"]
 
-        subgraph RP["RactorPool"]
-            CRD["Coordinator Ractor<br/>coordinator-dispatch"]
-            RW1["Pipeline Ractor 1<br/>HTTP1 + HTTP2 parser<br/>chunked decode<br/>HPACK decode"]
+        subgraph RP1["HTTP/1.1 RactorPool"]
+            RW1["Pipeline Ractor 1<br/>HTTP/1.x parser<br/>chunked decode"]
             RWM["Pipeline Ractor M"]
-            CRD --> RW1
-            CRD --> RWM
         end
 
-        COL["Collector thread<br/>Ractor::Port receive<br/>dispatches to thread pool<br/>or back to reactor"]
+        subgraph RP2["HTTP/2 RactorPool"]
+            RW2["Pipeline Ractor 1<br/>HTTP/2 parser<br/>HPACK decode"]
+            RWN["Pipeline Ractor N"]
+        end
+
+        COL["Collector threads<br/>Ractor::Port receive<br/>dispatch to thread pool<br/>or back to reactor"]
 
         subgraph ATP["AtomicThreadPool, CAS work queue"]
             TR1["App thread 1"]
@@ -379,10 +384,13 @@ flowchart TB
         KA{"Keep-alive?"}
         EAG{"wait_readable<br/>1ms"}
 
-        SRV -->|"eager_accept, parse inline, push proc"| ATP
-        SRV -->|"data not ready or incomplete, reactor.add"| RCT
-        RCT -->|"Ractor.make_shareable state"| RP
-        RP -->|"result via Ractor::Port"| COL
+        SRV -->|"HTTP/1.1 eager_accept, parse inline, push proc"| ATP
+        SRV -->|"HTTP/2 eager_accept, parse inline, push proc"| ATP
+        SRV -->|"data not ready or incomplete, hand to reactor"| RCT
+        RCT -->|"HTTP/1.1 state via Ractor.make_shareable"| RP1
+        RCT -->|"HTTP/2 state via Ractor.make_shareable"| RP2
+        RP1 -->|"result via Ractor::Port"| COL
+        RP2 -->|"result via Ractor::Port"| COL
         COL --> CHK
         CHK -->|"no, more bytes needed"| RCT
         CHK -->|"yes, push proc"| ATP
@@ -406,13 +414,14 @@ flowchart TB
     classDef storage fill:#e5e7eb,stroke:#6b7280,color:#374151
     class SRV accept
     class RCT reactor
-    class RP parse
+    class RP1 parse
+    class RP2 parse
     class ATP pool
     class COL collector
     class SHM storage
 ```
 
-The critical structural difference from Puma is that parsing is not on the app thread. It is on the Ractor pool. The app thread only does the Rack call and the response write. This decouples the two costs and lets Ruby actually use more than one CPU for the protocol work.
+The critical structural difference from Puma is that parsing is not on the app thread. It is on the protocol's Ractor pool. The app thread only does the Rack call and the response write. This decouples the two costs and lets Ruby actually use more than one CPU for the protocol work.
 
 ## Part III: Head to head
 
@@ -420,9 +429,9 @@ The critical structural difference from Puma is that parsing is not on the app t
 
 **Puma.** Parsing happens on the app thread. The C parser callbacks build the env hash. Between requests, the thread either loops (if there's back-to-back data and a spare thread) or hands off to the reactor. Every request goes through: reactor → thread pool → parser (Ruby thread + C ext) → app → write → reactor. Parsing shares the GVL with the app.
 
-**Raptor.** Parsing happens on Ractors. Between requests, the app thread does a 1ms micro-poll before handing back. Every request goes through: reactor (I/O only) → Ractor pool (parse only) → collector → thread pool (app + write) → 1ms wait → maybe repeat. Parsing does not share the GVL with the app because Ractors have their own GVLs.
+**Raptor.** Parsing happens on Ractors. Between requests, the app thread does a 1ms micro-poll before handing back. Every request goes through: reactor (I/O only) → protocol's Ractor pool (parse only) → collector → thread pool (app + write) → 1ms wait → maybe repeat. Parsing does not share the GVL with the app because Ractors have their own GVLs.
 
-The concrete effect is that Puma has one process-wide GVL. Every thread inside a worker (server, reactor, and every app thread) has to take turns holding it. Raptor has that same main-process GVL plus one additional GVL per Ractor. With 3 app threads and 1 pipeline Ractor, Raptor can genuinely run two things at once on two CPU cores. The Ractor parses an incoming request while an app thread executes the Rack app. Puma cannot. Under CPU-heavy parsing (many small requests, high header count), Raptor's parsing throughput is straightforwardly higher because the parse never contends with the app for the same GVL.
+The concrete effect is that Puma has one process-wide GVL. Every thread inside a worker (server, reactor, and every app thread) has to take turns holding it. Raptor has that same main-process GVL plus one additional GVL per Ractor. With 3 app threads and one HTTP/1.1 pipeline Ractor plus one HTTP/2 pipeline Ractor, Raptor can genuinely run three things at once on three CPU cores. A Ractor parses an incoming request while an app thread executes the Rack app. Puma cannot. Under CPU-heavy parsing (many small requests, high header count), Raptor's parsing throughput is straightforwardly higher because the parse never contends with the app for the same GVL.
 
 ### Timeout management
 

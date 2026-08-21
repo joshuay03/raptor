@@ -206,18 +206,14 @@ module Raptor
       return unless perform_ssl_handshake(ssl_socket)
 
       if ssl_socket.alpn_protocol == H2_PROTOCOL
-        ssl_socket.write(@http2.initial_settings_frame) rescue nil
-
-        @reactor.add(
-          id: ssl_socket.object_id,
-          socket: ssl_socket,
-          remote_addr: remote_addr,
-          url_scheme: HTTPS_SCHEME,
-          protocol: :http2,
-          writer: @http2.create_writer,
-          flow_control: Http2::FlowControl.new
+        @http2.eager_accept(
+          ssl_socket,
+          ssl_socket.object_id,
+          @reactor,
+          @thread_pool,
+          remote_addr,
+          HTTPS_SCHEME
         )
-
         return
       end
 

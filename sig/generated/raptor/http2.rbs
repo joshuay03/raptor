@@ -192,6 +192,14 @@ module Raptor
     # @rbs () -> Writer
     def create_writer: () -> Writer
 
+    # Returns a Ractor-safe proc that parses HTTP/2 frames from the
+    # state hash's buffered bytes.
+    #
+    # @return [Proc]
+    #
+    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+    def parser_worker: () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
     # Advances HTTP/2 frame parsing from the connection buffer, returning
     # updated connection state along with any outgoing protocol frames and
     # completed stream requests.
@@ -235,12 +243,28 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[[Integer, Integer]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
     def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[[ Integer, Integer ]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
 
+    # Sends the server SETTINGS frame on a freshly negotiated HTTP/2
+    # connection, then eagerly reads and parses the first client frame
+    # batch, dispatching completed streams directly to the thread pool.
+    # Falls back to the reactor when no initial data is ready.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param id [Integer] unique client identifier
+    # @param reactor [Reactor] the reactor managing the connection
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "https"
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
+    def eager_accept: (OpenSSL::SSL::SSLSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
+
     # Handles a parsed HTTP/2 result. Writes outgoing frames, dispatches
     # completed stream requests to the thread pool, and eagerly consumes
     # further buffered frame batches before returning control to the
     # reactor.
     #
-    # @param result [Hash] the parsed result from the ractor pool
+    # @param result [Hash] the parsed result produced by {process_frames}
     # @param reactor [Reactor] the reactor managing the connection
     # @param thread_pool [AtomicThreadPool] thread pool for Rack app dispatch
     # @return [void]

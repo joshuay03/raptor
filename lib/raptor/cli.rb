@@ -33,7 +33,6 @@ module Raptor
       socket_backlog: 1024,
       drain_accept_queue: false,
       workers: DEFAULT_WORKER_COUNT,
-      ractors: 1,
       threads: 3,
       rackup: "config.ru",
       chdir: nil,
@@ -46,10 +45,12 @@ module Raptor
         body_spool_threshold: 1024 * 1024,
       },
       http1: {
+        ractors: nil,
         persistent_data_timeout: 65,
         max_keepalive_requests: 100,
       },
       http2: {
+        ractors: nil,
         max_concurrent_streams: 100,
       },
       worker_boot_timeout: 60,
@@ -237,10 +238,6 @@ module Raptor
           @options[:workers] = num
         end
 
-        opts.on("-r", "--ractors NUM", Integer, "Number of pipeline ractors per worker (default: 1)") do |num|
-          @options[:ractors] = num
-        end
-
         opts.on("-t", "--threads NUM", Integer, "Number of application threads per worker (default: 3)") do |num|
           @options[:threads] = num
         end
@@ -273,12 +270,20 @@ module Raptor
           @options[:connection][:body_spool_threshold] = bytes
         end
 
+        opts.on("--http1-ractors NUM", Integer, "Number of HTTP/1.1 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..3)") do |num|
+          @options[:http1][:ractors] = num
+        end
+
         opts.on("--http1-persistent-data-timeout SECONDS", Integer, "HTTP/1.1 keep-alive idle timeout in seconds (default: 65)") do |timeout|
           @options[:http1][:persistent_data_timeout] = timeout
         end
 
         opts.on("--http1-max-keepalive-requests NUM", Integer, "Maximum HTTP/1.1 requests per keep-alive connection (default: 100)") do |num|
           @options[:http1][:max_keepalive_requests] = num
+        end
+
+        opts.on("--http2-ractors NUM", Integer, "Number of HTTP/2 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..2)") do |num|
+          @options[:http2][:ractors] = num
         end
 
         opts.on("--http2-max-concurrent-streams NUM", Integer, "Maximum HTTP/2 concurrent streams per connection (default: 100)") do |num|

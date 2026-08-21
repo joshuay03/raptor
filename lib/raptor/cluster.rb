@@ -1,6 +1,7 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
+require "concurrent/utility/processor_counter"
 require "json"
 
 require "atomic-ruby/atomic_thread_pool"
@@ -26,6 +27,9 @@ module Raptor
   class Cluster
     INHERITED_FDS_ENV = "RAPTOR_INHERITED_FDS"
 
+    HTTP1_RACTOR_COUNT_CAP = 3
+    HTTP2_RACTOR_COUNT_CAP = 2
+
     # Creates and runs a cluster with the given options.
     #
     # @param options [Hash] cluster configuration options
@@ -36,9 +40,38 @@ module Raptor
       new(options).run
     end
 
+    # Returns the default number of HTTP/1.1 pipeline ractors per
+    # worker for the given worker count, rounded from the available
+    # processor count per worker and clamped to
+    # `[1, HTTP1_RACTOR_COUNT_CAP]`.
+    #
+    # @param worker_count [Integer] the configured worker count
+    # @return [Integer]
+    #
+    # @rbs (Integer worker_count) -> Integer
+    def self.default_http1_ractor_count(worker_count)
+      cores = Integer(Concurrent.available_processor_count)
+      (cores.to_f / worker_count).round.clamp(1, HTTP1_RACTOR_COUNT_CAP)
+    end
+
+    # Returns the default number of HTTP/2 pipeline ractors per
+    # worker for the given worker count, rounded from the available
+    # processor count per worker and clamped to
+    # `[1, HTTP2_RACTOR_COUNT_CAP]`.
+    #
+    # @param worker_count [Integer] the configured worker count
+    # @return [Integer]
+    #
+    # @rbs (Integer worker_count) -> Integer
+    def self.default_http2_ractor_count(worker_count)
+      cores = Integer(Concurrent.available_processor_count)
+      (cores.to_f / worker_count).round.clamp(1, HTTP2_RACTOR_COUNT_CAP)
+    end
+
     # @rbs @drain_accept_queue: bool
     # @rbs @worker_count: Integer
-    # @rbs @ractor_count: Integer
+    # @rbs @http1_ractor_count: Integer
+    # @rbs @http2_ractor_count: Integer
     # @rbs @thread_count: Integer
     # @rbs @environment: String
     # @rbs @connection_options: Hash[Symbol, untyped]
@@ -91,7 +124,6 @@ module Raptor
     # @option options [Integer] :socket_backlog kernel listen() queue depth for TCP/SSL listeners
     # @option options [Boolean] :drain_accept_queue whether to drain the kernel accept queue on shutdown
     # @option options [Integer] :workers number of worker processes
-    # @option options [Integer] :ractors number of ractors per worker process
     # @option options [Integer] :threads number of threads per worker process
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
@@ -123,7 +155,8 @@ module Raptor
     def initialize(options)
       @drain_accept_queue = options[:drain_accept_queue]
       @worker_count = options[:workers]
-      @ractor_count = options[:ractors]
+      @http1_ractor_count = options[:http1][:ractors] || self.class.default_http1_ractor_count(@worker_count)
+      @http2_ractor_count = options[:http2][:ractors] || self.class.default_http2_ractor_count(@worker_count)
       @thread_count = options[:threads]
       @environment = options[:environment] || ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
       @connection_options = options[:connection]
@@ -736,23 +769,33 @@ module Raptor
         access_log_io: @access_log_io,
         on_error: @on_error
       )
-      ractor_pool = RactorPool.new(
-        size: @ractor_count,
-        worker: http1.parser_worker
+      http1_ractor_pool = RactorPool.new(
+        size: @http1_ractor_count,
+        worker: http1.parser_worker,
+        name: "HTTP/1.1"
       ) do |parsed_result|
         begin
-          if parsed_result[:protocol] == :http2
-            http2.handle_parsed_request(parsed_result, reactor, thread_pool)
-          else
-            http1.handle_parsed_request(parsed_result, reactor, thread_pool)
-          end
+          http1.handle_parsed_request(parsed_result, reactor, thread_pool)
+        rescue => error
+          Log.rescued_error(error)
+        end
+      end
+
+      http2_ractor_pool = RactorPool.new(
+        size: @http2_ractor_count,
+        worker: http2.parser_worker,
+        name: "HTTP/2"
+      ) do |parsed_result|
+        begin
+          http2.handle_parsed_request(parsed_result, reactor, thread_pool)
         rescue => error
           Log.rescued_error(error)
         end
       end
 
       reactor = Reactor.new(
-        ractor_pool,
+        http1_ractor_pool,
+        http2_ractor_pool,
         thread_pool,
         connection_options: @connection_options,
         http1_options: @http1_options
@@ -824,7 +867,8 @@ module Raptor
       server_thread.join
       reactor.shutdown
       reactor_thread.join
-      ractor_pool.shutdown
+      http1_ractor_pool.shutdown
+      http2_ractor_pool.shutdown
       http1.shutdown
       drain_thread_pool(thread_pool)
       stats_thread.join
@@ -931,8 +975,9 @@ module Raptor
       Log.info "│  └─ #{@worker_count} worker process#{"es" if @worker_count > 1}"
       Log.info "│     ├─ 1 server thread"
       Log.info "│     ├─ 1 reactor thread"
-      Log.info "│     ├─ #{@ractor_count} pipeline ractor#{"s" if @ractor_count > 1}"
-      Log.info "│     ├─ 1 pipeline collector thread"
+      Log.info "│     ├─ #{@http1_ractor_count} HTTP/1.1 pipeline ractor#{"s" if @http1_ractor_count > 1}"
+      Log.info "│     ├─ #{@http2_ractor_count} HTTP/2 pipeline ractor#{"s" if @http2_ractor_count > 1}"
+      Log.info "│     ├─ 2 pipeline collector threads"
       Log.info "│     ├─ #{@thread_count} worker thread#{"s" if @thread_count > 1}"
       Log.info "│     └─ 1 stats thread"
       Log.info "└─ Listening on #{@binder.addresses.join(", ")}"
