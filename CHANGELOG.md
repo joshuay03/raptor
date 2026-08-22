@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-22
+
 - Parse HTTP/2 requests in a dedicated ractor pool
 - Parse the first HTTP/2 frame batch inline on accept
 - Nest the `ractors` config under `http1` and `http2`, defaulting both to `round(cores / workers)` clamped to 1..3 for HTTP/1.1 and 1..2 for HTTP/2
