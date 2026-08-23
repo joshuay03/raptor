@@ -12,8 +12,6 @@ module Raptor
 
     FILE_CHUNK_SIZE: untyped
 
-    MAX_CHUNK_OVERHEAD: untyped
-
     READ_BUFFER_SIZE: untyped
 
     RESPONSE_BUFFER_CAPACITY: untyped
@@ -64,8 +62,6 @@ module Raptor
 
     ILLEGAL_HEADER_VALUE_REGEX: ::Regexp
 
-    CHUNK_SIZE_REGEX: ::Regexp
-
     # Returns true when an HTTP/1.1 request lacks a valid `Host` header per
     # RFC 9112 section 3.2, where a valid value is a non-empty single-value
     # line.
@@ -88,21 +84,6 @@ module Raptor
     # @rbs (Hash[String, untyped] env) -> bool
     def self.request_smuggling?: (Hash[String, untyped] env) -> bool
 
-    # Decodes a chunked transfer-encoded body buffer.
-    #
-    # Returns the decoded bytes and a state symbol: `:complete` when the
-    # terminating zero-length chunk and trailer section were fully consumed,
-    # `:too_large` when the decoded size would exceed `max_size`, `:malformed`
-    # when a chunk-size line is not valid hex or chunk framing overhead exceeds
-    # `MAX_CHUNK_OVERHEAD`, or `:incomplete` otherwise.
-    #
-    # @param buffer [String] the raw body buffer to decode
-    # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited
-    # @return [Array(String, Symbol)] decoded body and completion state
-    #
-    # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
-    def self.decode_chunked: (String buffer, ?Integer? max_size) -> [ String, Symbol ]
-
     # Advances an HTTP/1.x request parse from the state hash's buffered
     # bytes. A complete well-formed request returns with `:complete` set
     # plus populated `:env` and `:body`; malformed or oversized input flips
@@ -117,27 +98,27 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] data, Hash[String, untyped] env_template, Integer? max_body_size) -> Hash[Symbol, untyped]
     def self.parse: (Hash[Symbol, untyped] data, Hash[String, untyped] env_template, Integer? max_body_size) -> Hash[Symbol, untyped]
 
-    @env_template: Hash[String, untyped]
-
-    @running: AtomicBoolean
-
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
-
-    @access_log_io: IO?
-
-    @max_keepalive_requests: Integer
-
-    @body_spool_threshold: Integer?
-
-    @max_body_size: Integer?
-
-    @write_timeout: Integer
-
-    @server_port_string: String
+    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
 
     @server_port: Integer
 
-    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
+    @server_port_string: String
+
+    @write_timeout: Integer
+
+    @max_body_size: Integer?
+
+    @body_spool_threshold: Integer?
+
+    @max_keepalive_requests: Integer
+
+    @access_log_io: IO?
+
+    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+
+    @running: AtomicBoolean
+
+    @env_template: Hash[String, untyped]
 
     # Creates a new Http1 handler.
     #

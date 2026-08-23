@@ -37,6 +37,8 @@ typedef struct raptor_parser {
 #define FLAG_HAS_BODY 0x2
 #define FLAG_FINISHED 0x4
 
+#define MAX_CHUNK_OVERHEAD (16 * 1024)
+
 static VALUE eHttpParserError;
 static VALUE global_request_method;
 static VALUE global_request_uri;
@@ -44,6 +46,10 @@ static VALUE global_query_string;
 static VALUE global_server_protocol;
 static VALUE global_request_path;
 static VALUE global_fragment;
+static ID id_complete;
+static ID id_incomplete;
+static ID id_malformed;
+static ID id_too_large;
 
 struct common_field {
   const char *name;
@@ -1316,6 +1322,88 @@ static VALUE parser_body(VALUE self) {
   return parser->body;
 }
 
+static const char *find_crlf(const char *buf, size_t len) {
+  if (len < 2) return NULL;
+  const char *end = buf + len - 1;
+  for (const char *p = buf; p < end; p++) {
+    if (*p == '\r' && *(p + 1) == '\n') return p;
+  }
+  return NULL;
+}
+
+static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
+  (void)self;
+  VALUE buffer, max_size;
+  rb_scan_args(argc, argv, "11", &buffer, &max_size);
+  Check_Type(buffer, T_STRING);
+
+  const char *buf = RSTRING_PTR(buffer);
+  size_t len = (size_t)RSTRING_LEN(buffer);
+  size_t offset = 0;
+  size_t overhead = 0;
+  int has_max = !NIL_P(max_size);
+  size_t max_bytes = has_max ? NUM2SIZET(max_size) : 0;
+
+  VALUE decoded = rb_str_buf_new((long)len);
+
+  while (offset < len) {
+    const char *crlf = find_crlf(buf + offset, len - offset);
+    if (!crlf) return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
+
+    size_t line_len = (size_t)(crlf - (buf + offset));
+    size_t size_len = line_len;
+    for (size_t i = 0; i < line_len; i++) {
+      if (buf[offset + i] == ';') { size_len = i; break; }
+    }
+    if (size_len == 0) return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
+
+    uint64_t chunk_size = 0;
+    for (size_t i = 0; i < size_len; i++) {
+      char c = buf[offset + i];
+      uint64_t digit;
+      if (c >= '0' && c <= '9') digit = (uint64_t)(c - '0');
+      else if (c >= 'a' && c <= 'f') digit = (uint64_t)(c - 'a' + 10);
+      else if (c >= 'A' && c <= 'F') digit = (uint64_t)(c - 'A' + 10);
+      else return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
+      if (chunk_size > (UINT64_MAX >> 4)) return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
+      chunk_size = (chunk_size << 4) | digit;
+    }
+    if (chunk_size > (uint64_t)(SIZE_MAX / 2)) return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
+
+    size_t crlf_offset = offset + line_len;
+
+    if (chunk_size == 0) {
+      size_t trailer_offset = crlf_offset + 2;
+      while (1) {
+        if (trailer_offset >= len) return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
+        const char *tcrlf = find_crlf(buf + trailer_offset, len - trailer_offset);
+        if (!tcrlf) return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
+        if (tcrlf == buf + trailer_offset) return rb_ary_new_from_args(2, decoded, ID2SYM(id_complete));
+        trailer_offset = (size_t)(tcrlf - buf) + 2;
+      }
+    }
+
+    size_t decoded_len = (size_t)RSTRING_LEN(decoded);
+    if (has_max && (decoded_len + (size_t)chunk_size) > max_bytes) {
+      return rb_ary_new_from_args(2, decoded, ID2SYM(id_too_large));
+    }
+
+    overhead += line_len + 4;
+    if (overhead > (decoded_len + (size_t)chunk_size + MAX_CHUNK_OVERHEAD)) {
+      return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
+    }
+
+    size_t data_offset = crlf_offset + 2;
+    size_t available = len > data_offset ? len - data_offset : 0;
+    size_t bytes_to_copy = (size_t)chunk_size < available ? (size_t)chunk_size : available;
+    rb_str_cat(decoded, buf + data_offset, (long)bytes_to_copy);
+
+    offset = data_offset + (size_t)chunk_size + 2;
+  }
+
+  return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
+}
+
 RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   rb_ext_ractor_safe(true);
 
@@ -1337,6 +1425,11 @@ RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   global_request_path = rb_str_new2("PATH_INFO");
   global_fragment = rb_str_new2("FRAGMENT");
 
+  id_complete = rb_intern("complete");
+  id_incomplete = rb_intern("incomplete");
+  id_malformed = rb_intern("malformed");
+  id_too_large = rb_intern("too_large");
+
   for (size_t i = 0; i < NUM_COMMON_FIELDS; i++) {
     common_fields[i].interned = rb_enc_interned_str(common_fields[i].name, common_fields[i].len, rb_utf8_encoding());
     rb_global_variable(&common_fields[i].interned);
@@ -1351,4 +1444,6 @@ RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   rb_define_method(cHttpParser, "nread", parser_nread, 0);
   rb_define_method(cHttpParser, "reset", parser_reset, 0);
   rb_define_method(cHttpParser, "body", parser_body, 0);
+  rb_define_singleton_method(cHttpParser, "decode_chunked", parser_decode_chunked, -1);
+  rb_define_const(cHttpParser, "MAX_CHUNK_OVERHEAD", INT2FIX(MAX_CHUNK_OVERHEAD));
 }

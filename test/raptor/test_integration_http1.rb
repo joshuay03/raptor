@@ -749,7 +749,7 @@ module Raptor
 
     def test_excessive_chunk_overhead_returns_400
       with_server("rack_input.ru") do |uri|
-        bloated_extension = "A" * (Http1::MAX_CHUNK_OVERHEAD + 1)
+        bloated_extension = "A" * (HttpParser::MAX_CHUNK_OVERHEAD + 1)
         response = raw_request(
           uri,
           "POST / HTTP/1.1\r\n" \

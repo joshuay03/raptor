@@ -21,7 +21,6 @@ module Raptor
     BODY_BUFFER_THRESHOLD = 256 * 1024
     CHUNKED_WRITE_THRESHOLD = 512 * 1024
     FILE_CHUNK_SIZE = 64 * 1024
-    MAX_CHUNK_OVERHEAD = 16 * 1024
     READ_BUFFER_SIZE = 64 * 1024
     RESPONSE_BUFFER_CAPACITY = 4 * 1024
     KEEPALIVE_READ_TIMEOUT = 0.001
@@ -58,7 +57,6 @@ module Raptor
 
     ILLEGAL_HEADER_KEY_REGEX = /[\x00-\x20\(\)<>@,;:\\"\/\[\]\?=\{\}\x7F]/
     ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/
-    CHUNK_SIZE_REGEX = /\A[0-9A-Fa-f]+\z/
 
     # Returns true when an HTTP/1.1 request lacks a valid `Host` header per
     # RFC 9112 section 3.2, where a valid value is a non-empty single-value
@@ -102,59 +100,6 @@ module Raptor
       false
     end
 
-    # Decodes a chunked transfer-encoded body buffer.
-    #
-    # Returns the decoded bytes and a state symbol: `:complete` when the
-    # terminating zero-length chunk and trailer section were fully consumed,
-    # `:too_large` when the decoded size would exceed `max_size`, `:malformed`
-    # when a chunk-size line is not valid hex or chunk framing overhead exceeds
-    # `MAX_CHUNK_OVERHEAD`, or `:incomplete` otherwise.
-    #
-    # @param buffer [String] the raw body buffer to decode
-    # @param max_size [Integer, nil] maximum decoded body size, or nil for unlimited
-    # @return [Array(String, Symbol)] decoded body and completion state
-    #
-    # @rbs (String buffer, ?Integer? max_size) -> [String, Symbol]
-    def self.decode_chunked(buffer, max_size = nil)
-      decoded = String.new
-      offset = 0
-      overhead = 0
-
-      while offset < buffer.bytesize
-        crlf = buffer.index("\r\n", offset)
-        return [decoded, :incomplete] unless crlf
-
-        size_line = buffer.byteslice(offset, crlf - offset)
-        semicolon = size_line.index(";")
-        size_part = semicolon ? size_line.byteslice(0, semicolon) : size_line
-        return [decoded, :malformed] unless size_part.match?(CHUNK_SIZE_REGEX)
-
-        chunk_size = size_part.to_i(16)
-
-        if chunk_size.zero?
-          trailer_offset = crlf + 2
-          loop do
-            trailer_crlf = buffer.index("\r\n", trailer_offset)
-            return [decoded, :incomplete] unless trailer_crlf
-            return [decoded, :complete] if trailer_crlf == trailer_offset
-
-            trailer_offset = trailer_crlf + 2
-          end
-        end
-
-        return [decoded, :too_large] if max_size && (decoded.bytesize + chunk_size) > max_size
-
-        overhead += (crlf - offset) + 4
-        return [decoded, :malformed] if overhead > (decoded.bytesize + chunk_size + MAX_CHUNK_OVERHEAD)
-
-        offset = crlf + 2
-        decoded << buffer.byteslice(offset, chunk_size)
-        offset += chunk_size + 2
-      end
-
-      [decoded, :incomplete]
-    end
-
     # Advances an HTTP/1.x request parse from the state hash's buffered
     # bytes. A complete well-formed request returns with `:complete` set
     # plus populated `:env` and `:body`; malformed or oversized input flips
@@ -191,7 +136,7 @@ module Raptor
           if max_body_size && parser.content_length > max_body_size
             data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
           elsif parser.chunked?
-            decoded_body, chunked_state = decode_chunked(body_buffer, max_body_size)
+            decoded_body, chunked_state = HttpParser.decode_chunked(body_buffer, max_body_size)
 
             case chunked_state
             when :complete
@@ -479,7 +424,7 @@ module Raptor
       if parser.chunked?
         return :incomplete unless decode_chunked
 
-        body, chunked_state = Http1.decode_chunked(body, @max_body_size)
+        body, chunked_state = HttpParser.decode_chunked(body, @max_body_size)
         case chunked_state
         when :complete
           env.delete(HTTP_TRANSFER_ENCODING)
