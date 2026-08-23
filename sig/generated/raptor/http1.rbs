@@ -46,6 +46,8 @@ module Raptor
 
     TRANSFER_ENCODING_CHUNKED: ::String
 
+    CHUNKED_TERMINATOR: ::String
+
     HTTP_CONNECTION: ::String
 
     HTTP_EXPECT: ::String
@@ -57,10 +59,6 @@ module Raptor
     RACK_HIJACKED: ::String
 
     RACK_HIJACK_IO: ::String
-
-    ILLEGAL_HEADER_KEY_REGEX: ::Regexp
-
-    ILLEGAL_HEADER_VALUE_REGEX: ::Regexp
 
     # Returns true when an HTTP/1.1 request lacks a valid `Host` header per
     # RFC 9112 section 3.2, where a valid value is a non-empty single-value
@@ -572,43 +570,6 @@ module Raptor
     #
     # @rbs (TCPSocket socket, String response, untyped body, bool use_chunked) -> void
     def write_enumerable_body: (TCPSocket socket, String response, untyped body, bool use_chunked) -> void
-
-    # Returns true if the header key contains characters illegal in HTTP headers.
-    #
-    # @param key [String] the header key to check
-    # @return [Boolean] true if the key is illegal
-    #
-    # @rbs (String key) -> bool
-    def illegal_header_key?: (String key) -> bool
-
-    # Returns true if the header value contains characters illegal in HTTP headers.
-    #
-    # @param value [String] the header value to check
-    # @return [Boolean] true if the value is illegal
-    #
-    # @rbs (String value) -> bool
-    def illegal_header_value?: (String value) -> bool
-
-    # Appends normalised header lines to `result`. Skips entries with
-    # illegal keys or values. Array values are written as separate lines.
-    #
-    # @param headers [Hash] normalized response headers
-    # @return [String] formatted header lines, each ending with CRLF
-    #
-    # @rbs (String result, Hash[String, String | Array[String]] headers) -> void
-    def format_headers: (String result, Hash[String, String | Array[String]] headers) -> void
-
-    # Appends one or more `name: value` header lines to `result`, splitting
-    # newline-joined values across separate lines and skipping empty or
-    # illegal values.
-    #
-    # @param result [String] the buffer to append to
-    # @param name [String] the header name
-    # @param value [Object] the header value (any object responding to `to_s`)
-    # @return [void]
-    #
-    # @rbs (String result, String name, untyped value) -> void
-    def append_header_value: (String result, String name, untyped value) -> void
 
     # Calls every `rack.response_finished` callback in reverse
     # registration order, rescuing any that raise.

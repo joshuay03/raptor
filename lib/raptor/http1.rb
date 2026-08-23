@@ -47,6 +47,7 @@ module Raptor
     CONNECTION_KEEPALIVE = "keep-alive"
     EXPECT_100_CONTINUE = "100-continue"
     TRANSFER_ENCODING_CHUNKED = "chunked"
+    CHUNKED_TERMINATOR = "0\r\n\r\n"
 
     HTTP_CONNECTION = "HTTP_CONNECTION"
     HTTP_EXPECT = "HTTP_EXPECT"
@@ -54,9 +55,6 @@ module Raptor
     RACK_HEADER_PREFIX = "rack."
     RACK_HIJACKED = "rack.hijacked"
     RACK_HIJACK_IO = "rack.hijack_io"
-
-    ILLEGAL_HEADER_KEY_REGEX = /[\x00-\x20\(\)<>@,;:\\"\/\[\]\?=\{\}\x7F]/
-    ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/
 
     # Returns true when an HTTP/1.1 request lacks a valid `Host` header per
     # RFC 9112 section 3.2, where a valid value is a non-empty single-value
@@ -864,11 +862,11 @@ module Raptor
 
       response = +"#{HTTP_11} 103 Early Hints\r\n"
       hints.each do |key, value|
-        next if illegal_header_key?(key)
+        next if HttpParser.illegal_header_key?(key)
 
         values = value.is_a?(Array) ? value : [value]
         values.each do |hint_value|
-          next if illegal_header_value?(hint_value.to_s)
+          next if HttpParser.illegal_header_value?(hint_value.to_s)
 
           response << "#{key.downcase}: #{hint_value}\r\n"
         end
@@ -946,7 +944,7 @@ module Raptor
       headers.each do |key, value|
         raise TypeError, "header keys must be Strings" unless key.is_a?(String)
 
-        next if illegal_header_key?(key)
+        next if HttpParser.illegal_header_key?(key)
 
         normalized_key = key.match?(/[A-Z]/) ? key.downcase : key
         next if normalized_key.start_with?(RACK_HEADER_PREFIX)
@@ -1000,7 +998,7 @@ module Raptor
     #
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, ^(TCPSocket) -> void response_hijack) -> void
     def write_hijacked_response(socket, response, headers, response_hijack)
-      format_headers(response, headers)
+      HttpParser.format_headers(response, headers)
       response << "\r\n"
       socket_write(socket, response)
       uncork_socket(socket)
@@ -1023,7 +1021,7 @@ module Raptor
         headers[Rack::CONTENT_LENGTH] = "0" unless headers.key?(Rack::CONTENT_LENGTH) || headers.key?(Rack::TRANSFER_ENCODING)
       end
 
-      format_headers(response, headers)
+      HttpParser.format_headers(response, headers)
       response << "\r\n"
       socket_write(socket, response)
     end
@@ -1042,7 +1040,7 @@ module Raptor
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
     def write_full_response(socket, response, headers, body, http_version)
       if body.respond_to?(:call)
-        format_headers(response, headers)
+        HttpParser.format_headers(response, headers)
         response << "\r\n"
         socket_write(socket, response)
         uncork_socket(socket)
@@ -1068,7 +1066,7 @@ module Raptor
         headers[Rack::TRANSFER_ENCODING] = TRANSFER_ENCODING_CHUNKED
       end
 
-      format_headers(response, headers)
+      HttpParser.format_headers(response, headers)
       response << "\r\n"
 
       if body.respond_to?(:to_path) && (path = body.to_path) && File.readable?(path)
@@ -1117,13 +1115,13 @@ module Raptor
         if use_chunked
           buffer = response
           while (chunk = file.read(FILE_CHUNK_SIZE))
-            buffer << chunk.bytesize.to_s(16) << "\r\n" << chunk << "\r\n"
+            HttpParser.chunked_encode(buffer, chunk)
             if buffer.bytesize >= CHUNKED_WRITE_THRESHOLD
               socket_write(socket, buffer)
               buffer = +""
             end
           end
-          buffer << "0\r\n\r\n"
+          buffer << CHUNKED_TERMINATOR
           socket_write(socket, buffer)
         elsif content_length && content_length < BODY_BUFFER_THRESHOLD
           response << file.read(content_length)
@@ -1166,7 +1164,8 @@ module Raptor
       raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
       if use_chunked
-        response << chunk.bytesize.to_s(16) << "\r\n" << chunk << "\r\n0\r\n\r\n"
+        HttpParser.chunked_encode(response, chunk)
+        response << CHUNKED_TERMINATOR
         socket_write(socket, response)
       else
         socket_writev(socket, [response, chunk])
@@ -1189,15 +1188,13 @@ module Raptor
         body_array.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
-          next if chunk.empty?
-
-          buffer << chunk.bytesize.to_s(16) << "\r\n" << chunk << "\r\n"
+          HttpParser.chunked_encode(buffer, chunk)
           if buffer.bytesize >= CHUNKED_WRITE_THRESHOLD
             socket_write(socket, buffer)
             buffer = +""
           end
         end
-        buffer << "0\r\n\r\n"
+        buffer << CHUNKED_TERMINATOR
         socket_write(socket, buffer)
       else
         body_array.each do |chunk|
@@ -1220,14 +1217,15 @@ module Raptor
     def write_enumerable_body(socket, response, body, use_chunked)
       if use_chunked
         socket_write(socket, response)
+        buffer = +""
         body.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
 
-          next if chunk.empty?
-
-          socket_write(socket, "#{chunk.bytesize.to_s(16)}\r\n#{chunk}\r\n")
+          buffer.clear
+          HttpParser.chunked_encode(buffer, chunk)
+          socket_write(socket, buffer) unless buffer.empty?
         end
-        socket_write(socket, "0\r\n\r\n")
+        socket_write(socket, CHUNKED_TERMINATOR)
       else
         body.each do |chunk|
           raise TypeError, "body must yield String values" unless chunk.is_a?(String)
@@ -1235,72 +1233,6 @@ module Raptor
           response << chunk
         end
         socket_write(socket, response)
-      end
-    end
-
-    # Returns true if the header key contains characters illegal in HTTP headers.
-    #
-    # @param key [String] the header key to check
-    # @return [Boolean] true if the key is illegal
-    #
-    # @rbs (String key) -> bool
-    def illegal_header_key?(key)
-      key.match?(ILLEGAL_HEADER_KEY_REGEX)
-    end
-
-    # Returns true if the header value contains characters illegal in HTTP headers.
-    #
-    # @param value [String] the header value to check
-    # @return [Boolean] true if the value is illegal
-    #
-    # @rbs (String value) -> bool
-    def illegal_header_value?(value)
-      value.match?(ILLEGAL_HEADER_VALUE_REGEX)
-    end
-
-    # Appends normalised header lines to `result`. Skips entries with
-    # illegal keys or values. Array values are written as separate lines.
-    #
-    # @param headers [Hash] normalized response headers
-    # @return [String] formatted header lines, each ending with CRLF
-    #
-    # @rbs (String result, Hash[String, String | Array[String]] headers) -> void
-    def format_headers(result, headers)
-      headers.each do |name, value|
-        next if illegal_header_key?(name)
-
-        if value.is_a?(Array)
-          value.each { |entry| append_header_value(result, name, entry) }
-        else
-          append_header_value(result, name, value)
-        end
-      end
-    end
-
-    # Appends one or more `name: value` header lines to `result`, splitting
-    # newline-joined values across separate lines and skipping empty or
-    # illegal values.
-    #
-    # @param result [String] the buffer to append to
-    # @param name [String] the header name
-    # @param value [Object] the header value (any object responding to `to_s`)
-    # @return [void]
-    #
-    # @rbs (String result, String name, untyped value) -> void
-    def append_header_value(result, name, value)
-      string_value = value.is_a?(String) ? value : value.to_s
-      return if string_value.empty?
-
-      if string_value.include?("\n")
-        string_value.split("\n").each do |line|
-          next if line.empty? || illegal_header_value?(line)
-
-          result << name << ": " << line << "\r\n"
-        end
-      else
-        return if illegal_header_value?(string_value)
-
-        result << name << ": " << string_value << "\r\n"
       end
     end
 

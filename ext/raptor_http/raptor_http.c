@@ -1404,6 +1404,118 @@ static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
   return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
 }
 
+static uint8_t illegal_header_key_bitmap[32];
+static uint8_t illegal_header_value_bitmap[32];
+
+static void bitmap_set(uint8_t *bitmap, unsigned char byte) {
+  bitmap[byte >> 3] |= (uint8_t)(1u << (byte & 7));
+}
+
+static int contains_illegal_byte(const uint8_t *bitmap, const char *str, size_t len) {
+  for (size_t i = 0; i < len; i++) {
+    unsigned char byte = (unsigned char)str[i];
+    if ((bitmap[byte >> 3] >> (byte & 7)) & 1) return 1;
+  }
+  return 0;
+}
+
+static VALUE parser_illegal_header_key_p(VALUE self, VALUE key) {
+  (void)self;
+  Check_Type(key, T_STRING);
+  return contains_illegal_byte(illegal_header_key_bitmap, RSTRING_PTR(key), (size_t)RSTRING_LEN(key)) ? Qtrue : Qfalse;
+}
+
+static VALUE parser_illegal_header_value_p(VALUE self, VALUE value) {
+  (void)self;
+  Check_Type(value, T_STRING);
+  return contains_illegal_byte(illegal_header_value_bitmap, RSTRING_PTR(value), (size_t)RSTRING_LEN(value)) ? Qtrue : Qfalse;
+}
+
+static void emit_header_line(VALUE buffer, const char *name, long name_len,
+                             const char *value, long value_len) {
+  if (value_len == 0) return;
+  if (contains_illegal_byte(illegal_header_value_bitmap, value, (size_t)value_len)) return;
+  rb_str_cat(buffer, name, name_len);
+  rb_str_cat(buffer, ": ", 2);
+  rb_str_cat(buffer, value, value_len);
+  rb_str_cat(buffer, "\r\n", 2);
+}
+
+static void emit_header(VALUE buffer, const char *name, long name_len, VALUE value) {
+  VALUE str = RB_TYPE_P(value, T_STRING) ? value : rb_funcall(value, rb_intern("to_s"), 0);
+  const char *ptr = RSTRING_PTR(str);
+  long len = RSTRING_LEN(str);
+  if (len == 0) return;
+
+  if (!memchr(ptr, '\n', (size_t)len)) {
+    emit_header_line(buffer, name, name_len, ptr, len);
+    return;
+  }
+
+  long line_start = 0;
+  for (long i = 0; i < len; i++) {
+    if (ptr[i] == '\n') {
+      emit_header_line(buffer, name, name_len, ptr + line_start, i - line_start);
+      line_start = i + 1;
+    }
+  }
+  if (line_start < len) {
+    emit_header_line(buffer, name, name_len, ptr + line_start, len - line_start);
+  }
+}
+
+static int format_header_iter(VALUE key, VALUE value, VALUE data) {
+  VALUE buffer = (VALUE)data;
+  if (!RB_TYPE_P(key, T_STRING)) return ST_CONTINUE;
+  const char *name = RSTRING_PTR(key);
+  long name_len = RSTRING_LEN(key);
+  if (contains_illegal_byte(illegal_header_key_bitmap, name, (size_t)name_len)) return ST_CONTINUE;
+
+  if (RB_TYPE_P(value, T_ARRAY)) {
+    long entries = RARRAY_LEN(value);
+    for (long i = 0; i < entries; i++) {
+      emit_header(buffer, name, name_len, RARRAY_AREF(value, i));
+    }
+  } else {
+    emit_header(buffer, name, name_len, value);
+  }
+  return ST_CONTINUE;
+}
+
+static VALUE parser_format_headers(VALUE self, VALUE buffer, VALUE headers) {
+  (void)self;
+  Check_Type(buffer, T_STRING);
+  Check_Type(headers, T_HASH);
+  rb_hash_foreach(headers, format_header_iter, buffer);
+  return buffer;
+}
+
+static VALUE parser_chunked_encode(VALUE self, VALUE buffer, VALUE chunk) {
+  (void)self;
+  Check_Type(buffer, T_STRING);
+  Check_Type(chunk, T_STRING);
+  long chunk_len = RSTRING_LEN(chunk);
+  if (chunk_len == 0) return buffer;
+
+  char hex_buf[17];
+  int hex_len = snprintf(hex_buf, sizeof(hex_buf), "%lx", (unsigned long)chunk_len);
+  rb_str_cat(buffer, hex_buf, hex_len);
+  rb_str_cat(buffer, "\r\n", 2);
+  rb_str_cat(buffer, RSTRING_PTR(chunk), chunk_len);
+  rb_str_cat(buffer, "\r\n", 2);
+  return buffer;
+}
+
+static void init_illegal_header_bitmaps(void) {
+  for (int byte = 0x00; byte <= 0x20; byte++) bitmap_set(illegal_header_key_bitmap, (unsigned char)byte);
+  const char *key_specials = "()<>@,;:\\\"/[]?={}";
+  for (const char *p = key_specials; *p; p++) bitmap_set(illegal_header_key_bitmap, (unsigned char)*p);
+  bitmap_set(illegal_header_key_bitmap, 0x7F);
+
+  for (int byte = 0x00; byte <= 0x08; byte++) bitmap_set(illegal_header_value_bitmap, (unsigned char)byte);
+  for (int byte = 0x0A; byte <= 0x1F; byte++) bitmap_set(illegal_header_value_bitmap, (unsigned char)byte);
+}
+
 RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   rb_ext_ractor_safe(true);
 
@@ -1430,6 +1542,8 @@ RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   id_malformed = rb_intern("malformed");
   id_too_large = rb_intern("too_large");
 
+  init_illegal_header_bitmaps();
+
   for (size_t i = 0; i < NUM_COMMON_FIELDS; i++) {
     common_fields[i].interned = rb_enc_interned_str(common_fields[i].name, common_fields[i].len, rb_utf8_encoding());
     rb_global_variable(&common_fields[i].interned);
@@ -1445,5 +1559,9 @@ RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   rb_define_method(cHttpParser, "reset", parser_reset, 0);
   rb_define_method(cHttpParser, "body", parser_body, 0);
   rb_define_singleton_method(cHttpParser, "decode_chunked", parser_decode_chunked, -1);
+  rb_define_singleton_method(cHttpParser, "illegal_header_key?", parser_illegal_header_key_p, 1);
+  rb_define_singleton_method(cHttpParser, "illegal_header_value?", parser_illegal_header_value_p, 1);
+  rb_define_singleton_method(cHttpParser, "format_headers", parser_format_headers, 2);
+  rb_define_singleton_method(cHttpParser, "chunked_encode", parser_chunked_encode, 2);
   rb_define_const(cHttpParser, "MAX_CHUNK_OVERHEAD", INT2FIX(MAX_CHUNK_OVERHEAD));
 }

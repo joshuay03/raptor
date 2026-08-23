@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Emit HTTP/1.1 response headers and chunked bodies in C
 - Decode chunked request bodies in C
 
 ## [0.16.1] - 2026-08-23
