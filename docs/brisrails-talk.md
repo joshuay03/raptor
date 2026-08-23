@@ -37,7 +37,7 @@ _[luma.com/t3l24s8h](https://luma.com/t3l24s8h)_
 - <big>I built a Ruby web server over the last few months</big>
 - <big>It's called Raptor</big>
 - <big>It runs Rack apps, like Puma and Falcon do</big>
-- <big>It's built around Ruby 4's Ractors</big>
+- <big>It's built around a Ractor-parallel HTTP parser</big>
 - <big>It's fast enough that the numbers are interesting</big>
 - <big>It's not production-ready. Nobody's Rails app should be behind it yet.</big>
 

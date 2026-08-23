@@ -1,6 +1,6 @@
 # Raptor vs Puma: A Design Comparison
 
-Raptor is a Ruby web server designed around Ruby 4's Ractors. On CPU-bound HTTP/1.1 it holds a real edge over the latest Puma release on the same hardware regardless of keep-alive; on IO-heavy work fibers still win, and Falcon is the server to compare to there rather than Raptor or Puma. Raptor also speaks HTTP/2 natively, which Puma does not. This document is a systems-design walkthrough of how it manages both.
+Raptor is a Ruby web server designed around a Ractor-parallel HTTP parser. On CPU-bound HTTP/1.1 it holds a real edge over the latest Puma release on the same hardware regardless of keep-alive; on IO-heavy work fibers still win, and Falcon is the server to compare to there rather than Raptor or Puma. Raptor also speaks HTTP/2 natively, which Puma does not. This document is a systems-design walkthrough of how it manages both.
 
 ## Why this document exists
 
