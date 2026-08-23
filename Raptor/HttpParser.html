@@ -136,7 +136,95 @@
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#chunked_encode-class_method" title="chunked_encode (class method)">.<strong>chunked_encode</strong>(buffer, chunk)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#decode_chunked-class_method" title="decode_chunked (class method)">.<strong>decode_chunked</strong>(*args)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#format_headers-class_method" title="format_headers (class method)">.<strong>format_headers</strong>(buffer, headers)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#illegal_header_key%3F-class_method" title="illegal_header_key? (class method)">.<strong>illegal_header_key?</strong>(key)  &#x21d2; Boolean </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#illegal_header_value%3F-class_method" title="illegal_header_value? (class method)">.<strong>illegal_header_value?</strong>(value)  &#x21d2; Boolean </a>
     
 
     
@@ -352,7 +440,61 @@
 
     
       <div class="method_details first">
-  <h3 class="signature first" id="decode_chunked-class_method">
+  <h3 class="signature first" id="chunked_encode-class_method">
+  
+    .<strong>chunked_encode</strong>(buffer, chunk)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+1493
+1494
+1495
+1496
+1497
+1498
+1499
+1500
+1501
+1502
+1503
+1504
+1505
+1506
+1507</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1493</span>
+
+static VALUE parser_chunked_encode(VALUE self, VALUE buffer, VALUE chunk) {
+  (void)self;
+  Check_Type(buffer, T_STRING);
+  Check_Type(chunk, T_STRING);
+  long chunk_len = RSTRING_LEN(chunk);
+  if (chunk_len == 0) return buffer;
+
+  char hex_buf[17];
+  int hex_len = snprintf(hex_buf, sizeof(hex_buf), &quot;%lx&quot;, (unsigned long)chunk_len);
+  rb_str_cat(buffer, hex_buf, hex_len);
+  rb_str_cat(buffer, &quot;\r\n&quot;, 2);
+  rb_str_cat(buffer, RSTRING_PTR(chunk), chunk_len);
+  rb_str_cat(buffer, &quot;\r\n&quot;, 2);
+  return buffer;
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="decode_chunked-class_method">
   
     .<strong>decode_chunked</strong>(*args)  &#x21d2; <tt>Object</tt> 
   
@@ -513,6 +655,156 @@ static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
   }
 
   return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="format_headers-class_method">
+  
+    .<strong>format_headers</strong>(buffer, headers)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+1485
+1486
+1487
+1488
+1489
+1490
+1491</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1485</span>
+
+static VALUE parser_format_headers(VALUE self, VALUE buffer, VALUE headers) {
+  (void)self;
+  Check_Type(buffer, T_STRING);
+  Check_Type(headers, T_HASH);
+  rb_hash_foreach(headers, format_header_iter, buffer);
+  return buffer;
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="illegal_header_key?-class_method">
+  
+    .<strong>illegal_header_key?</strong>(key)  &#x21d2; <tt>Boolean</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+1422
+1423
+1424
+1425
+1426</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1422</span>
+
+static VALUE parser_illegal_header_key_p(VALUE self, VALUE key) {
+  (void)self;
+  Check_Type(key, T_STRING);
+  return contains_illegal_byte(illegal_header_key_bitmap, RSTRING_PTR(key), (size_t)RSTRING_LEN(key)) ? Qtrue : Qfalse;
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="illegal_header_value?-class_method">
+  
+    .<strong>illegal_header_value?</strong>(value)  &#x21d2; <tt>Boolean</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+1428
+1429
+1430
+1431
+1432</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1428</span>
+
+static VALUE parser_illegal_header_value_p(VALUE self, VALUE value) {
+  (void)self;
+  Check_Type(value, T_STRING);
+  return contains_illegal_byte(illegal_header_value_bitmap, RSTRING_PTR(value), (size_t)RSTRING_LEN(value)) ? Qtrue : Qfalse;
 }</pre>
     </td>
   </tr>
@@ -896,7 +1188,7 @@ static VALUE parser_reset(VALUE self) {
 </div>
 
       <div id="footer">
-  Generated on Sun Aug 23 07:09:05 2026 by
+  Generated on Sun Aug 23 07:14:43 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
