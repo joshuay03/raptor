@@ -26,10 +26,11 @@ module Raptor
     # `[1, HTTP1_RACTOR_COUNT_CAP]`.
     #
     # @param worker_count [Integer] the configured worker count
+    # @param cores [Integer] the available processor count
     # @return [Integer]
     #
-    # @rbs (Integer worker_count) -> Integer
-    def self.default_http1_ractor_count: (Integer worker_count) -> Integer
+    # @rbs (Integer worker_count, ?cores: Integer) -> Integer
+    def self.default_http1_ractor_count: (Integer worker_count, ?cores: Integer) -> Integer
 
     # Returns the default number of HTTP/2 pipeline ractors per
     # worker for the given worker count, rounded from the available
@@ -37,10 +38,11 @@ module Raptor
     # `[1, HTTP2_RACTOR_COUNT_CAP]`.
     #
     # @param worker_count [Integer] the configured worker count
+    # @param cores [Integer] the available processor count
     # @return [Integer]
     #
-    # @rbs (Integer worker_count) -> Integer
-    def self.default_http2_ractor_count: (Integer worker_count) -> Integer
+    # @rbs (Integer worker_count, ?cores: Integer) -> Integer
+    def self.default_http2_ractor_count: (Integer worker_count, ?cores: Integer) -> Integer
 
     @server_port: Integer
 

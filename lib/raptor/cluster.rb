@@ -46,11 +46,11 @@ module Raptor
     # `[1, HTTP1_RACTOR_COUNT_CAP]`.
     #
     # @param worker_count [Integer] the configured worker count
+    # @param cores [Integer] the available processor count
     # @return [Integer]
     #
-    # @rbs (Integer worker_count) -> Integer
-    def self.default_http1_ractor_count(worker_count)
-      cores = Integer(Concurrent.available_processor_count)
+    # @rbs (Integer worker_count, ?cores: Integer) -> Integer
+    def self.default_http1_ractor_count(worker_count, cores: Integer(Concurrent.available_processor_count))
       (cores.to_f / worker_count).round.clamp(1, HTTP1_RACTOR_COUNT_CAP)
     end
 
@@ -60,11 +60,11 @@ module Raptor
     # `[1, HTTP2_RACTOR_COUNT_CAP]`.
     #
     # @param worker_count [Integer] the configured worker count
+    # @param cores [Integer] the available processor count
     # @return [Integer]
     #
-    # @rbs (Integer worker_count) -> Integer
-    def self.default_http2_ractor_count(worker_count)
-      cores = Integer(Concurrent.available_processor_count)
+    # @rbs (Integer worker_count, ?cores: Integer) -> Integer
+    def self.default_http2_ractor_count(worker_count, cores: Integer(Concurrent.available_processor_count))
       (cores.to_f / worker_count).round.clamp(1, HTTP2_RACTOR_COUNT_CAP)
     end
 
