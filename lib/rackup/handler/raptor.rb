@@ -43,7 +43,6 @@ module Rackup
           "Host=HOST"   => "Hostname to listen on (default: #{DEFAULT_OPTIONS[:Host]})",
           "Port=PORT"   => "Port to listen on (default: #{DEFAULT_OPTIONS[:Port]})",
           "Workers=NUM" => "Number of worker processes (default: available processor count)",
-          "Ractors=NUM" => "Number of pipeline ractors per worker (default: 1)",
           "Threads=NUM" => "Number of threads per worker (default: 3)",
           "Config=PATH" => "Load additional configuration from PATH"
         }

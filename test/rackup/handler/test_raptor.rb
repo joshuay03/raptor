@@ -3,11 +3,9 @@
 require "test_helper"
 
 require "concurrent/utility/processor_counter"
-require "tempfile"
 
 require "rackup"
 require "rackup/handler/raptor"
-require "raptor/cli"
 
 module Rackup
   module Handler
@@ -20,7 +18,7 @@ module Rackup
 
       def test_valid_options_keys
         assert_equal(
-          ["Host=HOST", "Port=PORT", "Workers=NUM", "Ractors=NUM", "Threads=NUM", "Config=PATH"],
+          ["Host=HOST", "Port=PORT", "Workers=NUM", "Threads=NUM", "Config=PATH"],
           Rackup::Handler::Raptor.valid_options.keys
         )
       end

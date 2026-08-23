@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Drop the stale `Ractors=NUM` option from the Rackup handler
+
 ## [0.16.0] - 2026-08-22
 
 - Parse HTTP/2 requests in a dedicated ractor pool
