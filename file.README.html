@@ -245,11 +245,11 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 ...
 </code></pre>
 <h2 id="_Micro__Benchmarks">(Micro) Benchmarks</h2>
-<p>Raptor 0.16.0 vs Puma 8.0.2 vs PumaPlus 0.1.0 vs Falcon 0.57.0 across two workload profiles. <strong>IO-bound</strong> is a GET
-endpoint that interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes
-several DB or cache calls. <strong>CPU-bound</strong> is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of
-JSON item building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path
-that does most of its work in Ruby with a few near-zero-cost cache hits.</p>
+<p>Raptor 0.16.0 vs Puma 8.0.2 vs Falcon 0.57.0 across two workload profiles. <strong>IO-bound</strong> is a GET endpoint that
+interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
+cache calls. <strong>CPU-bound</strong> is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of JSON item
+building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
+most of its work in Ruby with a few near-zero-cost cache hits.</p>
 <p>Each cell reports the median throughput and median p95 latency independently across 5 runs, so the two numbers in a row
 may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
 state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
@@ -265,10 +265,6 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <th>Puma p95</th>
 <th>vs Puma req/s</th>
 <th>vs Puma p95</th>
-<th>PumaPlus req/s</th>
-<th>PumaPlus p95</th>
-<th>vs PumaPlus req/s</th>
-<th>vs PumaPlus p95</th>
 <th>Falcon req/s</th>
 <th>Falcon p95</th>
 <th>vs Falcon req/s</th>
@@ -285,10 +281,6 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <td>131.00 ms</td>
 <td>117.7% higher</td>
 <td>51.8% lower</td>
-<td>1.63k req/s</td>
-<td>84.20 ms</td>
-<td>97.0% higher</td>
-<td>24.9% lower</td>
 <td>12.27k req/s</td>
 <td>14.00 ms</td>
 <td>73.8% lower</td>
@@ -303,10 +295,6 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <td>21.20 ms</td>
 <td>3.2% lower</td>
 <td>57.1% higher</td>
-<td>8.08k req/s</td>
-<td>19.20 ms</td>
-<td>2.6% higher</td>
-<td>73.4% higher</td>
 <td>6.62k req/s</td>
 <td>27.00 ms</td>
 <td>25.2% higher</td>
@@ -321,10 +309,6 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <td>110.20 ms</td>
 <td>68.7% higher</td>
 <td>50.6% lower</td>
-<td>1.58k req/s</td>
-<td>87.10 ms</td>
-<td>54.2% higher</td>
-<td>37.5% lower</td>
 <td>6.28k req/s</td>
 <td>27.90 ms</td>
 <td>61.3% lower</td>
@@ -339,10 +323,6 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <td>21.90 ms</td>
 <td>1.1% lower</td>
 <td>14.2% lower</td>
-<td>8.36k req/s</td>
-<td>18.40 ms</td>
-<td>0.4% higher</td>
-<td>2.2% higher</td>
 <td>7.09k req/s</td>
 <td>31.50 ms</td>
 <td>18.5% higher</td>
@@ -357,10 +337,6 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>1.52k req/s</td>
-<td>90.13 ms</td>
-<td>36.0% lower</td>
-<td>119.6% higher</td>
 <td>6.59k req/s</td>
 <td>27.21 ms</td>
 <td>85.2% lower</td>
@@ -375,10 +351,6 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>8.05k req/s</td>
-<td>19.23 ms</td>
-<td>17.9% lower</td>
-<td>66.3% higher</td>
 <td>8.09k req/s</td>
 <td>45.04 ms</td>
 <td>18.3% lower</td>
@@ -388,7 +360,7 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 </table>
 <blockquote>
 <p>ruby 4.0.6 (2026-07-14 revision 03b6d3f889) +YJIT +PRISM [aarch64-linux]
-10 worker processes; Raptor, Puma, and PumaPlus run 3 threads per worker, Falcon runs unbounded fibers per worker;
+10 worker processes; Raptor and Puma run 3 threads per worker, Falcon runs unbounded fibers per worker;
 120 concurrent HTTP/1.1 client connections; 40 concurrent HTTP/2 client connections × 3 streams each</p>
 </blockquote>
 <p>See <a href="bin/benchmark">bin/benchmark</a> for more details.</p>
@@ -410,7 +382,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sat Aug 22 23:38:06 2026 by
+  Generated on Sun Aug 23 00:25:53 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
