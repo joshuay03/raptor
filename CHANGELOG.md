@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.16.1] - 2026-08-23
+
 - Drop the stale `Ractors=NUM` option from the Rackup handler
 
 ## [0.16.0] - 2026-08-22
