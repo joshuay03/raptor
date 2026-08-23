@@ -20,7 +20,7 @@ unless File.exist?("/.dockerenv")
   exec(File.expand_path("dev", __dir__), "bin/#{File.basename(__FILE__)}", *argv)
 end
 
-system("bundle", "update", "puma", "puma-plus", "falcon", exception: true)
+system("bundle", "update", "puma", "falcon", exception: true)
 system("bundle", "exec", "rake", "compile", "bpf:compile", exception: true)
 
 require "bundler/setup"
@@ -380,13 +380,6 @@ def puma_version
   output.strip
 end
 
-def puma_plus_version
-  output, status = Open3.capture2("bundle", "exec", "ruby", "-e", "require 'puma_plus/version'; puts PumaPlus::VERSION")
-  abort "could not read PumaPlus version" unless status.success?
-
-  output.strip
-end
-
 def falcon_version
   output, status = Open3.capture2("bundle", "exec", "ruby", "-e", "require 'falcon/version'; puts Falcon::VERSION")
   abort "could not read Falcon version" unless status.success?
@@ -410,28 +403,6 @@ def puma_cmd(fixture)
     "bundle", "exec", "puma",
     "-w", WORKERS.to_s, "-t", "#{THREADS}:#{THREADS}",
     "-b", "tcp://0.0.0.0:#{H1_PORT}",
-    fixture
-  ]
-end
-
-def puma_plus_h1_cmd(fixture)
-  [
-    "bundle", "exec", "puma-plus",
-    "-w", WORKERS.to_s, "-t", THREADS.to_s,
-    "-b", "tcp://0.0.0.0:#{H1_PORT}",
-    "--no-config",
-    fixture
-  ]
-end
-
-def puma_plus_h2_cmd(fixture)
-  [
-    "bundle", "exec", "puma-plus",
-    "-w", WORKERS.to_s, "-t", THREADS.to_s,
-    "-b", "ssl://0.0.0.0:#{H2_PORT}",
-    "--tls-cert", CERT_PATH,
-    "--tls-key", KEY_PATH,
-    "--no-config",
     fixture
   ]
 end
@@ -482,8 +453,6 @@ WORKLOADS.each do |workload, config|
   method = config[:method]
   raptor_ports = [H1_PORT, H2_PORT]
   puma_ports = [H1_PORT]
-  puma_plus_h1_ports = [H1_PORT]
-  puma_plus_h2_ports = [H2_PORT]
   falcon_h1_ports = [H1_PORT]
   falcon_h2_ports = [H2_PORT]
 
@@ -493,9 +462,6 @@ WORKLOADS.each do |workload, config|
     raptor_h2: bench_h2("Raptor", raptor_cmd(fixture), raptor_ports, label, method: method),
     puma_h1: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, method: method, keep_alive: false),
     puma_h1_ka: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, method: method, keep_alive: true),
-    puma_plus_h1: bench_h1("PumaPlus", puma_plus_h1_cmd(fixture), puma_plus_h1_ports, label, method: method, keep_alive: false),
-    puma_plus_h1_ka: bench_h1("PumaPlus", puma_plus_h1_cmd(fixture), puma_plus_h1_ports, label, method: method, keep_alive: true),
-    puma_plus_h2: bench_h2("PumaPlus", puma_plus_h2_cmd(fixture), puma_plus_h2_ports, label, method: method),
     falcon_h1: bench_h1("Falcon", falcon_h1_cmd(fixture), falcon_h1_ports, label, method: method, keep_alive: false),
     falcon_h1_ka: bench_h1("Falcon", falcon_h1_cmd(fixture), falcon_h1_ports, label, method: method, keep_alive: true),
     falcon_h2: bench_h2("Falcon", falcon_h2_cmd(fixture), falcon_h2_ports, label, method: method)
@@ -503,9 +469,9 @@ WORKLOADS.each do |workload, config|
 end
 
 PROTOCOLS = [
-  { label: "HTTP/1.1", raptor_key: :raptor_h1, puma_key: :puma_h1, puma_plus_key: :puma_plus_h1, falcon_key: :falcon_h1 },
-  { label: "HTTP/1.1 (keep-alive)", raptor_key: :raptor_h1_ka, puma_key: :puma_h1_ka, puma_plus_key: :puma_plus_h1_ka, falcon_key: :falcon_h1_ka },
-  { label: "HTTP/2", raptor_key: :raptor_h2, puma_key: nil, puma_plus_key: :puma_plus_h2, falcon_key: :falcon_h2 }
+  { label: "HTTP/1.1", raptor_key: :raptor_h1, puma_key: :puma_h1, falcon_key: :falcon_h1 },
+  { label: "HTTP/1.1 (keep-alive)", raptor_key: :raptor_h1_ka, puma_key: :puma_h1_ka, falcon_key: :falcon_h1_ka },
+  { label: "HTTP/2", raptor_key: :raptor_h2, puma_key: nil, falcon_key: :falcon_h2 }
 ]
 
 rows = []
@@ -513,7 +479,6 @@ PROTOCOLS.each do |protocol|
   WORKLOADS.each do |workload, config|
     raptor_value = results[workload][protocol[:raptor_key]]
     puma_value = protocol[:puma_key] ? results[workload][protocol[:puma_key]] : nil
-    puma_plus_value = protocol[:puma_plus_key] ? results[workload][protocol[:puma_plus_key]] : nil
     falcon_value = protocol[:falcon_key] ? results[workload][protocol[:falcon_key]] : nil
     rows << {
       protocol: protocol[:label],
@@ -524,10 +489,6 @@ PROTOCOLS.each do |protocol|
       puma_p95: puma_value ? format_p95_ms(puma_value[:p95_ms]) : "N/A",
       vs_puma_req_s: puma_value ? format_delta(raptor_value[:req_s], puma_value[:req_s]) : "-",
       vs_puma_p95: puma_value ? format_delta(raptor_value[:p95_ms], puma_value[:p95_ms]) : "-",
-      puma_plus_req_s: puma_plus_value ? format_req_s(puma_plus_value[:req_s]) : "N/A",
-      puma_plus_p95: puma_plus_value ? format_p95_ms(puma_plus_value[:p95_ms]) : "N/A",
-      vs_puma_plus_req_s: puma_plus_value ? format_delta(raptor_value[:req_s], puma_plus_value[:req_s]) : "-",
-      vs_puma_plus_p95: puma_plus_value ? format_delta(raptor_value[:p95_ms], puma_plus_value[:p95_ms]) : "-",
       falcon_req_s: falcon_value ? format_req_s(falcon_value[:req_s]) : "N/A",
       falcon_p95: falcon_value ? format_p95_ms(falcon_value[:p95_ms]) : "N/A",
       vs_falcon_req_s: falcon_value ? format_delta(raptor_value[:req_s], falcon_value[:req_s]) : "-",
@@ -545,10 +506,6 @@ HEADERS = {
   puma_p95: "Puma p95",
   vs_puma_req_s: "vs Puma req/s",
   vs_puma_p95: "vs Puma p95",
-  puma_plus_req_s: "PumaPlus req/s",
-  puma_plus_p95: "PumaPlus p95",
-  vs_puma_plus_req_s: "vs PumaPlus req/s",
-  vs_puma_plus_p95: "vs PumaPlus p95",
   falcon_req_s: "Falcon req/s",
   falcon_p95: "Falcon p95",
   vs_falcon_req_s: "vs Falcon req/s",
@@ -570,11 +527,11 @@ worst_p95_spread = all_cells.map { |cell| cell[:p95_stats][:spread_pct] }.max
 section = <<~MD
   ## (Micro) Benchmarks
 
-  Raptor #{Raptor::VERSION} vs Puma #{puma_version} vs PumaPlus #{puma_plus_version} vs Falcon #{falcon_version} across two workload profiles. **IO-bound** is a GET
-  endpoint that interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes
-  several DB or cache calls. **CPU-bound** is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of
-  JSON item building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path
-  that does most of its work in Ruby with a few near-zero-cost cache hits.
+  Raptor #{Raptor::VERSION} vs Puma #{puma_version} vs Falcon #{falcon_version} across two workload profiles. **IO-bound** is a GET endpoint that
+  interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
+  cache calls. **CPU-bound** is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of JSON item
+  building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
+  most of its work in Ruby with a few near-zero-cost cache hits.
 
   Each cell reports the median throughput and median p95 latency independently across #{RUNS_PER_MODE} runs, so the two numbers in a row
   may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
@@ -584,7 +541,7 @@ section = <<~MD
   #{table_lines.join("\n")}
 
   > #{RUBY_DESCRIPTION}
-  > #{WORKERS} worker processes; Raptor, Puma, and PumaPlus run #{THREADS} threads per worker, Falcon runs unbounded fibers per worker;
+  > #{WORKERS} worker processes; Raptor and Puma run #{THREADS} threads per worker, Falcon runs unbounded fibers per worker;
   > #{HEY_CONNECTIONS} concurrent HTTP/1.1 client connections; #{H2LOAD_CONNECTIONS} concurrent HTTP/2 client connections × #{H2LOAD_STREAMS} streams each
 
   See [bin/benchmark](bin/benchmark) for more details.

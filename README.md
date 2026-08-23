@@ -201,28 +201,28 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 
 ## (Micro) Benchmarks
 
-Raptor 0.16.0 vs Puma 8.0.2 vs PumaPlus 0.1.0 vs Falcon 0.57.0 across two workload profiles. **IO-bound** is a GET
-endpoint that interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes
-several DB or cache calls. **CPU-bound** is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of
-JSON item building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path
-that does most of its work in Ruby with a few near-zero-cost cache hits.
+Raptor 0.16.0 vs Puma 8.0.2 vs Falcon 0.57.0 across two workload profiles. **IO-bound** is a GET endpoint that
+interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
+cache calls. **CPU-bound** is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of JSON item
+building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
+most of its work in Ruby with a few near-zero-cost cache hits.
 
 Each cell reports the median throughput and median p95 latency independently across 5 runs, so the two numbers in a row
 may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
 state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
 ((max - min) / 2 / median) between runs of a single cell was ±24.8% for throughput and ±40.3% for p95.
 
-| Protocol              | Workload | Raptor req/s | Raptor p95 | Puma req/s  | Puma p95  | vs Puma req/s | vs Puma p95  | PumaPlus req/s | PumaPlus p95 | vs PumaPlus req/s | vs PumaPlus p95 | Falcon req/s | Falcon p95 | vs Falcon req/s | vs Falcon p95 |
-| --------------------- | -------- | ------------ | ---------- | ----------- | --------- | ------------- | ------------ | -------------- | ------------ | ----------------- | --------------- | ------------ | ---------- | --------------- | ------------- |
-| HTTP/1.1              | IO       | 3.21k req/s  | 63.20 ms   | 1.48k req/s | 131.00 ms | 117.7% higher | 51.8% lower  | 1.63k req/s    | 84.20 ms     | 97.0% higher      | 24.9% lower     | 12.27k req/s | 14.00 ms   | 73.8% lower     | 351.4% higher |
-| HTTP/1.1              | CPU      | 8.29k req/s  | 33.30 ms   | 8.56k req/s | 21.20 ms  | 3.2% lower    | 57.1% higher | 8.08k req/s    | 19.20 ms     | 2.6% higher       | 73.4% higher    | 6.62k req/s  | 27.00 ms   | 25.2% higher    | 23.3% higher  |
-| HTTP/1.1 (keep-alive) | IO       | 2.43k req/s  | 54.40 ms   | 1.44k req/s | 110.20 ms | 68.7% higher  | 50.6% lower  | 1.58k req/s    | 87.10 ms     | 54.2% higher      | 37.5% lower     | 6.28k req/s  | 27.90 ms   | 61.3% lower     | 95.0% higher  |
-| HTTP/1.1 (keep-alive) | CPU      | 8.40k req/s  | 18.80 ms   | 8.49k req/s | 21.90 ms  | 1.1% lower    | 14.2% lower  | 8.36k req/s    | 18.40 ms     | 0.4% higher       | 2.2% higher     | 7.09k req/s  | 31.50 ms   | 18.5% higher    | 40.3% lower   |
-| HTTP/2                | IO       | 0.97k req/s  | 197.97 ms  | N/A         | N/A       | -             | -            | 1.52k req/s    | 90.13 ms     | 36.0% lower       | 119.6% higher   | 6.59k req/s  | 27.21 ms   | 85.2% lower     | 627.6% higher |
-| HTTP/2                | CPU      | 6.61k req/s  | 31.98 ms   | N/A         | N/A       | -             | -            | 8.05k req/s    | 19.23 ms     | 17.9% lower       | 66.3% higher    | 8.09k req/s  | 45.04 ms   | 18.3% lower     | 29.0% lower   |
+| Protocol              | Workload | Raptor req/s | Raptor p95 | Puma req/s  | Puma p95  | vs Puma req/s | vs Puma p95  | Falcon req/s | Falcon p95 | vs Falcon req/s | vs Falcon p95 |
+| --------------------- | -------- | ------------ | ---------- | ----------- | --------- | ------------- | ------------ | ------------ | ---------- | --------------- | ------------- |
+| HTTP/1.1              | IO       | 3.21k req/s  | 63.20 ms   | 1.48k req/s | 131.00 ms | 117.7% higher | 51.8% lower  | 12.27k req/s | 14.00 ms   | 73.8% lower     | 351.4% higher |
+| HTTP/1.1              | CPU      | 8.29k req/s  | 33.30 ms   | 8.56k req/s | 21.20 ms  | 3.2% lower    | 57.1% higher | 6.62k req/s  | 27.00 ms   | 25.2% higher    | 23.3% higher  |
+| HTTP/1.1 (keep-alive) | IO       | 2.43k req/s  | 54.40 ms   | 1.44k req/s | 110.20 ms | 68.7% higher  | 50.6% lower  | 6.28k req/s  | 27.90 ms   | 61.3% lower     | 95.0% higher  |
+| HTTP/1.1 (keep-alive) | CPU      | 8.40k req/s  | 18.80 ms   | 8.49k req/s | 21.90 ms  | 1.1% lower    | 14.2% lower  | 7.09k req/s  | 31.50 ms   | 18.5% higher    | 40.3% lower   |
+| HTTP/2                | IO       | 0.97k req/s  | 197.97 ms  | N/A         | N/A       | -             | -            | 6.59k req/s  | 27.21 ms   | 85.2% lower     | 627.6% higher |
+| HTTP/2                | CPU      | 6.61k req/s  | 31.98 ms   | N/A         | N/A       | -             | -            | 8.09k req/s  | 45.04 ms   | 18.3% lower     | 29.0% lower   |
 
 > ruby 4.0.6 (2026-07-14 revision 03b6d3f889) +YJIT +PRISM [aarch64-linux]
-> 10 worker processes; Raptor, Puma, and PumaPlus run 3 threads per worker, Falcon runs unbounded fibers per worker;
+> 10 worker processes; Raptor and Puma run 3 threads per worker, Falcon runs unbounded fibers per worker;
 > 120 concurrent HTTP/1.1 client connections; 40 concurrent HTTP/2 client connections × 3 streams each
 
 See [bin/benchmark](bin/benchmark) for more details.
