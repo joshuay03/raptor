@@ -226,7 +226,7 @@ unexpectedly or stop checking in.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#default_http1_ractor_count-class_method" title="default_http1_ractor_count (class method)">.<strong>default_http1_ractor_count</strong>(worker_count)  &#x21d2; Integer </a>
+      <a href="#default_http1_ractor_count-class_method" title="default_http1_ractor_count (class method)">.<strong>default_http1_ractor_count</strong>(worker_count, cores: Integer(Concurrent.available_processor_count))  &#x21d2; Integer </a>
     
 
     
@@ -248,7 +248,7 @@ unexpectedly or stop checking in.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#default_http2_ractor_count-class_method" title="default_http2_ractor_count (class method)">.<strong>default_http2_ractor_count</strong>(worker_count)  &#x21d2; Integer </a>
+      <a href="#default_http2_ractor_count-class_method" title="default_http2_ractor_count (class method)">.<strong>default_http2_ractor_count</strong>(worker_count, cores: Integer(Concurrent.available_processor_count))  &#x21d2; Integer </a>
     
 
     
@@ -1475,7 +1475,7 @@ unexpectedly or stop checking in.</p>
       <div class="method_details first">
   <h3 class="signature first" id="default_http1_ractor_count-class_method">
   
-    .<strong>default_http1_ractor_count</strong>(worker_count)  &#x21d2; <tt>Integer</tt> 
+    .<strong>default_http1_ractor_count</strong>(worker_count, cores: Integer(Concurrent.available_processor_count))  &#x21d2; <tt>Integer</tt> 
   
 
   
@@ -1508,6 +1508,35 @@ processor count per worker and clamped to
       
     </li>
   
+    <li>
+      
+        <span class='name'>cores</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>Integer(Concurrent.available_processor_count)</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>the available processor count</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>cores:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>Integer(Concurrent.available_processor_count)</tt>)</em>
+      
+      
+    </li>
+  
 </ul>
 
 <p class="tag_title">Returns:</p>
@@ -1530,16 +1559,14 @@ processor count per worker and clamped to
       <pre class="lines">
 
 
-52
 53
 54
 55</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 52</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 53</span>
 
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_default_http1_ractor_count'>default_http1_ractor_count</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_count'>worker_count</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_cores'>cores</span> <span class='op'>=</span> <span class='const'>Integer</span><span class='lparen'>(</span><span class='const'>Concurrent</span><span class='period'>.</span><span class='id identifier rubyid_available_processor_count'>available_processor_count</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_default_http1_ractor_count'>default_http1_ractor_count</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_count'>worker_count</span><span class='comma'>,</span> <span class='label'>cores:</span> <span class='const'>Integer</span><span class='lparen'>(</span><span class='const'>Concurrent</span><span class='period'>.</span><span class='id identifier rubyid_available_processor_count'>available_processor_count</span><span class='rparen'>)</span><span class='rparen'>)</span>
   <span class='lparen'>(</span><span class='id identifier rubyid_cores'>cores</span><span class='period'>.</span><span class='id identifier rubyid_to_f'>to_f</span> <span class='op'>/</span> <span class='id identifier rubyid_worker_count'>worker_count</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_round'>round</span><span class='period'>.</span><span class='id identifier rubyid_clamp'>clamp</span><span class='lparen'>(</span><span class='int'>1</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#HTTP1_RACTOR_COUNT_CAP-constant" title="Raptor::Cluster::HTTP1_RACTOR_COUNT_CAP (constant)">HTTP1_RACTOR_COUNT_CAP</a></span></span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -1550,7 +1577,7 @@ processor count per worker and clamped to
       <div class="method_details ">
   <h3 class="signature " id="default_http2_ractor_count-class_method">
   
-    .<strong>default_http2_ractor_count</strong>(worker_count)  &#x21d2; <tt>Integer</tt> 
+    .<strong>default_http2_ractor_count</strong>(worker_count, cores: Integer(Concurrent.available_processor_count))  &#x21d2; <tt>Integer</tt> 
   
 
   
@@ -1583,6 +1610,35 @@ processor count per worker and clamped to
       
     </li>
   
+    <li>
+      
+        <span class='name'>cores</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>Integer(Concurrent.available_processor_count)</tt>)</em>
+      
+      
+        &mdash;
+        <div class='inline'><p>the available processor count</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>cores:</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>Integer(Concurrent.available_processor_count)</tt>)</em>
+      
+      
+    </li>
+  
 </ul>
 
 <p class="tag_title">Returns:</p>
@@ -1605,16 +1661,14 @@ processor count per worker and clamped to
       <pre class="lines">
 
 
-66
 67
 68
 69</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 66</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 67</span>
 
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_default_http2_ractor_count'>default_http2_ractor_count</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_count'>worker_count</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_cores'>cores</span> <span class='op'>=</span> <span class='const'>Integer</span><span class='lparen'>(</span><span class='const'>Concurrent</span><span class='period'>.</span><span class='id identifier rubyid_available_processor_count'>available_processor_count</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_default_http2_ractor_count'>default_http2_ractor_count</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_count'>worker_count</span><span class='comma'>,</span> <span class='label'>cores:</span> <span class='const'>Integer</span><span class='lparen'>(</span><span class='const'>Concurrent</span><span class='period'>.</span><span class='id identifier rubyid_available_processor_count'>available_processor_count</span><span class='rparen'>)</span><span class='rparen'>)</span>
   <span class='lparen'>(</span><span class='id identifier rubyid_cores'>cores</span><span class='period'>.</span><span class='id identifier rubyid_to_f'>to_f</span> <span class='op'>/</span> <span class='id identifier rubyid_worker_count'>worker_count</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_round'>round</span><span class='period'>.</span><span class='id identifier rubyid_clamp'>clamp</span><span class='lparen'>(</span><span class='int'>1</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#HTTP2_RACTOR_COUNT_CAP-constant" title="Raptor::Cluster::HTTP2_RACTOR_COUNT_CAP (constant)">HTTP2_RACTOR_COUNT_CAP</a></span></span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -4230,7 +4284,7 @@ being promoted.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Aug 23 00:25:55 2026 by
+  Generated on Sun Aug 23 00:32:50 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
