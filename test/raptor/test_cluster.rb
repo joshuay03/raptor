@@ -2,8 +2,6 @@
 
 require "test_helper"
 
-require "raptor/cluster"
-
 module Raptor
   class TestCluster < TestCase
     parallelize_me!

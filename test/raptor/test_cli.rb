@@ -2,10 +2,7 @@
 
 require "test_helper"
 
-require "tempfile"
 require "tmpdir"
-
-require "raptor/cli"
 
 module Raptor
   class TestCLI < TestCase

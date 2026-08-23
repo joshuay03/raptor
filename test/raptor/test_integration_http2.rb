@@ -3,23 +3,20 @@
 require "test_helper"
 
 require "openssl"
-require "socket"
-require "tempfile"
-require "timeout"
 
 require "http/2"
-require "raptor/cli"
-require "raptor/cluster"
 
 module Raptor
-  class TestIntegrationHttp2 < TestCase
+  class TestIntegrationHttp2 < IntegrationTestCase
+    parallelize_me!
+
     def setup
       generate_test_certs
 
       @options = CLI::DEFAULT_OPTIONS.merge(
         binds: ["ssl://127.0.0.1:0?cert=#{@cert_path}&key=#{@key_path}"],
         workers: 1,
-        rackup: File.expand_path("../fixtures/hello_world.ru", __dir__)
+        rackup: fixture_path("hello_world.ru")
       )
     end
 
@@ -146,7 +143,7 @@ module Raptor
 
     def with_http2_server(fixture = nil)
       if fixture
-        @options[:rackup] = File.expand_path("../fixtures/#{fixture}", __dir__)
+        @options[:rackup] = fixture_path(fixture)
       end
 
       cluster = without_output { Cluster.new(@options) }

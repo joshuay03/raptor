@@ -2,6 +2,9 @@
 
 require "test_helper"
 
+require "socket"
+require "timeout"
+
 require "raptor/http2"
 
 module Raptor
@@ -39,6 +42,28 @@ module Raptor
       flow_control.add_connection_window(Http2::DEFAULT_WINDOW_SIZE)
 
       assert_equal Http2::MAX_FRAME_SIZE, flow_control.acquire(1, Http2::DEFAULT_WINDOW_SIZE + 900)
+    end
+
+    def test_writer_write_frames_does_not_block_indefinitely_on_full_send_buffer
+      server = TCPServer.new("127.0.0.1", 0)
+      client = TCPSocket.new("127.0.0.1", server.addr[1])
+      accepted = server.accept
+
+      client.setsockopt(Socket::SOL_SOCKET, Socket::SO_SNDBUF, 1024)
+      accepted.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVBUF, 1024)
+
+      writer = Http2::Writer.new(write_timeout: Http::WRITE_TIMEOUT)
+      big_frame = "x" * (1024 * 1024)
+
+      Timeout.timeout(Http::WRITE_TIMEOUT + 5) do
+        writer.write_frames(client, [big_frame])
+      end
+
+      pass
+    ensure
+      client&.close
+      accepted&.close
+      server&.close
     end
 
     def test_process_frames_rejects_even_client_stream_id
