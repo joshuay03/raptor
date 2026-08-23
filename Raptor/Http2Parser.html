@@ -218,6 +218,28 @@
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#encode_response_headers-instance_method" title="#encode_response_headers (instance method)">#<strong>encode_response_headers</strong>(status, headers)  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#parse_frame-instance_method" title="#parse_frame (instance method)">#<strong>parse_frame</strong>(buffer)  &#x21d2; Object </a>
     
 
@@ -328,13 +350,13 @@
       <pre class="lines">
 
 
-667
-668
-669
-670</pre>
+726
+727
+728
+729</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 667</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 726</span>
 
 static VALUE h2_connection_preface(VALUE self) {
   (void)self;
@@ -366,48 +388,48 @@ static VALUE h2_connection_preface(VALUE self) {
       <pre class="lines">
 
 
-627
-628
-629
-630
-631
-632
-633
-634
-635
-636
-637
-638
-639
-640
-641
-642
-643
-644
-645
-646
-647
-648
-649
-650
-651
-652
-653
-654
-655
-656
-657
-658
-659
-660
-661
-662
-663
-664
-665</pre>
+686
+687
+688
+689
+690
+691
+692
+693
+694
+695
+696
+697
+698
+699
+700
+701
+702
+703
+704
+705
+706
+707
+708
+709
+710
+711
+712
+713
+714
+715
+716
+717
+718
+719
+720
+721
+722
+723
+724</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 627</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 686</span>
 
 static VALUE h2_build_frame(VALUE self, VALUE type, VALUE flags, VALUE stream_id, VALUE payload) {
   (void)self;
@@ -468,43 +490,43 @@ static VALUE h2_build_frame(VALUE self, VALUE type, VALUE flags, VALUE stream_id
       <pre class="lines">
 
 
-708
-709
-710
-711
-712
-713
-714
-715
-716
-717
-718
-719
-720
-721
-722
-723
-724
-725
-726
-727
-728
-729
-730
-731
-732
-733
-734
-735
-736
-737
-738
-739
-740
-741</pre>
+767
+768
+769
+770
+771
+772
+773
+774
+775
+776
+777
+778
+779
+780
+781
+782
+783
+784
+785
+786
+787
+788
+789
+790
+791
+792
+793
+794
+795
+796
+797
+798
+799
+800</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 708</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 767</span>
 
 static VALUE h2_build_settings(VALUE self, VALUE settings) {
   (void)self;
@@ -580,6 +602,50 @@ static VALUE h2_encode_headers(VALUE self, VALUE headers) {
 </div>
     
       <div class="method_details ">
+  <h3 class="signature " id="encode_response_headers-instance_method">
+  
+    #<strong>encode_response_headers</strong>(status, headers)  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+650
+651
+652
+653
+654
+655
+656
+657
+658
+659</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 650</span>
+
+static VALUE h2_encode_response_headers(VALUE self, VALUE status, VALUE headers) {
+  (void)self;
+  Check_Type(headers, T_HASH);
+
+  VALUE pairs = rb_ary_new();
+  rb_ary_push(pairs, rb_ary_new_from_args(2, rb_str_new_lit(&quot;:status&quot;), rb_obj_as_string(status)));
+  rb_hash_foreach(headers, response_headers_iter, pairs);
+
+  return hpack_encode_header_block(pairs);
+}</pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
   <h3 class="signature " id="parse_frame-instance_method">
   
     #<strong>parse_frame</strong>(buffer)  &#x21d2; <tt>Object</tt> 
@@ -594,33 +660,33 @@ static VALUE h2_encode_headers(VALUE self, VALUE headers) {
       <pre class="lines">
 
 
-602
-603
-604
-605
-606
-607
-608
-609
-610
-611
-612
-613
-614
-615
-616
-617
-618
-619
-620
-621
-622
-623
-624
-625</pre>
+661
+662
+663
+664
+665
+666
+667
+668
+669
+670
+671
+672
+673
+674
+675
+676
+677
+678
+679
+680
+681
+682
+683
+684</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 602</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 661</span>
 
 static VALUE h2_parse_frame(VALUE self, VALUE buffer) {
   (void)self;
@@ -730,44 +796,44 @@ static VALUE h2_parse_headers(VALUE self, VALUE header_block, VALUE dyn_table) {
       <pre class="lines">
 
 
-672
-673
-674
-675
-676
-677
-678
-679
-680
-681
-682
-683
-684
-685
-686
-687
-688
-689
-690
-691
-692
-693
-694
-695
-696
-697
-698
-699
-700
-701
-702
-703
-704
-705
-706</pre>
+731
+732
+733
+734
+735
+736
+737
+738
+739
+740
+741
+742
+743
+744
+745
+746
+747
+748
+749
+750
+751
+752
+753
+754
+755
+756
+757
+758
+759
+760
+761
+762
+763
+764
+765</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 672</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 731</span>
 
 static VALUE h2_parse_settings(VALUE self, VALUE payload) {
   (void)self;
@@ -824,22 +890,22 @@ static VALUE h2_parse_settings(VALUE self, VALUE payload) {
       <pre class="lines">
 
 
-743
-744
-745
-746
-747
-748
-749
-750
-751
-752
-753
-754
-755</pre>
+802
+803
+804
+805
+806
+807
+808
+809
+810
+811
+812
+813
+814</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 743</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 802</span>
 
 static VALUE h2_parse_window_update(VALUE self, VALUE payload) {
   (void)self;
@@ -864,7 +930,7 @@ static VALUE h2_parse_window_update(VALUE self, VALUE payload) {
 </div>
 
       <div id="footer">
-  Generated on Sun Aug 23 07:15:52 2026 by
+  Generated on Sun Aug 23 07:19:47 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
