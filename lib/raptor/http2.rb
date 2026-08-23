@@ -229,8 +229,6 @@ module Raptor
     MAX_FRAME_SIZE = 16_384
 
     SERVER_PROTOCOL = "HTTP/2"
-    RACK_HEADER_PREFIX = "rack."
-    HOP_BY_HOP_HEADERS = ["connection", "transfer-encoding", "keep-alive", "upgrade", "proxy-connection"].freeze
 
     REQUEST_PSEUDO_HEADERS = [":method", ":scheme", ":path", ":authority"].freeze
     REQUIRED_REQUEST_PSEUDO_HEADERS = [":method", ":scheme", ":path"].freeze
@@ -766,20 +764,7 @@ module Raptor
     def write_http2_response(socket, writer, flow_control, stream_id, status, headers, body)
       parser = Http2Parser.new
 
-      header_pairs = [[":status", status.to_s]]
-      headers.each do |name, value|
-        lowered = name.downcase
-        next if lowered.start_with?(RACK_HEADER_PREFIX)
-        next if HOP_BY_HOP_HEADERS.include?(lowered)
-
-        if value.is_a?(Array)
-          value.each { |entry| header_pairs << [lowered, entry.to_s] }
-        else
-          header_pairs << [lowered, value.to_s]
-        end
-      end
-
-      encoded_headers = parser.encode_headers(header_pairs)
+      encoded_headers = parser.encode_response_headers(status, headers)
       body_chunks = []
       body_bytes = 0
       body.each do |chunk|

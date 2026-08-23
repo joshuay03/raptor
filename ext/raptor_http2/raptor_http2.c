@@ -599,6 +599,65 @@ static VALUE h2_encode_headers(VALUE self, VALUE headers) {
   return hpack_encode_header_block(headers);
 }
 
+static const char *const HOP_BY_HOP_HEADERS[] = {
+  "connection", "transfer-encoding", "keep-alive", "upgrade", "proxy-connection"
+};
+#define NUM_HOP_BY_HOP_HEADERS 5
+
+static int is_hop_by_hop(const char *name, long name_len) {
+  for (size_t i = 0; i < NUM_HOP_BY_HOP_HEADERS; i++) {
+    size_t hbh_len = strlen(HOP_BY_HOP_HEADERS[i]);
+    if ((long)hbh_len == name_len && memcmp(name, HOP_BY_HOP_HEADERS[i], hbh_len) == 0) return 1;
+  }
+  return 0;
+}
+
+static VALUE ascii_lowercase_str(VALUE str) {
+  long len = RSTRING_LEN(str);
+  VALUE lower = rb_str_new(RSTRING_PTR(str), len);
+  char *ptr = RSTRING_PTR(lower);
+  for (long i = 0; i < len; i++) {
+    if (ptr[i] >= 'A' && ptr[i] <= 'Z') ptr[i] = (char)(ptr[i] | 0x20);
+  }
+  return lower;
+}
+
+static int response_headers_iter(VALUE key, VALUE value, VALUE data) {
+  VALUE pairs = data;
+  if (!RB_TYPE_P(key, T_STRING)) return ST_CONTINUE;
+
+  VALUE lowered = ascii_lowercase_str(key);
+  const char *lname = RSTRING_PTR(lowered);
+  long lname_len = RSTRING_LEN(lowered);
+
+  if (lname_len >= 5 && memcmp(lname, "rack.", 5) == 0) return ST_CONTINUE;
+  if (is_hop_by_hop(lname, lname_len)) return ST_CONTINUE;
+
+  if (RB_TYPE_P(value, T_ARRAY)) {
+    long entries = RARRAY_LEN(value);
+    for (long i = 0; i < entries; i++) {
+      VALUE entry = RARRAY_AREF(value, i);
+      VALUE str = RB_TYPE_P(entry, T_STRING) ? entry : rb_obj_as_string(entry);
+      rb_ary_push(pairs, rb_ary_new_from_args(2, lowered, str));
+    }
+  } else {
+    VALUE str = RB_TYPE_P(value, T_STRING) ? value : rb_obj_as_string(value);
+    rb_ary_push(pairs, rb_ary_new_from_args(2, lowered, str));
+  }
+  return ST_CONTINUE;
+}
+
+static VALUE h2_encode_response_headers(VALUE self, VALUE status, VALUE headers) {
+  (void)self;
+  Check_Type(headers, T_HASH);
+
+  VALUE pairs = rb_ary_new();
+  rb_ary_push(pairs, rb_ary_new_from_args(2, rb_str_new_lit(":status"), rb_obj_as_string(status)));
+  rb_hash_foreach(headers, response_headers_iter, pairs);
+
+  return hpack_encode_header_block(pairs);
+}
+
 static VALUE h2_parse_frame(VALUE self, VALUE buffer) {
   (void)self;
   Check_Type(buffer, T_STRING);
@@ -765,6 +824,7 @@ RUBY_FUNC_EXPORTED void Init_raptor_http2(void) {
   rb_define_method(cHttp2Parser, "parse_frame", h2_parse_frame, 1);
   rb_define_method(cHttp2Parser, "parse_headers", h2_parse_headers, 2);
   rb_define_method(cHttp2Parser, "encode_headers", h2_encode_headers, 1);
+  rb_define_method(cHttp2Parser, "encode_response_headers", h2_encode_response_headers, 2);
   rb_define_method(cHttp2Parser, "parse_settings", h2_parse_settings, 1);
   rb_define_method(cHttp2Parser, "build_settings", h2_build_settings, 1);
   rb_define_method(cHttp2Parser, "build_frame", h2_build_frame, 4);
