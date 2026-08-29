@@ -182,7 +182,7 @@ of cleanup.</p>
 <p><code>RAPTOR_WORKERS</code>, <code>RAPTOR_THREADS</code>, and <code>RAPTOR_MAX_THREADS</code> can set the corresponding options without a config file.
 Config files override defaults, environment variables override config files, and command-line options override both.
 <code>RAPTOR_MAX_THREADS=unlimited</code> leaves adaptive growth uncapped.</p>
-<p><code>before_worker_boot</code> and <code>before_worker_shutdown</code> hooks receive the worker index, matching Puma's lifecycle hooks.</p>
+<p><code>before_worker_boot</code> and <code>before_worker_shutdown</code> hooks receive the worker index.</p>
 <h2 id="Bindings">Bindings</h2>
 <p>Raptor accepts multiple <code>binds:</code> URIs across three schemes.</p>
 <ul>
@@ -262,11 +262,10 @@ Worker 0 (phase 0): pid=91350, requests=1234, busy=2/3, backlog=0, booted, last_
 Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_checkin=10:42:01
 ...
 </code></pre>
-<p>Set <code>control_url</code> to a Unix socket URL such as <code>unix:///tmp/raptor-control.sock</code> to expose the same cluster <code>/stats</code>
-shape as Puma. Existing Puma monitoring can then read Raptor without a separate adapter. For adaptive pools,
-<code>max_threads</code> in each worker's status is its current thread count, so <code>pool_capacity / max_threads</code> measures the
-capacity available at that moment rather than comparing against an unbounded configured limit. The control server is
-read-only and does not implement Puma's other control commands.</p>
+<p>Set <code>control_url</code> to a Unix socket URL such as <code>unix:///tmp/raptor-control.sock</code> to expose cluster stats over <code>/stats</code>.
+For adaptive pools, <code>max_threads</code> in each worker's status is its current thread count, so
+<code>pool_capacity / max_threads</code> measures the capacity available at that moment rather than comparing against an
+unbounded configured limit. The control server is read-only and currently exposes only <code>/stats</code>.</p>
 <h2 id="_Micro__Benchmarks">(Micro) Benchmarks</h2>
 <p>Raptor 0.19.0 vs Puma 8.0.2 vs Falcon 0.57.0 across two workload profiles. <strong>IO-bound</strong> is a GET endpoint that
 interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
@@ -506,7 +505,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sat Aug 29 21:10:47 2026 by
+  Generated on Sat Aug 29 21:13:53 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

@@ -106,9 +106,7 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Serves cluster statistics over a Unix socket using Puma's <code>/stats</code>
-response shape. This lets existing Puma monitoring read Raptor stats
-during a server migration.</p>
+    <p>Serves cluster statistics over a Unix socket.</p>
 
   </div>
 </div>
@@ -352,7 +350,7 @@ during a server migration.</p>
       
       
         &mdash;
-        <div class='inline'><p>Puma-compatible cluster statistics</p></div>
+        <div class='inline'><p>cluster statistics</p></div>
       
     </li>
   
@@ -380,6 +378,8 @@ during a server migration.</p>
       <pre class="lines">
 
 
+26
+27
 28
 29
 30
@@ -387,12 +387,10 @@ during a server migration.</p>
 32
 33
 34
-35
-36
-37</pre>
+35</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 28</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 26</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_url'>url</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_stats'>stats</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_uri'>uri</span> <span class='op'>=</span> <span class='const'>URI</span><span class='lparen'>(</span><span class='id identifier rubyid_url'>url</span><span class='rparen'>)</span>
@@ -440,13 +438,13 @@ during a server migration.</p>
       <pre class="lines">
 
 
+42
+43
 44
-45
-46
-47</pre>
+45</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 44</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 42</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_bind'>bind</span>
   <span class='id identifier rubyid_remove_stale_socket'>remove_stale_socket</span>
@@ -496,6 +494,8 @@ during a server migration.</p>
       <pre class="lines">
 
 
+103
+104
 105
 106
 107
@@ -509,12 +509,10 @@ during a server migration.</p>
 115
 116
 117
-118
-119
-120</pre>
+118</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 105</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 103</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle'>handle</span><span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_request_line'>request_line</span> <span class='op'>=</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_gets'>gets</span>
@@ -561,6 +559,8 @@ during a server migration.</p>
       <pre class="lines">
 
 
+79
+80
 81
 82
 83
@@ -568,12 +568,10 @@ during a server migration.</p>
 85
 86
 87
-88
-89
-90</pre>
+88</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 81</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 79</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_stale_socket'>remove_stale_socket</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span>
@@ -614,6 +612,8 @@ during a server migration.</p>
       <pre class="lines">
 
 
+91
+92
 93
 94
 95
@@ -621,12 +621,10 @@ during a server migration.</p>
 97
 98
 99
-100
-101
-102</pre>
+100</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 93</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 91</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_serve'>serve</span>
   <span class='kw'>while</span> <span class='ivar'>@running</span>
@@ -667,15 +665,15 @@ during a server migration.</p>
       <pre class="lines">
 
 
+69
+70
 71
 72
 73
-74
-75
-76</pre>
+74</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 71</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 69</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='ivar'>@running</span> <span class='op'>=</span> <span class='kw'>false</span>
@@ -712,6 +710,8 @@ during a server migration.</p>
       <pre class="lines">
 
 
+52
+53
 54
 55
 56
@@ -720,12 +720,10 @@ during a server migration.</p>
 59
 60
 61
-62
-63
-64</pre>
+62</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 54</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 52</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start'>start</span>
   <span class='ivar'>@running</span> <span class='op'>=</span> <span class='kw'>true</span>
@@ -748,7 +746,7 @@ during a server migration.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 29 21:10:48 2026 by
+  Generated on Sat Aug 29 21:13:55 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
