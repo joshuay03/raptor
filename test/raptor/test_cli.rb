@@ -30,7 +30,7 @@ module Raptor
       assert_equal 1024 * 1024, options(cli)[:connection][:body_spool_threshold]
       assert_nil options(cli)[:http1][:ractors]
       assert_equal 65, options(cli)[:http1][:persistent_data_timeout]
-      assert_equal 100, options(cli)[:http1][:max_keepalive_requests]
+      assert_equal 1000, options(cli)[:http1][:max_keepalive_requests]
       assert_nil options(cli)[:http2][:ractors]
       assert_equal 100, options(cli)[:http2][:max_concurrent_streams]
       assert_equal 25, options(cli)[:worker_drain_timeout]

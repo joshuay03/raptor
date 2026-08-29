@@ -51,7 +51,7 @@ module Raptor
       http1: {
         ractors: nil,
         persistent_data_timeout: 65,
-        max_keepalive_requests: 100,
+        max_keepalive_requests: 1000,
       },
       http2: {
         ractors: nil,
@@ -338,7 +338,7 @@ module Raptor
           @options[:http1][:persistent_data_timeout] = timeout
         end
 
-        opts.on("--http1-max-keepalive-requests NUM", Integer, "Maximum HTTP/1.1 requests per keep-alive connection (default: 100)") do |num|
+        opts.on("--http1-max-keepalive-requests NUM", Integer, "Maximum HTTP/1.1 requests per keep-alive connection (default: 1000)") do |num|
           @options[:http1][:max_keepalive_requests] = num
         end
 

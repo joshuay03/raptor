@@ -108,7 +108,7 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   http1: {
     ractors: nil,
     persistent_data_timeout: 65,
-    max_keepalive_requests: 100,
+    max_keepalive_requests: 1000,
   },
   http2: {
     ractors: nil,

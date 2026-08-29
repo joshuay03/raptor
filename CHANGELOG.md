@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Increase the HTTP/1.1 keep-alive request limit to 1,000 and requeue the connection when other work is waiting
 - Add a read-only `/stats` control socket
 - Pass the worker index to worker boot and shutdown hooks
 - Add `RAPTOR_WORKERS`, `RAPTOR_THREADS`, and `RAPTOR_MAX_THREADS`

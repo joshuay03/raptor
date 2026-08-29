@@ -463,11 +463,13 @@ Under moderate load, queue mechanics are unlikely to dominate either server. Und
 
 **Puma.** After a response, if the connection is keep-alive and there are already buffered bytes for the next request (`has_back_to_back_requests?`) and there is a spare app thread, loop inline. Otherwise, if `eagerly_finish` (non-blocking reads while data is already buffered) returns true, either loop inline (if spare threads) or hand back to the thread pool (`@thread_pool << client`). Otherwise, back to the reactor with `@persistent_timeout`.
 
-**Raptor.** After a response, the app thread does `socket.wait_readable(0.001)`, waiting up to 1ms for bytes. If bytes arrive, it parses the next request inline. If the thread pool queue is at least as deep as the pool, the parsed request is handed back to the pool so other threads share the load; otherwise the same thread dispatches it inline. If no bytes arrive, `reactor.persist` and return.
+**Raptor.** After a response, the app thread does `socket.wait_readable(0.001)`, waiting up to 1ms for bytes. If bytes arrive, it parses the next request inline. If other work is already waiting, the parsed request goes to the back of the pool queue; otherwise the same thread dispatches it inline. If no bytes arrive, `reactor.persist` and return.
 
 The difference is subtle. Puma's `eagerly_finish` catches bytes already available on the socket; Raptor's `wait_readable(1ms)` catches those plus bytes arriving during the next millisecond. A request caught there parses on the response-writing thread and avoids a reactor round-trip. The cost is that an app thread can spend up to 1ms waiting on an otherwise idle connection.
 
-This fast path is one plausible contributor to Raptor's keep-alive result. Requests arriving inside the polling window are parsed without a reactor round-trip: the response-writing thread either continues serving that connection inline (when the pool queue is shallower than the pool) or hands the parsed request back to the pool (when it is not). Puma's app threads also continue inline when data is already available and capacity permits. The material difference is Raptor's short wait for data that has not arrived yet.
+This fast path is one plausible contributor to Raptor's keep-alive result. Requests arriving inside the polling window are parsed without a reactor round-trip: the response-writing thread either continues serving that connection inline when no other work is waiting or puts it at the back of the queue when there is. Puma's app threads also continue inline when data is already available and capacity permits. The material difference is Raptor's short wait for data that has not arrived yet.
+
+Raptor closes an HTTP/1.1 connection after 1,000 requests by default. The finite limit bounds connection-lifetime state without forcing frequent TCP teardown and reconnection under sustained keep-alive traffic.
 
 ### Backpressure
 

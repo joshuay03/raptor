@@ -25,7 +25,7 @@ module Raptor
     READ_BUFFER_SIZE = 64 * 1024
     RESPONSE_BUFFER_CAPACITY = 4 * 1024
     KEEPALIVE_READ_TIMEOUT = 0.001
-    MAX_KEEPALIVE_REQUESTS = 100
+    MAX_KEEPALIVE_REQUESTS = 1000
 
     HTTP_10 = "HTTP/1.0"
     HTTP_11 = "HTTP/1.1"
@@ -646,7 +646,7 @@ module Raptor
 
         request_count += 1
 
-        if thread_pool.queue_size >= thread_pool.size
+        if thread_pool.queue_size.positive?
           thread_pool << proc do
             process_client(
               socket,
