@@ -2240,10 +2240,10 @@ I didn't set out to build a small library ecosystem. It's what happens when you 
 
 Real numbers are in the [README benchmarks section](../README.md#micro-benchmarks). The shape:
 
-- <big>**IO-bound HTTP/1.1**: Falcon leads the fixed pools. Fixed Raptor still delivers a little over twice Puma's throughput with less than half its p95. Scaling Raptor tests how much of the gap temporary threads can close.</big>
-- <big>**CPU-bound HTTP/1.1**: Fixed Puma and Raptor are close. Puma leads by 1–4% on throughput in the current runs; Raptor leads Falcon. Scaling is designed to stay close to fixed when the pool sees GVL contention.</big>
+- <big>**IO-bound HTTP/1.1**: Scaling lifts Raptor from 3.11k to 8.63k req/s without keep-alive and from 3.21k to 9.43k with it. Falcon wins the first; Raptor wins the second.</big>
+- <big>**CPU-bound HTTP/1.1**: Fixed and scaling Raptor are effectively identical. Puma leads by 5% without keep-alive and less than 1% with it; Raptor leads Falcon.</big>
   - Tail latency ("p95") is the response time that 5% of requests exceed. It's what your slowest users see. Lower is better.
-- <big>**HTTP/2**: Raptor and Falcon both implement it. Puma doesn't. Falcon leads fixed Raptor's throughput in both current profiles; Raptor's CPU p95 is lower.</big>
+- <big>**HTTP/2**: Scaling lifts Raptor from 1.14k to 4.46k req/s on IO and narrows Falcon's CPU-throughput lead from 27% to 14%. Falcon still leads throughput; Raptor has the lower CPU p95.</big>
 - <big>**Variance**: HTTP/1.1 is stable. HTTP/2 is noisy enough that I treat it as direction, not a precise ranking.</big>
 
 Different workloads, different winners. That's fine.

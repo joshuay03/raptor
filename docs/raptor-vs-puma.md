@@ -26,9 +26,9 @@ Two workload profiles are measured. **IO-bound** is a GET endpoint that does 5 t
 
 Each cell in the table reports the median throughput and median p95 latency independently across 3 runs, and every run boots a fresh server process so state cannot accumulate across measurements. Both Raptor modes are compared with both servers: fixed mode is the like-for-like comparison with Puma, while scaling mode tests whether adaptive OS threads can close the IO-concurrency gap with Falcon's much cheaper fibers. Rather than pin every number into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
 
-- On IO-bound HTTP/1.1, fixed Raptor delivers a little over twice Puma's throughput with less than half its p95 latency in the current results, while Falcon leads by keeping every client connection in flight. Scaling Raptor removes the fixed app-thread cap when those threads are blocked outside the GVL.
-- On CPU-bound HTTP/1.1, fixed Puma and Raptor are close. Puma leads Raptor by 3.7% without keep-alive and 1.3% with it; Raptor leads Falcon on both variants. Raptor's p95 is also slightly above Puma's. Scaling is designed to stay near the fixed result because GVL contention prevents the pool from growing.
-- On HTTP/2, Raptor and Falcon both implement it; Puma doesn't. The fixed-mode CPU result is mixed: Falcon leads throughput while Raptor leads p95. Falcon dominates the fixed-mode IO profile. HTTP/2 also varies substantially more between runs in this benchmark, so those medians deserve less confidence than the stable HTTP/1.1 results.
+- On IO-bound HTTP/1.1, fixed Raptor delivers a little over twice Puma's throughput with less than half its p95 latency. Scaling lifts Raptor to 8.63k req/s without keep-alive and 9.43k with it: still 29.3% behind Falcon on fresh connections, but 51.3% ahead with keep-alive.
+- On CPU-bound HTTP/1.1, fixed and scaling Raptor are effectively identical. Puma leads by 5.0% without keep-alive and 0.7% with it, while both Raptor modes lead Falcon. This is the intended result: the pool gets its IO gains without trading away CPU throughput.
+- On HTTP/2, Raptor and Falcon both implement it; Puma doesn't. Scaling raises Raptor's IO throughput from 1.14k to 4.46k req/s, though it remains 30.3% behind Falcon. On the CPU profile it narrows Falcon's throughput lead from 26.9% to 14.2% while keeping a lower p95. HTTP/2 also varies substantially more between runs in this benchmark, so those medians deserve less confidence than the stable HTTP/1.1 results.
 
 The rest of this doc explains why the shape looks like that.
 
@@ -571,19 +571,19 @@ In this timing, Puma returns Request 3 to the reactor while Raptor catches it on
 
 On the IO-bound benchmark profile, each request does 5 to 10 short sleeps interleaved with small CPU work, simulating a request that makes several DB or cache calls throughout its lifetime. The bottleneck is how many requests a worker can keep in flight while they wait on IO. Fixed Raptor and Puma cap application execution at three threads per worker. Falcon spawns a fiber per connection and cooperatively yields on every sleep, so many more client connections can make progress while others wait. That advantage gives Falcon the clear lead over both fixed-thread servers, especially without keep-alive.
 
-Scaling Raptor starts with the same three threads, then adds temporary threads while work is queued and the active threads are mostly blocked outside the GVL. This is the comparison with Falcon: whether more OS threads can recover IO concurrency without also growing the pool during CPU-bound work. The benchmark reports fixed and scaling Raptor separately rather than hiding that difference in one result.
+Scaling Raptor starts with the same three threads, then adds temporary threads while work is queued and the active threads are mostly blocked outside the GVL. In the current results that raises throughput from 3.11k to 8.63k req/s without keep-alive, and from 3.21k to 9.43k with it. Falcon still leads the first by 29.3%; scaling Raptor leads the second by 51.3%. The benchmark reports fixed and scaling Raptor separately rather than hiding that difference in one result.
 
 Between the thread-based servers, Raptor holds a clear lead over Puma on both throughput and p95. Its eager paths, explicit admission control, response batching, and app pool are all designed to reduce coordination, but the benchmark does not isolate enough variables to assign the result to one of them.
 
-Real applications that spend most of their time waiting on a database or an upstream service look like this. If your app is IO-heavy and you're free to adopt the `async` ecosystem, Falcon is the interesting comparison there, not Raptor or Puma.
+Real applications that spend most of their time waiting on a database or an upstream service look like this. If your app is IO-heavy and you're free to adopt the `async` ecosystem, Falcon and scaling Raptor are the interesting comparison: fibers are cheaper, while Raptor can run ordinary blocking Rack code without requiring a fiber-aware stack.
 
 ### CPU-bound HTTP/1.1, where Puma and Raptor converge
 
 On the CPU-bound benchmark profile, each POST request accepts a small JSON body and builds a JSON response in 3 to 5 chunks totalling 450 to 1500 items, with sub-100µs sleeps between chunks. It's roughly 95% CPU by wall time, so fibers can't multiplex their way to an advantage. The CPU work happens under a single Ruby VM regardless of concurrency model.
 
-**Without keep-alive**, every request opens a fresh TCP connection, gets parsed, dispatched, served, and closes. Puma leads fixed Raptor by 3.7% on throughput in the current result and has the lower p95; Raptor still leads Falcon. The Puma/Raptor gap is small enough that neither architecture has overwhelmed the CPU cost of the Rack workload.
+**Without keep-alive**, every request opens a fresh TCP connection, gets parsed, dispatched, served, and closes. Puma leads fixed Raptor by 5.0% on throughput and has the lower p95; Raptor still leads Falcon. Fixed and scaling Raptor both deliver 8.22k req/s. The Puma/Raptor gap is small enough that neither architecture has overwhelmed the CPU cost of the Rack workload.
 
-**With keep-alive**, Puma leads fixed Raptor by 1.3% on throughput and 1.2ms at p95 in the current medians; Raptor leads Falcon on both. Puma and Raptor are effectively close peers on throughput here. The result is more useful as a guardrail than a victory claim: Raptor's additional coordination does not buy a CPU-bound lead in this profile, but it also does not impose a large throughput penalty. Scaling mode is designed to stay near the same result because GVL-bound work does not pass the pool's growth checks.
+**With keep-alive**, Puma leads fixed Raptor by 0.7% on throughput, while Raptor's p95 is 0.4ms lower; Raptor leads Falcon on both. Fixed and scaling Raptor both deliver 8.49k req/s, with scaling p95 matching Puma. The result is more useful as a guardrail than a victory claim: adaptive scaling provides the IO-bound gains without hurting this CPU-bound profile.
 
 ### HTTP/2, when it matters
 
@@ -591,7 +591,7 @@ Puma doesn't implement HTTP/2, and most Rails production terminates HTTP/2 at ng
 
 Where Raptor's HTTP/2 support does matter is the all-Ruby stack: no proxy in front, TLS terminated at the app, and browsers or API clients speaking h2 directly to it. In that setup, Puma negotiates HTTP/1.1 instead, so the app-server connection does not get HTTP/2 multiplexing or HPACK header compression.
 
-Falcon also speaks HTTP/2 natively, so it's the interesting comparison there rather than Puma. In fixed mode, Raptor's current CPU-bound median is 10% behind Falcon on throughput and 22.9% lower at p95. Falcon wins the fixed-mode IO comparison by a wide margin. The h2 samples vary substantially more than the h1 samples, so these results establish broad shape rather than a precise ranking.
+Falcon also speaks HTTP/2 natively, so it's the interesting comparison there rather than Puma. On the CPU profile, scaling narrows Raptor's throughput gap from 26.9% to 14.2% and improves its p95 advantage from 12.3% to 21.3%. On IO, scaling raises Raptor from 1.14k to 4.46k req/s, but remains 30.3% behind Falcon. The h2 samples vary substantially more than the h1 samples, so these results establish broad shape rather than a precise ranking.
 
 The benchmark's h2 listener uses TLS, while Raptor's BPF reuseport path only wraps plain TCP listeners. BPF dispatch therefore cannot explain the h2 variance. With 40 physical connections spread across 10 workers, each carrying three streams, placement and per-connection scheduling have coarse granularity; more instrumentation is needed before assigning the variance to a specific mechanism.
 

@@ -547,9 +547,9 @@ section = <<~MD
   building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
   most of its work in Ruby with a few near-zero-cost cache hits.
 
-  Raptor is run in two modes: **Fixed** keeps #{BASE_THREADS} application threads per worker, matching Puma, while **Scaling** starts with
-  #{BASE_THREADS} and may add threads without a fixed limit when queued work is blocked outside the GVL. Both modes are compared with
-  both Puma and Falcon in the table below.
+  Raptor is run in two modes: **Fixed** keeps #{BASE_THREADS} application threads per worker, matching Puma, while **Scaling** starts
+  with #{BASE_THREADS} and may add threads without a fixed limit when queued work is blocked outside the GVL. Both modes are compared
+  with both Puma and Falcon in the table below.
 
   Each cell reports the median throughput and median p95 latency independently across #{RUNS_PER_MODE} #{RUNS_PER_MODE == 1 ? "run" : "runs"}, so the two numbers in a row
   may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
@@ -559,8 +559,9 @@ section = <<~MD
   #{table_lines.join("\n")}
 
   > #{RUBY_DESCRIPTION}
-  > #{WORKERS} worker processes; fixed Raptor and Puma run #{BASE_THREADS} threads per worker; scaling Raptor starts at #{BASE_THREADS} with no fixed limit; Falcon runs unbounded fibers per worker;
-  > #{HEY_CONNECTIONS} concurrent HTTP/1.1 client connections; #{H2LOAD_CONNECTIONS} concurrent HTTP/2 client connections × #{H2LOAD_STREAMS} streams each
+  > #{WORKERS} worker processes; fixed Raptor and Puma run #{BASE_THREADS} threads per worker; scaling Raptor starts at #{BASE_THREADS} with no fixed limit;
+  > Falcon runs unbounded fibers per worker; #{HEY_CONNECTIONS} concurrent HTTP/1.1 client connections; #{H2LOAD_CONNECTIONS} concurrent HTTP/2 client
+  > connections × #{H2LOAD_STREAMS} streams each
 
   See [bin/benchmark](bin/benchmark) for more details.
 MD
