@@ -72,7 +72,7 @@ _[luma.com/t3l24s8h](https://luma.com/t3l24s8h)_
   - Red-black trees
   - Anonymous shared memory via mmap
   - eBPF programs running inside the Linux kernel
-- <big>All in Ruby. All working together in one gem.</big>
+- <big>Ruby APIs, native extensions, and one tiny BPF program, all working together in one server.</big>
 
 <br>
 <br>
@@ -239,7 +239,7 @@ One thing to note: the whole `SYN` → `SYN-ACK` → `ACK` handshake at the top 
 
 - <big>Kernel does the handshake and puts the completed connection on the listener's accept queue</big>
 - <big>Server calls `accept_nonblock` to pull the next connection off the queue</big>
-- <big>The BPF program we'll see later runs during the SYN phase, deciding which listener's queue the connection gets placed in</big>
+- <big>For Raptor's plain-TCP listener, the BPF program we'll see later can choose which worker socket receives each new connection</big>
 
 <br>
 <br>
@@ -273,8 +273,8 @@ One thing to note: the whole `SYN` → `SYN-ACK` → `ACK` handshake at the top 
 
 **[Falcon](https://github.com/socketry/falcon)**
 
-- <big>One fiber per request instead of threads</big>
-  - A fiber is a lightweight coroutine, about 5KB versus a thread's ~1MB
+- <big>Lightweight async tasks backed by fibers instead of a fixed app thread pool</big>
+  - Fibers are cooperatively scheduled coroutines and much cheaper to create than OS threads
 - <big>Built on the [`async`](https://github.com/socketry/async) gem, mostly written by Samuel Williams ([`@ioquatix`](https://github.com/ioquatix))</big>
 - <big>Speaks HTTP/2 natively</big>
 - <big>Excellent at long-lived connections and streaming</big>
@@ -535,9 +535,9 @@ If parsing runs in a Ractor:
 
 - <big>It uses a **different GVL** than the app</big>
 - <big>On a two-core machine, the parser and the app can run at the exact same instant</big>
-- <big>Actual parallelism inside one request pipeline</big>
+- <big>Actual protocol and app parallelism inside one worker process</big>
 
-That's the whole idea. Everything else in Raptor grew out of taking it seriously.
+That's the whole idea. Raptor uses that pipeline when a connection needs the reactor; complete requests on its eager paths parse inline instead of paying for a Ractor handoff.
 
 <br>
 <br>
@@ -591,6 +591,7 @@ flowchart TB
 
         STA["Stats thread<br/>writes 1 Hz"]
 
+        SRV -->|"complete first read"| ATP
         SRV --> RCT
         RCT --> RP1
         RCT --> RP2
@@ -759,7 +760,7 @@ flowchart LR
 
 - <big>App threads share one GVL among themselves. Only one runs Ruby at a time.</big>
 - <big>The pipeline Ractor has its own GVL. It runs Ruby independently.</big>
-- <big>Two Ruby threads can run Ruby code at the same time, on two CPU cores, on the same request pipeline</big>
+- <big>A pipeline Ractor and an app thread can run Ruby code at the same time, on two CPU cores</big>
 - <big>That is not something you get out of the box in Ruby</big>
 
 <br>
@@ -786,7 +787,7 @@ flowchart LR
 
 Where your Rack app runs, and where the response gets written back to the socket.
 
-- <big>Puma's pool is a `Mutex + ConditionVariable + Array`</big>
+- <big>Puma's pool coordinates a Ruby `Queue` with `Mutex + ConditionVariable`</big>
 - <big>Every enqueue and every dequeue takes the mutex</big>
 - <big>Under low concurrency, it's fine</big>
 - <big>Under contention, the mutex becomes a serialisation point</big>
@@ -794,7 +795,7 @@ Where your Rack app runs, and where the response gets written back to the socket
 
 Raptor's pool is **lock-free on the hot path**.
 
-To explain that, one minute on one CPU instruction.
+To explain that, one minute on one atomic primitive.
 
 <br>
 <br>
@@ -831,13 +832,13 @@ flowchart LR
     T2 -->|"CAS(42, 77)<br/>fails because current is now 99"| Memory
 ```
 
-- <big>A single CPU instruction</big>
+- <big>A hardware-supported atomic operation</big>
 - <big>Reads a memory word</big>
 - <big>Compares to what you expected</big>
 - <big>If they match, replaces with a new value</big>
 - <big>All atomically. No lock.</big>
 
-On x86 it's `LOCK CMPXCHG`. On ARM it's `LDXR` / `STXR`.
+On x86 it is commonly `LOCK CMPXCHG`. On ARM it is commonly an exclusive load/store pair such as `LDXR` / `STXR`.
 
 <br>
 <br>
@@ -867,15 +868,15 @@ On x86 it's `LOCK CMPXCHG`. On ARM it's `LDXR` / `STXR`.
 cas(@slot, expected, new_value)
 ```
 
-- <big>If you can build a data structure so "publish a new version" is one CAS, you never need a lock</big>
+- <big>If a state transition can be published with CAS, threads do not need a lock for that transition</big>
 - <big>If the CAS fails, you retry (someone else got there first)</big>
-- <big>Every high-performance concurrent data structure you've heard of is built on this</big>
+- <big>Many high-performance concurrent data structures are built on this</big>
   - Java's `ConcurrentHashMap`
   - Rust's `AtomicUsize`
   - Go's `sync/atomic`
 - <big>[`concurrent-ruby`](https://github.com/ruby-concurrency/concurrent-ruby) has had CAS primitives (`AtomicReference`, `AtomicBoolean`, `AtomicFixnum`) since 2013</big>
-  - But its primitives aren't Ractor-safe, they touch class-level state Ractors can't reach
-  - Ractor-safe CAS in Ruby is what Raptor needed, and it's what `atomic-ruby` gives you
+  - I could have built around those primitives, but Raptor also needed a lock-free FIFO and lock-free waiter parking
+  - I built that smaller, native set of pieces as `atomic-ruby`, with its C extension explicitly marked Ractor-safe
 
 <br>
 <br>
@@ -950,10 +951,10 @@ Where it pays off:
 
 Why we picked CAS for Raptor's thread pool:
 
-- <big>Enqueue and dequeue are each one publish operation, exactly what CAS is for</big>
+- <big>The queue can publish head, tail, and link changes through small atomic steps</big>
 - <big>The server thread reads pool metrics on every accept iteration, thousands of times per second</big>
-- <big>Under a mutex, every read of the queue length blocks writers, and every write blocks readers</big>
-- <big>Under CAS, reads are just atomic loads. Free. Never contend with writes.</big>
+- <big>Under a queue-wide mutex, readers and writers serialise around the same lock</big>
+- <big>Atomic counters avoid that lock. They still cost a synchronised memory access, but they do not park another thread.</big>
 
 <br>
 <br>
@@ -980,11 +981,12 @@ Why we picked CAS for Raptor's thread pool:
 Another gem I wrote. Native C extension. Exposes CAS-based primitives to Ruby:
 
 - <big>`Atom` – a CAS-protected reference cell holding one Ruby value</big>
-- <big>`AtomicBoolean`, `AtomicInteger` – type-specialised versions</big>
+- <big>`AtomicBoolean` – a type-specialised boolean</big>
+- <big>`AtomicQueue` – a multi-producer, multi-consumer FIFO</big>
 - <big>`AtomicThreadPool` – the thread pool Raptor uses</big>
 - <big>`AtomicConditionVariable` – lock-free waiter parking</big>
 
-Ruby's `VALUE` type on 64-bit is a tagged pointer. Fits in one CPU word. So `atom.swap` compiles down to one instruction.
+Ruby's `VALUE` type on 64-bit is a tagged pointer. It fits in one machine word, so the native extension can compare and replace the reference atomically.
 
 ```c
 old = ATOMIC_VALUE_CAS(&atom->value, expected, new_value);
@@ -1010,27 +1012,19 @@ old = ATOMIC_VALUE_CAS(&atom->value, expected, new_value);
 <br>
 <br>
 
-## The Banker's queue
+## The Michael-Scott queue
 
-Raptor's thread pool stores its queue as a frozen `Hash` inside an `Atom`:
-
-```ruby
-{ in: [...], out: [...], count:, shutdown: }
-```
+Raptor's thread pool uses a lock-free linked FIFO from `atomic-ruby`:
 
 ```mermaid
 flowchart LR
-    subgraph Q["Atom value"]
-        In["in: [C, B, A]<br/>latest first"]
-        Out["out: []"]
-    end
-
-    Push["enqueue D"] -->|"one CAS to<br/>{in: [D,C,B,A], out: []}"| Q2["…"]
-
-    subgraph Q3["When out is empty, flip"]
-        In3["in: []"]
-        Out3["out: [A, B, C, D]"]
-    end
+    H["atomic head"] --> S["dummy sentinel"]
+    S --> A["work A"]
+    A --> B["work B"]
+    B --> N["nil"]
+    T["atomic tail"] --> B
+    P["producer: work C"] -->|"CAS B.next from nil to C<br/>then advance tail"| C["work C"]
+    Q["consumer"] -->|"read A<br/>CAS head from S to A"| H
 ```
 
 <br>
@@ -1055,19 +1049,19 @@ flowchart LR
 
 ## Why this pattern works
 
-- <big>Two stacks. Push to `in`. Pop from `out`.</big>
-- <big>When `out` is empty, atomically flip `in` (reversed) into `out`</big>
-- <big>Amortised O(1) per operation</big>
-- <big>One CAS per operation</big>
+- <big>A dummy node separates the queue's head position from its first value</big>
+- <big>Producers append at the tail; consumers advance the head</big>
+- <big>Multiple producers and consumers can make progress without one queue-wide lock</big>
+- <big>Push and pop are O(1), with CAS retries when another thread wins a race</big>
 - <big>Lock-free</big>
-- <big>It's a classic pattern from purely functional data structures</big>
+- <big>It's the Michael-Scott queue, a classic concurrent FIFO design</big>
 
 The bit that matters most in practice:
 
-- <big>Backpressure metrics (queue length, active count) are lock-free reads of the atom's state</big>
+- <big>Queue length and active count are tracked in separate atoms</big>
 - <big>The server thread reads them every iteration of the accept loop</big>
-- <big>On Puma: take a mutex, or accept fuzzy stats</big>
-- <big>On Raptor: essentially free</big>
+- <big>Those reads do not acquire the queue's mutation lock, because there isn't one</big>
+- <big>The values are point-in-time snapshots; they can change immediately after being read</big>
 
 <br>
 <br>
@@ -1281,7 +1275,7 @@ flowchart TB
     Col["Collector threads<br/>drain Ractor::Ports"]
     ATP["App thread pool<br/>calls Rack app<br/>writes response"]
 
-    Client -->|"SYN"| Srv
+    Client -->|"connected socket + request bytes"| Srv
     Srv -->|"fast path: complete on first read"| ATP
     Srv -->|"slow path: bytes not ready"| Rct
     Rct -->|"got bytes; hand raw buffer to pool"| RP
@@ -1369,8 +1363,8 @@ end
 
 - <big>Wait 1ms for the next request on the same connection</big>
 - <big>If bytes arrive in that window: parse and dispatch inline, on the same thread</big>
-- <big>Only bounce back to the reactor when the client actually stops sending</big>
-- <big>For clients that pipeline requests (browsers, gRPC-Ruby transports), this is a huge tail-latency win</big>
+- <big>Return to the reactor when no bytes arrive inside the 1ms window, or when a request is incomplete</big>
+- <big>The trade: occupy an app thread for up to 1ms to widen the no-reactor fast path</big>
 
 <br>
 <br>
@@ -1493,7 +1487,7 @@ Notable: a single HTTP/2 client connection in Raptor can have many streams in fl
 - <big>Each stream is a separate work item in the queue</big>
 - <big>Different streams from the same connection can end up on different app threads</big>
 - <big>Those threads still share the main GVL, so they overlap productively when the app is in I/O (the common Rails case), the same way Puma's keep-alive requests do</big>
-- <big>The parsing for each stream happens in the HTTP/2 Ractor pool on its own GVL, actually in parallel with the app work</big>
+- <big>On the reactor path, frame batches parse in the HTTP/2 Ractor pool on its own GVL, in parallel with app work</big>
 
 <br>
 <br>
@@ -1560,7 +1554,7 @@ The master needs to know what the workers are doing.
 - <big>How busy?</big>
 - <big>Have they crashed?</big>
 
-**Puma**: pipes. Workers write JSON messages every check interval. Master reads.
+**Puma**: pipes. Workers write status messages every check interval. Master reads.
 
 **Raptor**: anonymous shared memory via `mmap`.
 
@@ -1760,9 +1754,10 @@ The problem:
 - <big>Default is a deterministic hash of the connection's four-tuple (client IP, client port, server IP, server port)</big>
   - Same four-tuple always lands on the same worker. Not random. Not round-robin.
   - Good spread on average across many clients, but no awareness of which worker is actually busy
-  - One client hammering from the same source port lands on the same worker every SYN
 
-The Linux answer since kernel 4.5: **attach a BPF program to the reuseport group** via the `SO_ATTACH_REUSEPORT_EBPF` socket option. Kernel runs your program on every incoming SYN to decide which listener wins.
+The Linux answer since kernel 4.5: **attach a BPF program to the reuseport group** via the `SO_ATTACH_REUSEPORT_EBPF` socket option. When the kernel selects a socket from that group for a new connection, your program can make the choice.
+
+Raptor uses this for plain `tcp://` listeners. TLS and Unix listeners continue to use sockets inherited from the master.
 
 <br>
 <br>
@@ -1791,9 +1786,9 @@ Puma has [`ClusterAcceptLoopDelay`](https://github.com/puma/puma/blob/master/lib
 - <big>Before each accept, a worker sleeps for a fraction of `max_delay` (default 5ms)</big>
 - <big>The sleep is proportional to the worker's own load: 0 when idle, `max_delay` when very busy</big>
 - <big>Every worker still accepts. Nobody refuses. Nobody gets skipped.</big>
-- <big>Busier workers wake later. Less-busy workers wake first and win the accept race on the shared `SO_REUSEPORT` listener.</big>
+- <big>Busier workers wake later. Less-busy workers wake first and win the accept race on the listener inherited from Puma's master.</big>
 
-It's clever, but the signal is a proxy for load, not the load itself. And it does the choosing in userspace, one worker sleeping past its turn. BPF does the choosing in the kernel with real numbers.
+It's clever, portable, and deliberately imprecise. Each worker only needs its own load. Raptor's BPF path instead publishes cluster-wide load to a kernel map and chooses before a worker calls `accept`.
 
 <br>
 <br>
@@ -1826,7 +1821,7 @@ It's clever, but the signal is a proxy for load, not the load itself. And it doe
   - No out-of-bounds memory access
   - Provably terminates
 - <big>If any of that can't be proved, the program is rejected at load time</big>
-- <big>Once loaded, runs at essentially zero overhead per event</big>
+- <big>Once loaded, runs inside the kernel without a userspace round-trip for each decision</big>
 
 Modern Linux observability (`bcc`, `bpftrace`, `cilium`, `perf`) is all built on this. It's genuinely one of the most exciting things that has happened to Linux in the last decade.
 
@@ -1854,25 +1849,26 @@ Modern Linux observability (`bcc`, `bpftrace`, `cilium`, `perf`) is all built on
 
 ```mermaid
 flowchart TB
-    Client(["client SYN"])
-    K["Kernel: reuseport group has 4 sockets"]
-    BPF["Raptor's BPF program<br/>reads load map"]
-    W0["Worker 0<br/>load = 5"]
-    W1["Worker 1<br/>load = 2 ← min"]
-    W2["Worker 2<br/>load = 8"]
-    W3["Worker 3<br/>load = 6"]
+    Client(["new connection"])
+    Hash["connection hash"]
+    A["candidate A<br/>Worker 0, load 5"]
+    B["candidate B<br/>Worker 3, load 6"]
+    Pick["choose Worker 0<br/>reserve load 5 → 6"]
+    Queue["Worker 0 accept queue"]
 
-    Client --> K
-    K -->|"which socket?"| BPF
-    BPF -->|"pick W1"| K
-    K -->|"deliver to W1's accept queue"| W1
+    Client --> Hash
+    Hash -->|"sample 1"| A
+    Hash -->|"sample 2"| B
+    A --> Pick
+    B --> Pick
+    Pick -->|"atomic increment, then route"| Queue
 ```
 
 - <big>Each worker has a **load reporter thread**</big>
 - <big>Publishes its current backlog into a BPF map every millisecond</big>
-- <big>BPF program reads all slots, finds the minimum</big>
-- <big>Loads within 1 of that minimum are treated as tied. That range from `min` to `min + 1` is what I call the **tie band**.</big>
-- <big>Ties are broken by the four-tuple hash. If nobody's in the tie band with the min, the min wins outright.</big>
+- <big>The connection hash picks two distinct workers</big>
+- <big>The BPF program compares those two load slots and chooses the lower one</big>
+- <big>That is **power of two choices**: near-global balance without scanning every worker</big>
 
 <br>
 <br>
@@ -1894,18 +1890,17 @@ flowchart TB
 <br>
 <br>
 
-## Why the tie band matters
+## Why the reservation matters
 
-- <big>Without it, a worker that briefly drains one request looks like the least-loaded worker</big>
-- <big>Every new SYN gets routed to it</big>
-- <big>By the time the next load-map update happens (1ms later), that worker is now the most loaded</big>
-- <big>You end up herding bursts onto whichever worker most recently reported the lowest load</big>
+The reporter only publishes once per millisecond. A burst can contain many connections.
 
-With the tie band:
+- <big>Without a reservation, every connection in that burst can observe the same stale low value</big>
+- <big>They can all choose the same worker before Ruby reports the new backlog</big>
+- <big>Raptor atomically increments the chosen BPF slot **before** routing</big>
+- <big>The next connection sees that reservation immediately</big>
+- <big>When Ruby accepts a socket, it also publishes `backlog + 1` rather than waiting for the reporter</big>
 
-- <big>Small differences don't cause herding</big>
-- <big>Load spreads across all near-idle workers via the four-tuple hash</big>
-- <big>Under bursts, the effect is measurable in the p95 latency numbers</big>
+The load number is partly measurement and partly admission ledger. That closes the stale-reporting window that caused herding in the earlier design.
 
 <br>
 <br>
@@ -1929,9 +1924,9 @@ With the tie band:
 
 ## BPF in Raptor, by the numbers
 
-- <big>The whole BPF program is about 70 lines of C</big>
+- <big>The whole BPF program is under 70 lines of C</big>
 - <big>Compiles down to a few hundred bytes of BPF bytecode</big>
-- <big>Runs in the kernel, on every incoming SYN</big>
+- <big>Runs in the kernel whenever the reuseport group selects a socket for a new connection</big>
 - <big>To load it from Ruby, I wrote **`libbpf-ruby`**</big>
   - `libbpf` is the standard C library that user-space programs use to load, verify and attach BPF programs
   - `libbpf-ruby` is my binding around it
@@ -1939,7 +1934,7 @@ With the tie band:
 
 Graceful fallback:
 
-- <big>If `libbpf-ruby` isn't installed, or the BPF object hasn't been compiled, Raptor silently falls back to the kernel's default four-tuple-hash routing</big>
+- <big>If `libbpf-ruby` isn't installed, or the BPF object hasn't been compiled, Raptor silently falls back to the listener inherited from the master</big>
 - <big>Everything still works. You just don't get load-aware routing.</big>
 - <big>If the kernel refuses the program (verifier error, missing features), startup raises. Loud failure, not silent misbehaviour.</big>
 
@@ -2180,9 +2175,9 @@ The libraries that came out of building Raptor:
 
 Each of them is small, focused, tested, and useful outside of Raptor.
 
-- <big>If you want lock-free primitives in Ruby, `atomic-ruby` is the fastest way in</big>
+- <big>If you want lock-free primitives in Ruby, `atomic-ruby` gives you a small, direct API</big>
 - <big>If you want to try Ractor-based parallelism without writing the coordination yourself, `ractor-pool` is that</big>
-- <big>If you want to load a BPF program from Ruby, `libbpf-ruby` is currently the only option</big>
+- <big>If you want to load a BPF program from Ruby, `libbpf-ruby` gives you a direct binding to libbpf</big>
 
 I didn't set out to build a small library ecosystem. It's what happens when you refuse to fold every helper back into the main gem.
 
@@ -2210,10 +2205,11 @@ I didn't set out to build a small library ecosystem. It's what happens when you 
 
 Real numbers are in the [README benchmarks section](../README.md#micro-benchmarks). The shape:
 
-- <big>**IO-bound work**: Falcon wins by a wide margin. Its fibers keep every client connection in flight at once. Thread-based servers cap out at their pool size.</big>
-- <big>**CPU-bound HTTP/1.1**: Raptor beats Puma on both throughput and tail latency.</big>
+- <big>**IO-bound HTTP/1.1**: Falcon wins overall. Between the fixed-thread servers, Raptor delivers a little over twice Puma's throughput with less than half its p95.</big>
+- <big>**CPU-bound HTTP/1.1**: Puma and Raptor are close. Puma leads Raptor by 1–4% on throughput in the current runs; Raptor leads Falcon.</big>
   - Tail latency ("p95") is the response time that 5% of requests exceed. It's what your slowest users see. Lower is better.
-- <big>**HTTP/2**: Raptor and Falcon both implement it. Puma doesn't.</big>
+- <big>**HTTP/2**: Raptor and Falcon both implement it. Puma doesn't. Falcon leads throughput in both current profiles; Raptor's CPU p95 is lower.</big>
+- <big>**Variance**: HTTP/1.1 is stable. HTTP/2 is noisy enough that I treat it as direction, not a precise ranking.</big>
 
 Different workloads, different winners. That's fine.
 
