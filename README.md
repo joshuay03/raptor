@@ -47,7 +47,7 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 [Raptor 83654|Main|Main] │     ├─ 1 HTTP/1.1 pipeline ractor
 [Raptor 83654|Main|Main] │     ├─ 1 HTTP/2 pipeline ractor
 [Raptor 83654|Main|Main] │     ├─ 2 pipeline collector threads
-[Raptor 83654|Main|Main] │     ├─ 3 worker threads
+[Raptor 83654|Main|Main] │     ├─ 3 worker threads (scaling, no limit)
 [Raptor 83654|Main|Main] │     └─ 1 stats thread
 [Raptor 83654|Main|Main] └─ Listening on 0.0.0.0:9292
 [Raptor 83658|Main|Main] Worker 2 booted
@@ -93,7 +93,7 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   drain_accept_queue: false,
   workers: 4, # `Etc.nprocessors`
   threads: 3,
-  max_threads: nil, # `Float::INFINITY` for no limit
+  max_threads: Float::INFINITY, # set to `threads` for a fixed pool
   chdir: nil,
   environment: nil, # falls back to `RAILS_ENV`, then `RACK_ENV`, then `"development"`
   connection: {
@@ -129,10 +129,10 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
 }
 ```
 
-`threads` sets the number of application threads each worker keeps running. Set `max_threads` above it to let Raptor
-add temporary threads when queued work is held up by blocking operations, or use `Float::INFINITY` for no limit.
-Raptor does not add threads when waiting for the GVL is the bottleneck. Temporary threads leave after the queue
-drains. The default `nil` keeps the pool fixed at `threads`.
+`threads` sets the number of application threads each worker keeps running. By default, Raptor adds temporary threads
+without a fixed limit when queued work is held up by blocking operations. It does not add threads when waiting for the
+GVL is the bottleneck, and temporary threads leave after the queue drains. Set `max_threads` to cap growth, or set it
+to the same value as `threads` for a fixed pool.
 
 ## Bindings
 

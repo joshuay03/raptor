@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Default to adaptive application thread scaling
+
 ## [0.18.0] - 2026-08-29
 
 - Add adaptive application thread scaling with `max_threads`

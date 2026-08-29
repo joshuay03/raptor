@@ -44,7 +44,7 @@ module Rackup
           "Port=PORT"      => "Port to listen on (default: #{DEFAULT_OPTIONS[:Port]})",
           "Workers=NUM"    => "Number of worker processes (default: available processor count)",
           "Threads=NUM"    => "Number of threads per worker (default: 3)",
-          "MaxThreads=NUM" => "Maximum threads per worker (`unlimited` for no limit; default: fixed at Threads)",
+          "MaxThreads=NUM" => "Maximum threads per worker (`unlimited` for no limit; default: unlimited)",
           "Config=PATH"    => "Load additional configuration from PATH"
         }
       end
@@ -71,6 +71,8 @@ module Rackup
         cli_defaults = ::Raptor::CLI::DEFAULT_OPTIONS
         config_path = options[:Config] || ::Raptor::CLI.default_config_path
         config = config_path ? ::Raptor::CLI.load_config_file(config_path) : {}
+        threads = (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i
+        max_threads = options[:MaxThreads] || config.fetch(:max_threads, cli_defaults[:max_threads])
 
         result = {
           binds: if options[:Host] || options[:Port]
@@ -81,8 +83,8 @@ module Rackup
           socket_backlog: (config[:socket_backlog] || cli_defaults[:socket_backlog]).to_i,
           drain_accept_queue: config.key?(:drain_accept_queue) ? config[:drain_accept_queue] : cli_defaults[:drain_accept_queue],
           workers: (options[:Workers] || config[:workers] || Concurrent.available_processor_count).to_i,
-          threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,
-          max_threads: ::Raptor::CLI.parse_max_threads(options[:MaxThreads] || config[:max_threads]),
+          threads: threads,
+          max_threads: ::Raptor::CLI.parse_max_threads(max_threads, threads: threads),
           app: app
         }
         result[:rackup] = config[:rackup] if config.key?(:rackup)

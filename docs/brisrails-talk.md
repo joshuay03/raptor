@@ -1085,18 +1085,18 @@ The bit that matters most in practice:
 
 ## Scaling app threads without making CPU contention worse
 
-The pool stays fixed at `threads` unless you set `max_threads`.
+The pool starts at `threads` and scales automatically when more threads would help.
 
 - <big>A native CRuby thread hook measures time running, blocked outside the GVL, and waiting for the GVL</big>
 - <big>The queue has to stay non-empty, and every current worker has to be active</big>
 - <big>Blocked time has to exceed half of worker time</big>
 - <big>GVL wait has to stay below two percent</big>
-- <big>Only then does the pool add a temporary thread, up to `max_threads`</big>
+- <big>Only then does the pool add a temporary thread</big>
 - <big>When the queue drains, temporary threads leave and the pool returns to `threads`</big>
 
 The distinction matters. More threads help when requests are asleep in database or network calls. They make CPU-bound Ruby slower when the GVL is already the bottleneck.
 
-`max_threads: Float::INFINITY` allows the pool to grow without a fixed limit. That still does not make OS threads as cheap as fibers.
+Growth has no fixed limit by default. Set `max_threads` to cap it, or set it to `threads` to keep the pool fixed. OS threads still are not as cheap as fibers.
 
 <br>
 <br>

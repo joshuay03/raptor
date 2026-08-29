@@ -46,12 +46,14 @@ module Raptor
 
     # Parses a maximum thread count from a CLI, config, or Rack handler value.
     #
-    # @param value [Integer, Float, String, nil] maximum thread count
-    # @return [Integer, Float, nil] parsed thread count, `Float::INFINITY` for
-    #   `"unlimited"`, or nil for a fixed-size pool
+    # @param value [Integer, Float, String] maximum thread count
+    # @param threads [Integer] baseline thread count
+    # @return [Integer, Float] parsed thread count, or `Float::INFINITY` for
+    #   `"unlimited"`
+    # @raise [ArgumentError] if the maximum is nil or less than the baseline
     #
-    # @rbs (Integer | Float | String | nil value) -> (Integer | Float)?
-    def self.parse_max_threads: (Integer | Float | String | nil value) -> (Integer | Float)?
+    # @rbs (Integer | Float | String value, threads: Integer) -> (Integer | Float)
+    def self.parse_max_threads: (Integer | Float | String value, threads: Integer) -> (Integer | Float)
 
     @parser: OptionParser
 

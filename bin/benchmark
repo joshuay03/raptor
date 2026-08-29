@@ -393,7 +393,7 @@ def falcon_version
 end
 
 def raptor_cmd(fixture, scaling:)
-  max_threads_args = scaling ? ["--max-threads", "unlimited"] : []
+  max_threads_args = scaling ? [] : ["--max-threads", BASE_THREADS.to_s]
   [
     "bundle", "exec", "raptor",
     "-w", WORKERS.to_s, "-t", BASE_THREADS.to_s,

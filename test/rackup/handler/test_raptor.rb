@@ -30,7 +30,7 @@ module Rackup
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:socket_backlog], opts[:socket_backlog]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:drain_accept_queue], opts[:drain_accept_queue]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
-        assert_nil opts[:max_threads]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:max_threads], opts[:max_threads]
         assert_equal Integer(Concurrent.available_processor_count), opts[:workers]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:connection], opts[:connection]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http1], opts[:http1]
@@ -69,6 +69,10 @@ module Rackup
         assert_equal Float::INFINITY, opts[:max_threads]
       end
 
+      def test_max_threads_cannot_be_less_than_threads
+        assert_raises(ArgumentError) { build(Threads: 3, MaxThreads: 2) }
+      end
+
       def test_maps_workers
         opts = build(Workers: 2)
 
@@ -91,6 +95,12 @@ module Rackup
           assert_equal Float::INFINITY, opts[:max_threads]
           assert_equal 60, opts[:connection][:first_data_timeout]
           assert_equal 10, opts[:connection][:chunk_data_timeout]
+        end
+      end
+
+      def test_config_file_rejects_nil_max_threads
+        with_config_file({ max_threads: nil }) do |path|
+          assert_raises(ArgumentError) { build(Config: path) }
         end
       end
 

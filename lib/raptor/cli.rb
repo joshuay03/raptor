@@ -34,7 +34,7 @@ module Raptor
       drain_accept_queue: false,
       workers: DEFAULT_WORKER_COUNT,
       threads: 3,
-      max_threads: nil,
+      max_threads: Float::INFINITY,
       rackup: "config.ru",
       chdir: nil,
       environment: nil,
@@ -101,17 +101,27 @@ module Raptor
 
     # Parses a maximum thread count from a CLI, config, or Rack handler value.
     #
-    # @param value [Integer, Float, String, nil] maximum thread count
-    # @return [Integer, Float, nil] parsed thread count, `Float::INFINITY` for
-    #   `"unlimited"`, or nil for a fixed-size pool
+    # @param value [Integer, Float, String] maximum thread count
+    # @param threads [Integer] baseline thread count
+    # @return [Integer, Float] parsed thread count, or `Float::INFINITY` for
+    #   `"unlimited"`
+    # @raise [ArgumentError] if the maximum is nil or less than the baseline
     #
-    # @rbs (Integer | Float | String | nil value) -> (Integer | Float)?
-    def self.parse_max_threads(value)
-      return unless value
-      return Float::INFINITY if value == "unlimited" || value == Float::INFINITY
-      return value if value.is_a?(Integer)
+    # @rbs (Integer | Float | String value, threads: Integer) -> (Integer | Float)
+    def self.parse_max_threads(value, threads:)
+      raise ArgumentError, "max_threads cannot be nil" unless value
 
-      Integer(value, 10)
+      max_threads = if value == "unlimited" || value == Float::INFINITY
+        Float::INFINITY
+      elsif value.is_a?(Integer)
+        value
+      else
+        Integer(value, 10)
+      end
+
+      raise ArgumentError, "max_threads must be greater than or equal to threads" if max_threads < threads
+
+      max_threads
     end
 
     # @rbs @command: Symbol
@@ -146,7 +156,7 @@ module Raptor
       @parser.parse!(argv)
 
       @options[:rackup] = argv.first if @command == :server && argv.first
-      @options[:max_threads] = self.class.parse_max_threads(@options[:max_threads])
+      @options[:max_threads] = self.class.parse_max_threads(@options[:max_threads], threads: @options[:threads])
     end
 
     # Runs the requested command.
@@ -259,7 +269,7 @@ module Raptor
           @options[:threads] = num
         end
 
-        opts.on("--max-threads NUM", "Maximum application threads per worker (`unlimited` for no limit; default: fixed at --threads)") do |num|
+        opts.on("--max-threads NUM", "Maximum application threads per worker (`unlimited` for no limit; default: unlimited)") do |num|
           @options[:max_threads] = num
         end
 
