@@ -71,7 +71,7 @@ module Raptor
     # Creates a new Reactor instance.
     #
     # @param http1_ractor_pool [RactorPool] ractor pool for HTTP/1.x parsing
-    # @param http2_ractor_pool [RactorPool] ractor pool for HTTP/2 parsing
+    # @param http2_ractor_pool [RactorPool, nil] ractor pool for HTTP/2 parsing, or nil when no listener supports HTTP/2
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param connection_options [Hash] per-connection timeout configuration
     # @option connection_options [Integer] :first_data_timeout timeout for initial data

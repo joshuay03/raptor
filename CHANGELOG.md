@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Skip HTTP/2 Ractor pools without SSL bindings
 - Default to adaptive application thread scaling
 
 ## [0.18.0] - 2026-08-29

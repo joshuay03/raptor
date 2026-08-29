@@ -784,15 +784,17 @@ module Raptor
         end
       end
 
-      http2_ractor_pool = RactorPool.new(
-        size: @http2_ractor_count,
-        worker: http2.parser_worker,
-        name: "HTTP/2"
-      ) do |parsed_result|
-        begin
-          http2.handle_parsed_request(parsed_result, reactor, thread_pool)
-        rescue => error
-          Log.rescued_error(error)
+      http2_ractor_pool = if @binder.http2?
+        RactorPool.new(
+          size: @http2_ractor_count,
+          worker: http2.parser_worker,
+          name: "HTTP/2"
+        ) do |parsed_result|
+          begin
+            http2.handle_parsed_request(parsed_result, reactor, thread_pool)
+          rescue => error
+            Log.rescued_error(error)
+          end
         end
       end
 
@@ -871,7 +873,7 @@ module Raptor
       reactor.shutdown
       reactor_thread.join
       http1_ractor_pool.shutdown
-      http2_ractor_pool.shutdown
+      http2_ractor_pool&.shutdown
       http1.shutdown
       drain_thread_pool(thread_pool)
       stats_thread.join
@@ -979,8 +981,10 @@ module Raptor
       Log.info "│     ├─ 1 server thread"
       Log.info "│     ├─ 1 reactor thread"
       Log.info "│     ├─ #{@http1_ractor_count} HTTP/1.1 pipeline ractor#{"s" if @http1_ractor_count > 1}"
-      Log.info "│     ├─ #{@http2_ractor_count} HTTP/2 pipeline ractor#{"s" if @http2_ractor_count > 1}"
-      Log.info "│     ├─ 2 pipeline collector threads"
+      http2_enabled = @binder.http2?
+      Log.info "│     ├─ #{@http2_ractor_count} HTTP/2 pipeline ractor#{"s" if @http2_ractor_count > 1}" if http2_enabled
+      collector_count = http2_enabled ? 2 : 1
+      Log.info "│     ├─ #{collector_count} pipeline collector thread#{"s" if collector_count > 1}"
       thread_limit = if @max_thread_count == Float::INFINITY
         " (scaling, no limit)"
       elsif @max_thread_count

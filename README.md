@@ -36,30 +36,29 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 
 ```
 > bundle exec raptor -w 10 -t 3 hello_world.ru
-[Raptor 83654|Main|Main] Cluster initializing:
-[Raptor 83654|Main|Main] ├─ Version: 0.18.0
-[Raptor 83654|Main|Main] ├─ Ruby Version: ruby 4.0.6 (2026-07-14 revision 03b6d3f889) +YJIT +PRISM [arm64-darwin23]
-[Raptor 83654|Main|Main] ├─ Environment: development
-[Raptor 83654|Main|Main] ├─ Master PID: 83654
-[Raptor 83654|Main|Main] │  └─ 10 worker processes
-[Raptor 83654|Main|Main] │     ├─ 1 server thread
-[Raptor 83654|Main|Main] │     ├─ 1 reactor thread
-[Raptor 83654|Main|Main] │     ├─ 1 HTTP/1.1 pipeline ractor
-[Raptor 83654|Main|Main] │     ├─ 1 HTTP/2 pipeline ractor
-[Raptor 83654|Main|Main] │     ├─ 2 pipeline collector threads
-[Raptor 83654|Main|Main] │     ├─ 3 worker threads (scaling, no limit)
-[Raptor 83654|Main|Main] │     └─ 1 stats thread
-[Raptor 83654|Main|Main] └─ Listening on 0.0.0.0:9292
-[Raptor 83658|Main|Main] Worker 2 booted
-[Raptor 83659|Main|Main] Worker 3 booted
-[Raptor 83656|Main|Main] Worker 0 booted
-[Raptor 83660|Main|Main] Worker 4 booted
-[Raptor 83662|Main|Main] Worker 6 booted
-[Raptor 83657|Main|Main] Worker 1 booted
-[Raptor 83661|Main|Main] Worker 5 booted
-[Raptor 83663|Main|Main] Worker 7 booted
-[Raptor 83664|Main|Main] Worker 8 booted
-[Raptor 83665|Main|Main] Worker 9 booted
+[Raptor 46475|Main|Main] Cluster initializing:
+[Raptor 46475|Main|Main] ├─ Version: 0.18.0
+[Raptor 46475|Main|Main] ├─ Ruby Version: ruby 4.0.6 (2026-07-14 revision 03b6d3f889) +YJIT +PRISM [arm64-darwin23]
+[Raptor 46475|Main|Main] ├─ Environment: development
+[Raptor 46475|Main|Main] ├─ Master PID: 46475
+[Raptor 46475|Main|Main] │  └─ 10 worker processes
+[Raptor 46475|Main|Main] │     ├─ 1 server thread
+[Raptor 46475|Main|Main] │     ├─ 1 reactor thread
+[Raptor 46475|Main|Main] │     ├─ 1 HTTP/1.1 pipeline ractor
+[Raptor 46475|Main|Main] │     ├─ 1 pipeline collector thread
+[Raptor 46475|Main|Main] │     ├─ 3 worker threads (scaling, no limit)
+[Raptor 46475|Main|Main] │     └─ 1 stats thread
+[Raptor 46475|Main|Main] └─ Listening on 0.0.0.0:9292
+[Raptor 46480|Main|Main] Worker 0 booted
+[Raptor 46484|Main|Main] Worker 4 booted
+[Raptor 46482|Main|Main] Worker 2 booted
+[Raptor 46481|Main|Main] Worker 1 booted
+[Raptor 46483|Main|Main] Worker 3 booted
+[Raptor 46485|Main|Main] Worker 5 booted
+[Raptor 46486|Main|Main] Worker 6 booted
+[Raptor 46487|Main|Main] Worker 7 booted
+[Raptor 46488|Main|Main] Worker 8 booted
+[Raptor 46489|Main|Main] Worker 9 booted
 ```
 
 ```

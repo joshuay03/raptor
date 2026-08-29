@@ -26,6 +26,32 @@ module Raptor
       assert_equal "rails_wins",  environment_in_subprocess(rack_env: "rack_only", rails_env: "rails_wins")
     end
 
+    def test_plaintext_worker_does_not_start_http2_ractors
+      reader, writer = IO.pipe
+      @options[:http1] = @options[:http1].merge(ractors: 1)
+      @options[:http2] = @options[:http2].merge(ractors: 1)
+      @options[:before_worker_boot] = [proc { writer.write([Ractor.count].pack("L")) }]
+
+      cluster = without_output { Cluster.new(@options) }
+      cluster_pid = fork do
+        reader.close
+        without_output { cluster.run }
+      end
+      cluster.instance_variable_get(:@binder).close
+      writer.close
+
+      ractor_count = Timeout.timeout(5) { reader.read(4).unpack1("L") }
+
+      assert_equal 2, ractor_count
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+      reader&.close
+      writer&.close
+    end
+
     def test_chdir_option_changes_working_directory
       original_pwd = Dir.pwd
       target = File.realpath("/tmp")

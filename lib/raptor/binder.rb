@@ -106,6 +106,15 @@ module Raptor
       tcp_listener.local_address.ip_port
     end
 
+    # Returns whether any listener can negotiate HTTP/2.
+    #
+    # @return [Boolean]
+    #
+    # @rbs () -> bool
+    def http2?
+      @listeners.any? { |listener| listener.is_a?(SslListener) }
+    end
+
     # Closes all listening sockets.
     #
     # @return [void]
