@@ -1098,6 +1098,8 @@ The distinction matters. More threads help when requests are asleep in database 
 
 Growth has no fixed limit by default. Set `max_threads` to cap it, or set it to `threads` to keep the pool fixed. OS threads still are not as cheap as fibers.
 
+Raptor clears application thread locals when each request finishes. Running every request in a fresh Fiber is also available when an application needs Fiber-local isolation. Parser and response buffers are kept separately so the server can still reuse them without carrying application state into the next request.
+
 <br>
 <br>
 <br>

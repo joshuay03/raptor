@@ -8,6 +8,7 @@ require "rack"
 
 require_relative "http"
 require_relative "raptor_http2"
+require_relative "thread_locals"
 
 module Raptor
   # Handles HTTP/2 request processing and Rack application integration.
@@ -267,6 +268,8 @@ module Raptor
     # @rbs @server_port: Integer
     # @rbs @write_timeout: Integer
     # @rbs @access_log_io: IO?
+    # @rbs @clean_thread_locals: bool
+    # @rbs @clean_fiber_locals: bool
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @initial_settings_frame: String
 
@@ -285,15 +288,19 @@ module Raptor
     # @param http2_options [Hash] HTTP/2-specific settings
     # @option http2_options [Integer] :max_concurrent_streams maximum HTTP/2 concurrent streams per connection
     # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
+    # @param clean_thread_locals [Boolean] whether to clear application thread locals after each request
+    # @param clean_fiber_locals [Boolean] whether to process each request in a fresh Fiber
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize(app, server_port, connection_options: {}, http2_options: {}, access_log_io: nil, on_error: nil)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize(app, server_port, connection_options: {}, http2_options: {}, access_log_io: nil, clean_thread_locals: true, clean_fiber_locals: false, on_error: nil)
       @app = app
       @server_port = server_port
       @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
       @access_log_io = access_log_io
+      @clean_thread_locals = clean_thread_locals
+      @clean_fiber_locals = clean_fiber_locals
       @on_error = on_error
 
       parser = Http2Parser.new
@@ -730,6 +737,19 @@ module Raptor
     #
     # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
     def dispatch_stream_request(socket, writer, flow_control, stream_id, headers, body, remote_addr:)
+      if @clean_fiber_locals
+        Fiber.new { perform_stream_request(socket, writer, flow_control, stream_id, headers, body, remote_addr:) }.resume
+      else
+        perform_stream_request(socket, writer, flow_control, stream_id, headers, body, remote_addr:)
+      end
+    ensure
+      ThreadLocals.clear if @clean_thread_locals
+    end
+
+    # Calls the Rack app and writes its response for one stream.
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
+    def perform_stream_request(socket, writer, flow_control, stream_id, headers, body, remote_addr:)
       env = build_rack_env(headers, body, remote_addr: remote_addr)
       status, response_headers, response_body = @app.call(env)
 

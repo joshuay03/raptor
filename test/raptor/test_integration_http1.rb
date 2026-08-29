@@ -531,6 +531,39 @@ module Raptor
       File.delete(log_path) rescue nil
     end
 
+    def test_thread_locals_are_cleaned_by_default
+      @options[:max_threads] = @options[:threads] = 1
+
+      with_server("locals.ru") do |uri|
+        Net::HTTP.get(URI.join(uri, "/set"))
+
+        assert_equal '["fiber", nil, "storage"]', Net::HTTP.get(URI.join(uri, "/read"))
+      end
+    end
+
+    def test_thread_local_cleaning_can_be_disabled
+      @options[:max_threads] = @options[:threads] = 1
+      @options[:clean_thread_locals] = false
+      @options[:clean_fiber_locals] = true
+
+      with_server("locals.ru") do |uri|
+        Net::HTTP.get(URI.join(uri, "/set"))
+
+        assert_equal '[nil, "thread", nil]', Net::HTTP.get(URI.join(uri, "/read"))
+      end
+    end
+
+    def test_fiber_local_cleaning_can_be_enabled
+      @options[:max_threads] = @options[:threads] = 1
+      @options[:clean_fiber_locals] = true
+
+      with_server("locals.ru") do |uri|
+        Net::HTTP.get(URI.join(uri, "/set"))
+
+        assert_equal "[nil, nil, nil]", Net::HTTP.get(URI.join(uri, "/read"))
+      end
+    end
+
     def test_max_body_size_returns_413
       @options[:connection] = @options[:connection].merge(max_body_size: 5)
 

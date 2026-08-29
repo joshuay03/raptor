@@ -242,6 +242,8 @@ The pool starts at `threads` and scales without a fixed limit by default. Set `m
 
 The pool still uses an `AtomicConditionVariable` under the hood to park idle threads (idle threads call `Thread.stop` and get woken with `Thread#wakeup`; there is no spinning), because idle spinning would waste CPU. The difference from Puma's pool is not "no locks anywhere" but rather "the hot path (enqueue and dequeue when the queue has items) is lock-free". Once every worker is busy the mechanics look similar; where things diverge is under contention when you have many threads all trying to push and pop.
 
+Application thread locals are cleared when each request finishes. Running every request in a fresh Fiber is independently configurable, but opt-in. The pool keeps its own parser and response buffers in private thread variables so the server can reuse them without preserving application state between requests.
+
 The knock-on effect is that the server thread can read `pool.queue_size + pool.active_count` on every accept-loop iteration without acquiring the queue's mutation lock. Those are still synchronised atomic reads, but they do not serialise producers and consumers behind one mutex.
 
 ### I/O model

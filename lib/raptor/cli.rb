@@ -35,6 +35,8 @@ module Raptor
       workers: DEFAULT_WORKER_COUNT,
       threads: 3,
       max_threads: Float::INFINITY,
+      clean_thread_locals: true,
+      clean_fiber_locals: false,
       rackup: "config.ru",
       chdir: nil,
       environment: nil,
@@ -271,6 +273,14 @@ module Raptor
 
         opts.on("--max-threads NUM", "Maximum application threads per worker (`unlimited` for no limit; default: unlimited)") do |num|
           @options[:max_threads] = num
+        end
+
+        opts.on("--[no-]clean-thread-locals", "Clear application thread locals after each request (default: on)") do |bool|
+          @options[:clean_thread_locals] = bool
+        end
+
+        opts.on("--[no-]clean-fiber-locals", "Process each request in a fresh Fiber (default: off)") do |bool|
+          @options[:clean_fiber_locals] = bool
         end
 
         opts.on("-C", "--chdir PATH", String, "Change to PATH before loading the Rack application (default: none)") do |path|

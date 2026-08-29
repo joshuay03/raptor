@@ -31,6 +31,8 @@ module Rackup
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:drain_accept_queue], opts[:drain_accept_queue]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:max_threads], opts[:max_threads]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:clean_thread_locals], opts[:clean_thread_locals]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:clean_fiber_locals], opts[:clean_fiber_locals]
         assert_equal Integer(Concurrent.available_processor_count), opts[:workers]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:connection], opts[:connection]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http1], opts[:http1]
@@ -120,15 +122,23 @@ module Rackup
         end
       end
 
-      def test_config_file_can_supply_on_error_and_paths
+      def test_config_file_can_supply_runtime_options
         with_config_source(<<~RUBY) do |path|
-          { on_error: ->(_env, _error) {}, stats_file: "tmp/c.json", pid_file: "tmp/c.pid" }
+          {
+            on_error: ->(_env, _error) {},
+            stats_file: "tmp/c.json",
+            pid_file: "tmp/c.pid",
+            clean_thread_locals: false,
+            clean_fiber_locals: false,
+          }
         RUBY
           opts = build(Config: path)
 
           assert_kind_of Proc, opts[:on_error]
           assert_equal "tmp/c.json", opts[:stats_file]
           assert_equal "tmp/c.pid", opts[:pid_file]
+          assert_equal false, opts[:clean_thread_locals]
+          assert_equal false, opts[:clean_fiber_locals]
         end
       end
 

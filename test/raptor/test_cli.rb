@@ -17,6 +17,8 @@ module Raptor
       assert_equal CLI::DEFAULT_WORKER_COUNT, options(cli)[:workers]
       assert_equal 3, options(cli)[:threads]
       assert_equal Float::INFINITY, options(cli)[:max_threads]
+      assert_equal true, options(cli)[:clean_thread_locals]
+      assert_equal false, options(cli)[:clean_fiber_locals]
       assert_equal "config.ru", options(cli)[:rackup]
       assert_nil options(cli)[:chdir]
       assert_nil options(cli)[:environment]
@@ -191,6 +193,13 @@ module Raptor
     def test_max_threads_cannot_be_less_than_threads
       assert_raises(ArgumentError) { CLI.new(["--threads", "3", "--max-threads", "2"]) }
       assert_raises(ArgumentError) { CLI.new(["--max-threads", "2", "--threads", "3"]) }
+    end
+
+    def test_local_cleaning
+      cli = CLI.new(["--no-clean-thread-locals", "--no-clean-fiber-locals"])
+
+      assert_equal false, options(cli)[:clean_thread_locals]
+      assert_equal false, options(cli)[:clean_fiber_locals]
     end
 
     def test_chdir_short_flag

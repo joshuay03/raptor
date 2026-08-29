@@ -93,6 +93,8 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   workers: 4, # `Etc.nprocessors`
   threads: 3,
   max_threads: Float::INFINITY, # set to `threads` for a fixed pool
+  clean_thread_locals: true,
+  clean_fiber_locals: false,
   chdir: nil,
   environment: nil, # falls back to `RAILS_ENV`, then `RACK_ENV`, then `"development"`
   connection: {
@@ -132,6 +134,9 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
 without a fixed limit when queued work is held up by blocking operations. It does not add threads when waiting for the
 GVL is the bottleneck, and temporary threads leave after the queue drains. Set `max_threads` to cap growth, or set it
 to the same value as `threads` for a fixed pool.
+
+Raptor clears application thread locals after each request by default. Set `clean_thread_locals` to `false` to disable
+it. Set `clean_fiber_locals` to `true` to run each request in a fresh Fiber, isolating Fiber-local state as well.
 
 ## Bindings
 

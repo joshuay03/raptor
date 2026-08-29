@@ -14,6 +14,29 @@ module Raptor
     GOAWAY_FRAME_TYPE = 0x7
     RST_STREAM_FRAME_TYPE = 0x3
 
+    def test_dispatch_cleans_thread_and_fiber_locals
+      handler = Http2.allocate
+      handler.instance_variable_set(:@clean_thread_locals, true)
+      handler.instance_variable_set(:@clean_fiber_locals, true)
+      values = []
+      handler.define_singleton_method(:perform_stream_request) do |*|
+        values << [
+          Thread.current[:raptor_test_fiber],
+          Thread.current.thread_variable_get(:raptor_test_thread),
+          Fiber[:raptor_test_storage],
+        ]
+        Thread.current[:raptor_test_fiber] = "fiber"
+        Thread.current.thread_variable_set(:raptor_test_thread, "thread")
+        Fiber[:raptor_test_storage] = "storage"
+      end
+
+      2.times do
+        handler.send(:dispatch_stream_request, nil, nil, nil, 1, [], "", remote_addr: "127.0.0.1")
+      end
+
+      assert_equal [[nil, nil, nil], [nil, nil, nil]], values
+    end
+
     def test_flow_control_acquire_caps_grant_at_max_frame_size
       flow_control = Http2::FlowControl.new
 

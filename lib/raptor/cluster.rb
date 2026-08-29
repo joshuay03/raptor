@@ -74,6 +74,8 @@ module Raptor
     # @rbs @http2_ractor_count: Integer
     # @rbs @thread_count: Integer
     # @rbs @max_thread_count: (Integer | Float)?
+    # @rbs @clean_thread_locals: bool
+    # @rbs @clean_fiber_locals: bool
     # @rbs @environment: String
     # @rbs @connection_options: Hash[Symbol, untyped]
     # @rbs @http1_options: Hash[Symbol, untyped]
@@ -127,6 +129,8 @@ module Raptor
     # @option options [Integer] :workers number of worker processes
     # @option options [Integer] :threads number of threads per worker process
     # @option options [Integer, Float] :max_threads maximum number of threads per worker process, or `Float::INFINITY` for no limit
+    # @option options [Boolean] :clean_thread_locals whether to clear application thread locals after each request
+    # @option options [Boolean] :clean_fiber_locals whether to process each request in a fresh Fiber
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [String, nil] :chdir directory to change to before loading the Rack application, or nil to leave the working directory unchanged
@@ -161,6 +165,8 @@ module Raptor
       @http2_ractor_count = options[:http2][:ractors] || self.class.default_http2_ractor_count(@worker_count)
       @thread_count = options[:threads]
       @max_thread_count = options[:max_threads]
+      @clean_thread_locals = options[:clean_thread_locals]
+      @clean_fiber_locals = options[:clean_fiber_locals]
       @environment = options[:environment] || ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
       @connection_options = options[:connection]
       @http1_options = options[:http1]
@@ -762,6 +768,8 @@ module Raptor
         connection_options: @connection_options,
         http1_options: @http1_options,
         access_log_io: @access_log_io,
+        clean_thread_locals: @clean_thread_locals,
+        clean_fiber_locals: @clean_fiber_locals,
         on_error: @on_error
       )
       http2 = Http2.new(
@@ -770,6 +778,8 @@ module Raptor
         connection_options: @connection_options,
         http2_options: @http2_options,
         access_log_io: @access_log_io,
+        clean_thread_locals: @clean_thread_locals,
+        clean_fiber_locals: @clean_fiber_locals,
         on_error: @on_error
       )
       http1_ractor_pool = RactorPool.new(

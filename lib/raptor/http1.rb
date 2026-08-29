@@ -10,6 +10,7 @@ require "rack"
 
 require_relative "http"
 require_relative "raptor_http"
+require_relative "thread_locals"
 
 module Raptor
   # Parses HTTP/1.x requests and dispatches them to the Rack
@@ -168,6 +169,8 @@ module Raptor
     # @rbs @body_spool_threshold: Integer?
     # @rbs @max_keepalive_requests: Integer
     # @rbs @access_log_io: IO?
+    # @rbs @clean_thread_locals: bool
+    # @rbs @clean_fiber_locals: bool
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @running: AtomicBoolean
     # @rbs @env_template: Hash[String, untyped]
@@ -183,11 +186,13 @@ module Raptor
     # @param http1_options [Hash] HTTP/1.1-specific settings
     # @option http1_options [Integer] :max_keepalive_requests maximum requests per HTTP/1.1 keep-alive connection
     # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
+    # @param clean_thread_locals [Boolean] whether to clear application thread locals after each request
+    # @param clean_fiber_locals [Boolean] whether to process each request in a fresh Fiber
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize(app, server_port, connection_options: {}, http1_options: {}, access_log_io: nil, on_error: nil)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    def initialize(app, server_port, connection_options: {}, http1_options: {}, access_log_io: nil, clean_thread_locals: true, clean_fiber_locals: false, on_error: nil)
       @app = app
       @server_port = server_port
       @server_port_string = server_port.to_s.freeze
@@ -196,6 +201,8 @@ module Raptor
       @body_spool_threshold = connection_options[:body_spool_threshold]
       @max_keepalive_requests = http1_options[:max_keepalive_requests] || MAX_KEEPALIVE_REQUESTS
       @access_log_io = access_log_io
+      @clean_thread_locals = clean_thread_locals
+      @clean_fiber_locals = clean_fiber_locals
       @on_error = on_error
       @running = AtomicBoolean.new(true)
       @env_template = {
@@ -373,7 +380,7 @@ module Raptor
     #
     # @rbs (TCPSocket socket) -> String
     def read_into_thread_buffer(socket)
-      buffer = (Thread.current[:raptor_read_buffer] ||= String.new(capacity: READ_BUFFER_SIZE))
+      buffer = ThreadLocals.fetch(:raptor_read_buffer) { String.new(capacity: READ_BUFFER_SIZE) }
       socket.read_nonblock(READ_BUFFER_SIZE, buffer)
 
       while socket.respond_to?(:pending) && socket.pending.positive?
@@ -392,7 +399,7 @@ module Raptor
     #
     # @rbs (String buffer) -> [Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser]
     def parse_next_request(buffer)
-      parser = (Thread.current[:raptor_http_parser] ||= HttpParser.new)
+      parser = ThreadLocals.fetch(:raptor_http_parser) { HttpParser.new }
       parser.reset
       env = @env_template.dup
       nread = parser.execute(env, buffer, 0)
@@ -505,6 +512,19 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Integer request_count, String remote_addr, String url_scheme) -> bool
     def process_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme)
+      if @clean_fiber_locals
+        Fiber.new { perform_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme) }.resume
+      else
+        perform_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme)
+      end
+    ensure
+      ThreadLocals.clear if @clean_thread_locals
+    end
+
+    # Calls the Rack app and writes its response for one request.
+    #
+    # @rbs (TCPSocket socket, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Integer request_count, String remote_addr, String url_scheme) -> bool
+    def perform_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme)
       rack_env = nil
       status = nil
       headers = nil
@@ -983,7 +1003,7 @@ module Raptor
     # @rbs (String http_version, Integer status) -> String
     def build_status_line(http_version, status)
       cache = http_version == HTTP_11 ? STATUS_LINE_CACHE_11 : STATUS_LINE_CACHE_10
-      response = (Thread.current[:raptor_response_buffer] ||= String.new(capacity: RESPONSE_BUFFER_CAPACITY))
+      response = ThreadLocals.fetch(:raptor_response_buffer) { String.new(capacity: RESPONSE_BUFFER_CAPACITY) }
       response.clear
       response << cache[status]
       response

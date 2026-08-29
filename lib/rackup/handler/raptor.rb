@@ -85,6 +85,8 @@ module Rackup
           workers: (options[:Workers] || config[:workers] || Concurrent.available_processor_count).to_i,
           threads: threads,
           max_threads: ::Raptor::CLI.parse_max_threads(max_threads, threads: threads),
+          clean_thread_locals: config.key?(:clean_thread_locals) ? config[:clean_thread_locals] : cli_defaults[:clean_thread_locals],
+          clean_fiber_locals: config.key?(:clean_fiber_locals) ? config[:clean_fiber_locals] : cli_defaults[:clean_fiber_locals],
           app: app
         }
         result[:rackup] = config[:rackup] if config.key?(:rackup)

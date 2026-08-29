@@ -1,0 +1,24 @@
+# Generated from lib/raptor/thread_locals.rb with RBS::Inline
+
+module Raptor
+  # Owns Raptor's reusable per-thread values and clears application thread
+  # locals after each request.
+  module ThreadLocals
+    PRESERVED_KEYS: untyped
+
+    # Returns a reusable value stored on the current thread.
+    #
+    # @return [Object]
+    #
+    # @rbs (Symbol key) { () -> untyped } -> untyped
+    def self.fetch: (Symbol key) { () -> untyped } -> untyped
+
+    # Clears application-owned true thread locals while retaining Raptor's
+    # reusable per-thread values.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def self.clear: () -> void
+  end
+end
