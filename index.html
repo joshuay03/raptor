@@ -131,7 +131,8 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
   <span class='label'>drain_accept_queue:</span> <span class='kw'>false</span><span class='comma'>,</span>
   <span class='label'>workers:</span> <span class='int'>4</span><span class='comma'>,</span> <span class='comment'># `Etc.nprocessors`
 </span>  <span class='label'>threads:</span> <span class='int'>3</span><span class='comma'>,</span>
-  <span class='label'>chdir:</span> <span class='kw'>nil</span><span class='comma'>,</span>
+  <span class='label'>max_threads:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='comment'># `Float::INFINITY` for no limit
+</span>  <span class='label'>chdir:</span> <span class='kw'>nil</span><span class='comma'>,</span>
   <span class='label'>environment:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='comment'># falls back to `RAILS_ENV`, then `RACK_ENV`, then `&quot;development&quot;`
 </span>  <span class='label'>connection:</span> <span class='lbrace'>{</span>
     <span class='label'>first_data_timeout:</span> <span class='int'>30</span><span class='comma'>,</span>
@@ -165,6 +166,10 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
   <span class='label'>access_log_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
 <span class='rbrace'>}</span>
 </code></pre>
+<p><code>threads</code> sets the number of application threads each worker keeps running. Set <code>max_threads</code> above it to let Raptor
+add temporary threads when queued work is held up by blocking operations, or use <code>Float::INFINITY</code> for no limit.
+Raptor does not add threads when waiting for the GVL is the bottleneck. Temporary threads leave after the queue
+drains. The default <code>nil</code> keeps the pool fixed at <code>threads</code>.</p>
 <h2 id="Bindings">Bindings</h2>
 <p>Raptor accepts multiple <code>binds:</code> URIs across three schemes.</p>
 <ul>
@@ -236,8 +241,8 @@ ExecReload=/bin/kill -USR2 $MAINPID
 KillMode=mixed
 </code></pre>
 <h2 id="Stats">Stats</h2>
-<p>Each worker writes per-worker stats (request count, busy threads, backlog, last check-in) to shared memory and to a
-JSON file (default <code>tmp/raptor.json</code>; set via <code>stats_file</code>).</p>
+<p>Each worker writes per-worker stats (request count, busy and available threads, backlog, last check-in) to shared
+memory and to a JSON file (default <code>tmp/raptor.json</code>; set via <code>stats_file</code>).</p>
 <pre class="code ruby"><code class="ruby">&gt; bundle exec raptor stats
 Master PID: 91348
 Worker 0 (phase 0): pid=91350, requests=1234, busy=2/3, backlog=0, booted, last_checkin=10:42:01
@@ -382,7 +387,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sat Aug 29 03:57:38 2026 by
+  Generated on Sat Aug 29 06:10:08 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
