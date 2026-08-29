@@ -348,7 +348,7 @@ workers stay responsive to in-flight requests.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Accepts a connection from the given listener and dispatches it into the HTTP/1.1 or SSL/HTTP-2 pipeline.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Accepts a connection from the given listener, immediately publishes the pending work to the BPF map, and dispatches the socket into the HTTP/1.1 or SSL/HTTP-2 pipeline.</p></div></span>
   
 </li>
 
@@ -817,8 +817,9 @@ workers stay responsive to in-flight requests.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Accepts a connection from the given listener and dispatches it into
-the HTTP/1.1 or SSL/HTTP-2 pipeline.</p>
+    <p>Accepts a connection from the given listener, immediately publishes
+the pending work to the BPF map, and dispatches the socket into the
+HTTP/1.1 or SSL/HTTP-2 pipeline.</p>
 
   </div>
 </div>
@@ -865,7 +866,6 @@ the HTTP/1.1 or SSL/HTTP-2 pipeline.</p>
       <pre class="lines">
 
 
-162
 163
 164
 165
@@ -894,10 +894,13 @@ the HTTP/1.1 or SSL/HTTP-2 pipeline.</p>
 188
 189
 190
-191</pre>
+191
+192
+193
+194</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 162</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 163</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_accept_connection'>accept_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_listener'>listener</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tcp_client'>tcp_client</span> <span class='op'>=</span> <span class='kw'>begin</span>
@@ -911,6 +914,8 @@ the HTTP/1.1 or SSL/HTTP-2 pipeline.</p>
   <span class='kw'>else</span>
     <span class='id identifier rubyid_remote_addr'>remote_addr</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#DEFAULT_REMOTE_ADDR-constant" title="Raptor::Server::DEFAULT_REMOTE_ADDR (constant)">DEFAULT_REMOTE_ADDR</a></span></span>
   <span class='kw'>end</span>
+
+  <span class='const'><span class='object_link'><a href="ReuseportBPF.html" title="Raptor::ReuseportBPF (module)">ReuseportBPF</a></span></span><span class='period'>.</span><span class='id identifier rubyid_update_accepted_load'><span class='object_link'><a href="ReuseportBPF.html#update_accepted_load-class_method" title="Raptor::ReuseportBPF.update_accepted_load (method)">update_accepted_load</a></span></span><span class='lparen'>(</span><span class='ivar'>@reactor</span><span class='period'>.</span><span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>+</span> <span class='int'>1</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='ivar'>@bpf_active</span>
 
   <span class='kw'>if</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Binder.html" title="Raptor::Binder (class)">Binder</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span><span class='rparen'>)</span>
     <span class='ivar'>@thread_pool</span> <span class='op'>&lt;&lt;</span> <span class='id identifier rubyid_proc'>proc</span> <span class='kw'>do</span>
@@ -1006,9 +1011,6 @@ HTTP/1.1 path.</p>
       <pre class="lines">
 
 
-203
-204
-205
 206
 207
 208
@@ -1031,10 +1033,13 @@ HTTP/1.1 path.</p>
 225
 226
 227
-228</pre>
+228
+229
+230
+231</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 203</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 206</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_dispatch_ssl_connection'>dispatch_ssl_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_listener'>listener</span><span class='comma'>,</span> <span class='id identifier rubyid_tcp_client'>tcp_client</span><span class='comma'>,</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_ssl_socket'>ssl_socket</span> <span class='op'>=</span> <span class='const'>OpenSSL</span><span class='op'>::</span><span class='const'>SSL</span><span class='op'>::</span><span class='const'>SSLSocket</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_tcp_client'>tcp_client</span><span class='comma'>,</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_ssl_context'>ssl_context</span><span class='rparen'>)</span>
@@ -1175,9 +1180,6 @@ timeout or SSL error.</p>
       <pre class="lines">
 
 
-238
-239
-240
 241
 242
 243
@@ -1194,10 +1196,13 @@ timeout or SSL error.</p>
 254
 255
 256
-257</pre>
+257
+258
+259
+260</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 238</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 241</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_perform_ssl_handshake'>perform_ssl_handshake</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span> <span class='op'>+</span> <span class='ivar'>@first_data_timeout</span>
@@ -1553,9 +1558,6 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
       <pre class="lines">
 
 
-268
-269
-270
 271
 272
 273
@@ -1567,10 +1569,13 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 279
 280
 281
-282</pre>
+282
+283
+284
+285</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 268</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 271</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_wait_for_handshake'>wait_for_handshake</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='comma'>,</span> <span class='id identifier rubyid_deadline'>deadline</span><span class='comma'>,</span> <span class='id identifier rubyid_direction'>direction</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_remaining'>remaining</span> <span class='op'>=</span> <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>-</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span>
@@ -1597,7 +1602,7 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Aug 23 07:19:46 2026 by
+  Generated on Sat Aug 29 01:50:49 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

@@ -90,8 +90,8 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Routes incoming connections across worker processes to the worker with
-the lowest reactor backlog.</p>
+    <p>Routes incoming connections across worker processes using two-choice
+load sampling, atomically reserving the selected slot before routing.</p>
 <p>Auto-enabled on Linux when the <code>libbpf-ruby</code> gem is installed and the
 BPF object file has been compiled. Falls back silently to standard
 <code>SO_REUSEPORT</code> when either is missing. Raises when the kernel refuses
@@ -289,6 +289,28 @@ left to the binder's shared listeners.</p>
 
   
     <span class="summary_desc"><div class='inline'><p>Returns true when the preconditions for BPF-directed reuseport are met on this platform.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#update_accepted_load-class_method" title="update_accepted_load (class method)">.<strong>update_accepted_load</strong>(backlog)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Publishes an accept-side backlog estimate.</p></div></span>
   
 </li>
 
@@ -515,7 +537,8 @@ Skips non-tcp bind URIs.</p>
 99
 100
 101
-102</pre>
+102
+103</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 99</span>
@@ -523,6 +546,7 @@ Skips non-tcp bind URIs.</p>
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_enable_load_reporting'>enable_load_reporting</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='ivar'>@load_key</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='ivar'>@load_value</span> <span class='op'>=</span> <span class='const'>String</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>\x00\x00\x00\x00</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>encoding:</span> <span class='const'>Encoding</span><span class='op'>::</span><span class='const'>ASCII_8BIT</span><span class='rparen'>)</span>
+  <span class='ivar'>@accepted_load_value</span> <span class='op'>=</span> <span class='const'>String</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>\x00\x00\x00\x00</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>encoding:</span> <span class='const'>Encoding</span><span class='op'>::</span><span class='const'>ASCII_8BIT</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -572,14 +596,14 @@ sentinel maximum so the BPF program's least-loaded pick skips it.</p>
       <pre class="lines">
 
 
-125
-126
-127
-128
-129</pre>
+142
+143
+144
+145
+146</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 125</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 142</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_mark_unavailable'>mark_unavailable</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@loads_fd</span>
@@ -668,7 +692,7 @@ the program.</p>
   <span class='kw'>return</span> <span class='kw'>false</span> <span class='kw'>unless</span> <span class='id identifier rubyid_supported?'>supported?</span>
 
   <span class='ivar'>@object</span> <span class='op'>=</span> <span class='const'>LibBPFRuby</span><span class='op'>::</span><span class='const'>Object</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#BPF_OBJECT_PATH-constant" title="Raptor::ReuseportBPF::BPF_OBJECT_PATH (constant)">BPF_OBJECT_PATH</a></span></span><span class='rparen'>)</span>
-  <span class='ivar'>@program_fd</span> <span class='op'>=</span> <span class='ivar'>@object</span><span class='period'>.</span><span class='id identifier rubyid_program_fd'>program_fd</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>select_least_loaded</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
+  <span class='ivar'>@program_fd</span> <span class='op'>=</span> <span class='ivar'>@object</span><span class='period'>.</span><span class='id identifier rubyid_program_fd'>program_fd</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>select_less_loaded</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='ivar'>@socks_fd</span> <span class='op'>=</span> <span class='ivar'>@object</span><span class='period'>.</span><span class='id identifier rubyid_map_fd'>map_fd</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>socks</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
   <span class='ivar'>@loads_fd</span> <span class='op'>=</span> <span class='ivar'>@object</span><span class='period'>.</span><span class='id identifier rubyid_map_fd'>map_fd</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>loads</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
 
@@ -734,6 +758,73 @@ met on this platform.</p>
 </div>
     
       <div class="method_details ">
+  <h3 class="signature " id="update_accepted_load-class_method">
+  
+    .<strong>update_accepted_load</strong>(backlog)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Publishes an accept-side backlog estimate. This uses a separate value
+buffer because the server and load reporter call into the map from
+different threads.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>backlog</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the estimated backlog after accepting a socket</p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+127
+128
+129
+130
+131
+132
+133</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 127</span>
+
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_accepted_load'>update_accepted_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
+  <span class='ivar'>@accepted_load_value</span><span class='period'>.</span><span class='id identifier rubyid_setbyte'>setbyte</span><span class='lparen'>(</span><span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>&amp;</span> <span class='int'>0xff</span><span class='rparen'>)</span>
+  <span class='ivar'>@accepted_load_value</span><span class='period'>.</span><span class='id identifier rubyid_setbyte'>setbyte</span><span class='lparen'>(</span><span class='int'>1</span><span class='comma'>,</span> <span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>&gt;&gt;</span> <span class='int'>8</span><span class='rparen'>)</span> <span class='op'>&amp;</span> <span class='int'>0xff</span><span class='rparen'>)</span>
+  <span class='ivar'>@accepted_load_value</span><span class='period'>.</span><span class='id identifier rubyid_setbyte'>setbyte</span><span class='lparen'>(</span><span class='int'>2</span><span class='comma'>,</span> <span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>&gt;&gt;</span> <span class='int'>16</span><span class='rparen'>)</span> <span class='op'>&amp;</span> <span class='int'>0xff</span><span class='rparen'>)</span>
+  <span class='ivar'>@accepted_load_value</span><span class='period'>.</span><span class='id identifier rubyid_setbyte'>setbyte</span><span class='lparen'>(</span><span class='int'>3</span><span class='comma'>,</span> <span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>&gt;&gt;</span> <span class='int'>24</span><span class='rparen'>)</span> <span class='op'>&amp;</span> <span class='int'>0xff</span><span class='rparen'>)</span>
+  <span class='const'>LibBPFRuby</span><span class='period'>.</span><span class='id identifier rubyid_map_update'>map_update</span><span class='lparen'>(</span><span class='ivar'>@loads_fd</span><span class='comma'>,</span> <span class='ivar'>@load_key</span><span class='comma'>,</span> <span class='ivar'>@accepted_load_value</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
   <h3 class="signature " id="update_load-class_method">
   
     .<strong>update_load</strong>(backlog)  &#x21d2; <tt>void</tt> 
@@ -775,16 +866,16 @@ met on this platform.</p>
       <pre class="lines">
 
 
-110
 111
 112
 113
 114
 115
-116</pre>
+116
+117</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 110</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 111</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_load'>update_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='ivar'>@load_value</span><span class='period'>.</span><span class='id identifier rubyid_setbyte'>setbyte</span><span class='lparen'>(</span><span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>&amp;</span> <span class='int'>0xff</span><span class='rparen'>)</span>
@@ -803,7 +894,7 @@ met on this platform.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Aug 23 07:19:45 2026 by
+  Generated on Sat Aug 29 01:50:48 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
