@@ -34,6 +34,7 @@ module Raptor
       drain_accept_queue: false,
       workers: DEFAULT_WORKER_COUNT,
       threads: 3,
+      max_threads: nil,
       rackup: "config.ru",
       chdir: nil,
       environment: nil,
@@ -98,6 +99,21 @@ module Raptor
       DEFAULT_CONFIG_PATHS.find { |path| File.exist?(File.join(root, path)) }
     end
 
+    # Parses a maximum thread count from a CLI, config, or Rack handler value.
+    #
+    # @param value [Integer, Float, String, nil] maximum thread count
+    # @return [Integer, Float, nil] parsed thread count, `Float::INFINITY` for
+    #   `"unlimited"`, or nil for a fixed-size pool
+    #
+    # @rbs (Integer | Float | String | nil value) -> (Integer | Float)?
+    def self.parse_max_threads(value)
+      return unless value
+      return Float::INFINITY if value == "unlimited" || value == Float::INFINITY
+      return value if value.is_a?(Integer)
+
+      Integer(value, 10)
+    end
+
     # @rbs @command: Symbol
     # @rbs @options: Hash[Symbol, untyped]
     # @rbs @parser: OptionParser
@@ -130,6 +146,7 @@ module Raptor
       @parser.parse!(argv)
 
       @options[:rackup] = argv.first if @command == :server && argv.first
+      @options[:max_threads] = self.class.parse_max_threads(@options[:max_threads])
     end
 
     # Runs the requested command.
@@ -240,6 +257,10 @@ module Raptor
 
         opts.on("-t", "--threads NUM", Integer, "Number of application threads per worker (default: 3)") do |num|
           @options[:threads] = num
+        end
+
+        opts.on("--max-threads NUM", "Maximum application threads per worker (`unlimited` for no limit; default: fixed at --threads)") do |num|
+          @options[:max_threads] = num
         end
 
         opts.on("-C", "--chdir PATH", String, "Change to PATH before loading the Rack application (default: none)") do |path|

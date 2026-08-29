@@ -46,7 +46,7 @@ module Raptor
     # @param requests [Integer] total requests handled by this worker
     # @param backlog [Integer] current queue depth
     # @param busy_threads [Integer] worker threads currently processing requests
-    # @param thread_capacity [Integer] worker threads configured for this worker
+    # @param thread_capacity [Integer] worker threads currently available to this worker
     # @param started_at [Float] process start time as a Unix timestamp
     # @param last_checkin [Float] time of last stats write as a Unix timestamp
     # @param booted [Boolean] whether the worker has finished starting

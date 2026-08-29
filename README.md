@@ -93,6 +93,7 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   drain_accept_queue: false,
   workers: 4, # `Etc.nprocessors`
   threads: 3,
+  max_threads: nil, # `Float::INFINITY` for no limit
   chdir: nil,
   environment: nil, # falls back to `RAILS_ENV`, then `RACK_ENV`, then `"development"`
   connection: {
@@ -127,6 +128,11 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   access_log_file: nil,
 }
 ```
+
+`threads` sets the number of application threads each worker keeps running. Set `max_threads` above it to let Raptor
+add temporary threads when queued work is held up by blocking operations, or use `Float::INFINITY` for no limit.
+Raptor does not add threads when waiting for the GVL is the bottleneck. Temporary threads leave after the queue
+drains. The default `nil` keeps the pool fixed at `threads`.
 
 ## Bindings
 
@@ -188,8 +194,8 @@ KillMode=mixed
 
 ## Stats
 
-Each worker writes per-worker stats (request count, busy threads, backlog, last check-in) to shared memory and to a
-JSON file (default `tmp/raptor.json`; set via `stats_file`).
+Each worker writes per-worker stats (request count, busy and available threads, backlog, last check-in) to shared
+memory and to a JSON file (default `tmp/raptor.json`; set via `stats_file`).
 
 ```
 > bundle exec raptor stats

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Add adaptive application thread scaling with `max_threads`
+
 ## [0.17.0] - 2026-08-29
 
 - Reserve BPF-routed connections before accept

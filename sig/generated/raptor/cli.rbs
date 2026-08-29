@@ -44,11 +44,20 @@ module Raptor
     # @rbs (?String root) -> String?
     def self.default_config_path: (?String root) -> String?
 
-    @command: Symbol
+    # Parses a maximum thread count from a CLI, config, or Rack handler value.
+    #
+    # @param value [Integer, Float, String, nil] maximum thread count
+    # @return [Integer, Float, nil] parsed thread count, `Float::INFINITY` for
+    #   `"unlimited"`, or nil for a fixed-size pool
+    #
+    # @rbs (Integer | Float | String | nil value) -> (Integer | Float)?
+    def self.parse_max_threads: (Integer | Float | String | nil value) -> (Integer | Float)?
+
+    @parser: OptionParser
 
     @options: Hash[Symbol, untyped]
 
-    @parser: OptionParser
+    @command: Symbol
 
     # Creates a new CLI instance from `argv`. A rackup file may be given
     # as the first positional argument; every other value is parsed as a

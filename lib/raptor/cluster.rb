@@ -73,6 +73,7 @@ module Raptor
     # @rbs @http1_ractor_count: Integer
     # @rbs @http2_ractor_count: Integer
     # @rbs @thread_count: Integer
+    # @rbs @max_thread_count: (Integer | Float)?
     # @rbs @environment: String
     # @rbs @connection_options: Hash[Symbol, untyped]
     # @rbs @http1_options: Hash[Symbol, untyped]
@@ -125,6 +126,7 @@ module Raptor
     # @option options [Boolean] :drain_accept_queue whether to drain the kernel accept queue on shutdown
     # @option options [Integer] :workers number of worker processes
     # @option options [Integer] :threads number of threads per worker process
+    # @option options [Integer, Float, nil] :max_threads maximum number of threads per worker process, `Float::INFINITY` for no limit, or nil for a fixed-size pool
     # @option options [#call] :app pre-built Rack application
     # @option options [String] :rackup path to Rack configuration file
     # @option options [String, nil] :chdir directory to change to before loading the Rack application, or nil to leave the working directory unchanged
@@ -158,6 +160,7 @@ module Raptor
       @http1_ractor_count = options[:http1][:ractors] || self.class.default_http1_ractor_count(@worker_count)
       @http2_ractor_count = options[:http2][:ractors] || self.class.default_http2_ractor_count(@worker_count)
       @thread_count = options[:threads]
+      @max_thread_count = options[:max_threads]
       @environment = options[:environment] || ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
       @connection_options = options[:connection]
       @http1_options = options[:http1]
@@ -752,7 +755,7 @@ module Raptor
         request_count += 1
         @app.call(env)
       }
-      thread_pool = AtomicThreadPool.new(size: @thread_count)
+      thread_pool = AtomicThreadPool.new(size: @thread_count, max_size: @max_thread_count)
       http1 = Http1.new(
         counting_app,
         @server_port,
@@ -839,7 +842,7 @@ module Raptor
             requests: request_count,
             backlog: reactor.backlog,
             busy_threads: thread_pool.active_count,
-            thread_capacity: @thread_count,
+            thread_capacity: thread_pool.size,
             started_at:,
             last_checkin: Process.clock_gettime(Process::CLOCK_REALTIME),
             booted: true
@@ -978,7 +981,14 @@ module Raptor
       Log.info "│     ├─ #{@http1_ractor_count} HTTP/1.1 pipeline ractor#{"s" if @http1_ractor_count > 1}"
       Log.info "│     ├─ #{@http2_ractor_count} HTTP/2 pipeline ractor#{"s" if @http2_ractor_count > 1}"
       Log.info "│     ├─ 2 pipeline collector threads"
-      Log.info "│     ├─ #{@thread_count} worker thread#{"s" if @thread_count > 1}"
+      thread_limit = if @max_thread_count == Float::INFINITY
+        " (scaling, no limit)"
+      elsif @max_thread_count
+        " (scaling up to #{@max_thread_count})"
+      else
+        ""
+      end
+      Log.info "│     ├─ #{@thread_count} worker thread#{"s" if @thread_count > 1}#{thread_limit}"
       Log.info "│     └─ 1 stats thread"
       Log.info "└─ Listening on #{@binder.addresses.join(", ")}"
     end

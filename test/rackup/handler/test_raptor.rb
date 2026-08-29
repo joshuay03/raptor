@@ -18,7 +18,7 @@ module Rackup
 
       def test_valid_options_keys
         assert_equal(
-          ["Host=HOST", "Port=PORT", "Workers=NUM", "Threads=NUM", "Config=PATH"],
+          ["Host=HOST", "Port=PORT", "Workers=NUM", "Threads=NUM", "MaxThreads=NUM", "Config=PATH"],
           Rackup::Handler::Raptor.valid_options.keys
         )
       end
@@ -30,6 +30,7 @@ module Rackup
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:socket_backlog], opts[:socket_backlog]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:drain_accept_queue], opts[:drain_accept_queue]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
+        assert_nil opts[:max_threads]
         assert_equal Integer(Concurrent.available_processor_count), opts[:workers]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:connection], opts[:connection]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http1], opts[:http1]
@@ -56,6 +57,18 @@ module Rackup
         assert_equal 4, opts[:threads]
       end
 
+      def test_maps_max_threads
+        opts = build(MaxThreads: 16)
+
+        assert_equal 16, opts[:max_threads]
+      end
+
+      def test_maps_unlimited_max_threads
+        opts = build(MaxThreads: "unlimited")
+
+        assert_equal Float::INFINITY, opts[:max_threads]
+      end
+
       def test_maps_workers
         opts = build(Workers: 2)
 
@@ -69,12 +82,13 @@ module Rackup
       end
 
       def test_config_file_layers_under_rack_options
-        with_config_file({ workers: 2, threads: 8, http1: { ractors: 4 }, connection: { first_data_timeout: 60 } }) do |path|
+        with_config_file({ workers: 2, threads: 8, max_threads: "unlimited", http1: { ractors: 4 }, connection: { first_data_timeout: 60 } }) do |path|
           opts = build(Config: path, Workers: 16)
 
           assert_equal 16, opts[:workers]
           assert_equal 4, opts[:http1][:ractors]
           assert_equal 8, opts[:threads]
+          assert_equal Float::INFINITY, opts[:max_threads]
           assert_equal 60, opts[:connection][:first_data_timeout]
           assert_equal 10, opts[:connection][:chunk_data_timeout]
         end

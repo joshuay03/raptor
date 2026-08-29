@@ -1083,6 +1083,41 @@ The bit that matters most in practice:
 <br>
 <br>
 
+## Scaling app threads without making CPU contention worse
+
+The pool stays fixed at `threads` unless you set `max_threads`.
+
+- <big>A native CRuby thread hook measures time running, blocked outside the GVL, and waiting for the GVL</big>
+- <big>The queue has to stay non-empty, and every current worker has to be active</big>
+- <big>Blocked time has to exceed half of worker time</big>
+- <big>GVL wait has to stay below two percent</big>
+- <big>Only then does the pool add a temporary thread, up to `max_threads`</big>
+- <big>When the queue drains, temporary threads leave and the pool returns to `threads`</big>
+
+The distinction matters. More threads help when requests are asleep in database or network calls. They make CPU-bound Ruby slower when the GVL is already the bottleneck.
+
+`max_threads: Float::INFINITY` allows the pool to grow without a fixed limit. That still does not make OS threads as cheap as fibers.
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+---
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
 ## The reactor
 
 - <big>Every network server has to track connections that are open but not yet ready to be read</big>
@@ -1669,7 +1704,7 @@ flowchart TB
 
 - <big>Master calls `mmap` for the region **before** forking</big>
 - <big>Every worker inherits the mapping</big>
-- <big>Each worker writes a 49-byte slot every second: pid, phase, requests, backlog, busy threads, boot time, checkin time, booted flag</big>
+- <big>Each worker writes a 49-byte slot every second: pid, phase, requests, backlog, busy and available threads, boot time, checkin time, booted flag</big>
 - <big>Master reads the whole region directly. No JSON. No pipe drain. No signal.</big>
 - <big>`bundle exec raptor stats` prints the region as JSON, essentially instantly</big>
 
@@ -2205,10 +2240,10 @@ I didn't set out to build a small library ecosystem. It's what happens when you 
 
 Real numbers are in the [README benchmarks section](../README.md#micro-benchmarks). The shape:
 
-- <big>**IO-bound HTTP/1.1**: Falcon wins overall. Between the fixed-thread servers, Raptor delivers a little over twice Puma's throughput with less than half its p95.</big>
-- <big>**CPU-bound HTTP/1.1**: Puma and Raptor are close. Puma leads Raptor by 1–4% on throughput in the current runs; Raptor leads Falcon.</big>
+- <big>**IO-bound HTTP/1.1**: Falcon leads the fixed pools. Fixed Raptor still delivers a little over twice Puma's throughput with less than half its p95. Scaling Raptor tests how much of the gap temporary threads can close.</big>
+- <big>**CPU-bound HTTP/1.1**: Fixed Puma and Raptor are close. Puma leads by 1–4% on throughput in the current runs; Raptor leads Falcon. Scaling is designed to stay close to fixed when the pool sees GVL contention.</big>
   - Tail latency ("p95") is the response time that 5% of requests exceed. It's what your slowest users see. Lower is better.
-- <big>**HTTP/2**: Raptor and Falcon both implement it. Puma doesn't. Falcon leads throughput in both current profiles; Raptor's CPU p95 is lower.</big>
+- <big>**HTTP/2**: Raptor and Falcon both implement it. Puma doesn't. Falcon leads fixed Raptor's throughput in both current profiles; Raptor's CPU p95 is lower.</big>
 - <big>**Variance**: HTTP/1.1 is stable. HTTP/2 is noisy enough that I treat it as direction, not a precise ranking.</big>
 
 Different workloads, different winners. That's fine.

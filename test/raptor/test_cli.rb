@@ -16,6 +16,7 @@ module Raptor
       assert_equal false, options(cli)[:drain_accept_queue]
       assert_equal CLI::DEFAULT_WORKER_COUNT, options(cli)[:workers]
       assert_equal 3, options(cli)[:threads]
+      assert_nil options(cli)[:max_threads]
       assert_equal "config.ru", options(cli)[:rackup]
       assert_nil options(cli)[:chdir]
       assert_nil options(cli)[:environment]
@@ -44,12 +45,13 @@ module Raptor
     end
 
     def test_config_file_short_flag_layers_under_cli_args
-      with_config_file({ workers: 2, threads: 8, http1: { ractors: 4 }, connection: { first_data_timeout: 60 } }) do |path|
+      with_config_file({ workers: 2, threads: 8, max_threads: 16, http1: { ractors: 4 }, connection: { first_data_timeout: 60 } }) do |path|
         cli = CLI.new(["-c", path, "-w", "16"])
 
         assert_equal 16, options(cli)[:workers]
         assert_equal 4, options(cli)[:http1][:ractors]
         assert_equal 8, options(cli)[:threads]
+        assert_equal 16, options(cli)[:max_threads]
         assert_equal 60, options(cli)[:connection][:first_data_timeout]
         assert_equal 10, options(cli)[:connection][:chunk_data_timeout]
       end
@@ -60,6 +62,14 @@ module Raptor
         cli = CLI.new(["--config", path])
 
         assert_equal 7, options(cli)[:threads]
+      end
+    end
+
+    def test_config_file_accepts_unlimited_max_threads
+      with_config_file({ max_threads: "unlimited" }) do |path|
+        cli = CLI.new(["--config", path])
+
+        assert_equal Float::INFINITY, options(cli)[:max_threads]
       end
     end
 
@@ -158,6 +168,18 @@ module Raptor
       cli = CLI.new(["--threads", "8"])
 
       assert_equal 8, options(cli)[:threads]
+    end
+
+    def test_max_threads
+      cli = CLI.new(["--max-threads", "16"])
+
+      assert_equal 16, options(cli)[:max_threads]
+    end
+
+    def test_unlimited_max_threads
+      cli = CLI.new(["--max-threads", "unlimited"])
+
+      assert_equal Float::INFINITY, options(cli)[:max_threads]
     end
 
     def test_chdir_short_flag

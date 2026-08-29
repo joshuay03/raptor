@@ -40,11 +40,12 @@ module Rackup
       # @rbs () -> Hash[String, String]
       def self.valid_options
         {
-          "Host=HOST"   => "Hostname to listen on (default: #{DEFAULT_OPTIONS[:Host]})",
-          "Port=PORT"   => "Port to listen on (default: #{DEFAULT_OPTIONS[:Port]})",
-          "Workers=NUM" => "Number of worker processes (default: available processor count)",
-          "Threads=NUM" => "Number of threads per worker (default: 3)",
-          "Config=PATH" => "Load additional configuration from PATH"
+          "Host=HOST"      => "Hostname to listen on (default: #{DEFAULT_OPTIONS[:Host]})",
+          "Port=PORT"      => "Port to listen on (default: #{DEFAULT_OPTIONS[:Port]})",
+          "Workers=NUM"    => "Number of worker processes (default: available processor count)",
+          "Threads=NUM"    => "Number of threads per worker (default: 3)",
+          "MaxThreads=NUM" => "Maximum threads per worker (`unlimited` for no limit; default: fixed at Threads)",
+          "Config=PATH"    => "Load additional configuration from PATH"
         }
       end
 
@@ -81,6 +82,7 @@ module Rackup
           drain_accept_queue: config.key?(:drain_accept_queue) ? config[:drain_accept_queue] : cli_defaults[:drain_accept_queue],
           workers: (options[:Workers] || config[:workers] || Concurrent.available_processor_count).to_i,
           threads: (options[:Threads] || config[:threads] || cli_defaults[:threads]).to_i,
+          max_threads: ::Raptor::CLI.parse_max_threads(options[:MaxThreads] || config[:max_threads]),
           app: app
         }
         result[:rackup] = config[:rackup] if config.key?(:rackup)

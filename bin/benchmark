@@ -36,9 +36,9 @@ require "timeout"
 require_relative "../lib/raptor/version"
 
 WORKERS = Integer(Concurrent.available_processor_count)
-THREADS = 3
+BASE_THREADS = 3
 CLIENTS_PER_SERVER_THREAD = 4
-HEY_CONNECTIONS = WORKERS * THREADS * CLIENTS_PER_SERVER_THREAD
+HEY_CONNECTIONS = WORKERS * BASE_THREADS * CLIENTS_PER_SERVER_THREAD
 H2LOAD_STREAMS = 3
 H2LOAD_CONNECTIONS = HEY_CONNECTIONS / H2LOAD_STREAMS
 H1_PORT = 9292
@@ -68,7 +68,7 @@ if options[:fast]
   MAIN_SECONDS = 5
   BETWEEN_RUNS_SECONDS = 0
 else
-  RUNS_PER_MODE = 5
+  RUNS_PER_MODE = 3
   WARMUP_SECONDS = 3
   MAIN_SECONDS = 15
   BETWEEN_RUNS_SECONDS = 5
@@ -148,12 +148,16 @@ def wait_for_port_free(port, timeout: 30)
   deadline = Time.now + timeout
   loop do
     begin
-      TCPSocket.new("127.0.0.1", port).close
+      Socket.tcp("127.0.0.1", port, connect_timeout: 1).close
       raise "Port #{port} still in use" if Time.now > deadline
 
       sleep 0.5
     rescue Errno::ECONNREFUSED, Errno::ECONNRESET
       return
+    rescue Errno::ETIMEDOUT, IO::TimeoutError
+      raise "Port #{port} did not become available" if Time.now > deadline
+
+      sleep 0.5
     end
   end
 end
@@ -195,6 +199,7 @@ at_exit { reap_all_spawned_servers }
 end
 
 def start_server(cmd, ports)
+  ports.each { |port| wait_for_port_free(port, timeout: 0) }
   log_file = Tempfile.new(["server-", ".log"])
   pid = Thread.handle_interrupt(SystemExit => :never) do
     child_pid = spawn(*cmd, [:out, :err] => log_file.path, pgroup: true)
@@ -387,10 +392,12 @@ def falcon_version
   output.strip
 end
 
-def raptor_cmd(fixture)
+def raptor_cmd(fixture, scaling:)
+  max_threads_args = scaling ? ["--max-threads", "unlimited"] : []
   [
     "bundle", "exec", "raptor",
-    "-w", WORKERS.to_s, "-t", THREADS.to_s,
+    "-w", WORKERS.to_s, "-t", BASE_THREADS.to_s,
+    *max_threads_args,
     "--refork-after", "0",
     "-b", "tcp://0.0.0.0:#{H1_PORT}",
     "-b", "ssl://0.0.0.0:#{H2_PORT}?cert=#{CERT_PATH}&key=#{KEY_PATH}",
@@ -401,7 +408,7 @@ end
 def puma_cmd(fixture)
   [
     "bundle", "exec", "puma",
-    "-w", WORKERS.to_s, "-t", "#{THREADS}:#{THREADS}",
+    "-w", WORKERS.to_s, "-t", "#{BASE_THREADS}:#{BASE_THREADS}",
     "-b", "tcp://0.0.0.0:#{H1_PORT}",
     fixture
   ]
@@ -457,9 +464,12 @@ WORKLOADS.each do |workload, config|
   falcon_h2_ports = [H2_PORT]
 
   results[workload] = {
-    raptor_h1: bench_h1("Raptor", raptor_cmd(fixture), raptor_ports, label, method: method, keep_alive: false),
-    raptor_h1_ka: bench_h1("Raptor", raptor_cmd(fixture), raptor_ports, label, method: method, keep_alive: true),
-    raptor_h2: bench_h2("Raptor", raptor_cmd(fixture), raptor_ports, label, method: method),
+    raptor_fixed_h1: bench_h1("Raptor (fixed)", raptor_cmd(fixture, scaling: false), raptor_ports, label, method: method, keep_alive: false),
+    raptor_fixed_h1_ka: bench_h1("Raptor (fixed)", raptor_cmd(fixture, scaling: false), raptor_ports, label, method: method, keep_alive: true),
+    raptor_fixed_h2: bench_h2("Raptor (fixed)", raptor_cmd(fixture, scaling: false), raptor_ports, label, method: method),
+    raptor_scaling_h1: bench_h1("Raptor (scaling)", raptor_cmd(fixture, scaling: true), raptor_ports, label, method: method, keep_alive: false),
+    raptor_scaling_h1_ka: bench_h1("Raptor (scaling)", raptor_cmd(fixture, scaling: true), raptor_ports, label, method: method, keep_alive: true),
+    raptor_scaling_h2: bench_h2("Raptor (scaling)", raptor_cmd(fixture, scaling: true), raptor_ports, label, method: method),
     puma_h1: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, method: method, keep_alive: false),
     puma_h1_ka: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, method: method, keep_alive: true),
     falcon_h1: bench_h1("Falcon", falcon_h1_cmd(fixture), falcon_h1_ports, label, method: method, keep_alive: false),
@@ -469,37 +479,41 @@ WORKLOADS.each do |workload, config|
 end
 
 PROTOCOLS = [
-  { label: "HTTP/1.1", raptor_key: :raptor_h1, puma_key: :puma_h1, falcon_key: :falcon_h1 },
-  { label: "HTTP/1.1 (keep-alive)", raptor_key: :raptor_h1_ka, puma_key: :puma_h1_ka, falcon_key: :falcon_h1_ka },
-  { label: "HTTP/2", raptor_key: :raptor_h2, puma_key: nil, falcon_key: :falcon_h2 }
+  { label: "HTTP/1.1", key: :h1, puma_key: :puma_h1, falcon_key: :falcon_h1 },
+  { label: "HTTP/1.1 (keep-alive)", key: :h1_ka, puma_key: :puma_h1_ka, falcon_key: :falcon_h1_ka },
+  { label: "HTTP/2", key: :h2, puma_key: nil, falcon_key: :falcon_h2 }
 ]
 
 rows = []
 PROTOCOLS.each do |protocol|
   WORKLOADS.each do |workload, config|
-    raptor_value = results[workload][protocol[:raptor_key]]
     puma_value = protocol[:puma_key] ? results[workload][protocol[:puma_key]] : nil
     falcon_value = protocol[:falcon_key] ? results[workload][protocol[:falcon_key]] : nil
-    rows << {
-      protocol: protocol[:label],
-      workload: config[:label],
-      raptor_req_s: format_req_s(raptor_value[:req_s]),
-      raptor_p95: format_p95_ms(raptor_value[:p95_ms]),
-      puma_req_s: puma_value ? format_req_s(puma_value[:req_s]) : "N/A",
-      puma_p95: puma_value ? format_p95_ms(puma_value[:p95_ms]) : "N/A",
-      vs_puma_req_s: puma_value ? format_delta(raptor_value[:req_s], puma_value[:req_s]) : "-",
-      vs_puma_p95: puma_value ? format_delta(raptor_value[:p95_ms], puma_value[:p95_ms]) : "-",
-      falcon_req_s: falcon_value ? format_req_s(falcon_value[:req_s]) : "N/A",
-      falcon_p95: falcon_value ? format_p95_ms(falcon_value[:p95_ms]) : "N/A",
-      vs_falcon_req_s: falcon_value ? format_delta(raptor_value[:req_s], falcon_value[:req_s]) : "-",
-      vs_falcon_p95: falcon_value ? format_delta(raptor_value[:p95_ms], falcon_value[:p95_ms]) : "-"
-    }
+    { fixed: "Fixed", scaling: "Scaling" }.each do |mode, mode_label|
+      raptor_value = results[workload][:"raptor_#{mode}_#{protocol[:key]}"]
+      rows << {
+        protocol: protocol[:label],
+        workload: config[:label],
+        raptor_mode: mode_label,
+        raptor_req_s: format_req_s(raptor_value[:req_s]),
+        raptor_p95: format_p95_ms(raptor_value[:p95_ms]),
+        puma_req_s: puma_value ? format_req_s(puma_value[:req_s]) : "N/A",
+        puma_p95: puma_value ? format_p95_ms(puma_value[:p95_ms]) : "N/A",
+        vs_puma_req_s: puma_value ? format_delta(raptor_value[:req_s], puma_value[:req_s]) : "-",
+        vs_puma_p95: puma_value ? format_delta(raptor_value[:p95_ms], puma_value[:p95_ms]) : "-",
+        falcon_req_s: falcon_value ? format_req_s(falcon_value[:req_s]) : "N/A",
+        falcon_p95: falcon_value ? format_p95_ms(falcon_value[:p95_ms]) : "N/A",
+        vs_falcon_req_s: falcon_value ? format_delta(raptor_value[:req_s], falcon_value[:req_s]) : "-",
+        vs_falcon_p95: falcon_value ? format_delta(raptor_value[:p95_ms], falcon_value[:p95_ms]) : "-"
+      }
+    end
   end
 end
 
 HEADERS = {
   protocol: "Protocol",
   workload: "Workload",
+  raptor_mode: "Raptor mode",
   raptor_req_s: "Raptor req/s",
   raptor_p95: "Raptor p95",
   puma_req_s: "Puma req/s",
@@ -533,7 +547,11 @@ section = <<~MD
   building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
   most of its work in Ruby with a few near-zero-cost cache hits.
 
-  Each cell reports the median throughput and median p95 latency independently across #{RUNS_PER_MODE} runs, so the two numbers in a row
+  Raptor is run in two modes: **Fixed** keeps #{BASE_THREADS} application threads per worker, matching Puma, while **Scaling** starts with
+  #{BASE_THREADS} and may add threads without a fixed limit when queued work is blocked outside the GVL. Both modes are compared with
+  both Puma and Falcon in the table below.
+
+  Each cell reports the median throughput and median p95 latency independently across #{RUNS_PER_MODE} #{RUNS_PER_MODE == 1 ? "run" : "runs"}, so the two numbers in a row
   may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
   state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
   ((max - min) / 2 / median) between runs of a single cell was ±#{format('%.1f', worst_req_s_spread)}% for throughput and ±#{format('%.1f', worst_p95_spread)}% for p95.
@@ -541,7 +559,7 @@ section = <<~MD
   #{table_lines.join("\n")}
 
   > #{RUBY_DESCRIPTION}
-  > #{WORKERS} worker processes; Raptor and Puma run #{THREADS} threads per worker, Falcon runs unbounded fibers per worker;
+  > #{WORKERS} worker processes; fixed Raptor and Puma run #{BASE_THREADS} threads per worker; scaling Raptor starts at #{BASE_THREADS} with no fixed limit; Falcon runs unbounded fibers per worker;
   > #{HEY_CONNECTIONS} concurrent HTTP/1.1 client connections; #{H2LOAD_CONNECTIONS} concurrent HTTP/2 client connections × #{H2LOAD_STREAMS} streams each
 
   See [bin/benchmark](bin/benchmark) for more details.
