@@ -67,6 +67,7 @@ module Raptor
       before_worker_shutdown: [].freeze,
       before_refork: [].freeze,
       stats_file: "tmp/raptor.json",
+      control_url: nil,
       pid_file: nil,
       stdout_file: nil,
       stderr_file: nil,
@@ -371,6 +372,10 @@ module Raptor
 
         opts.on("--stats-file PATH", String, "Stats file path (default: tmp/raptor.json)") do |path|
           @options[:stats_file] = path
+        end
+
+        opts.on("--control-url URI", String, "Serve cluster stats on a unix:// URI (default: off)") do |uri|
+          @options[:control_url] = uri
         end
 
         opts.on("--pid-file PATH", String, "PID file path (default: none)") do |path|

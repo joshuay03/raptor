@@ -124,6 +124,7 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
   before_worker_shutdown: [],
   before_refork: [],
   stats_file: "tmp/raptor.json",
+  control_url: nil,
   pid_file: nil,
   stdout_file: nil,
   stderr_file: nil,
@@ -219,6 +220,11 @@ Worker 0 (phase 0): pid=91350, requests=1234, busy=2/3, backlog=0, booted, last_
 Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_checkin=10:42:01
 ...
 ```
+
+Set `control_url` to a Unix socket URL such as `unix:///tmp/raptor-control.sock` to expose cluster stats over `/stats`.
+For adaptive pools, `max_threads` in each worker's status is its current thread count, so
+`pool_capacity / max_threads` measures the capacity available at that moment rather than comparing against an
+unbounded configured limit. The control server is read-only and currently exposes only `/stats`.
 
 ## (Micro) Benchmarks
 

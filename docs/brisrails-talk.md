@@ -1709,6 +1709,7 @@ flowchart TB
 - <big>Each worker writes a 49-byte slot every second: pid, phase, requests, backlog, busy and available threads, boot time, checkin time, booted flag</big>
 - <big>Master reads the whole region directly. No JSON. No pipe drain. No signal.</big>
 - <big>`bundle exec raptor stats` prints the region as JSON, essentially instantly</big>
+- <big>An optional read-only Unix socket exposes the cluster snapshot at `GET /stats` for monitoring</big>
 
 Wrapped in a small C extension I wrote: **`mmap-ruby`**.
 

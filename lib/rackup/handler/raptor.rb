@@ -101,6 +101,7 @@ module Rackup
         result[:worker_drain_timeout] = (config[:worker_drain_timeout] || cli_defaults[:worker_drain_timeout]).to_i
         result[:worker_shutdown_timeout] = (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i
         result[:stats_file] = config.key?(:stats_file) ? config[:stats_file] : cli_defaults[:stats_file]
+        result[:control_url] = config[:control_url] if config.key?(:control_url)
         result[:pid_file] = config[:pid_file] if config.key?(:pid_file)
         result[:stdout_file] = config[:stdout_file] if config.key?(:stdout_file)
         result[:stderr_file] = config[:stderr_file] if config.key?(:stderr_file)

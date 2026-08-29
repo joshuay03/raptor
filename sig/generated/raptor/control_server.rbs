@@ -1,0 +1,58 @@
+# Generated from lib/raptor/control_server.rb with RBS::Inline
+
+module Raptor
+  # Serves cluster statistics over a Unix socket.
+  class ControlServer
+    @path: String
+
+    @stats: ^() -> Hash[Symbol, untyped]
+
+    @server: UNIXServer?
+
+    @thread: Thread?
+
+    @running: bool
+
+    # Creates a control server for `url` without binding it.
+    #
+    # @param url [String] `unix://` URL to listen on
+    # @yieldreturn [Hash] cluster statistics
+    # @return [void]
+    # @raise [ArgumentError] if the URL is not a Unix socket
+    #
+    # @rbs (String url) { () -> Hash[Symbol, untyped] } -> void
+    def initialize: (String url) { () -> Hash[Symbol, untyped] } -> void
+
+    # Binds the Unix socket.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def bind: () -> void
+
+    # Starts serving requests in a background thread.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def start: () -> void
+
+    # Stops serving and removes the socket.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def shutdown: () -> void
+
+    private
+
+    # @rbs () -> void
+    def remove_stale_socket: () -> void
+
+    # @rbs () -> void
+    def serve: () -> void
+
+    # @rbs (UNIXSocket client) -> void
+    def handle: (UNIXSocket client) -> void
+  end
+end

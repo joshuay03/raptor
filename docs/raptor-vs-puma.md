@@ -483,6 +483,8 @@ This fast path is one plausible contributor to Raptor's keep-alive result. Reque
 
 The performance difference here is negligible because the update happens once per worker per second, outside request processing. The design mainly gives the master a fixed-size snapshot it can inspect without draining per-worker messages.
 
+For external monitoring, `control_url` can expose a read-only `GET /stats` endpoint over a Unix socket. Its per-worker status includes backlog, busy threads, free capacity, request count, and the thread count currently available. Adaptive pools report their current size as `max_threads`, rather than their configured limit, so `pool_capacity / max_threads` remains a useful measure while the pool grows and shrinks.
+
 ### HTTP/2
 
 **Puma.** Not implemented. Puma's [position](https://github.com/puma/puma/issues/2697) is that HTTP/2 belongs at the edge (nginx, Caddy, ALB), which terminates it and speaks HTTP/1.1 to the app server. That's a reasonable call for the deployments Puma is aimed at, and it's where most Rails production actually sits.

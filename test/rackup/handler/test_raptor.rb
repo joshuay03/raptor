@@ -151,6 +151,7 @@ module Rackup
           {
             on_error: ->(_env, _error) {},
             stats_file: "tmp/c.json",
+            control_url: "unix:///tmp/c.sock",
             pid_file: "tmp/c.pid",
             cpu_affinity: true,
             clean_thread_locals: false,
@@ -161,6 +162,7 @@ module Rackup
 
           assert_kind_of Proc, opts[:on_error]
           assert_equal "tmp/c.json", opts[:stats_file]
+          assert_equal "unix:///tmp/c.sock", opts[:control_url]
           assert_equal "tmp/c.pid", opts[:pid_file]
           assert_equal true, opts[:cpu_affinity]
           assert_equal false, opts[:clean_thread_locals]

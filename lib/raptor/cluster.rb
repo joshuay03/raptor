@@ -3,6 +3,7 @@
 
 require "concurrent/utility/processor_counter"
 require "json"
+require "time"
 
 require "atomic-ruby/atomic_thread_pool"
 require "rack/builder"
@@ -10,6 +11,7 @@ require "ractor-pool"
 
 require_relative "log"
 require_relative "binder"
+require_relative "control_server"
 require_relative "reactor"
 require_relative "server"
 require_relative "reuseport_bpf"
@@ -90,6 +92,7 @@ module Raptor
     # @rbs @before_worker_shutdown: Array[Proc]
     # @rbs @before_refork: Array[Proc]
     # @rbs @stats_file: String?
+    # @rbs @control_server: ControlServer?
     # @rbs @pid_file: String?
     # @rbs @stdout_file: String?
     # @rbs @stderr_file: String?
@@ -105,6 +108,7 @@ module Raptor
     # @rbs @workers: Hash[Integer, Integer]
     # @rbs @timed_out: Set[Integer]
     # @rbs @stats: Stats
+    # @rbs @started_at: Float
     # @rbs @phase: Integer
     # @rbs @phased_restart_requested: bool
     # @rbs @phased_restarting: bool
@@ -150,6 +154,7 @@ module Raptor
     # @option options [Array<Proc>] :before_worker_shutdown procs called with the worker index before its graceful shutdown
     # @option options [Array<Proc>] :before_refork procs called in a worker before it transitions to a seed
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
+    # @option options [String, nil] :control_url `unix://` URL serving cluster stats, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
     # @option options [String, nil] :stdout_file path to redirect stdout to, reopened on SIGHUP, or nil to disable
     # @option options [String, nil] :stderr_file path to redirect stderr to, reopened on SIGHUP, or nil to disable
@@ -183,6 +188,7 @@ module Raptor
       @before_worker_shutdown = Array(options[:before_worker_shutdown])
       @before_refork = Array(options[:before_refork])
       @stats_file = options[:stats_file]
+      @control_server = ControlServer.new(options[:control_url]) { stats_hash } if options[:control_url]
       @pid_file = options[:pid_file]
       @stdout_file = options[:stdout_file]
       @stderr_file = options[:stderr_file]
@@ -211,6 +217,7 @@ module Raptor
       @workers = {}
       @timed_out = Set.new
       @stats = Stats.new(@worker_count)
+      @started_at = Process.clock_gettime(Process::CLOCK_REALTIME)
       @phase = 0
       @phased_restart_requested = false
       @phased_restarting = false
@@ -256,7 +263,9 @@ module Raptor
 
       @bpf_active = ReuseportBPF.setup(@worker_count)
 
+      @control_server&.bind
       @worker_count.times { |index| spawn_worker(index) }
+      @control_server&.start
 
       stats_file_thread = if @stats_file
         Thread.new do
@@ -283,6 +292,7 @@ module Raptor
       Systemd.notify("STOPPING=1")
       stop_workers
       stats_file_thread&.join
+      @control_server&.shutdown
       File.delete(@stats_file) rescue nil if @stats_file
       File.delete(@pid_file) rescue nil if @pid_file
       @stats.unmap
@@ -300,7 +310,56 @@ module Raptor
       @stats.all
     end
 
+    # Returns cluster statistics for the control server.
+    # For an adaptive pool, `max_threads` is the number of threads currently
+    # running so utilization reflects the capacity available at that moment.
+    #
+    # @return [Hash] cluster statistics
+    #
+    # @rbs () -> Hash[Symbol, untyped]
+    def stats_hash
+      worker_stats = @stats.all
+      worker_status = @workers.sort.map do |index, pid|
+        stat = worker_stats[index]
+        stat = {} unless stat && stat[:pid] == pid
+        capacity = stat.fetch(:thread_capacity, 0)
+        active = stat.fetch(:busy_threads, 0)
+        total_work = stat.fetch(:backlog, 0)
+
+        {
+          started_at: timestamp(stat.fetch(:started_at, 0)),
+          pid: pid,
+          index: index,
+          phase: stat.fetch(:phase, @phase),
+          booted: stat.fetch(:booted, false),
+          last_checkin: timestamp(stat.fetch(:last_checkin, 0)),
+          last_status: {
+            backlog: [total_work - active, 0].max,
+            running: capacity,
+            pool_capacity: [capacity - total_work, 0].max,
+            busy_threads: active,
+            max_threads: capacity,
+            requests_count: stat.fetch(:requests, 0),
+          },
+        }
+      end
+
+      {
+        started_at: timestamp(@started_at),
+        workers: worker_status.length,
+        phase: @phase,
+        booted_workers: worker_status.count { |worker| worker[:booted] },
+        old_workers: worker_status.count { |worker| worker[:phase] != @phase },
+        worker_status: worker_status,
+      }
+    end
+
     private
+
+    # @rbs (Float timestamp) -> String
+    def timestamp(timestamp)
+      Time.at(timestamp).utc.iso8601(6)
+    end
 
     # Returns the inherited-FDs hash for a systemd socket-activation handoff,
     # pairing each bind URI with the FD systemd passed at the same index.
@@ -709,6 +768,7 @@ module Raptor
       stop_workers
       @binder.clear_close_on_exec
       ENV[INHERITED_FDS_ENV] = JSON.generate(@binder.inheritable_fds)
+      @control_server&.shutdown
       File.delete(@stats_file) rescue nil if @stats_file
       File.delete(@pid_file) rescue nil if @pid_file
       @stats.unmap

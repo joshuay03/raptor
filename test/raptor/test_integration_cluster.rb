@@ -148,6 +148,39 @@ module Raptor
       end
     end
 
+    def test_control_server_exposes_cluster_stats
+      control_path = "/tmp/raptor_test_control_#{Process.pid}.sock"
+      File.delete(control_path) rescue nil
+      @options[:control_url] = "unix://#{control_path}"
+
+      with_server do |uri|
+        3.times { Net::HTTP.get_response(uri) }
+
+        stats = Timeout.timeout(5) do
+          loop do
+            response = raw_unix_request(control_path, "GET /stats HTTP/1.0\r\nHost: localhost\r\n\r\n") rescue nil
+            next sleep 0.1 unless response
+
+            data = JSON.parse(response.split("\r\n\r\n", 2).last, symbolize_names: true)
+            break data if data.dig(:worker_status, 0, :last_status, :requests_count).to_i >= 3
+
+            sleep 0.1
+          end
+        end
+
+        assert_equal 1, stats[:workers]
+        assert_equal 1, stats[:booted_workers]
+        assert_equal 0, stats[:old_workers]
+        assert_equal 1, stats[:worker_status].length
+        assert_equal @options[:threads], stats.dig(:worker_status, 0, :last_status, :max_threads)
+        assert_equal @options[:threads], stats.dig(:worker_status, 0, :last_status, :pool_capacity)
+      end
+
+      refute File.exist?(control_path)
+    ensure
+      File.delete(control_path) rescue nil
+    end
+
     def test_worker_restart_on_crash
       @options[:workers] = 2
       cluster = without_output { Cluster.new(@options) }

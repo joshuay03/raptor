@@ -35,6 +35,7 @@ module Raptor
       assert_equal 100, options(cli)[:http2][:max_concurrent_streams]
       assert_equal 25, options(cli)[:worker_drain_timeout]
       assert_equal "tmp/raptor.json", options(cli)[:stats_file]
+      assert_nil options(cli)[:control_url]
       assert_nil options(cli)[:pid_file]
       assert_nil options(cli)[:stdout_file]
       assert_nil options(cli)[:stderr_file]
@@ -251,6 +252,12 @@ module Raptor
       cli = CLI.new(["--environment", "production"])
 
       assert_equal "production", options(cli)[:environment]
+    end
+
+    def test_control_url
+      cli = CLI.new(["--control-url", "unix:///tmp/raptor-control.sock"])
+
+      assert_equal "unix:///tmp/raptor-control.sock", options(cli)[:control_url]
     end
 
     def test_first_data_timeout
