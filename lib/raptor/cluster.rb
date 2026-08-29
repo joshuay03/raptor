@@ -146,8 +146,8 @@ module Raptor
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
     # @option options [Integer, Array<Integer>, nil] :refork_after request-count threshold(s) at which a warm worker is promoted to a fork source for phased refork; nil or 0 disables. Requires `PR_SET_CHILD_SUBREAPER` (Linux)
     # @option options [Array<Proc>] :before_fork procs called in the master before every worker fork
-    # @option options [Array<Proc>] :before_worker_boot procs called in each worker before it begins serving
-    # @option options [Array<Proc>] :before_worker_shutdown procs called in each worker before its graceful shutdown
+    # @option options [Array<Proc>] :before_worker_boot procs called with the worker index before it begins serving
+    # @option options [Array<Proc>] :before_worker_shutdown procs called with the worker index before its graceful shutdown
     # @option options [Array<Proc>] :before_refork procs called in a worker before it transitions to a seed
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
@@ -842,7 +842,7 @@ module Raptor
       )
       server_thread = server.run
 
-      @before_worker_boot.each(&:call)
+      @before_worker_boot.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index) }
 
       Log.info "Worker #{index} booted"
 
@@ -878,7 +878,7 @@ module Raptor
         @before_refork.each(&:call)
         server.stop_accepting
       else
-        @before_worker_shutdown.each(&:call)
+        @before_worker_shutdown.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index) }
         server.shutdown
       end
 

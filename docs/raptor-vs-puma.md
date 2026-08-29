@@ -185,6 +185,8 @@ The process and app-thread counts can be set with `RAPTOR_WORKERS`, `RAPTOR_THRE
 
 The master is a supervisor. It never handles requests. It forks workers, watches them via a shared-memory region (more on that in a moment), traps signals, restarts crashed workers, and orchestrates restarts.
 
+Worker boot and shutdown hooks receive the worker's slot index, so setup and cleanup can identify the same slot across restarts. Hooks that do not take an argument continue to work.
+
 Two kinds of restart are supported:
 
 1. **Phased restart on SIGUSR1.** Same idea as Puma. Kill each worker in sequence, wait for its replacement to boot, move on. Existing workers drain their connections while their replacements come up. This is cheap and safe when the change does not require a fresh master.

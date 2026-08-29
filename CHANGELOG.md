@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Pass the worker index to worker boot and shutdown hooks
 - Add `RAPTOR_WORKERS`, `RAPTOR_THREADS`, and `RAPTOR_MAX_THREADS`
 - Make worker CPU affinity opt-in
 - Add request-local thread and Fiber cleanup options

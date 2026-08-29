@@ -147,6 +147,8 @@ it. Set `clean_fiber_locals` to `true` to run each request in a fresh Fiber, iso
 Config files override defaults, environment variables override config files, and command-line options override both.
 `RAPTOR_MAX_THREADS=unlimited` leaves adaptive growth uncapped.
 
+`before_worker_boot` and `before_worker_shutdown` hooks receive the worker index.
+
 ## Bindings
 
 Raptor accepts multiple `binds:` URIs across three schemes.

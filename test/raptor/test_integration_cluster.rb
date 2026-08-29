@@ -370,7 +370,7 @@ module Raptor
       File.delete(marker) rescue nil
 
       @options[:workers] = 1
-      @options[:before_worker_boot] = [proc { File.write(marker, Process.pid.to_s) }]
+      @options[:before_worker_boot] = [proc { |index| File.write(marker, "#{index}:#{Process.pid}") }]
 
       cluster = without_output { Cluster.new(@options) }
       server_port = cluster.instance_variable_get(:@server_port)
@@ -382,7 +382,7 @@ module Raptor
       Timeout.timeout(10) { sleep 0.05 until File.exist?(marker) && !File.read(marker).empty? }
       worker_pid = `pgrep -P #{cluster_pid}`.strip.split.map(&:to_i).first
 
-      assert_equal worker_pid.to_s, File.read(marker)
+      assert_equal "0:#{worker_pid}", File.read(marker)
     ensure
       if cluster_pid
         Process.kill("TERM", cluster_pid) rescue nil
@@ -396,7 +396,7 @@ module Raptor
       File.delete(marker) rescue nil
 
       @options[:workers] = 1
-      @options[:before_worker_shutdown] = [proc { File.write(marker, Process.pid.to_s) }]
+      @options[:before_worker_shutdown] = [proc { |index| File.write(marker, "#{index}:#{Process.pid}") }]
 
       cluster = without_output { Cluster.new(@options) }
       server_port = cluster.instance_variable_get(:@server_port)
@@ -411,7 +411,7 @@ module Raptor
       Process.wait(cluster_pid)
       cluster_pid = nil
 
-      assert_equal worker_pid.to_s, File.read(marker)
+      assert_equal "0:#{worker_pid}", File.read(marker)
     ensure
       if cluster_pid
         Process.kill("TERM", cluster_pid) rescue nil
