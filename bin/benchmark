@@ -41,6 +41,7 @@ CLIENTS_PER_SERVER_THREAD = 4
 HEY_CONNECTIONS = WORKERS * BASE_THREADS * CLIENTS_PER_SERVER_THREAD
 H2LOAD_STREAMS = 3
 H2LOAD_CONNECTIONS = HEY_CONNECTIONS / H2LOAD_STREAMS
+MAX_KEEPALIVE_REQUESTS = 999
 H1_PORT = 9292
 H2_PORT = 9443
 CERT_PATH = "tmp/bench.crt"
@@ -392,24 +393,35 @@ def falcon_version
   output.strip
 end
 
-def raptor_cmd(fixture, scaling:)
+def raptor_cmd(fixture, scaling:, protocol:)
   max_threads_args = scaling ? [] : ["--max-threads", BASE_THREADS.to_s]
+  http1_args = protocol == :h1 ? ["--http1-max-keepalive-requests", MAX_KEEPALIVE_REQUESTS.to_s] : []
+  bind = if protocol == :h2
+    "ssl://0.0.0.0:#{H2_PORT}?cert=#{CERT_PATH}&key=#{KEY_PATH}"
+  else
+    "tcp://0.0.0.0:#{H1_PORT}"
+  end
   [
     "bundle", "exec", "raptor",
+    "-b", bind,
     "-w", WORKERS.to_s, "-t", BASE_THREADS.to_s,
     *max_threads_args,
+    "--no-cpu-affinity",
+    "--no-clean-thread-locals",
+    "--no-clean-fiber-locals",
+    *http1_args,
     "--refork-after", "0",
-    "-b", "tcp://0.0.0.0:#{H1_PORT}",
-    "-b", "ssl://0.0.0.0:#{H2_PORT}?cert=#{CERT_PATH}&key=#{KEY_PATH}",
     fixture
   ]
 end
 
 def puma_cmd(fixture)
   [
+    { "PUMA_FIBER_PER_REQUEST" => nil },
     "bundle", "exec", "puma",
-    "-w", WORKERS.to_s, "-t", "#{BASE_THREADS}:#{BASE_THREADS}",
+    "--no-config",
     "-b", "tcp://0.0.0.0:#{H1_PORT}",
+    "-w", WORKERS.to_s, "-t", "#{BASE_THREADS}:#{BASE_THREADS}",
     fixture
   ]
 end
@@ -417,19 +429,19 @@ end
 def falcon_h1_cmd(fixture)
   [
     "bundle", "exec", "falcon", "serve",
-    "--count", WORKERS.to_s,
     "--bind", "http://0.0.0.0:#{H1_PORT}",
-    "--config", fixture
+    "--config", fixture,
+    "--count", WORKERS.to_s
   ]
 end
 
 def falcon_h2_cmd(fixture)
   [
     "bundle", "exec", "falcon", "serve",
-    "--count", WORKERS.to_s,
     "--bind", "https://0.0.0.0:#{H2_PORT}",
     "--hostname", "localhost",
-    "--config", fixture
+    "--config", fixture,
+    "--count", WORKERS.to_s
   ]
 end
 
@@ -458,23 +470,21 @@ WORKLOADS.each do |workload, config|
   fixture = config[:fixture]
   label = config[:label]
   method = config[:method]
-  raptor_ports = [H1_PORT, H2_PORT]
-  puma_ports = [H1_PORT]
-  falcon_h1_ports = [H1_PORT]
-  falcon_h2_ports = [H2_PORT]
+  h1_ports = [H1_PORT]
+  h2_ports = [H2_PORT]
 
   results[workload] = {
-    raptor_fixed_h1: bench_h1("Raptor (fixed)", raptor_cmd(fixture, scaling: false), raptor_ports, label, method: method, keep_alive: false),
-    raptor_fixed_h1_ka: bench_h1("Raptor (fixed)", raptor_cmd(fixture, scaling: false), raptor_ports, label, method: method, keep_alive: true),
-    raptor_fixed_h2: bench_h2("Raptor (fixed)", raptor_cmd(fixture, scaling: false), raptor_ports, label, method: method),
-    raptor_scaling_h1: bench_h1("Raptor (scaling)", raptor_cmd(fixture, scaling: true), raptor_ports, label, method: method, keep_alive: false),
-    raptor_scaling_h1_ka: bench_h1("Raptor (scaling)", raptor_cmd(fixture, scaling: true), raptor_ports, label, method: method, keep_alive: true),
-    raptor_scaling_h2: bench_h2("Raptor (scaling)", raptor_cmd(fixture, scaling: true), raptor_ports, label, method: method),
-    puma_h1: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, method: method, keep_alive: false),
-    puma_h1_ka: bench_h1("Puma", puma_cmd(fixture), puma_ports, label, method: method, keep_alive: true),
-    falcon_h1: bench_h1("Falcon", falcon_h1_cmd(fixture), falcon_h1_ports, label, method: method, keep_alive: false),
-    falcon_h1_ka: bench_h1("Falcon", falcon_h1_cmd(fixture), falcon_h1_ports, label, method: method, keep_alive: true),
-    falcon_h2: bench_h2("Falcon", falcon_h2_cmd(fixture), falcon_h2_ports, label, method: method)
+    raptor_fixed_h1: bench_h1("Raptor (fixed)", raptor_cmd(fixture, scaling: false, protocol: :h1), h1_ports, label, method: method, keep_alive: false),
+    raptor_fixed_h1_ka: bench_h1("Raptor (fixed)", raptor_cmd(fixture, scaling: false, protocol: :h1), h1_ports, label, method: method, keep_alive: true),
+    raptor_fixed_h2: bench_h2("Raptor (fixed)", raptor_cmd(fixture, scaling: false, protocol: :h2), h2_ports, label, method: method),
+    raptor_scaling_h1: bench_h1("Raptor (scaling)", raptor_cmd(fixture, scaling: true, protocol: :h1), h1_ports, label, method: method, keep_alive: false),
+    raptor_scaling_h1_ka: bench_h1("Raptor (scaling)", raptor_cmd(fixture, scaling: true, protocol: :h1), h1_ports, label, method: method, keep_alive: true),
+    raptor_scaling_h2: bench_h2("Raptor (scaling)", raptor_cmd(fixture, scaling: true, protocol: :h2), h2_ports, label, method: method),
+    puma_h1: bench_h1("Puma", puma_cmd(fixture), h1_ports, label, method: method, keep_alive: false),
+    puma_h1_ka: bench_h1("Puma", puma_cmd(fixture), h1_ports, label, method: method, keep_alive: true),
+    falcon_h1: bench_h1("Falcon", falcon_h1_cmd(fixture), h1_ports, label, method: method, keep_alive: false),
+    falcon_h1_ka: bench_h1("Falcon", falcon_h1_cmd(fixture), h1_ports, label, method: method, keep_alive: true),
+    falcon_h2: bench_h2("Falcon", falcon_h2_cmd(fixture), h2_ports, label, method: method)
   }
 end
 
@@ -549,7 +559,8 @@ section = <<~MD
 
   Raptor is run in two modes: **Fixed** keeps #{BASE_THREADS} application threads per worker, matching Puma, while **Scaling** starts
   with #{BASE_THREADS} and may add threads without a fixed limit when queued work is blocked outside the GVL. Both modes are compared
-  with both Puma and Falcon in the table below.
+  with both Puma and Falcon in the table below. Raptor request-local cleanup and Puma's Fiber-per-request mode are disabled,
+  and both threaded servers allow #{MAX_KEEPALIVE_REQUESTS} requests per HTTP/1.1 keep-alive connection.
 
   Each cell reports the median throughput and median p95 latency independently across #{RUNS_PER_MODE} #{RUNS_PER_MODE == 1 ? "run" : "runs"}, so the two numbers in a row
   may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
