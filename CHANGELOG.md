@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Skip unnecessary HTTP/1.1 response work
 - Assemble HTTP/2 response headers in C
 - Emit HTTP/1.1 response headers and chunked bodies in C
 - Decode chunked request bodies in C

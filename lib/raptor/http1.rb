@@ -37,7 +37,6 @@ module Raptor
       h[status] = "HTTP/1.1 #{status}#{reason ? " #{reason}" : ""}\r\n".freeze
     end
 
-    STATUS_WITH_NO_ENTITY_BODY = [204, 304, *100..199].freeze
     CONTINUE_RESPONSE = "HTTP/1.1 100 Continue\r\n\r\n"
     BAD_REQUEST_RESPONSE = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     CONTENT_TOO_LARGE_RESPONSE = "HTTP/1.1 413 Content Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -524,7 +523,7 @@ module Raptor
           hijacked = headers.is_a?(Hash) && !!headers[Rack::RACK_HIJACK]
           streaming = body.respond_to?(:call) && !body.respond_to?(:each)
           keep_alive = (hijacked || streaming) ? false : keep_alive?(rack_env, request_count)
-          response_size = response_size(headers, body) unless hijacked
+          response_size = response_size(headers, body) if @access_log_io && !hijacked
           response_started = true
           write_response(socket, rack_env, status, headers, body, keep_alive: keep_alive)
         end
@@ -891,27 +890,29 @@ module Raptor
       validate_status(status)
       response_hijack = headers.is_a?(Hash) ? headers.delete(Rack::RACK_HIJACK) : nil
       headers = normalize_headers(headers)
-      validate_headers(headers, status)
+      no_entity_body = (status >= 100 && status < 200) || status == 204 || status == 304
+      validate_headers(headers, status, no_entity_body)
 
       headers["connection"] = keep_alive ? CONNECTION_KEEPALIVE : CONNECTION_CLOSE
 
       http_version = env[Rack::SERVER_PROTOCOL] == HTTP_11 ? HTTP_11 : HTTP_10
-      no_body = env[Rack::REQUEST_METHOD] == "HEAD" || STATUS_WITH_NO_ENTITY_BODY.include?(status)
+      no_body = env[Rack::REQUEST_METHOD] == "HEAD" || no_entity_body
 
       response = build_status_line(http_version, status)
 
-      cork_socket(socket)
+      corked = !keep_alive
+      cork_socket(socket) if corked
 
       if response_hijack
         write_hijacked_response(socket, response, headers, response_hijack)
       elsif no_body
-        write_no_body_response(socket, response, headers, status)
+        write_no_body_response(socket, response, headers, no_entity_body)
       else
         write_full_response(socket, response, headers, body, http_version)
       end
     ensure
       body.close if body.respond_to?(:close)
-      uncork_socket(socket)
+      uncork_socket(socket) if corked
       socket.flush rescue nil
     end
 
@@ -960,12 +961,13 @@ module Raptor
     #
     # @param headers [Hash] normalized response headers
     # @param status [Integer] HTTP status code
+    # @param no_entity_body [Boolean] whether the status forbids an entity body
     # @return [void]
     # @raise [ArgumentError] if a forbidden header is present for the status
     #
-    # @rbs (Hash[String, String | Array[String]] headers, Integer status) -> void
-    def validate_headers(headers, status)
-      if STATUS_WITH_NO_ENTITY_BODY.include?(status)
+    # @rbs (Hash[String, String | Array[String]] headers, Integer status, bool no_entity_body) -> void
+    def validate_headers(headers, status, no_entity_body)
+      if no_entity_body
         raise ArgumentError, "content-type must not be present for status #{status}" if headers.key?(Rack::CONTENT_TYPE)
 
         raise ArgumentError, "content-length must not be present for status #{status}" if headers.key?(Rack::CONTENT_LENGTH)
@@ -1012,12 +1014,12 @@ module Raptor
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
     # @param headers [Hash] normalized response headers
-    # @param status [Integer] HTTP status code
+    # @param no_entity_body [Boolean] whether the response status forbids an entity body
     # @return [void]
     #
-    # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, Integer status) -> void
-    def write_no_body_response(socket, response, headers, status)
-      unless STATUS_WITH_NO_ENTITY_BODY.include?(status)
+    # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, bool no_entity_body) -> void
+    def write_no_body_response(socket, response, headers, no_entity_body)
+      unless no_entity_body
         headers[Rack::CONTENT_LENGTH] = "0" unless headers.key?(Rack::CONTENT_LENGTH) || headers.key?(Rack::TRANSFER_ENCODING)
       end
 

@@ -28,8 +28,6 @@ module Raptor
 
     STATUS_LINE_CACHE_11: untyped
 
-    STATUS_WITH_NO_ENTITY_BODY: untyped
-
     CONTINUE_RESPONSE: ::String
 
     BAD_REQUEST_RESPONSE: ::String
@@ -449,11 +447,12 @@ module Raptor
     #
     # @param headers [Hash] normalized response headers
     # @param status [Integer] HTTP status code
+    # @param no_entity_body [Boolean] whether the status forbids an entity body
     # @return [void]
     # @raise [ArgumentError] if a forbidden header is present for the status
     #
-    # @rbs (Hash[String, String | Array[String]] headers, Integer status) -> void
-    def validate_headers: (Hash[String, String | Array[String]] headers, Integer status) -> void
+    # @rbs (Hash[String, String | Array[String]] headers, Integer status, bool no_entity_body) -> void
+    def validate_headers: (Hash[String, String | Array[String]] headers, Integer status, bool no_entity_body) -> void
 
     # Returns the HTTP status line for `status`.
     #
@@ -483,11 +482,11 @@ module Raptor
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
     # @param headers [Hash] normalized response headers
-    # @param status [Integer] HTTP status code
+    # @param no_entity_body [Boolean] whether the response status forbids an entity body
     # @return [void]
     #
-    # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, Integer status) -> void
-    def write_no_body_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, Integer status) -> void
+    # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, bool no_entity_body) -> void
+    def write_no_body_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, bool no_entity_body) -> void
 
     # Writes a complete response with a body. Emits a `Content-Length`
     # when the total size is known upfront, otherwise chunked encoding on
