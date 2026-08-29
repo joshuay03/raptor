@@ -228,7 +228,7 @@ settings.</p>
   <span class='label'>drain_accept_queue:</span> <span class='kw'>false</span><span class='comma'>,</span>
   <span class='label'>workers:</span> <span class='const'><span class='object_link'><a href="#DEFAULT_WORKER_COUNT-constant" title="Raptor::CLI::DEFAULT_WORKER_COUNT (constant)">DEFAULT_WORKER_COUNT</a></span></span><span class='comma'>,</span>
   <span class='label'>threads:</span> <span class='int'>3</span><span class='comma'>,</span>
-  <span class='label'>max_threads:</span> <span class='kw'>nil</span><span class='comma'>,</span>
+  <span class='label'>max_threads:</span> <span class='const'>Float</span><span class='op'>::</span><span class='const'>INFINITY</span><span class='comma'>,</span>
   <span class='label'>rackup:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config.ru</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
   <span class='label'>chdir:</span> <span class='kw'>nil</span><span class='comma'>,</span>
   <span class='label'>environment:</span> <span class='kw'>nil</span><span class='comma'>,</span>
@@ -1190,7 +1190,7 @@ same as in a regular script.</p>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:threads</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
-    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--max-threads NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Maximum application threads per worker (`unlimited` for no limit; default: fixed at --threads)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
+    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--max-threads NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Maximum application threads per worker (`unlimited` for no limit; default: unlimited)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:max_threads</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
@@ -1500,7 +1500,7 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 29 06:52:57 2026 by
+  Generated on Sat Aug 29 08:44:59 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

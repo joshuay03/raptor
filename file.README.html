@@ -95,7 +95,7 @@ is invoked on a thread pool, so any thread-safe Rack app (including Rails) works
 [Raptor 83654|Main|Main] │     ├─ 1 HTTP/1.1 pipeline ractor
 [Raptor 83654|Main|Main] │     ├─ 1 HTTP/2 pipeline ractor
 [Raptor 83654|Main|Main] │     ├─ 2 pipeline collector threads
-[Raptor 83654|Main|Main] │     ├─ 3 worker threads
+[Raptor 83654|Main|Main] │     ├─ 3 worker threads (scaling, no limit)
 [Raptor 83654|Main|Main] │     └─ 1 stats thread
 [Raptor 83654|Main|Main] └─ Listening on 0.0.0.0:9292
 [Raptor 83658|Main|Main] Worker 2 booted
@@ -131,7 +131,7 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
   <span class='label'>drain_accept_queue:</span> <span class='kw'>false</span><span class='comma'>,</span>
   <span class='label'>workers:</span> <span class='int'>4</span><span class='comma'>,</span> <span class='comment'># `Etc.nprocessors`
 </span>  <span class='label'>threads:</span> <span class='int'>3</span><span class='comma'>,</span>
-  <span class='label'>max_threads:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='comment'># `Float::INFINITY` for no limit
+  <span class='label'>max_threads:</span> <span class='const'>Float</span><span class='op'>::</span><span class='const'>INFINITY</span><span class='comma'>,</span> <span class='comment'># set to `threads` for a fixed pool
 </span>  <span class='label'>chdir:</span> <span class='kw'>nil</span><span class='comma'>,</span>
   <span class='label'>environment:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='comment'># falls back to `RAILS_ENV`, then `RACK_ENV`, then `&quot;development&quot;`
 </span>  <span class='label'>connection:</span> <span class='lbrace'>{</span>
@@ -166,10 +166,10 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
   <span class='label'>access_log_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
 <span class='rbrace'>}</span>
 </code></pre>
-<p><code>threads</code> sets the number of application threads each worker keeps running. Set <code>max_threads</code> above it to let Raptor
-add temporary threads when queued work is held up by blocking operations, or use <code>Float::INFINITY</code> for no limit.
-Raptor does not add threads when waiting for the GVL is the bottleneck. Temporary threads leave after the queue
-drains. The default <code>nil</code> keeps the pool fixed at <code>threads</code>.</p>
+<p><code>threads</code> sets the number of application threads each worker keeps running. By default, Raptor adds temporary threads
+without a fixed limit when queued work is held up by blocking operations. It does not add threads when waiting for the
+GVL is the bottleneck, and temporary threads leave after the queue drains. Set <code>max_threads</code> to cap growth, or set it
+to the same value as <code>threads</code> for a fixed pool.</p>
 <h2 id="Bindings">Bindings</h2>
 <p>Raptor accepts multiple <code>binds:</code> URIs across three schemes.</p>
 <ul>
@@ -488,7 +488,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sat Aug 29 06:52:57 2026 by
+  Generated on Sat Aug 29 08:44:58 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
