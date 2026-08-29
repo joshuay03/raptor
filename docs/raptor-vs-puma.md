@@ -181,6 +181,8 @@ Raptor takes a different position on nearly every axis. It is opinionated in a w
 
 There is no single mode. Raptor is always a cluster. A master forks N workers, monitors them, and restarts crashed workers. The Rack app is always loaded in the master before forking, so copy-on-write is preserved by default (no user-visible `preload_app` knob).
 
+The process and app-thread counts can be set with `RAPTOR_WORKERS`, `RAPTOR_THREADS`, and `RAPTOR_MAX_THREADS`, which lets a deployment tune them without generating a config file. Config files override the built-in defaults, environment variables override config files, and command-line options override both. `RAPTOR_MAX_THREADS=unlimited` leaves adaptive growth uncapped.
+
 The master is a supervisor. It never handles requests. It forks workers, watches them via a shared-memory region (more on that in a moment), traps signals, restarts crashed workers, and orchestrates restarts.
 
 Two kinds of restart are supported:

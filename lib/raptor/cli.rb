@@ -154,6 +154,7 @@ module Raptor
       end
 
       apply_config_file(extract_config_path(argv) || self.class.default_config_path)
+      apply_environment
 
       @parser = create_parser
       @parser.parse!(argv)
@@ -233,6 +234,18 @@ module Raptor
           @options[key] = value
         end
       end
+    end
+
+    # Applies worker and thread settings from the environment. Explicit CLI
+    # options are parsed afterwards and take precedence.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def apply_environment
+      @options[:workers] = Integer(ENV["RAPTOR_WORKERS"], 10) if ENV["RAPTOR_WORKERS"]
+      @options[:threads] = Integer(ENV["RAPTOR_THREADS"], 10) if ENV["RAPTOR_THREADS"]
+      @options[:max_threads] = ENV["RAPTOR_MAX_THREADS"] if ENV["RAPTOR_MAX_THREADS"]
     end
 
     # Creates the OptionParser instance with all supported command-line options.

@@ -82,6 +82,29 @@ module Rackup
         assert_equal 2, opts[:workers]
       end
 
+      def test_worker_and_thread_environment_variables
+        opts = options_from_subprocess(
+          { "RAPTOR_WORKERS" => "2", "RAPTOR_THREADS" => "4", "RAPTOR_MAX_THREADS" => "12" }
+        )
+
+        assert_equal 2, opts[:workers]
+        assert_equal 4, opts[:threads]
+        assert_equal 12, opts[:max_threads]
+      end
+
+      def test_handler_options_override_environment_variables
+        opts = options_from_subprocess(
+          { "RAPTOR_WORKERS" => "2", "RAPTOR_THREADS" => "4", "RAPTOR_MAX_THREADS" => "12" },
+          Workers: 3,
+          Threads: 5,
+          MaxThreads: 15
+        )
+
+        assert_equal 3, opts[:workers]
+        assert_equal 5, opts[:threads]
+        assert_equal 15, opts[:max_threads]
+      end
+
       def test_handles_user_supplied_options_metadata
         opts = build(Port: 3000, user_supplied_options: [:Port])
 
@@ -147,8 +170,28 @@ module Rackup
 
       private
 
-      def build(options)
+      def build(options = {})
         Rackup::Handler::Raptor.send(:build_cluster_options, ->(_) { [200, {}, []] }, options)
+      end
+
+      def options_from_subprocess(environment, options = {})
+        reader, writer = IO.pipe
+        pid = fork do
+          reader.close
+          ENV.update(environment)
+          result = build(options)
+          result.delete(:app)
+          Marshal.dump(result, writer)
+          writer.close
+          exit!(0)
+        end
+        writer.close
+        result = Marshal.load(reader)
+        Process.wait(pid)
+        result
+      ensure
+        reader&.close
+        writer&.close
       end
 
       def with_config_file(value)

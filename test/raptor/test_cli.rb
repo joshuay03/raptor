@@ -155,6 +155,27 @@ module Raptor
       assert_equal 2, options(cli)[:workers]
     end
 
+    def test_worker_and_thread_environment_variables
+      opts = options_from_subprocess(
+        { "RAPTOR_WORKERS" => "2", "RAPTOR_THREADS" => "4", "RAPTOR_MAX_THREADS" => "12" }
+      )
+
+      assert_equal 2, opts[:workers]
+      assert_equal 4, opts[:threads]
+      assert_equal 12, opts[:max_threads]
+    end
+
+    def test_cli_options_override_environment_variables
+      opts = options_from_subprocess(
+        { "RAPTOR_WORKERS" => "2", "RAPTOR_THREADS" => "4", "RAPTOR_MAX_THREADS" => "12" },
+        ["--workers", "3", "--threads", "5", "--max-threads", "15"]
+      )
+
+      assert_equal 3, opts[:workers]
+      assert_equal 5, opts[:threads]
+      assert_equal 15, opts[:max_threads]
+    end
+
     def test_http1_ractors_long_flag
       cli = CLI.new(["--http1-ractors", "4"])
 
@@ -361,6 +382,24 @@ module Raptor
 
     def options(cli)
       cli.instance_variable_get(:@options)
+    end
+
+    def options_from_subprocess(environment, argv = [])
+      reader, writer = IO.pipe
+      pid = fork do
+        reader.close
+        ENV.update(environment)
+        Marshal.dump(options(CLI.new(argv)), writer)
+        writer.close
+        exit!(0)
+      end
+      writer.close
+      result = Marshal.load(reader)
+      Process.wait(pid)
+      result
+    ensure
+      reader&.close
+      writer&.close
     end
 
     def with_config_file(value)

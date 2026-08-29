@@ -143,6 +143,10 @@ containers.
 Raptor clears application thread locals after each request by default. Set `clean_thread_locals` to `false` to disable
 it. Set `clean_fiber_locals` to `true` to run each request in a fresh Fiber, isolating Fiber-local state as well.
 
+`RAPTOR_WORKERS`, `RAPTOR_THREADS`, and `RAPTOR_MAX_THREADS` can set the corresponding options without a config file.
+Config files override defaults, environment variables override config files, and command-line options override both.
+`RAPTOR_MAX_THREADS=unlimited` leaves adaptive growth uncapped.
+
 ## Bindings
 
 Raptor accepts multiple `binds:` URIs across three schemes.
