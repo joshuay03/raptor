@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-29
+
 - Reserve BPF-routed connections before accept
 - Skip unnecessary HTTP/1.1 response work
 - Assemble HTTP/2 response headers in C
