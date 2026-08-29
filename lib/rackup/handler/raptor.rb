@@ -85,6 +85,7 @@ module Rackup
           workers: (options[:Workers] || config[:workers] || Concurrent.available_processor_count).to_i,
           threads: threads,
           max_threads: ::Raptor::CLI.parse_max_threads(max_threads, threads: threads),
+          cpu_affinity: config.key?(:cpu_affinity) ? config[:cpu_affinity] : cli_defaults[:cpu_affinity],
           clean_thread_locals: config.key?(:clean_thread_locals) ? config[:clean_thread_locals] : cli_defaults[:clean_thread_locals],
           clean_fiber_locals: config.key?(:clean_fiber_locals) ? config[:clean_fiber_locals] : cli_defaults[:clean_fiber_locals],
           app: app

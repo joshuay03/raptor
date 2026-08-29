@@ -193,7 +193,7 @@ Systemd socket activation is a native feature and slots straight into this model
 
 Routine worker monitoring does not use pipes. Every worker writes its stats (pid, request count, backlog, busy and available threads, last checkin timestamp, booted flag) into a fixed-size slot in an anonymous shared-memory region allocated with `mmap-ruby` before the fork. The master reads the region directly. There is no serialisation, pipe drain, or signal to trigger the read; it is 49 bytes per worker of native memory. `bundle exec raptor stats` prints a JSON snapshot. Refork coordination is separate and does use a pair of pipes between the master and seed.
 
-On Linux, each worker pins itself to a distinct CPU via `sched_setaffinity` when the worker count fits within the process's allowed CPU set, so it stays on one core and its L1/L2 caches stay warm. When workers outnumber available CPUs the pin is skipped and the kernel scheduler manages placement.
+On Linux, `cpu_affinity: true` pins each worker to a distinct CPU via `sched_setaffinity` when the worker count fits within the process's allowed CPU set, so it stays on one core and its L1/L2 caches stay warm. It is off by default because an allowed CPU in a container is not necessarily dedicated to that container. When workers outnumber available CPUs the pin is skipped and the kernel scheduler manages placement.
 
 ### Refork
 

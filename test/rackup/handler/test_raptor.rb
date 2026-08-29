@@ -31,6 +31,7 @@ module Rackup
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:drain_accept_queue], opts[:drain_accept_queue]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:max_threads], opts[:max_threads]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:cpu_affinity], opts[:cpu_affinity]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:clean_thread_locals], opts[:clean_thread_locals]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:clean_fiber_locals], opts[:clean_fiber_locals]
         assert_equal Integer(Concurrent.available_processor_count), opts[:workers]
@@ -128,6 +129,7 @@ module Rackup
             on_error: ->(_env, _error) {},
             stats_file: "tmp/c.json",
             pid_file: "tmp/c.pid",
+            cpu_affinity: true,
             clean_thread_locals: false,
             clean_fiber_locals: false,
           }
@@ -137,6 +139,7 @@ module Rackup
           assert_kind_of Proc, opts[:on_error]
           assert_equal "tmp/c.json", opts[:stats_file]
           assert_equal "tmp/c.pid", opts[:pid_file]
+          assert_equal true, opts[:cpu_affinity]
           assert_equal false, opts[:clean_thread_locals]
           assert_equal false, opts[:clean_fiber_locals]
         end

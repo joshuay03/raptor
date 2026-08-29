@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Make worker CPU affinity opt-in
 - Add request-local thread and Fiber cleanup options
 
 ## [0.19.0] - 2026-08-29

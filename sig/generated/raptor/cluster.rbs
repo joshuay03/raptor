@@ -44,6 +44,8 @@ module Raptor
     # @rbs (Integer worker_count, ?cores: Integer) -> Integer
     def self.default_http2_ractor_count: (Integer worker_count, ?cores: Integer) -> Integer
 
+    @before_refork: Array[Proc]
+
     @stats_file: String?
 
     @pid_file: String?
@@ -64,10 +66,6 @@ module Raptor
 
     @binder: Binder
 
-    @bpf_active: bool
-
-    @before_refork: Array[Proc]
-
     @before_worker_shutdown: Array[Proc]
 
     @before_worker_boot: Array[Proc]
@@ -85,6 +83,10 @@ module Raptor
     @http2_options: Hash[Symbol, untyped]
 
     @http1_options: Hash[Symbol, untyped]
+
+    @connection_options: Hash[Symbol, untyped]
+
+    @bpf_active: bool
 
     @resp_w: IO?
 
@@ -126,13 +128,13 @@ module Raptor
 
     @server_port: Integer
 
-    @connection_options: Hash[Symbol, untyped]
-
     @environment: String
 
     @clean_fiber_locals: bool
 
     @clean_thread_locals: bool
+
+    @cpu_affinity: bool
 
     @max_thread_count: (Integer | Float)?
 
@@ -155,6 +157,7 @@ module Raptor
     # @option options [Integer] :workers number of worker processes
     # @option options [Integer] :threads number of threads per worker process
     # @option options [Integer, Float] :max_threads maximum number of threads per worker process, or `Float::INFINITY` for no limit
+    # @option options [Boolean] :cpu_affinity whether to pin each worker to a CPU
     # @option options [Boolean] :clean_thread_locals whether to clear application thread locals after each request
     # @option options [Boolean] :clean_fiber_locals whether to process each request in a fresh Fiber
     # @option options [#call] :app pre-built Rack application

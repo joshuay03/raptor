@@ -17,6 +17,7 @@ module Raptor
       assert_equal CLI::DEFAULT_WORKER_COUNT, options(cli)[:workers]
       assert_equal 3, options(cli)[:threads]
       assert_equal Float::INFINITY, options(cli)[:max_threads]
+      assert_equal false, options(cli)[:cpu_affinity]
       assert_equal true, options(cli)[:clean_thread_locals]
       assert_equal false, options(cli)[:clean_fiber_locals]
       assert_equal "config.ru", options(cli)[:rackup]
@@ -193,6 +194,11 @@ module Raptor
     def test_max_threads_cannot_be_less_than_threads
       assert_raises(ArgumentError) { CLI.new(["--threads", "3", "--max-threads", "2"]) }
       assert_raises(ArgumentError) { CLI.new(["--max-threads", "2", "--threads", "3"]) }
+    end
+
+    def test_cpu_affinity
+      assert_equal true, options(CLI.new(["--cpu-affinity"]))[:cpu_affinity]
+      assert_equal false, options(CLI.new(["--no-cpu-affinity"]))[:cpu_affinity]
     end
 
     def test_local_cleaning

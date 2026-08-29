@@ -35,6 +35,7 @@ module Raptor
       workers: DEFAULT_WORKER_COUNT,
       threads: 3,
       max_threads: Float::INFINITY,
+      cpu_affinity: false,
       clean_thread_locals: true,
       clean_fiber_locals: false,
       rackup: "config.ru",
@@ -273,6 +274,10 @@ module Raptor
 
         opts.on("--max-threads NUM", "Maximum application threads per worker (`unlimited` for no limit; default: unlimited)") do |num|
           @options[:max_threads] = num
+        end
+
+        opts.on("--[no-]cpu-affinity", "Pin each worker process to a CPU (default: off)") do |bool|
+          @options[:cpu_affinity] = bool
         end
 
         opts.on("--[no-]clean-thread-locals", "Clear application thread locals after each request (default: on)") do |bool|
