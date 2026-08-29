@@ -10,8 +10,8 @@ rescue LoadError
 end
 
 module Raptor
-  # Routes incoming connections across worker processes to the worker with
-  # the lowest reactor backlog.
+  # Routes incoming connections across worker processes using two-choice
+  # load sampling, atomically reserving the selected slot before routing.
   #
   # Auto-enabled on Linux when the `libbpf-ruby` gem is installed and the
   # BPF object file has been compiled. Falls back silently to standard
@@ -47,7 +47,7 @@ module Raptor
       return false unless supported?
 
       @object = LibBPFRuby::Object.new(BPF_OBJECT_PATH)
-      @program_fd = @object.program_fd("select_least_loaded")
+      @program_fd = @object.program_fd("select_less_loaded")
       @socks_fd = @object.map_fd("socks")
       @loads_fd = @object.map_fd("loads")
 
@@ -99,6 +99,7 @@ module Raptor
     def self.enable_load_reporting(worker_index)
       @load_key = [worker_index + 1].pack("L")
       @load_value = String.new("\x00\x00\x00\x00", encoding: Encoding::ASCII_8BIT)
+      @accepted_load_value = String.new("\x00\x00\x00\x00", encoding: Encoding::ASCII_8BIT)
     end
 
     # Publishes this worker's current backlog to the BPF map.
@@ -113,6 +114,22 @@ module Raptor
       @load_value.setbyte(2, (backlog >> 16) & 0xff)
       @load_value.setbyte(3, (backlog >> 24) & 0xff)
       LibBPFRuby.map_update(@loads_fd, @load_key, @load_value)
+    end
+
+    # Publishes an accept-side backlog estimate. This uses a separate value
+    # buffer because the server and load reporter call into the map from
+    # different threads.
+    #
+    # @param backlog [Integer] the estimated backlog after accepting a socket
+    # @return [void]
+    #
+    # @rbs (Integer backlog) -> void
+    def self.update_accepted_load(backlog)
+      @accepted_load_value.setbyte(0, backlog & 0xff)
+      @accepted_load_value.setbyte(1, (backlog >> 8) & 0xff)
+      @accepted_load_value.setbyte(2, (backlog >> 16) & 0xff)
+      @accepted_load_value.setbyte(3, (backlog >> 24) & 0xff)
+      LibBPFRuby.map_update(@loads_fd, @load_key, @accepted_load_value)
     end
 
     # Marks a worker's slot as unavailable by parking its load at the

@@ -152,8 +152,9 @@ module Raptor
       end
     end
 
-    # Accepts a connection from the given listener and dispatches it into
-    # the HTTP/1.1 or SSL/HTTP-2 pipeline.
+    # Accepts a connection from the given listener, immediately publishes
+    # the pending work to the BPF map, and dispatches the socket into the
+    # HTTP/1.1 or SSL/HTTP-2 pipeline.
     #
     # @param listener [TCPServer, UNIXServer, Binder::SslListener] the ready listener
     # @return [Boolean] true if a connection was accepted, false if the listener had nothing to dispatch
@@ -171,6 +172,8 @@ module Raptor
       else
         remote_addr = DEFAULT_REMOTE_ADDR
       end
+
+      ReuseportBPF.update_accepted_load(@reactor.backlog + 1) if @bpf_active
 
       if listener.is_a?(Binder::SslListener)
         @thread_pool << proc do

@@ -2,7 +2,6 @@
 #include <bpf/bpf_helpers.h>
 
 #define MAX_WORKERS 64
-#define LOAD_TIE_TOLERANCE 1
 
 // Per-worker listening sockets, keyed by worker index.
 struct {
@@ -20,14 +19,12 @@ struct {
   __uint(max_entries, MAX_WORKERS + 1);
 } loads SEC(".maps");
 
-// Routes each incoming connection to the least-loaded worker. When the
-// spread between the busiest and idlest worker is within
-// `LOAD_TIE_TOLERANCE`, all workers are treated as tied and the connection
-// is placed by 4-tuple hash so bursts of accepts spread across workers
-// instead of clustering on whichever worker most recently reported the
-// lowest load.
+// Uses the power-of-two-choices strategy and reserves the selected worker's
+// slot before returning. Sampling two hash-selected workers avoids
+// concentrating variable-cost requests, while the reservation prevents a
+// burst from repeatedly selecting the same reported load.
 SEC("sk_reuseport")
-int select_least_loaded(struct sk_reuseport_md *ctx) {
+int select_less_loaded(struct sk_reuseport_md *ctx) {
   __u32 count_key = 0;
   __u32 *count_ptr = bpf_map_lookup_elem(&loads, &count_key);
   if (!count_ptr || *count_ptr == 0) {
@@ -38,29 +35,23 @@ int select_least_loaded(struct sk_reuseport_md *ctx) {
     num_workers = MAX_WORKERS;
   }
 
-  __u32 min_load = ~0u;
-  __u32 max_load = 0;
-  __u32 min_idx = 0;
-
-  for (__u32 worker_idx = 0; worker_idx < MAX_WORKERS; worker_idx++) {
-    if (worker_idx >= num_workers) {
-      break;
-    }
-    __u32 worker_key = worker_idx + 1;
-    __u32 *load_ptr = bpf_map_lookup_elem(&loads, &worker_key);
-    if (!load_ptr) {
-      continue;
-    }
-    if (*load_ptr < min_load) {
-      min_load = *load_ptr;
-      min_idx = worker_idx;
-    }
-    if (*load_ptr > max_load) {
-      max_load = *load_ptr;
+  __u32 chosen_idx = ctx->hash % num_workers;
+  __u32 chosen_key = chosen_idx + 1;
+  __u32 *chosen_load = bpf_map_lookup_elem(&loads, &chosen_key);
+  if (num_workers > 1) {
+    __u32 alternate_idx = (chosen_idx + 1 + ((ctx->hash >> 16) % (num_workers - 1))) % num_workers;
+    __u32 alternate_key = alternate_idx + 1;
+    __u32 *alternate_load = bpf_map_lookup_elem(&loads, &alternate_key);
+    if (chosen_load && alternate_load && *alternate_load < *chosen_load) {
+      chosen_idx = alternate_idx;
+      chosen_load = alternate_load;
     }
   }
 
-  __u32 chosen_idx = (max_load - min_load <= LOAD_TIE_TOLERANCE) ? (ctx->hash % num_workers) : min_idx;
+  if (chosen_load) {
+    __sync_fetch_and_add(chosen_load, 1);
+  }
+
   bpf_sk_select_reuseport(ctx, &socks, &chosen_idx, 0);
   return SK_PASS;
 }

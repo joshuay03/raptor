@@ -1,8 +1,8 @@
 # Generated from lib/raptor/reuseport_bpf.rb with RBS::Inline
 
 module Raptor
-  # Routes incoming connections across worker processes to the worker with
-  # the lowest reactor backlog.
+  # Routes incoming connections across worker processes using two-choice
+  # load sampling, atomically reserving the selected slot before routing.
   #
   # Auto-enabled on Linux when the `libbpf-ruby` gem is installed and the
   # BPF object file has been compiled. Falls back silently to standard
@@ -61,6 +61,16 @@ module Raptor
     #
     # @rbs (Integer backlog) -> void
     def self.update_load: (Integer backlog) -> void
+
+    # Publishes an accept-side backlog estimate. This uses a separate value
+    # buffer because the server and load reporter call into the map from
+    # different threads.
+    #
+    # @param backlog [Integer] the estimated backlog after accepting a socket
+    # @return [void]
+    #
+    # @rbs (Integer backlog) -> void
+    def self.update_accepted_load: (Integer backlog) -> void
 
     # Marks a worker's slot as unavailable by parking its load at the
     # sentinel maximum so the BPF program's least-loaded pick skips it.
