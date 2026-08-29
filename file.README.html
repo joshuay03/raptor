@@ -133,7 +133,7 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
   <span class='label'>max_threads:</span> <span class='const'>Float</span><span class='op'>::</span><span class='const'>INFINITY</span><span class='comma'>,</span> <span class='comment'># set to `threads` for a fixed pool
 </span>  <span class='label'>cpu_affinity:</span> <span class='kw'>false</span><span class='comma'>,</span>
   <span class='label'>clean_thread_locals:</span> <span class='kw'>true</span><span class='comma'>,</span>
-  <span class='label'>clean_fiber_locals:</span> <span class='kw'>true</span><span class='comma'>,</span>
+  <span class='label'>clean_fiber_locals:</span> <span class='kw'>false</span><span class='comma'>,</span>
   <span class='label'>chdir:</span> <span class='kw'>nil</span><span class='comma'>,</span>
   <span class='label'>environment:</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='comment'># falls back to `RAILS_ENV`, then `RACK_ENV`, then `&quot;development&quot;`
 </span>  <span class='label'>connection:</span> <span class='lbrace'>{</span>
@@ -176,9 +176,8 @@ to the same value as <code>threads</code> for a fixed pool.</p>
 <p>Set <code>cpu_affinity</code> to <code>true</code> to pin each worker to a distinct CPU when the worker count fits within the process's
 allowed CPU set. It is off by default because container runtimes commonly expose CPUs that are shared with other
 containers.</p>
-<p>Raptor clears application thread locals and runs each request in a fresh Fiber by default, so state left behind by one
-request cannot leak into the next. Set <code>clean_thread_locals</code> or <code>clean_fiber_locals</code> to <code>false</code> to disable either form
-of cleanup.</p>
+<p>Raptor clears application thread locals after each request by default. Set <code>clean_thread_locals</code> to <code>false</code> to disable
+it. Set <code>clean_fiber_locals</code> to <code>true</code> to run each request in a fresh Fiber, isolating Fiber-local state as well.</p>
 <p><code>RAPTOR_WORKERS</code>, <code>RAPTOR_THREADS</code>, and <code>RAPTOR_MAX_THREADS</code> can set the corresponding options without a config file.
 Config files override defaults, environment variables override config files, and command-line options override both.
 <code>RAPTOR_MAX_THREADS=unlimited</code> leaves adaptive growth uncapped.</p>
@@ -505,7 +504,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sat Aug 29 21:20:27 2026 by
+  Generated on Sat Aug 29 21:35:02 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>

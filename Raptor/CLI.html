@@ -231,7 +231,7 @@ settings.</p>
   <span class='label'>max_threads:</span> <span class='const'>Float</span><span class='op'>::</span><span class='const'>INFINITY</span><span class='comma'>,</span>
   <span class='label'>cpu_affinity:</span> <span class='kw'>false</span><span class='comma'>,</span>
   <span class='label'>clean_thread_locals:</span> <span class='kw'>true</span><span class='comma'>,</span>
-  <span class='label'>clean_fiber_locals:</span> <span class='kw'>true</span><span class='comma'>,</span>
+  <span class='label'>clean_fiber_locals:</span> <span class='kw'>false</span><span class='comma'>,</span>
   <span class='label'>rackup:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>config.ru</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
   <span class='label'>chdir:</span> <span class='kw'>nil</span><span class='comma'>,</span>
   <span class='label'>environment:</span> <span class='kw'>nil</span><span class='comma'>,</span>
@@ -1347,7 +1347,7 @@ options are parsed afterwards and take precedence.</p>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:clean_thread_locals</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_bool'>bool</span>
     <span class='kw'>end</span>
 
-    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--[no-]clean-fiber-locals</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Process each request in a fresh Fiber (default: on)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_bool'>bool</span><span class='op'>|</span>
+    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--[no-]clean-fiber-locals</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Process each request in a fresh Fiber (default: off)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_bool'>bool</span><span class='op'>|</span>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:clean_fiber_locals</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_bool'>bool</span>
     <span class='kw'>end</span>
 
@@ -1661,7 +1661,7 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 </div>
 
       <div id="footer">
-  Generated on Sat Aug 29 21:20:27 2026 by
+  Generated on Sat Aug 29 21:35:03 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
