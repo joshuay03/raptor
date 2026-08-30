@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.20.0] - 2026-08-30
+
 - Close connected control socket clients during shutdown
 - Skip TCP corking when `writev(2)` emits a response in one call
 - Return idle HTTP/1.1 keep-alive connections to the reactor without waiting
