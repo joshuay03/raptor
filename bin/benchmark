@@ -559,8 +559,8 @@ section = <<~MD
 
   Raptor is run in two modes: **Fixed** keeps #{BASE_THREADS} application threads per worker, matching Puma, while **Scaling** starts
   with #{BASE_THREADS} and may add threads without a fixed limit when queued work is blocked outside the GVL. Both modes are compared
-  with both Puma and Falcon in the table below. Raptor request-local cleanup and Puma's Fiber-per-request mode are disabled,
-  and both threaded servers allow #{MAX_KEEPALIVE_REQUESTS} requests per HTTP/1.1 keep-alive connection.
+  with both Puma and Falcon in the table below. Raptor request-local cleanup and Puma's Fiber-per-request mode are
+  disabled, and both threaded servers allow #{MAX_KEEPALIVE_REQUESTS} requests per HTTP/1.1 keep-alive connection.
 
   Each cell reports the median throughput and median p95 latency independently across #{RUNS_PER_MODE} #{RUNS_PER_MODE == 1 ? "run" : "runs"}, so the two numbers in a row
   may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
