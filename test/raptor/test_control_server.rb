@@ -40,6 +40,24 @@ module Raptor
       File.delete(socket_path) rescue nil
     end
 
+    def test_shutdown_with_connected_client
+      server = ControlServer.new("unix://#{socket_path}") { {} }
+      server.bind
+      server.start
+      client = UNIXSocket.new(socket_path)
+
+      Timeout.timeout(1) do
+        Thread.pass until server.instance_variable_get(:@client)
+        server.shutdown
+      end
+
+      assert_equal "", client.read
+    ensure
+      client&.close
+      server&.shutdown
+      File.delete(socket_path) rescue nil
+    end
+
     private
 
     def socket_path

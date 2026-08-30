@@ -12,8 +12,10 @@ module Raptor
     # @rbs @path: String
     # @rbs @stats: ^() -> Hash[Symbol, untyped]
     # @rbs @server: UNIXServer?
+    # @rbs @client: UNIXSocket?
     # @rbs @thread: Thread?
     # @rbs @running: bool
+    # @rbs @mutex: Mutex
 
     # Creates a control server for `url` without binding it.
     #
@@ -30,8 +32,10 @@ module Raptor
       @path = uri.path
       @stats = stats
       @server = nil
+      @client = nil
       @thread = nil
       @running = false
+      @mutex = Mutex.new
     end
 
     # Binds the Unix socket.
@@ -68,7 +72,10 @@ module Raptor
     # @rbs () -> void
     def shutdown
       @running = false
-      @server&.close
+      @mutex.synchronize do
+        @server&.close
+        @client&.close
+      end
       @thread&.join
       File.delete(@path) rescue nil
     end
@@ -93,8 +100,11 @@ module Raptor
         readable, = IO.select([@server], nil, nil, 1)
         next unless readable
 
-        client = @server.accept_nonblock(exception: false)
-        handle(client) if client.is_a?(UNIXSocket)
+        @mutex.synchronize do
+          client = @server.accept_nonblock(exception: false)
+          @client = client if client.is_a?(UNIXSocket)
+        end
+        handle(@client) if @client
       end
     rescue IOError, Errno::EBADF
     end
@@ -115,6 +125,7 @@ module Raptor
     rescue IOError, SystemCallError
     ensure
       client.close rescue nil
+      @mutex.synchronize { @client = nil }
     end
   end
 end
