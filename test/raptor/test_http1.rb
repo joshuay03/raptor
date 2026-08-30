@@ -56,5 +56,30 @@ module Raptor
       assert_equal 0, timeout
       assert_equal [[socket, 1, 2], { remote_addr: "127.0.0.1", url_scheme: "http" }], persisted
     end
+
+    def test_response_corking
+      handler = Http1.allocate
+      handler.instance_variable_set(:@write_timeout, 1)
+
+      corked = 0
+      uncorked = 0
+      handler.define_singleton_method(:cork_socket) { |_| corked += 1 }
+      handler.define_singleton_method(:uncork_socket) { |_| uncorked += 1 }
+      handler.define_singleton_method(:socket_write) { |*| }
+      handler.define_singleton_method(:socket_writev) { |*| }
+
+      env = { Rack::SERVER_PROTOCOL => "HTTP/1.1", Rack::REQUEST_METHOD => "GET" }
+      handler.send(:write_response, Object.new, env, 200, {}, ["hello"])
+
+      assert_equal 0, corked
+      assert_equal 0, uncorked
+
+      body = Object.new
+      body.define_singleton_method(:each) { |&block| block.call("hello") }
+      handler.send(:write_response, Object.new, env, 200, {}, body)
+
+      assert_equal 1, corked
+      assert_equal 1, uncorked
+    end
   end
 end

@@ -920,7 +920,7 @@ module Raptor
 
       response = build_status_line(http_version, status)
 
-      corked = !keep_alive
+      corked = !keep_alive && !body.respond_to?(:to_ary) && !no_body && !response_hijack
       cork_socket(socket) if corked
 
       if response_hijack

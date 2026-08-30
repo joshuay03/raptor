@@ -497,7 +497,7 @@ At the throughput numbers the benchmark shows, a small set of concurrent connect
 
 ### Response writing
 
-Both servers support the same fundamental response shapes: file bodies through `IO.copy_stream`, non-blocking writes with `wait_writable(timeout)` on EAGAIN, and chunked transfer encoding for enumerable bodies without a known length. Puma uses `TCP_CORK` on Linux around HTTP/1.1 responses. Raptor corks responses that will close the connection, but skips the cork/uncork socket options on keep-alive responses where its write batching already supplies the important grouping.
+Both servers support the same fundamental response shapes: file bodies through `IO.copy_stream`, non-blocking writes with `wait_writable(timeout)` on EAGAIN, and chunked transfer encoding for enumerable bodies without a known length. Puma uses `TCP_CORK` on Linux around HTTP/1.1 responses. Raptor only corks a response that will close the connection when its body cannot already be emitted with the headers in one `writev` call.
 
 On the HTTP/1.1 path, Raptor has a small `writev(2)` wrapper (`Raptor::VectorIO`) that can scatter-write the status line, headers, and body in one call for non-chunked responses. Puma sends the same content over multiple `write` calls batched by `TCP_CORK` at the kernel; Raptor groups the buffers in userspace and lets `writev` handle partial writes when necessary.
 

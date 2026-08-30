@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Skip TCP corking when `writev(2)` emits a response in one call
 - Return idle HTTP/1.1 keep-alive connections to the reactor without waiting
 - Increase the HTTP/1.1 keep-alive request limit to 1,000 and requeue the connection when other work is waiting
 - Add a read-only `/stats` control socket
