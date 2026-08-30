@@ -273,12 +273,12 @@ building (total 450-1500 items) with sub-100µs sleeps, and returns the built ar
 most of its work in Ruby with a few near-zero-cost cache hits.</p>
 <p>Raptor is run in two modes: <strong>Fixed</strong> keeps 3 application threads per worker, matching Puma, while <strong>Scaling</strong> starts
 with 3 and may add threads without a fixed limit when queued work is blocked outside the GVL. Both modes are compared
-with both Puma and Falcon in the table below. Raptor request-local cleanup and Puma's Fiber-per-request mode are disabled,
-and both threaded servers allow 999 requests per HTTP/1.1 keep-alive connection.</p>
+with both Puma and Falcon in the table below. Raptor request-local cleanup and Puma's Fiber-per-request mode are
+disabled, and both threaded servers allow 999 requests per HTTP/1.1 keep-alive connection.</p>
 <p>Each cell reports the median throughput and median p95 latency independently across 3 runs, so the two numbers in a row
 may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
 state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
-((max - min) / 2 / median) between runs of a single cell was ±21.7% for throughput and ±31.6% for p95.</p>
+((max - min) / 2 / median) between runs of a single cell was ±36.9% for throughput and ±40.1% for p95.</p>
 <table>
 <thead>
 <tr>
@@ -302,181 +302,181 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <td>HTTP/1.1</td>
 <td>IO</td>
 <td>Fixed</td>
-<td>2.81k req/s</td>
-<td>82.40 ms</td>
-<td>1.51k req/s</td>
-<td>124.90 ms</td>
-<td>86.5% higher</td>
-<td>34.0% lower</td>
-<td>11.81k req/s</td>
-<td>14.70 ms</td>
-<td>76.2% lower</td>
-<td>460.5% higher</td>
+<td>2.88k req/s</td>
+<td>87.30 ms</td>
+<td>1.47k req/s</td>
+<td>129.70 ms</td>
+<td>95.6% higher</td>
+<td>32.7% lower</td>
+<td>11.88k req/s</td>
+<td>14.50 ms</td>
+<td>75.8% lower</td>
+<td>502.1% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>IO</td>
 <td>Scaling</td>
-<td>7.17k req/s</td>
-<td>30.50 ms</td>
-<td>1.51k req/s</td>
-<td>124.90 ms</td>
-<td>375.3% higher</td>
-<td>75.6% lower</td>
-<td>11.81k req/s</td>
-<td>14.70 ms</td>
-<td>39.2% lower</td>
-<td>107.5% higher</td>
+<td>7.06k req/s</td>
+<td>30.40 ms</td>
+<td>1.47k req/s</td>
+<td>129.70 ms</td>
+<td>380.2% higher</td>
+<td>76.6% lower</td>
+<td>11.88k req/s</td>
+<td>14.50 ms</td>
+<td>40.6% lower</td>
+<td>109.7% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>CPU</td>
 <td>Fixed</td>
-<td>7.20k req/s</td>
-<td>37.00 ms</td>
-<td>8.59k req/s</td>
-<td>21.00 ms</td>
-<td>16.1% lower</td>
-<td>76.2% higher</td>
-<td>6.51k req/s</td>
-<td>28.10 ms</td>
-<td>10.6% higher</td>
-<td>31.7% higher</td>
+<td>7.39k req/s</td>
+<td>44.00 ms</td>
+<td>8.67k req/s</td>
+<td>20.70 ms</td>
+<td>14.8% lower</td>
+<td>112.6% higher</td>
+<td>6.44k req/s</td>
+<td>28.40 ms</td>
+<td>14.8% higher</td>
+<td>54.9% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>CPU</td>
 <td>Scaling</td>
-<td>6.91k req/s</td>
-<td>38.60 ms</td>
-<td>8.59k req/s</td>
-<td>21.00 ms</td>
-<td>19.6% lower</td>
-<td>83.8% higher</td>
-<td>6.51k req/s</td>
-<td>28.10 ms</td>
-<td>6.1% higher</td>
-<td>37.4% higher</td>
+<td>7.33k req/s</td>
+<td>37.20 ms</td>
+<td>8.67k req/s</td>
+<td>20.70 ms</td>
+<td>15.4% lower</td>
+<td>79.7% higher</td>
+<td>6.44k req/s</td>
+<td>28.40 ms</td>
+<td>14.0% higher</td>
+<td>31.0% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>IO</td>
 <td>Fixed</td>
-<td>2.81k req/s</td>
-<td>50.60 ms</td>
-<td>1.46k req/s</td>
-<td>109.90 ms</td>
-<td>92.0% higher</td>
-<td>54.0% lower</td>
-<td>6.33k req/s</td>
-<td>27.60 ms</td>
-<td>55.6% lower</td>
-<td>83.3% higher</td>
+<td>2.50k req/s</td>
+<td>60.50 ms</td>
+<td>1.41k req/s</td>
+<td>116.10 ms</td>
+<td>77.4% higher</td>
+<td>47.9% lower</td>
+<td>6.20k req/s</td>
+<td>28.20 ms</td>
+<td>59.6% lower</td>
+<td>114.5% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>IO</td>
 <td>Scaling</td>
-<td>7.71k req/s</td>
-<td>24.20 ms</td>
-<td>1.46k req/s</td>
-<td>109.90 ms</td>
-<td>426.9% higher</td>
-<td>78.0% lower</td>
-<td>6.33k req/s</td>
-<td>27.60 ms</td>
-<td>21.8% higher</td>
-<td>12.3% lower</td>
+<td>7.87k req/s</td>
+<td>22.50 ms</td>
+<td>1.41k req/s</td>
+<td>116.10 ms</td>
+<td>457.6% higher</td>
+<td>80.6% lower</td>
+<td>6.20k req/s</td>
+<td>28.20 ms</td>
+<td>27.1% higher</td>
+<td>20.2% lower</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>CPU</td>
 <td>Fixed</td>
-<td>5.90k req/s</td>
-<td>33.10 ms</td>
-<td>8.27k req/s</td>
-<td>22.70 ms</td>
-<td>28.7% lower</td>
-<td>45.8% higher</td>
-<td>6.86k req/s</td>
-<td>32.90 ms</td>
-<td>14.0% lower</td>
-<td>0.6% higher</td>
+<td>6.18k req/s</td>
+<td>33.00 ms</td>
+<td>8.37k req/s</td>
+<td>22.10 ms</td>
+<td>26.1% lower</td>
+<td>49.3% higher</td>
+<td>6.66k req/s</td>
+<td>34.00 ms</td>
+<td>7.2% lower</td>
+<td>2.9% lower</td>
 </tr>
 <tr>
 <td>HTTP/1.1 (keep-alive)</td>
 <td>CPU</td>
 <td>Scaling</td>
-<td>5.96k req/s</td>
-<td>34.90 ms</td>
-<td>8.27k req/s</td>
-<td>22.70 ms</td>
-<td>28.0% lower</td>
-<td>53.7% higher</td>
-<td>6.86k req/s</td>
-<td>32.90 ms</td>
+<td>6.63k req/s</td>
+<td>31.50 ms</td>
+<td>8.37k req/s</td>
+<td>22.10 ms</td>
+<td>20.7% lower</td>
+<td>42.5% higher</td>
+<td>6.66k req/s</td>
+<td>34.00 ms</td>
+<td>0.4% lower</td>
+<td>7.4% lower</td>
+</tr>
+<tr>
+<td>HTTP/2</td>
+<td>IO</td>
+<td>Fixed</td>
+<td>1.22k req/s</td>
+<td>150.34 ms</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>-</td>
+<td>-</td>
+<td>6.41k req/s</td>
+<td>27.71 ms</td>
+<td>80.9% lower</td>
+<td>442.6% higher</td>
+</tr>
+<tr>
+<td>HTTP/2</td>
+<td>IO</td>
+<td>Scaling</td>
+<td>5.57k req/s</td>
+<td>33.52 ms</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>-</td>
+<td>-</td>
+<td>6.41k req/s</td>
+<td>27.71 ms</td>
 <td>13.2% lower</td>
-<td>6.1% higher</td>
-</tr>
-<tr>
-<td>HTTP/2</td>
-<td>IO</td>
-<td>Fixed</td>
-<td>1.23k req/s</td>
-<td>146.17 ms</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-<td>-</td>
-<td>6.57k req/s</td>
-<td>27.30 ms</td>
-<td>81.3% lower</td>
-<td>435.4% higher</td>
-</tr>
-<tr>
-<td>HTTP/2</td>
-<td>IO</td>
-<td>Scaling</td>
-<td>6.53k req/s</td>
-<td>28.69 ms</td>
-<td>N/A</td>
-<td>N/A</td>
-<td>-</td>
-<td>-</td>
-<td>6.57k req/s</td>
-<td>27.30 ms</td>
-<td>0.6% lower</td>
-<td>5.1% higher</td>
+<td>21.0% higher</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>CPU</td>
 <td>Fixed</td>
-<td>6.25k req/s</td>
-<td>32.60 ms</td>
+<td>6.27k req/s</td>
+<td>31.15 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>8.39k req/s</td>
-<td>26.63 ms</td>
-<td>25.5% lower</td>
-<td>22.4% higher</td>
+<td>7.25k req/s</td>
+<td>50.25 ms</td>
+<td>13.5% lower</td>
+<td>38.0% lower</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>CPU</td>
 <td>Scaling</td>
-<td>5.64k req/s</td>
-<td>32.63 ms</td>
+<td>6.19k req/s</td>
+<td>32.22 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>8.39k req/s</td>
-<td>26.63 ms</td>
-<td>32.8% lower</td>
-<td>22.5% higher</td>
+<td>7.25k req/s</td>
+<td>50.25 ms</td>
+<td>14.6% lower</td>
+<td>35.9% lower</td>
 </tr>
 </tbody>
 </table>
@@ -505,7 +505,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Aug 30 08:38:42 2026 by
+  Generated on Sun Aug 30 10:44:19 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.6).
 </div>
