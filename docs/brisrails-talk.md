@@ -1320,7 +1320,7 @@ flowchart TB
     Col -->|"complete"| ATP
     Col -->|"incomplete"| Rct
     ATP -->|"response bytes"| Client
-    ATP -.->|"keep-alive: wait_readable(1ms), parse next inline"| ATP
+    ATP -.->|"keep-alive: parse ready bytes inline"| ATP
 ```
 
 <br>
@@ -1388,20 +1388,20 @@ After writing a response, if keep-alive is on:
 
 ```ruby
 loop do
-  unless socket.wait_readable(0.001) # 1 millisecond
+  unless socket.wait_readable(0)
     reactor.persist(socket, id, ...)
     return
   end
 
-  # Bytes arrived. Parse the next request inline on this thread.
+  # Bytes are ready. Parse the next request inline on this thread.
   # ...
 end
 ```
 
-- <big>Wait 1ms for the next request on the same connection</big>
-- <big>If bytes arrive in that window: parse and dispatch inline, on the same thread</big>
-- <big>Return to the reactor when no bytes arrive inside the 1ms window, or when a request is incomplete</big>
-- <big>The trade: occupy an app thread for up to 1ms to widen the no-reactor fast path</big>
+- <big>Check for the next request on the same connection without waiting</big>
+- <big>If bytes are ready: parse and dispatch inline, on the same thread</big>
+- <big>Return to the reactor immediately when no bytes are ready, or when a request is incomplete</big>
+- <big>Back-to-back requests avoid a reactor round-trip without holding an app thread open</big>
 
 <br>
 <br>

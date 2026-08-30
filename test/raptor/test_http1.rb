@@ -35,5 +35,26 @@ module Raptor
       assert_equal 1, queued.length
       assert_equal false, processed
     end
+
+    def test_eager_keepalive_persists_idle_connections
+      handler = Http1.allocate
+      handler.instance_variable_set(:@running, AtomicBoolean.new(true))
+
+      timeout = nil
+      socket = Object.new
+      socket.define_singleton_method(:wait_readable) do |value|
+        timeout = value
+        false
+      end
+
+      persisted = nil
+      reactor = Object.new
+      reactor.define_singleton_method(:persist) { |*args, **options| persisted = [args, options] }
+
+      handler.send(:eager_keepalive, socket, 1, reactor, nil, 2, "127.0.0.1", "http")
+
+      assert_equal 0, timeout
+      assert_equal [[socket, 1, 2], { remote_addr: "127.0.0.1", url_scheme: "http" }], persisted
+    end
   end
 end

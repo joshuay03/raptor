@@ -24,7 +24,6 @@ module Raptor
     FILE_CHUNK_SIZE = 64 * 1024
     READ_BUFFER_SIZE = 64 * 1024
     RESPONSE_BUFFER_CAPACITY = 4 * 1024
-    KEEPALIVE_READ_TIMEOUT = 0.001
     MAX_KEEPALIVE_REQUESTS = 1000
 
     HTTP_10 = "HTTP/1.0"
@@ -591,8 +590,9 @@ module Raptor
     end
 
     # Reads and processes subsequent requests inline on a kept-alive
-    # connection. Falls back to the reactor when no data arrives within the
-    # timeout, the thread pool is saturated, or the request is incomplete.
+    # connection. Returns the connection to the reactor when no data is ready
+    # or a request is incomplete, and queues complete requests behind work
+    # that is already waiting.
     #
     # @param socket [TCPSocket] the client socket
     # @param id [Integer] unique client identifier
@@ -611,7 +611,7 @@ module Raptor
           return
         end
 
-        unless socket.wait_readable(KEEPALIVE_READ_TIMEOUT)
+        unless socket.wait_readable(0)
           reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
           return
         end

@@ -16,8 +16,6 @@ module Raptor
 
     RESPONSE_BUFFER_CAPACITY: untyped
 
-    KEEPALIVE_READ_TIMEOUT: ::Float
-
     MAX_KEEPALIVE_REQUESTS: ::Integer
 
     HTTP_10: ::String
@@ -318,8 +316,9 @@ module Raptor
     def handle_app_error: (TCPSocket socket, Hash[String, untyped]? rack_env, Integer? status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
 
     # Reads and processes subsequent requests inline on a kept-alive
-    # connection. Falls back to the reactor when no data arrives within the
-    # timeout, the thread pool is saturated, or the request is incomplete.
+    # connection. Returns the connection to the reactor when no data is ready
+    # or a request is incomplete, and queues complete requests behind work
+    # that is already waiting.
     #
     # @param socket [TCPSocket] the client socket
     # @param id [Integer] unique client identifier

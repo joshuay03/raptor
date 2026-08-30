@@ -44,7 +44,7 @@ The rest of this doc explains why the shape looks like that.
 | Cluster dispatch       | Workers race on inherited listeners with a load-proportional accept delay | Two-choice load-aware BPF dispatch for TCP on Linux; shared-listener fallback |
 | Work queue             | Ruby `Queue` coordinated under the pool mutex             | Lock-free Michael-Scott FIFO queue                                            |
 | HTTP/2                 | Not implemented                                         | Native C parser + HPACK, lock-free per-connection frame writer               |
-| Keep-alive fast path   | Same-thread inline dispatch when spare threads exist    | Same-thread inline plus a `wait_readable(1ms)` micro-poll on the app thread  |
+| Keep-alive fast path   | Same-thread inline dispatch when spare threads exist    | Same-thread inline dispatch for bytes that are already waiting               |
 | Native extensions      | 1 (Ragel HTTP/1 parser + MiniSSL)                       | 3, all Ractor-safe (Ragel HTTP/1 parser; HTTP/2 parser + HPACK; `writev`, `sched_setaffinity`, `prctl` wrappers) |
 | Shared state (worker↔master) | Pipes and signals                                 | Anonymous shared-memory `mmap` region                                        |
 | Restart primitives     | Phased (USR1), hot (USR2 re-exec, inherits FDs via env), refork (SIGURG) | Phased (USR1), hot (USR2 re-exec, inherits FDs via env), refork (SIGURG) |
@@ -311,7 +311,7 @@ The eager keep-alive loop is one of Raptor's more deliberate latency/occupancy t
 
 ```ruby
 loop do
-  unless socket.wait_readable(KEEPALIVE_READ_TIMEOUT) # 0.001 s
+  unless socket.wait_readable(0)
     reactor.persist(socket, id, request_count, ...)
     return
   end
@@ -320,9 +320,9 @@ loop do
 end
 ```
 
-The thread waits up to 1 millisecond for the next request. If bytes arrive in that window, it parses them inline on the same thread and calls the Rack app again. If no bytes arrive, the connection returns to the reactor. Pipelined requests therefore avoid a reactor round-trip, while an idle keep-alive connection occupies an app thread for at most that short polling window.
+The thread checks for bytes without waiting. If they are already available, it parses them inline and calls the Rack app again. Otherwise the connection returns to the reactor immediately. Pipelined requests avoid a reactor round-trip without letting an idle keep-alive connection occupy an app thread.
 
-Puma has a similar shape but does not wait. It checks buffered back-to-back requests, then eagerly drains bytes already available on the socket. If a complete request is ready and the pool has a waiting thread, the current thread loops inline; otherwise Puma queues the client or returns it to the reactor. Raptor's 1ms poll deliberately widens the window in which the next request can stay on the current app thread.
+Puma has a similar shape. It checks buffered back-to-back requests, then eagerly drains bytes already available on the socket. If a complete request is ready and the pool has a waiting thread, the current thread loops inline; otherwise Puma queues the client or returns it to the reactor.
 
 The `reactor.persist` call re-registers the socket with the reactor using `persistent_data_timeout` (65s) as the new deadline. When the next bytes arrive, the reactor treats the socket like any other partially-read connection.
 
@@ -390,7 +390,7 @@ flowchart TB
 
         CHK{"Request<br/>complete?"}
         KA{"Keep-alive?"}
-        EAG{"wait_readable<br/>1ms"}
+        EAG{"wait_readable(0)<br/>bytes ready?"}
 
         SRV -->|"HTTP/1.1 eager_accept, parse inline, push proc"| ATP
         SRV -->|"HTTP/2 eager_accept, parse inline, push proc"| ATP
@@ -405,7 +405,7 @@ flowchart TB
         ATP -->|"app.call + write"| KA
         KA -->|"no, close"| CLS["close socket"]
         KA -->|"yes"| EAG
-        EAG -.->|"bytes within 1ms, parse+dispatch on same thread"| ATP
+        EAG -.->|"bytes ready, parse+dispatch on same thread"| ATP
         EAG -->|"no bytes, reactor.persist"| RCT
         RCT -->|"timeout expired"| TO["write 408, close"]
 
@@ -437,7 +437,7 @@ The critical structural difference from Puma is that Raptor has a separate proto
 
 **Puma.** Parsing happens on an app thread. The C parser callbacks build the env hash. A fresh client first enters the thread pool, where eager reads may complete it immediately; partial and idle keep-alive connections wait in the reactor before returning to the pool. Parsing shares the worker's GVL with the app.
 
-**Raptor.** Fresh and immediate keep-alive requests parse inline on the server or app thread. A connection that needs more bytes takes the longer path: reactor (I/O) → protocol Ractor pool (parse) → collector → app thread pool (Rack + write). Between keep-alive requests, the app thread does a 1ms micro-poll before returning an idle connection to the reactor. Parsing in the Ractor pipeline has its own GVL; parsing on an eager path does not.
+**Raptor.** Fresh and immediate keep-alive requests parse inline on the server or app thread. A connection that needs more bytes takes the longer path: reactor (I/O) → protocol Ractor pool (parse) → collector → app thread pool (Rack + write). Between keep-alive requests, the app thread checks for bytes without waiting before returning an idle connection to the reactor. Parsing in the Ractor pipeline has its own GVL; parsing on an eager path does not.
 
 In practice, Puma has one process-wide GVL per worker. Every Ruby thread inside that worker takes turns holding it. Raptor has the same main-Ractor GVL plus one GVL per protocol Ractor, so a pipeline Ractor can parse one connection while an app thread executes Rack for another. That parallelism is real, but so are the costs of making state shareable and crossing the Ractor and collector boundaries. Which side wins depends on how much work the request gives the protocol pipeline; the current CPU benchmark leaves Raptor and Puma close rather than proving a universal parsing advantage.
 
@@ -463,11 +463,9 @@ Under moderate load, queue mechanics are unlikely to dominate either server. Und
 
 **Puma.** After a response, if the connection is keep-alive and there are already buffered bytes for the next request (`has_back_to_back_requests?`) and there is a spare app thread, loop inline. Otherwise, if `eagerly_finish` (non-blocking reads while data is already buffered) returns true, either loop inline (if spare threads) or hand back to the thread pool (`@thread_pool << client`). Otherwise, back to the reactor with `@persistent_timeout`.
 
-**Raptor.** After a response, the app thread does `socket.wait_readable(0.001)`, waiting up to 1ms for bytes. If bytes arrive, it parses the next request inline. If other work is already waiting, the parsed request goes to the back of the pool queue; otherwise the same thread dispatches it inline. If no bytes arrive, `reactor.persist` and return.
+**Raptor.** After a response, the app thread checks `socket.wait_readable(0)`. If bytes are already available, it parses the next request inline. If other work is waiting, the parsed request goes to the back of the pool queue; otherwise the same thread dispatches it inline. If no bytes are ready, `reactor.persist` and return.
 
-The difference is subtle. Puma's `eagerly_finish` catches bytes already available on the socket; Raptor's `wait_readable(1ms)` catches those plus bytes arriving during the next millisecond. A request caught there parses on the response-writing thread and avoids a reactor round-trip. The cost is that an app thread can spend up to 1ms waiting on an otherwise idle connection.
-
-This fast path is one plausible contributor to Raptor's keep-alive result. Requests arriving inside the polling window are parsed without a reactor round-trip: the response-writing thread either continues serving that connection inline when no other work is waiting or puts it at the back of the queue when there is. Puma's app threads also continue inline when data is already available and capacity permits. The material difference is Raptor's short wait for data that has not arrived yet.
+Both servers therefore keep a back-to-back request on an app thread when its bytes are already waiting, and return an idle connection to the reactor without deliberately holding an app thread open. The details of their parsing and pool handoff still differ, but neither widens the inline window by waiting for the client.
 
 Raptor closes an HTTP/1.1 connection after 1,000 requests by default. The finite limit bounds connection-lifetime state without forcing frequent TCP teardown and reconnection under sustained keep-alive traffic.
 
@@ -511,7 +509,7 @@ Around the response boundary, HTTP/1.1 also amortises the common per-request all
 
 ### Keep-alive request by request
 
-To make the keep-alive distinction concrete, here is one possible timing for three requests on the same connection. The third request arrives after Puma's non-blocking eager read but inside Raptor's 1ms polling window. Drawn separately so the participant columns stay wide enough to read.
+To make the keep-alive paths concrete, here is one possible timing for three requests on the same connection. The second request is already buffered when the first response completes; the third arrives after the non-blocking check. Drawn separately so the participant columns stay wide enough to read.
 
 **Puma, three keep-alive requests:**
 
@@ -551,6 +549,7 @@ sequenceDiagram
     autonumber
     participant Client
     participant RS as Server thread
+    participant RR as Reactor thread
     participant RP as App thread
 
     Note over Client,RP: Request 1, initial
@@ -559,21 +558,21 @@ sequenceDiagram
     RS->>RP: push proc to thread pool
     RP->>Client: response 1
 
-    Note over Client,RP: Request 2, pipelined a few hundred us later
-    RP-->>RP: wait_readable 1ms
-    Client->>RP: request bytes
+    Note over Client,RP: Request 2, already buffered
+    Client->>RP: request bytes already waiting
+    RP->>RP: wait_readable(0) returns true
     RP->>RP: parse inline on app thread
     RP->>Client: response 2
 
-    Note over Client,RP: Request 3, arrives sub-millisecond later
-    RP-->>RP: wait_readable 1ms
-    Note right of RP: still within the 1ms window
-    Client->>RP: request bytes
-    RP->>RP: parse inline
+    Note over Client,RP: Request 3, not yet available
+    RP->>RP: wait_readable(0) returns false
+    RP->>RR: reactor.persist
+    Client->>RR: request bytes
+    RR->>RP: dispatch back to thread pool
     RP->>Client: response 3
 ```
 
-In this timing, Puma returns Request 3 to the reactor while Raptor catches it on the current thread. If the bytes were already available, both could stay inline; if they arrived after 1ms, both would use the reactor. The optimisation trades up to 1ms of app-thread occupancy for a wider inline window.
+In this timing, both servers keep Request 2 inline and return Request 3 to the reactor. Their implementations differ, but the occupancy rule is the same: use the current app thread for bytes that are ready, not to wait for future bytes.
 
 ## Part IV: What Raptor's design buys you
 
