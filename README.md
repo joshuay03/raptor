@@ -73,6 +73,9 @@ Also works with `rackup` and `rails server`:
 > bundle exec rails server -u raptor
 ```
 
+Rails apps using `SOLID_QUEUE_IN_PUMA` run jobs through `config/puma.rb`, which Raptor does not load. Run `bin/jobs` as
+a separately supervised process or container instead.
+
 ## Configuration
 
 Raptor accepts configuration via command-line flags, a Ruby config file, or both (CLI flags override config file
