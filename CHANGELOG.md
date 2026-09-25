@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Pass worker lifecycle settings through the Rackup handler
+
 ## [0.20.0] - 2026-08-30
 
 - Close connected control socket clients during shutdown

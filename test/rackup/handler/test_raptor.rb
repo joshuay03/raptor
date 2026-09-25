@@ -29,15 +29,24 @@ module Rackup
         assert_equal ["tcp://0.0.0.0:9292"], opts[:binds]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:socket_backlog], opts[:socket_backlog]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:drain_accept_queue], opts[:drain_accept_queue]
+        assert_equal Integer(Concurrent.available_processor_count), opts[:workers]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:threads], opts[:threads]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:max_threads], opts[:max_threads]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:cpu_affinity], opts[:cpu_affinity]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:clean_thread_locals], opts[:clean_thread_locals]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:clean_fiber_locals], opts[:clean_fiber_locals]
-        assert_equal Integer(Concurrent.available_processor_count), opts[:workers]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:connection], opts[:connection]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http1], opts[:http1]
         assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:http2], opts[:http2]
+        if RUBY_PLATFORM.include?("linux")
+          assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:refork_after], opts[:refork_after]
+        else
+          assert_nil opts[:refork_after]
+        end
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:before_fork], opts[:before_fork]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:before_worker_boot], opts[:before_worker_boot]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:before_worker_shutdown], opts[:before_worker_shutdown]
+        assert_equal ::Raptor::CLI::DEFAULT_OPTIONS[:before_refork], opts[:before_refork]
       end
 
       def test_passes_app_through
@@ -52,6 +61,12 @@ module Rackup
         opts = build(Host: "127.0.0.1", Port: 3000)
 
         assert_equal ["tcp://127.0.0.1:3000"], opts[:binds]
+      end
+
+      def test_maps_workers
+        opts = build(Workers: 2)
+
+        assert_equal 2, opts[:workers]
       end
 
       def test_maps_threads
@@ -74,12 +89,6 @@ module Rackup
 
       def test_max_threads_cannot_be_less_than_threads
         assert_raises(ArgumentError) { build(Threads: 3, MaxThreads: 2) }
-      end
-
-      def test_maps_workers
-        opts = build(Workers: 2)
-
-        assert_equal 2, opts[:workers]
       end
 
       def test_worker_and_thread_environment_variables
@@ -112,15 +121,15 @@ module Rackup
       end
 
       def test_config_file_layers_under_rack_options
-        with_config_file({ workers: 2, threads: 8, max_threads: "unlimited", http1: { ractors: 4 }, connection: { first_data_timeout: 60 } }) do |path|
+        with_config_file({ workers: 2, threads: 8, max_threads: "unlimited", connection: { first_data_timeout: 60 }, http1: { ractors: 4 } }) do |path|
           opts = build(Config: path, Workers: 16)
 
           assert_equal 16, opts[:workers]
-          assert_equal 4, opts[:http1][:ractors]
           assert_equal 8, opts[:threads]
           assert_equal Float::INFINITY, opts[:max_threads]
           assert_equal 60, opts[:connection][:first_data_timeout]
           assert_equal 10, opts[:connection][:chunk_data_timeout]
+          assert_equal 4, opts[:http1][:ractors]
         end
       end
 
@@ -149,24 +158,40 @@ module Rackup
       def test_config_file_can_supply_runtime_options
         with_config_source(<<~RUBY) do |path|
           {
-            on_error: ->(_env, _error) {},
-            stats_file: "tmp/c.json",
-            control_url: "unix:///tmp/c.sock",
-            pid_file: "tmp/c.pid",
             cpu_affinity: true,
             clean_thread_locals: false,
             clean_fiber_locals: false,
+            refork_after: [100, 500],
+            before_fork: [-> { :fork }],
+            before_worker_boot: [->(index) { index + 1 }],
+            before_worker_shutdown: [->(index) { index + 2 }],
+            before_refork: [-> { :refork }],
+            stats_file: "tmp/c.json",
+            control_url: "unix:///tmp/c.sock",
+            pid_file: "tmp/c.pid",
+            on_error: ->(_env, _error) {},
           }
         RUBY
           opts = build(Config: path)
 
-          assert_kind_of Proc, opts[:on_error]
-          assert_equal "tmp/c.json", opts[:stats_file]
-          assert_equal "unix:///tmp/c.sock", opts[:control_url]
-          assert_equal "tmp/c.pid", opts[:pid_file]
           assert_equal true, opts[:cpu_affinity]
           assert_equal false, opts[:clean_thread_locals]
           assert_equal false, opts[:clean_fiber_locals]
+          assert_equal [100, 500], opts[:refork_after]
+          assert_equal [:fork], opts[:before_fork].map(&:call)
+          assert_equal [8], opts[:before_worker_boot].map { |hook| hook.call(7) }
+          assert_equal [9], opts[:before_worker_shutdown].map { |hook| hook.call(7) }
+          assert_equal [:refork], opts[:before_refork].map(&:call)
+          assert_equal "tmp/c.json", opts[:stats_file]
+          assert_equal "unix:///tmp/c.sock", opts[:control_url]
+          assert_equal "tmp/c.pid", opts[:pid_file]
+          assert_kind_of Proc, opts[:on_error]
+        end
+      end
+
+      def test_config_file_can_disable_refork
+        with_config_file({ refork_after: nil }) do |path|
+          assert_nil build(Config: path)[:refork_after]
         end
       end
 

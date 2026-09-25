@@ -100,6 +100,11 @@ module Rackup
         result[:worker_timeout] = (config[:worker_timeout] || cli_defaults[:worker_timeout]).to_i
         result[:worker_drain_timeout] = (config[:worker_drain_timeout] || cli_defaults[:worker_drain_timeout]).to_i
         result[:worker_shutdown_timeout] = (config[:worker_shutdown_timeout] || cli_defaults[:worker_shutdown_timeout]).to_i
+        result[:refork_after] = config.fetch(:refork_after, cli_defaults[:refork_after])
+        result[:before_fork] = config.fetch(:before_fork, cli_defaults[:before_fork])
+        result[:before_worker_boot] = config.fetch(:before_worker_boot, cli_defaults[:before_worker_boot])
+        result[:before_worker_shutdown] = config.fetch(:before_worker_shutdown, cli_defaults[:before_worker_shutdown])
+        result[:before_refork] = config.fetch(:before_refork, cli_defaults[:before_refork])
         result[:stats_file] = config.key?(:stats_file) ? config[:stats_file] : cli_defaults[:stats_file]
         result[:control_url] = config[:control_url] if config.key?(:control_url)
         result[:pid_file] = config[:pid_file] if config.key?(:pid_file)
