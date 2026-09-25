@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.20.1] - 2026-09-26
+
 - Pass worker lifecycle settings through the Rackup handler
 
 ## [0.20.0] - 2026-08-30
