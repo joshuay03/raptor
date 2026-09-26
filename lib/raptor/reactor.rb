@@ -145,6 +145,13 @@ module Raptor
           end
         end
 
+        @id_to_socket.each_value { |socket| socket.close rescue nil }
+        @id_to_socket.clear
+        @socket_to_state.clear
+        @id_to_timeout.clear
+        @id_to_writer.clear
+        @id_to_flow_control.clear
+        @timeouts.clear!
         @selector.close
       end
     end

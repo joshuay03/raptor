@@ -366,6 +366,43 @@ module Raptor
       end
     end
 
+    def test_refork_closes_idle_keepalive_connections
+      skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Subreaper.enable
+
+      socket_path = "/tmp/raptor_refork_test_#{Process.pid}.sock"
+      stats_path = "/tmp/raptor_refork_test_#{Process.pid}.json"
+      File.delete(socket_path) rescue nil
+      File.delete(stats_path) rescue nil
+      @options[:binds] = ["unix://#{socket_path}"]
+      @options[:refork_after] = 1
+      @options[:stats_file] = stats_path
+      cluster = without_output { Cluster.new(@options) }
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      original_pid = wait_for_booted_worker_pid(stats_path)
+
+      client_socket = UNIXSocket.new(socket_path)
+      client_socket.write("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+
+      response = String.new
+      Timeout.timeout(5) do
+        response << client_socket.readpartial(1024) until response.include?("Hello, World!")
+      end
+
+      wait_for_booted_worker_pid(stats_path, except: original_pid)
+
+      assert_nil Timeout.timeout(5) { client_socket.read(1) }
+    ensure
+      client_socket&.close
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+      File.delete(socket_path) rescue nil
+      File.delete(stats_path) rescue nil
+    end
+
     def test_before_fork_hooks_run_in_the_master_before_every_fork
       marker = "/tmp/raptor_test_before_fork_#{Process.pid}.marker"
       File.delete(marker) rescue nil

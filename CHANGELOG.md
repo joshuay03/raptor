@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Close idle connections before reforking workers
+
 ## [0.20.1] - 2026-09-26
 
 - Pass worker lifecycle settings through the Rackup handler
