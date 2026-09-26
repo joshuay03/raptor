@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.20.2] - 2026-09-26
+
 - Close idle connections before reforking workers
 
 ## [0.20.1] - 2026-09-26
