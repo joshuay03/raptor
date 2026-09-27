@@ -122,6 +122,27 @@ module Raptor
       assert frames.last.getbyte(4).anybits?(Http2::FLAG_END_STREAM)
     end
 
+    def test_write_http2_response_calls_streaming_body
+      frames = []
+      observed_frames = nil
+      body = proc do |stream|
+        stream.write("first")
+        observed_frames = frames.dup
+        stream << "second"
+        stream.flush
+        assert_raises(IOError) { stream.read }
+        assert_raises(IOError) { stream.close_read }
+        stream.close_write
+        assert_predicate stream, :closed?
+      end
+
+      write_http2_response(body: body, frames: frames)
+
+      assert_equal [HEADERS_FRAME_TYPE, DATA_FRAME_TYPE], observed_frames.map { |frame| frame.getbyte(3) }
+      assert_equal ["first", "second", ""], frames.drop(1).map { |frame| frame.byteslice(9..-1) }
+      assert frames.last.getbyte(4).anybits?(Http2::FLAG_END_STREAM)
+    end
+
     def test_process_frames_rejects_even_client_stream_id
       result = process_frames_with(headers_frame(stream_id: 2))
 

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Support Rack streaming bodies over HTTP/2
 - Stream HTTP/2 response bodies incrementally
 - Suppress HTTP/2 response bodies when required
 

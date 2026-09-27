@@ -204,6 +204,132 @@ module Raptor
       end
     end
 
+    # Adapts one HTTP/2 response stream to Rack's streaming body interface.
+    #
+    class ResponseStream
+      # @rbs @socket: OpenSSL::SSL::SSLSocket
+      # @rbs @writer: Writer
+      # @rbs @flow_control: FlowControl
+      # @rbs @stream_id: Integer
+      # @rbs @parser: Http2Parser
+      # @rbs @bytes_written: Integer
+      # @rbs @closed: bool
+
+      # Returns the number of response body bytes written to the stream.
+      #
+      # @return [Integer]
+      attr_reader :bytes_written #: Integer
+
+      # Creates a response stream for a Rack streaming body.
+      #
+      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+      # @param writer [Writer] frame writer for the connection
+      # @param flow_control [FlowControl] outbound flow controller
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @return [void]
+      #
+      # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id) -> void
+      def initialize(socket, writer, flow_control, stream_id)
+        @socket = socket
+        @writer = writer
+        @flow_control = flow_control
+        @stream_id = stream_id
+        @parser = Http2Parser.new
+        @bytes_written = 0
+        @closed = false
+      end
+
+      # Streaming responses are write-only.
+      #
+      # @raise [IOError]
+      #
+      # @rbs (*untyped) -> bot
+      def read(*)
+        raise IOError, "not opened for reading"
+      end
+
+      # Writes response body bytes to the stream.
+      #
+      # @param chunk [String] response body bytes
+      # @return [Integer] number of bytes written
+      #
+      # @rbs (String chunk) -> Integer
+      def write(chunk)
+        raise IOError, "closed stream" if @closed
+        raise TypeError, "body must yield String values" unless chunk.is_a?(String)
+
+        offset = 0
+        while offset < chunk.bytesize
+          granted = @flow_control.acquire(@stream_id, chunk.bytesize - offset)
+          slice = offset.zero? && granted == chunk.bytesize ? chunk : chunk.byteslice(offset, granted)
+          offset += granted
+          @writer.write_frames(@socket, [@parser.build_frame(:data, 0, @stream_id, slice)])
+        end
+
+        @bytes_written += chunk.bytesize
+        chunk.bytesize
+      end
+
+      # Writes response body bytes and returns the stream.
+      #
+      # @param chunk [String] response body bytes
+      # @return [ResponseStream]
+      #
+      # @rbs (String chunk) -> ResponseStream
+      def <<(chunk)
+        write(chunk)
+        self
+      end
+
+      # Flushes the stream. Frame writes are already immediate.
+      #
+      # @return [ResponseStream]
+      #
+      # @rbs () -> ResponseStream
+      def flush
+        self
+      end
+
+      # Finishes the stream.
+      #
+      # @return [void]
+      #
+      # @rbs () -> void
+      def close
+        return if @closed
+
+        @closed = true
+        @writer.write_frames(@socket, [@parser.build_frame(:data, FLAG_END_STREAM, @stream_id, nil)])
+      end
+
+      # Closes the unsupported read side of the stream.
+      #
+      # @raise [IOError]
+      #
+      # @rbs () -> bot
+      def close_read
+        raise IOError, "closing non-duplex IO for reading"
+      end
+
+      # Finishes the writable side of the stream.
+      #
+      # @return [void]
+      #
+      # @rbs () -> void
+      def close_write
+        close
+      end
+
+      # Returns whether the stream has finished.
+      #
+      # @return [Boolean]
+      #
+      # @rbs () -> bool
+      def closed?
+        @closed
+      end
+    end
+
     EAGER_READ_TIMEOUT = 0.001
     EAGER_READ_BUFFER_SIZE = 64 * 1024
     EAGER_MAX_ROUNDS = 8
@@ -793,39 +919,15 @@ module Raptor
 
       writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)])
 
-      body_bytes = 0
-      body.each do |chunk|
-        raise TypeError, "body must yield String values" unless chunk.is_a?(String)
-        next if chunk.empty?
-
-        write_http2_data(socket, writer, flow_control, stream_id, chunk)
-        body_bytes += chunk.bytesize
+      stream = ResponseStream.new(socket, writer, flow_control, stream_id)
+      if body.respond_to?(:each)
+        body.each { |chunk| stream.write(chunk) }
+      else
+        body.call(stream)
       end
+      stream.close
 
-      writer.write_frames(socket, [parser.build_frame(:data, FLAG_END_STREAM, stream_id, nil)])
-      body_bytes.to_s
-    end
-
-    # Writes one response body chunk as flow-controlled HTTP/2 DATA frames.
-    #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param writer [Writer] lock-free frame writer for the connection
-    # @param flow_control [FlowControl] per-connection outbound flow controller
-    # @param stream_id [Integer] the HTTP/2 stream identifier
-    # @param chunk [String] response body bytes
-    # @return [void]
-    #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, String chunk) -> void
-    def write_http2_data(socket, writer, flow_control, stream_id, chunk)
-      parser = Http2Parser.new
-      offset = 0
-
-      while offset < chunk.bytesize
-        granted = flow_control.acquire(stream_id, chunk.bytesize - offset)
-        slice = offset.zero? && granted == chunk.bytesize ? chunk : chunk.byteslice(offset, granted)
-        offset += granted
-        writer.write_frames(socket, [parser.build_frame(:data, 0, stream_id, slice)])
-      end
+      stream.bytes_written.to_s
     end
 
     # Writes a 500 error response as HTTP/2 frames.
