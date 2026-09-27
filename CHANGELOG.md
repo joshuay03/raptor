@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Accept HTTP/2 request trailers
 - Propagate HTTP/2 stream cancellation to response bodies
 - Support Rack response lifecycle over HTTP/2
 - Support Rack streaming bodies over HTTP/2

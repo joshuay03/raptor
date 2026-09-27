@@ -341,6 +341,7 @@ From there the shape is similar to HTTP/1.1:
 
 Responses to `HEAD` requests and statuses that prohibit a message body end with the response `HEADERS` frame.
 Early hints and response-finished callbacks follow the same Rack lifecycle as HTTP/1.1.
+Trailing request `HEADERS` complete an open request. Rack has no standard request-trailer key, so Raptor validates them without adding them to the environment.
 
 The `Writer` is worth a paragraph. Naive per-connection writing would need a mutex around every socket write. Contention grows with concurrent streams. Raptor's `Writer` stores the "pending frames" queue in an `Atom` whose value is either `:idle` (nobody is writing) or an array of frames waiting to go out. A thread that wants to write does a CAS:
 

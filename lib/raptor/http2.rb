@@ -554,8 +554,9 @@ module Raptor
         when :headers
           stream_id = frame[:stream_id]
           header_payload = frame[:payload]
+          trailers = streams.key?(stream_id)
 
-          unless streams.key?(stream_id)
+          unless trailers
             if stream_id.even? || stream_id <= last_client_stream_id
               goaway_error = ERROR_PROTOCOL_ERROR
               break
@@ -571,14 +572,12 @@ module Raptor
 
           if frame[:flags].anybits?(FLAG_END_HEADERS)
             decoded_headers, hpack_table = parser.parse_headers(header_payload, hpack_table)
-            if invalid_pseudo_headers?(decoded_headers)
-              streams.delete(stream_id)
-              outgoing_frames << parser.build_frame(:rst_stream, 0, stream_id, [ERROR_PROTOCOL_ERROR].pack("N"))
-            else
-              streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, end_stream)
-            end
+            streams, completed_requests = complete_header_block(
+              streams, completed_requests, outgoing_frames, parser,
+              stream_id, decoded_headers, end_stream, trailers
+            )
           else
-            pending_headers = { stream_id: stream_id, buffer: header_payload, end_stream: end_stream }
+            pending_headers = { stream_id: stream_id, buffer: header_payload, end_stream: end_stream, trailers: trailers }
           end
 
         when :continuation
@@ -592,12 +591,10 @@ module Raptor
           if frame[:flags].anybits?(FLAG_END_HEADERS)
             stream_id = pending_headers[:stream_id]
             decoded_headers, hpack_table = parser.parse_headers(pending_headers[:buffer], hpack_table)
-            if invalid_pseudo_headers?(decoded_headers)
-              streams.delete(stream_id)
-              outgoing_frames << parser.build_frame(:rst_stream, 0, stream_id, [ERROR_PROTOCOL_ERROR].pack("N"))
-            else
-              streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, pending_headers[:end_stream])
-            end
+            streams, completed_requests = complete_header_block(
+              streams, completed_requests, outgoing_frames, parser,
+              stream_id, decoded_headers, pending_headers[:end_stream], pending_headers[:trailers]
+            )
             pending_headers = nil
           end
 
@@ -664,6 +661,45 @@ module Raptor
 
       build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, cancelled_streams, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, !!goaway_error)
     end
+
+    # Applies one complete request header block to its stream, resetting
+    # malformed initial headers or trailers and completing valid trailers.
+    #
+    # @param streams [Hash] current open-stream map
+    # @param completed_requests [Array<Hash>] accumulator of completed stream requests
+    # @param outgoing_frames [Array<String>] accumulator of protocol response frames
+    # @param parser [Http2Parser] frame parser and encoder
+    # @param stream_id [Integer] the stream identifier
+    # @param decoded_headers [Array<Array(String, String)>] decoded header pairs
+    # @param end_stream [Boolean] whether the source frame had END_STREAM set
+    # @param trailers [Boolean] whether this is a trailing header block
+    # @return [Array(Hash, Array<Hash>)] updated streams and completed requests
+    #
+    # @rbs (Hash[Integer, Hash[Symbol, untyped]] streams, Array[Hash[Symbol, untyped]] completed_requests, Array[String] outgoing_frames, Http2Parser parser, Integer stream_id, Array[[String, String]] decoded_headers, bool end_stream, bool trailers) -> [Hash[Integer, Hash[Symbol, untyped]], Array[Hash[Symbol, untyped]]]
+    def self.complete_header_block(streams, completed_requests, outgoing_frames, parser, stream_id, decoded_headers, end_stream, trailers)
+      invalid = if trailers
+        !end_stream || decoded_headers.any? { |name, _value| name.start_with?(":") }
+      else
+        invalid_pseudo_headers?(decoded_headers)
+      end
+
+      if invalid
+        streams.delete(stream_id)
+        outgoing_frames << parser.build_frame(:rst_stream, 0, stream_id, [ERROR_PROTOCOL_ERROR].pack("N"))
+      elsif trailers
+        stream = streams.delete(stream_id)
+        completed_requests << {
+          stream_id: stream_id,
+          headers: stream[:headers],
+          body: stream[:body] || ""
+        }
+      else
+        streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, end_stream)
+      end
+
+      [streams, completed_requests]
+    end
+    private_class_method :complete_header_block
 
     # Merges a decoded header block into the stream's accumulated state,
     # promoting the stream to `completed_requests` when END_STREAM is set.

@@ -335,6 +335,22 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
     def self.process_frames: (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
 
+    # Applies one complete request header block to its stream, resetting
+    # malformed initial headers or trailers and completing valid trailers.
+    #
+    # @param streams [Hash] current open-stream map
+    # @param completed_requests [Array<Hash>] accumulator of completed stream requests
+    # @param outgoing_frames [Array<String>] accumulator of protocol response frames
+    # @param parser [Http2Parser] frame parser and encoder
+    # @param stream_id [Integer] the stream identifier
+    # @param decoded_headers [Array<Array(String, String)>] decoded header pairs
+    # @param end_stream [Boolean] whether the source frame had END_STREAM set
+    # @param trailers [Boolean] whether this is a trailing header block
+    # @return [Array(Hash, Array<Hash>)] updated streams and completed requests
+    #
+    # @rbs (Hash[Integer, Hash[Symbol, untyped]] streams, Array[Hash[Symbol, untyped]] completed_requests, Array[String] outgoing_frames, Http2Parser parser, Integer stream_id, Array[[String, String]] decoded_headers, bool end_stream, bool trailers) -> [Hash[Integer, Hash[Symbol, untyped]], Array[Hash[Symbol, untyped]]]
+    def self.complete_header_block: (Hash[Integer, Hash[Symbol, untyped]] streams, Array[Hash[Symbol, untyped]] completed_requests, Array[String] outgoing_frames, Http2Parser parser, Integer stream_id, Array[[ String, String ]] decoded_headers, bool end_stream, bool trailers) -> [ Hash[Integer, Hash[Symbol, untyped]], Array[Hash[Symbol, untyped]] ]
+
     # Merges a decoded header block into the stream's accumulated state,
     # promoting the stream to `completed_requests` when END_STREAM is set.
     #

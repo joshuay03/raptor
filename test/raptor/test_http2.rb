@@ -263,6 +263,41 @@ module Raptor
       assert_equal [":method", ":path", ":scheme", ":authority"], result[:completed_requests].first[:headers].map(&:first)
     end
 
+    def test_process_frames_accepts_request_trailers
+      parser = Http2Parser.new
+      headers = headers_frame(stream_id: 1, end_stream: false)
+      data = parser.build_frame(:data, 0, 1, "body")
+      encoded = parser.encode_headers([["checksum", "abc"]])
+      half = encoded.bytesize / 2
+      trailers = parser.build_frame(:headers, Http2::FLAG_END_STREAM, 1, encoded.byteslice(0, half))
+      trailers << parser.build_frame(:continuation, Http2::FLAG_END_HEADERS, 1, encoded.byteslice(half..-1))
+
+      result = process_frames_with(headers + data + trailers)
+
+      assert_equal 1, result[:completed_requests].size
+      assert_equal "body", result[:completed_requests].first[:body]
+    end
+
+    def test_process_frames_resets_request_trailers_without_end_stream
+      headers = headers_frame(stream_id: 1, end_stream: false)
+      trailers = trailers_frame(stream_id: 1, headers: [["checksum", "abc"]], end_stream: false)
+
+      result = process_frames_with(headers + trailers)
+
+      assert_empty result[:completed_requests]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, rst_stream_error_code(result, stream_id: 1)
+    end
+
+    def test_process_frames_resets_request_trailers_with_pseudo_headers
+      headers = headers_frame(stream_id: 1, end_stream: false)
+      trailers = trailers_frame(stream_id: 1, headers: [[":path", "/other"]])
+
+      result = process_frames_with(headers + trailers)
+
+      assert_empty result[:completed_requests]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, rst_stream_error_code(result, stream_id: 1)
+    end
+
     def test_process_frames_rejects_continuation_without_pending_headers
       parser = Http2Parser.new
       continuation = parser.build_frame(:continuation, Http2::FLAG_END_HEADERS, 1, "")
@@ -427,10 +462,20 @@ module Raptor
       )
     end
 
-    def headers_frame(stream_id:)
+    def headers_frame(stream_id:, end_stream: true)
       parser = Http2Parser.new
       encoded = parser.encode_headers([[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "x"]])
-      parser.build_frame(:headers, Http2::FLAG_END_STREAM | Http2::FLAG_END_HEADERS, stream_id, encoded)
+      flags = Http2::FLAG_END_HEADERS
+      flags |= Http2::FLAG_END_STREAM if end_stream
+      parser.build_frame(:headers, flags, stream_id, encoded)
+    end
+
+    def trailers_frame(stream_id:, headers:, end_stream: true)
+      parser = Http2Parser.new
+      encoded = parser.encode_headers(headers)
+      flags = Http2::FLAG_END_HEADERS
+      flags |= Http2::FLAG_END_STREAM if end_stream
+      parser.build_frame(:headers, flags, stream_id, encoded)
     end
 
     def goaway_error_code(result)
