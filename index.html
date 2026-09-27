@@ -127,6 +127,8 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
 knowledge. Each <code>h2c://</code> listener accepts HTTP/2 only.</p>
 <p>HTTP/2 applications can populate <code>env[&quot;raptor.response_trailers&quot;]</code> with trailing response headers. Values may be
 strings or arrays of strings.</p>
+<p>Idle HTTP/2 connections receive a PING after <code>keepalive_interval</code> seconds and close when its acknowledgement does not
+arrive within <code>keepalive_timeout</code>. Set <code>keepalive_interval</code> to <code>0</code> to disable these probes.</p>
 <pre class="code ruby"><code class="ruby"><span class='comment'># raptor.rb
 </span>
 <span class='comment'># Every key below is set to its default value; only include the ones you want to override.
@@ -157,6 +159,8 @@ strings or arrays of strings.</p>
   <span class='label'>http2:</span> <span class='lbrace'>{</span>
     <span class='label'>ractors:</span> <span class='kw'>nil</span><span class='comma'>,</span>
     <span class='label'>max_concurrent_streams:</span> <span class='int'>100</span><span class='comma'>,</span>
+    <span class='label'>keepalive_interval:</span> <span class='int'>10</span><span class='comma'>,</span>
+    <span class='label'>keepalive_timeout:</span> <span class='int'>5</span><span class='comma'>,</span>
   <span class='rbrace'>}</span><span class='comma'>,</span>
   <span class='label'>worker_boot_timeout:</span> <span class='int'>60</span><span class='comma'>,</span>
   <span class='label'>worker_timeout:</span> <span class='int'>60</span><span class='comma'>,</span>
@@ -511,7 +515,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Sep 27 09:27:17 2026 by
+  Generated on Sun Sep 27 09:32:52 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
