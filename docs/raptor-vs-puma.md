@@ -348,7 +348,7 @@ The `Writer` is worth a paragraph. Naive per-connection writing would need a mut
 
 So under contention, only one thread does socket I/O at a time (because a socket can only be written to serially anyway), but no thread ever blocks on a lock. The "loser" of the CAS hands its frames off to the "winner" and returns immediately to whatever it was doing next, whether that is starting another stream, waiting for the next work item, or servicing a different connection.
 
-Once the writer thread has claimed a batch of pending frames, it concatenates them into a single buffer and issues one socket write for the whole batch. For a typical response of a HEADERS frame plus several DATA frames, that is one SSL_write call rather than one per frame.
+Once the writer thread has claimed a batch of pending frames, it concatenates them into a single buffer and issues one socket write for the whole batch. Frames handed off concurrently can share that write, while sequential body chunks reach the socket as the Rack body yields them.
 
 Flow control uses similar CAS-protected atoms. The connection-level window and the per-stream windows live in separate `Atom` cells. `acquire` atomically reserves connection capacity and, where per-stream tracking is needed, deducts the same grant from that stream's window. If either window is exhausted, the caller sleeps 1ms and retries until a `WINDOW_UPDATE` makes progress possible.
 

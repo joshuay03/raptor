@@ -55,11 +55,10 @@ module Raptor
       #
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @param max_bytes [Integer] the largest size the caller would like to send
-      # @param end_stream [Boolean] true when this is the final frame on the stream
       # @return [Integer] the number of bytes the caller may now send
       #
-      # @rbs (Integer stream_id, Integer max_bytes, ?end_stream: bool) -> Integer
-      def acquire: (Integer stream_id, Integer max_bytes, ?end_stream: bool) -> Integer
+      # @rbs (Integer stream_id, Integer max_bytes) -> Integer
+      def acquire: (Integer stream_id, Integer max_bytes) -> Integer
 
       # Increments the connection-level send window by `increment` bytes.
       #
@@ -330,6 +329,18 @@ module Raptor
     #
     # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) -> String
     def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) -> String
+
+    # Writes one response body chunk as flow-controlled HTTP/2 DATA frames.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
+    # @param flow_control [FlowControl] per-connection outbound flow controller
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param chunk [String] response body bytes
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, String chunk) -> void
+    def write_http2_data: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, String chunk) -> void
 
     # Writes a 500 error response as HTTP/2 frames.
     #

@@ -99,22 +99,12 @@ module Raptor
       #
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @param max_bytes [Integer] the largest size the caller would like to send
-      # @param end_stream [Boolean] true when this is the final frame on the stream
       # @return [Integer] the number of bytes the caller may now send
       #
-      # @rbs (Integer stream_id, Integer max_bytes, ?end_stream: bool) -> Integer
-      def acquire(stream_id, max_bytes, end_stream: false)
+      # @rbs (Integer stream_id, Integer max_bytes) -> Integer
+      def acquire(stream_id, max_bytes)
         initial = @initial_stream_window.value
         capped = max_bytes < MAX_FRAME_SIZE ? max_bytes : MAX_FRAME_SIZE
-
-        if end_stream && capped <= initial && !@stream_windows.value.key?(stream_id)
-          loop do
-            granted = reserve_connection(capped)
-            return granted if granted.positive?
-
-            sleep ACQUIRE_POLL_INTERVAL
-          end
-        end
 
         loop do
           stream_window = @stream_windows.value[stream_id] || initial
@@ -801,37 +791,41 @@ module Raptor
         return "0"
       end
 
-      body_chunks = []
+      writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)])
+
       body_bytes = 0
       body.each do |chunk|
+        raise TypeError, "body must yield String values" unless chunk.is_a?(String)
         next if chunk.empty?
-        body_chunks << chunk
+
+        write_http2_data(socket, writer, flow_control, stream_id, chunk)
         body_bytes += chunk.bytesize
       end
 
-      if body_chunks.empty?
-        writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers)])
-        return "0"
-      end
-
-      frames = [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)]
-
-      last_chunk_index = body_chunks.size - 1
-      body_chunks.each_with_index do |chunk, chunk_index|
-        offset = 0
-        while offset < chunk.bytesize
-          remaining = chunk.bytesize - offset
-          last_frame = chunk_index == last_chunk_index && remaining <= MAX_FRAME_SIZE
-          granted = flow_control.acquire(stream_id, remaining, end_stream: last_frame)
-          slice = offset.zero? && granted == chunk.bytesize ? chunk : chunk.byteslice(offset, granted)
-          offset += granted
-          end_stream = chunk_index == last_chunk_index && offset == chunk.bytesize
-          frames << parser.build_frame(:data, end_stream ? FLAG_END_STREAM : 0, stream_id, slice)
-        end
-      end
-
-      writer.write_frames(socket, frames)
+      writer.write_frames(socket, [parser.build_frame(:data, FLAG_END_STREAM, stream_id, nil)])
       body_bytes.to_s
+    end
+
+    # Writes one response body chunk as flow-controlled HTTP/2 DATA frames.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
+    # @param flow_control [FlowControl] per-connection outbound flow controller
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param chunk [String] response body bytes
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, String chunk) -> void
+    def write_http2_data(socket, writer, flow_control, stream_id, chunk)
+      parser = Http2Parser.new
+      offset = 0
+
+      while offset < chunk.bytesize
+        granted = flow_control.acquire(stream_id, chunk.bytesize - offset)
+        slice = offset.zero? && granted == chunk.bytesize ? chunk : chunk.byteslice(offset, granted)
+        offset += granted
+        writer.write_frames(socket, [parser.build_frame(:data, 0, stream_id, slice)])
+      end
     end
 
     # Writes a 500 error response as HTTP/2 frames.

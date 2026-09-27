@@ -11,6 +11,7 @@ module Raptor
   class TestHttp2 < TestCase
     parallelize_me!
 
+    DATA_FRAME_TYPE = 0x0
     HEADERS_FRAME_TYPE = 0x1
     RST_STREAM_FRAME_TYPE = 0x3
     GOAWAY_FRAME_TYPE = 0x7
@@ -102,6 +103,23 @@ module Raptor
 
       assert_equal [HEADERS_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
       assert frames.first.getbyte(4).anybits?(Http2::FLAG_END_STREAM)
+    end
+
+    def test_write_http2_response_streams_enumerable_body
+      frames = []
+      observed_frames = nil
+      body = Object.new
+      body.define_singleton_method(:each) do |&block|
+        block.call("first")
+        observed_frames = frames.dup
+        block.call("second")
+      end
+
+      write_http2_response(body: body, frames: frames)
+
+      assert_equal [HEADERS_FRAME_TYPE, DATA_FRAME_TYPE], observed_frames.map { |frame| frame.getbyte(3) }
+      assert_equal ["first", "second", ""], frames.drop(1).map { |frame| frame.byteslice(9..-1) }
+      assert frames.last.getbyte(4).anybits?(Http2::FLAG_END_STREAM)
     end
 
     def test_process_frames_rejects_even_client_stream_id
@@ -241,8 +259,7 @@ module Raptor
 
     private
 
-    def write_http2_response(request_method:, status:, body:)
-      frames = []
+    def write_http2_response(request_method: "GET", status: 200, body: ["body"], frames: [])
       writer = Object.new
       writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
 
