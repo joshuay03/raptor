@@ -106,8 +106,8 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Tracks the peer's connection-level and per-stream receive windows so
-outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
+    <p>Coordinates outbound flow control and stream cancellation without
+polling or mutexes.</p>
 
   </div>
 </div>
@@ -115,44 +115,6 @@ outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
   
 
 </div>
-  
-    <h2>
-      Constant Summary
-      <small><a href="#" class="constants_summary_toggle">collapse</a></small>
-    </h2>
-
-    <dl class="constants">
-      
-        <dt id="ACQUIRE_POLL_INTERVAL-constant" class="">ACQUIRE_POLL_INTERVAL =
-          <div class="docstring">
-  <div class="discussion">
-    
-
-  </div>
-</div>
-<div class="tags">
-  
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>::Float</tt>)</span>
-      
-      
-      
-    </li>
-  
-</ul>
-
-</div>
-        </dt>
-        <dd><pre class="code"><span class='float'>0.001</span></pre></dd>
-      
-    </dl>
-  
-
 
 
 
@@ -184,7 +146,7 @@ outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Reserves outbound capacity on the given stream, polling until at least one byte is available on both the connection and stream windows.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Reserves outbound capacity on the given stream, waiting until at least one byte is available on both the connection and stream windows.</p></div></span>
   
 </li>
 
@@ -229,6 +191,72 @@ outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
 
   
     <span class="summary_desc"><div class='inline'><p>Increments the send window for the given stream by <code>increment</code> bytes.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#cancel_stream-instance_method" title="#cancel_stream (instance method)">#<strong>cancel_stream</strong>(stream_id)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Cancels pending and future writes for the given stream.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#check-instance_method" title="#check (instance method)">#<strong>check</strong>(stream_id)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Raises when the given stream can no longer write a response.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#close-instance_method" title="#close (instance method)">#<strong>close</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Cancels pending and future writes for the connection.</p></div></span>
   
 </li>
 
@@ -354,19 +382,23 @@ outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
       <pre class="lines">
 
 
-90
-91
-92
-93
-94</pre>
+96
+97
+98
+99
+100
+101
+102</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 90</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 96</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span>
   <span class='ivar'>@connection_window</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="../Http2.html#DEFAULT_WINDOW_SIZE-constant" title="Raptor::Http2::DEFAULT_WINDOW_SIZE (constant)">DEFAULT_WINDOW_SIZE</a></span></span><span class='rparen'>)</span>
   <span class='ivar'>@stream_windows</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
   <span class='ivar'>@initial_stream_window</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="../Http2.html#DEFAULT_WINDOW_SIZE-constant" title="Raptor::Http2::DEFAULT_WINDOW_SIZE (constant)">DEFAULT_WINDOW_SIZE</a></span></span><span class='rparen'>)</span>
+  <span class='ivar'>@cancelled_streams</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
+  <span class='ivar'>@available</span> <span class='op'>=</span> <span class='const'>AtomicConditionVariable</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -391,9 +423,9 @@ outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Reserves outbound capacity on the given stream, polling until at
+    <p>Reserves outbound capacity on the given stream, waiting until at
 least one byte is available on both the connection and stream
-windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
+windows. Raises when the stream or connection closes.</p>
 
   </div>
 </div>
@@ -454,14 +486,6 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       <pre class="lines">
 
 
-105
-106
-107
-108
-109
-110
-111
-112
 113
 114
 115
@@ -473,16 +497,24 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
 121
 122
 123
-124</pre>
+124
+125
+126
+127
+128
+129
+130
+131</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 105</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 113</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_acquire'>acquire</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_max_bytes'>max_bytes</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_initial'>initial</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
   <span class='id identifier rubyid_capped'>capped</span> <span class='op'>=</span> <span class='id identifier rubyid_max_bytes'>max_bytes</span> <span class='op'>&lt;</span> <span class='const'><span class='object_link'><a href="../Http2.html#MAX_FRAME_SIZE-constant" title="Raptor::Http2::MAX_FRAME_SIZE (constant)">MAX_FRAME_SIZE</a></span></span> <span class='op'>?</span> <span class='id identifier rubyid_max_bytes'>max_bytes</span> <span class='op'>:</span> <span class='const'><span class='object_link'><a href="../Http2.html#MAX_FRAME_SIZE-constant" title="Raptor::Http2::MAX_FRAME_SIZE (constant)">MAX_FRAME_SIZE</a></span></span>
 
-  <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
+  <span class='ivar'>@available</span><span class='period'>.</span><span class='id identifier rubyid_wait'>wait</span> <span class='kw'>do</span>
+    <span class='id identifier rubyid_check'>check</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_stream_window'>stream_window</span> <span class='op'>=</span> <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
     <span class='id identifier rubyid_capped_full'>capped_full</span> <span class='op'>=</span> <span class='id identifier rubyid_capped'>capped</span> <span class='op'>&lt;</span> <span class='id identifier rubyid_stream_window'>stream_window</span> <span class='op'>?</span> <span class='id identifier rubyid_capped'>capped</span> <span class='op'>:</span> <span class='id identifier rubyid_stream_window'>stream_window</span>
     <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='id identifier rubyid_capped_full'>capped_full</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span> <span class='op'>?</span> <span class='id identifier rubyid_reserve_connection'>reserve_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_capped_full'>capped_full</span><span class='rparen'>)</span> <span class='op'>:</span> <span class='int'>0</span>
@@ -492,10 +524,8 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
         <span class='id identifier rubyid_current'>current</span> <span class='op'>=</span> <span class='id identifier rubyid_windows'>windows</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
         <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>-</span> <span class='id identifier rubyid_granted'>granted</span><span class='rparen'>)</span>
       <span class='kw'>end</span>
-      <span class='kw'>return</span> <span class='id identifier rubyid_granted'>granted</span>
+      <span class='id identifier rubyid_granted'>granted</span>
     <span class='kw'>end</span>
-
-    <span class='id identifier rubyid_sleep'>sleep</span> <span class='const'><span class='object_link'><a href="#ACQUIRE_POLL_INTERVAL-constant" title="Raptor::Http2::FlowControl::ACQUIRE_POLL_INTERVAL (constant)">ACQUIRE_POLL_INTERVAL</a></span></span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -545,15 +575,17 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       <pre class="lines">
 
 
-132
-133
-134</pre>
+139
+140
+141
+142</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 132</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 139</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_add_connection_window'>add_connection_window</span><span class='lparen'>(</span><span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='ivar'>@connection_window</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_window'>window</span><span class='op'>|</span> <span class='id identifier rubyid_window'>window</span> <span class='op'>+</span> <span class='id identifier rubyid_increment'>increment</span> <span class='rbrace'>}</span>
+  <span class='ivar'>@available</span><span class='period'>.</span><span class='id identifier rubyid_broadcast'>broadcast</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -616,16 +648,17 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       <pre class="lines">
 
 
-143
-144
-145
-146
-147
-148
-149</pre>
+151
+152
+153
+154
+155
+156
+157
+158</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 143</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 151</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_add_stream_window'>add_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_initial'>initial</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -633,6 +666,182 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
     <span class='id identifier rubyid_current'>current</span> <span class='op'>=</span> <span class='id identifier rubyid_windows'>windows</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
     <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>+</span> <span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
+  <span class='ivar'>@available</span><span class='period'>.</span><span class='id identifier rubyid_broadcast'>broadcast</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="cancel_stream-instance_method">
+  
+    #<strong>cancel_stream</strong>(stream_id)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Cancels pending and future writes for the given stream.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>stream_id</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the HTTP/2 stream identifier</p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+197
+198
+199
+200</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 197</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_cancel_stream'>cancel_stream</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+  <span class='ivar'>@cancelled_streams</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_streams'>streams</span><span class='op'>|</span> <span class='id identifier rubyid_streams'>streams</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span> <span class='op'>=&gt;</span> <span class='kw'>true</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+  <span class='ivar'>@available</span><span class='period'>.</span><span class='id identifier rubyid_broadcast'>broadcast</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="check-instance_method">
+  
+    #<strong>check</strong>(stream_id)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Raises when the given stream can no longer write a response.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>stream_id</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the HTTP/2 stream identifier</p></div>
+      
+    </li>
+  
+</ul>
+
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="StreamClosedError.html" title="Raptor::Http2::StreamClosedError (class)">StreamClosedError</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>if the stream or connection has closed</p></div>
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+186
+187
+188
+189</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 186</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_check'>check</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_cancelled'>cancelled</span> <span class='op'>=</span> <span class='ivar'>@cancelled_streams</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="StreamClosedError.html" title="Raptor::Http2::StreamClosedError (class)">StreamClosedError</a></span></span> <span class='kw'>if</span> <span class='id identifier rubyid_cancelled'>cancelled</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='int'>0</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='id identifier rubyid_cancelled'>cancelled</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="close-instance_method">
+  
+    #<strong>close</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Cancels pending and future writes for the connection.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+207
+208
+209
+210</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 207</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_close'>close</span>
+  <span class='ivar'>@cancelled_streams</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_streams'>streams</span><span class='op'>|</span> <span class='id identifier rubyid_streams'>streams</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='int'>0</span> <span class='op'>=&gt;</span> <span class='kw'>true</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+  <span class='ivar'>@available</span><span class='period'>.</span><span class='id identifier rubyid_broadcast'>broadcast</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -681,28 +890,38 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       <pre class="lines">
 
 
-175
-176
-177
-178
-179
-180
-181
-182
-183
-184
-185</pre>
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 175</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 218</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_discard_stream'>discard_stream</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
-  <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
-
   <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_windows'>windows</span><span class='op'>|</span>
     <span class='kw'>next</span> <span class='id identifier rubyid_windows'>windows</span> <span class='kw'>unless</span> <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
 
     <span class='id identifier rubyid_pruned'>pruned</span> <span class='op'>=</span> <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
+    <span class='id identifier rubyid_pruned'>pruned</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_pruned'>pruned</span>
+  <span class='kw'>end</span>
+  <span class='ivar'>@cancelled_streams</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_streams'>streams</span><span class='op'>|</span>
+    <span class='kw'>next</span> <span class='id identifier rubyid_streams'>streams</span> <span class='kw'>unless</span> <span class='id identifier rubyid_streams'>streams</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
+
+    <span class='id identifier rubyid_pruned'>pruned</span> <span class='op'>=</span> <span class='id identifier rubyid_streams'>streams</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
     <span class='id identifier rubyid_pruned'>pruned</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_pruned'>pruned</span>
   <span class='kw'>end</span>
@@ -769,17 +988,17 @@ exhausted).</p>
       <pre class="lines">
 
 
-197
-198
-199
-200
-201
-202
-203
-204</pre>
+245
+246
+247
+248
+249
+250
+251
+252</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 197</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 245</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reserve_connection'>reserve_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_capped'>capped</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='int'>0</span>
@@ -837,19 +1056,20 @@ existing stream window by the delta as required by RFC 7540 section 6.9.2.</p>
       <pre class="lines">
 
 
-158
-159
-160
-161
-162
-163
-164
-165
-166
-167</pre>
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 158</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 167</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_initial_stream_window'>set_initial_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_new_size'>new_size</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_old'>old</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -860,6 +1080,7 @@ existing stream window by the delta as required by RFC 7540 section 6.9.2.</p>
   <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_windows'>windows</span><span class='op'>|</span>
     <span class='id identifier rubyid_windows'>windows</span><span class='period'>.</span><span class='id identifier rubyid_transform_values'>transform_values</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_size'>size</span><span class='op'>|</span> <span class='id identifier rubyid_size'>size</span> <span class='op'>+</span> <span class='id identifier rubyid_delta'>delta</span> <span class='rbrace'>}</span>
   <span class='kw'>end</span>
+  <span class='ivar'>@available</span><span class='period'>.</span><span class='id identifier rubyid_broadcast'>broadcast</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -871,7 +1092,7 @@ existing stream window by the delta as required by RFC 7540 section 6.9.2.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Sep 27 09:12:17 2026 by
+  Generated on Sun Sep 27 09:16:12 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
