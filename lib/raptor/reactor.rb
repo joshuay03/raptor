@@ -145,6 +145,7 @@ module Raptor
           end
         end
 
+        @id_to_flow_control.each_value(&:close)
         @id_to_socket.each_value { |socket| socket.close rescue nil }
         @id_to_socket.clear
         @socket_to_state.clear
@@ -335,7 +336,7 @@ module Raptor
 
       @socket_to_state.delete(socket)
       @id_to_writer.delete(id)
-      @id_to_flow_control.delete(id)
+      @id_to_flow_control.delete(id)&.close
       socket.close rescue nil
     end
 
@@ -441,7 +442,7 @@ module Raptor
       state = @socket_to_state.delete(socket)
       @id_to_socket.delete(state[:id])
       @id_to_writer.delete(state[:id])
-      @id_to_flow_control.delete(state[:id])
+      @id_to_flow_control.delete(state[:id])&.close
       socket.close
     end
 

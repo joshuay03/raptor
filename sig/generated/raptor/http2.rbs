@@ -31,16 +31,23 @@ module Raptor
       def write_frames: (OpenSSL::SSL::SSLSocket socket, Array[String] frames) -> void
     end
 
-    # Tracks the peer's connection-level and per-stream receive windows so
-    # outbound `DATA` frames respect RFC 7540 section 5.2.
-    class FlowControl
-      ACQUIRE_POLL_INTERVAL: ::Float
+    class StreamClosedError < StandardError
+      # @rbs () -> String
+      def message: () -> String
+    end
 
+    # Coordinates outbound flow control and stream cancellation without
+    # polling or mutexes.
+    class FlowControl
       @connection_window: Atom
 
       @stream_windows: Atom
 
       @initial_stream_window: Atom
+
+      @cancelled_streams: Atom
+
+      @available: AtomicConditionVariable
 
       # Creates a new FlowControl with the spec-default windows.
       #
@@ -49,9 +56,9 @@ module Raptor
       # @rbs () -> void
       def initialize: () -> void
 
-      # Reserves outbound capacity on the given stream, polling until at
+      # Reserves outbound capacity on the given stream, waiting until at
       # least one byte is available on both the connection and stream
-      # windows. The returned size is capped at `MAX_FRAME_SIZE`.
+      # windows. Raises when the stream or connection closes.
       #
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @param max_bytes [Integer] the largest size the caller would like to send
@@ -85,6 +92,30 @@ module Raptor
       #
       # @rbs (Integer new_size) -> void
       def set_initial_stream_window: (Integer new_size) -> void
+
+      # Raises when the given stream can no longer write a response.
+      #
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @return [void]
+      # @raise [StreamClosedError] if the stream or connection has closed
+      #
+      # @rbs (Integer stream_id) -> void
+      def check: (Integer stream_id) -> void
+
+      # Cancels pending and future writes for the given stream.
+      #
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @return [void]
+      #
+      # @rbs (Integer stream_id) -> void
+      def cancel_stream: (Integer stream_id) -> void
+
+      # Cancels pending and future writes for the connection.
+      #
+      # @return [void]
+      #
+      # @rbs () -> void
+      def close: () -> void
 
       # Discards any per-stream tracking for the given stream.
       #
@@ -325,6 +356,7 @@ module Raptor
     # @param streams [Hash] updated stream states
     # @param outgoing_frames [Array<String>] frames to write to the socket
     # @param completed_requests [Array<Hash>] fully received stream requests
+    # @param cancelled_streams [Array<Integer>] streams reset by the peer
     # @param window_updates [Array<Array(Integer, Integer)>] inbound WINDOW_UPDATE pairs as [stream_id, increment]
     # @param peer_initial_window_size [Integer, nil] new SETTINGS_INITIAL_WINDOW_SIZE announced by the peer
     # @param connection_window [Integer] current connection flow control window
@@ -334,8 +366,8 @@ module Raptor
     # @param close_connection [Boolean] whether the connection should be closed after writing outgoing frames
     # @return [Hash] frozen result hash
     #
-    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[[Integer, Integer]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
-    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[[ Integer, Integer ]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[Integer, Integer]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
+    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[ Integer, Integer ]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
 
     # Sends the server SETTINGS frame on a freshly negotiated HTTP/2
     # connection, then eagerly reads and parses the first client frame
@@ -427,12 +459,13 @@ module Raptor
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
     # @param writer [Writer] frame writer for the connection
+    # @param flow_control [FlowControl] per-connection outbound flow controller
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param hints [Hash] response headers to send as early hints
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
-    def send_early_hints: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
+    def send_early_hints: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
 
     # Resets one HTTP/2 stream with the given error code.
     #
@@ -477,8 +510,8 @@ module Raptor
     # @param remote_addr [String] the client IP address
     # @return [Hash] fully populated Rack environment hash
     #
-    # @rbs (Array[[String, String]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
-    def build_rack_env: (Array[[ String, String ]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
+    # @rbs (Array[[String, String]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
+    def build_rack_env: (Array[[ String, String ]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
 
     # Populates SERVER_NAME and SERVER_PORT from the HTTP_HOST header.
     #

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Propagate HTTP/2 stream cancellation to response bodies
 - Support Rack response lifecycle over HTTP/2
 - Support Rack streaming bodies over HTTP/2
 - Stream HTTP/2 response bodies incrementally

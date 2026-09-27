@@ -351,7 +351,7 @@ So under contention, only one thread does socket I/O at a time (because a socket
 
 Once the writer thread has claimed a batch of pending frames, it concatenates them into a single buffer and issues one socket write for the whole batch. Frames handed off concurrently can share that write, while sequential body chunks reach the socket as the Rack body yields or writes them.
 
-Flow control uses similar CAS-protected atoms. The connection-level window and the per-stream windows live in separate `Atom` cells. `acquire` atomically reserves connection capacity and, where per-stream tracking is needed, deducts the same grant from that stream's window. If either window is exhausted, the caller sleeps 1ms and retries until a `WINDOW_UPDATE` makes progress possible.
+Flow control uses similar CAS-protected atoms. The connection-level window and the per-stream windows live in separate `Atom` cells. `acquire` atomically reserves connection capacity and, where per-stream tracking is needed, deducts the same grant from that stream's window. If either window is exhausted, the caller parks on an `AtomicConditionVariable`; a `WINDOW_UPDATE`, stream reset, or connection shutdown wakes it.
 
 Frame processing also has an eager loop. After processing one batch of frames, the h2 handler tries to `read_nonblock` one more time to see if the next batch is already available. Up to eight rounds are consumed inline before handing back to the reactor, and the loop bails out early once the app thread pool has more queued work than worker slots so one busy connection cannot starve the collector. This is the same principle as the HTTP/1.1 eager keep-alive: amortise the reactor round-trip when the client is actively sending, but back off under saturation.
 

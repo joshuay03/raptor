@@ -59,6 +59,30 @@ module Raptor
       assert_equal 40, blocked.value
     end
 
+    def test_flow_control_acquire_raises_when_stream_closes
+      flow_control = Http2::FlowControl.new
+      drain_windows(flow_control, stream_id: 1)
+
+      blocked = Thread.new { flow_control.acquire(1, 100) }
+      blocked.report_on_exception = false
+      sleep 0.05
+      flow_control.cancel_stream(1)
+
+      assert_raises(Http2::StreamClosedError) { Timeout.timeout(1) { blocked.value } }
+    end
+
+    def test_flow_control_acquire_raises_when_connection_closes
+      flow_control = Http2::FlowControl.new
+      drain_windows(flow_control, stream_id: 1)
+
+      blocked = Thread.new { flow_control.acquire(1, 100) }
+      blocked.report_on_exception = false
+      sleep 0.05
+      flow_control.close
+
+      assert_raises(Http2::StreamClosedError) { Timeout.timeout(1) { blocked.value } }
+    end
+
     def test_flow_control_set_initial_stream_window_shifts_existing_streams
       flow_control = Http2::FlowControl.new
       flow_control.acquire(1, 100)
@@ -177,6 +201,21 @@ module Raptor
       assert_equal [HEADERS_FRAME_TYPE, DATA_FRAME_TYPE, RST_STREAM_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
       assert_same error, callback_error
       assert_same error, handled_error
+    end
+
+    def test_perform_stream_request_handles_stream_cancellation
+      called = false
+      flow_control = Http2::FlowControl.new
+      flow_control.cancel_stream(1)
+      app = proc do
+        called = true
+        [200, {}, ["body"]]
+      end
+
+      frames = perform_stream_request(app, flow_control: flow_control)
+
+      refute called
+      assert_empty frames
     end
 
     def test_process_frames_rejects_even_client_stream_id
@@ -304,6 +343,16 @@ module Raptor
       assert_equal [[0, 1000], [5, 500]], result[:window_updates]
     end
 
+    def test_process_frames_extracts_stream_cancellations
+      parser = Http2Parser.new
+      reset = parser.build_frame(:rst_stream, 0, 1, [Http2::ERROR_NO_ERROR].pack("N"))
+
+      result = process_frames_with(headers_frame(stream_id: 1) + reset)
+
+      assert_empty result[:completed_requests]
+      assert_equal [1], result[:cancelled_streams]
+    end
+
     def test_process_frames_extracts_peer_initial_window_size_from_settings
       parser = Http2Parser.new
       settings_payload = parser.build_settings(initial_window_size: 32_768)
@@ -316,7 +365,7 @@ module Raptor
 
     private
 
-    def perform_stream_request(app, on_error: nil)
+    def perform_stream_request(app, flow_control: Http2::FlowControl.new, on_error: nil)
       frames = []
       writer = Object.new
       writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
@@ -327,7 +376,7 @@ module Raptor
         :perform_stream_request,
         nil,
         writer,
-        Http2::FlowControl.new,
+        flow_control,
         1,
         headers,
         "",
