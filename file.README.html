@@ -125,6 +125,8 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
 <code>connection:</code> (shared across protocols), <code>http1:</code> (HTTP/1.1-specific), and <code>http2:</code> (HTTP/2-specific).</p>
 <p>Use an <code>ssl://</code> bind for HTTP/2 negotiated with ALPN, or an <code>h2c://</code> bind for cleartext HTTP/2 clients using prior
 knowledge. Each <code>h2c://</code> listener accepts HTTP/2 only.</p>
+<p>HTTP/2 applications can populate <code>env[&quot;raptor.response_trailers&quot;]</code> with trailing response headers. Values may be
+strings or arrays of strings.</p>
 <pre class="code ruby"><code class="ruby"><span class='comment'># raptor.rb
 </span>
 <span class='comment'># Every key below is set to its default value; only include the ones you want to override.
@@ -509,7 +511,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Sep 27 09:24:25 2026 by
+  Generated on Sun Sep 27 09:27:17 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
