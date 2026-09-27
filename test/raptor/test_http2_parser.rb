@@ -75,5 +75,12 @@ module Raptor
 
       assert_equal [[":status", "404"]], parser.parse_headers(encoded, []).first
     end
+
+    def test_encode_response_trailers
+      parser = Http2Parser.new
+      encoded = parser.encode_response_trailers({"Grpc-Status" => "0", ":status" => "500"})
+
+      assert_equal [["grpc-status", "0"]], parser.parse_headers(encoded, []).first
+    end
   end
 end

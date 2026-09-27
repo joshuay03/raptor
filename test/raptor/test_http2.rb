@@ -195,6 +195,20 @@ module Raptor
       assert_equal [200, {"content-type" => "text/plain"}, nil], callback_arguments.drop(1)
     end
 
+    def test_perform_stream_request_writes_response_trailers
+      app = proc do |env|
+        env[Http2::RESPONSE_TRAILERS]["grpc-status"] = "0"
+        [200, {"content-type" => "application/grpc"}, ["body"]]
+      end
+
+      frames = perform_stream_request(app)
+
+      assert_equal [HEADERS_FRAME_TYPE, DATA_FRAME_TYPE, HEADERS_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
+      assert_equal [[":status", "200"], ["content-type", "application/grpc"]], decode_header_blocks(frames).first
+      assert_equal [["grpc-status", "0"]], decode_header_blocks(frames).last
+      assert frames.last.getbyte(4).anybits?(Http2::FLAG_END_STREAM)
+    end
+
     def test_perform_stream_request_handles_body_errors
       callback_error = nil
       handled_error = nil
@@ -459,6 +473,7 @@ module Raptor
         status,
         {},
         body,
+        trailers: {},
         request_method: request_method
       )
 

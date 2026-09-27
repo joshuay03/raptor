@@ -3,6 +3,8 @@
 module Raptor
   # Handles HTTP/2 request processing and Rack application integration.
   class Http2
+    RESPONSE_TRAILERS: ::String
+
     # Serialises concurrent frame writes on a single HTTP/2 connection so
     # exactly one thread is writing at any moment.
     class Writer
@@ -146,6 +148,8 @@ module Raptor
 
       @parser: Http2Parser
 
+      @trailers: Hash[String, String | Array[String]]
+
       @stream_id: Integer
 
       @flow_control: FlowControl
@@ -165,10 +169,11 @@ module Raptor
       # @param writer [Writer] frame writer for the connection
       # @param flow_control [FlowControl] outbound flow controller
       # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @param trailers [Hash] trailing response headers populated by the Rack application
       # @return [void]
       #
-      # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id) -> void
-      def initialize: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id) -> void
+      # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] trailers) -> void
+      def initialize: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] trailers) -> void
 
       # Streaming responses are write-only.
       #
@@ -478,11 +483,12 @@ module Raptor
     # @param status [Integer] HTTP status code
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body responding to each
+    # @param trailers [Hash] trailing response headers populated by the Rack application
     # @param request_method [String] request method used to suppress HEAD response bodies
     # @return [String] the response body size in bytes
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) ?{ () -> void } -> String
-    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) ?{ () -> void } -> String
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, trailers: Hash[String, String | Array[String]], request_method: String) ?{ () -> void } -> String
+    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, trailers: Hash[String, String | Array[String]], request_method: String) ?{ () -> void } -> String
 
     # Sends an HTTP 103 Early Hints response.
     #

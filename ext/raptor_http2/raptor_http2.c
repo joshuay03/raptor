@@ -630,6 +630,7 @@ static int response_headers_iter(VALUE key, VALUE value, VALUE data) {
   const char *lname = RSTRING_PTR(lowered);
   long lname_len = RSTRING_LEN(lowered);
 
+  if (lname_len > 0 && lname[0] == ':') return ST_CONTINUE;
   if (lname_len >= 5 && memcmp(lname, "rack.", 5) == 0) return ST_CONTINUE;
   if (is_hop_by_hop(lname, lname_len)) return ST_CONTINUE;
 
@@ -654,6 +655,16 @@ static VALUE h2_encode_response_headers(VALUE self, VALUE status, VALUE headers)
   VALUE pairs = rb_ary_new();
   rb_ary_push(pairs, rb_ary_new_from_args(2, rb_str_new_lit(":status"), rb_obj_as_string(status)));
   rb_hash_foreach(headers, response_headers_iter, pairs);
+
+  return hpack_encode_header_block(pairs);
+}
+
+static VALUE h2_encode_response_trailers(VALUE self, VALUE trailers) {
+  (void)self;
+  Check_Type(trailers, T_HASH);
+
+  VALUE pairs = rb_ary_new();
+  rb_hash_foreach(trailers, response_headers_iter, pairs);
 
   return hpack_encode_header_block(pairs);
 }
@@ -825,6 +836,7 @@ RUBY_FUNC_EXPORTED void Init_raptor_http2(void) {
   rb_define_method(cHttp2Parser, "parse_headers", h2_parse_headers, 2);
   rb_define_method(cHttp2Parser, "encode_headers", h2_encode_headers, 1);
   rb_define_method(cHttp2Parser, "encode_response_headers", h2_encode_response_headers, 2);
+  rb_define_method(cHttp2Parser, "encode_response_trailers", h2_encode_response_trailers, 1);
   rb_define_method(cHttp2Parser, "parse_settings", h2_parse_settings, 1);
   rb_define_method(cHttp2Parser, "build_settings", h2_build_settings, 1);
   rb_define_method(cHttp2Parser, "build_frame", h2_build_frame, 4);

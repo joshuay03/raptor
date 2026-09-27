@@ -16,6 +16,8 @@ module Raptor
   # Handles HTTP/2 request processing and Rack application integration.
   #
   class Http2
+    RESPONSE_TRAILERS = "raptor.response_trailers"
+
     # Serialises concurrent frame writes on a single HTTP/2 connection so
     # exactly one thread is writing at any moment.
     #
@@ -260,6 +262,7 @@ module Raptor
       # @rbs @writer: Writer
       # @rbs @flow_control: FlowControl
       # @rbs @stream_id: Integer
+      # @rbs @trailers: Hash[String, String | Array[String]]
       # @rbs @parser: Http2Parser
       # @rbs @bytes_written: Integer
       # @rbs @closed: bool
@@ -275,14 +278,16 @@ module Raptor
       # @param writer [Writer] frame writer for the connection
       # @param flow_control [FlowControl] outbound flow controller
       # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @param trailers [Hash] trailing response headers populated by the Rack application
       # @return [void]
       #
-      # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id) -> void
-      def initialize(socket, writer, flow_control, stream_id)
+      # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] trailers) -> void
+      def initialize(socket, writer, flow_control, stream_id, trailers)
         @socket = socket
         @writer = writer
         @flow_control = flow_control
         @stream_id = stream_id
+        @trailers = trailers
         @parser = Http2Parser.new
         @bytes_written = 0
         @closed = false
@@ -349,7 +354,13 @@ module Raptor
 
         @flow_control.check(@stream_id)
         @closed = true
-        @writer.write_frames(@socket, [@parser.build_frame(:data, FLAG_END_STREAM, @stream_id, nil)])
+        if @trailers.empty?
+          frame = @parser.build_frame(:data, FLAG_END_STREAM, @stream_id, nil)
+        else
+          encoded = @parser.encode_response_trailers(@trailers)
+          frame = @parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, @stream_id, encoded)
+        end
+        @writer.write_frames(@socket, [frame])
       end
 
       # Closes the unsupported read side of the stream.
@@ -1011,6 +1022,7 @@ module Raptor
         status,
         response_headers,
         response_body,
+        trailers: env[RESPONSE_TRAILERS],
         request_method: env[Rack::REQUEST_METHOD]
       ) { response_started = true }
       response_body.close if response_body.respond_to?(:close)
@@ -1045,11 +1057,12 @@ module Raptor
     # @param status [Integer] HTTP status code
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body responding to each
+    # @param trailers [Hash] trailing response headers populated by the Rack application
     # @param request_method [String] request method used to suppress HEAD response bodies
     # @return [String] the response body size in bytes
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) ?{ () -> void } -> String
-    def write_http2_response(socket, writer, flow_control, stream_id, status, headers, body, request_method:)
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, trailers: Hash[String, String | Array[String]], request_method: String) ?{ () -> void } -> String
+    def write_http2_response(socket, writer, flow_control, stream_id, status, headers, body, trailers:, request_method:)
       parser = Http2Parser.new
 
       encoded_headers = parser.encode_response_headers(status, headers)
@@ -1064,7 +1077,7 @@ module Raptor
       writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)])
       yield if block_given?
 
-      stream = ResponseStream.new(socket, writer, flow_control, stream_id)
+      stream = ResponseStream.new(socket, writer, flow_control, stream_id, trailers)
       if body.respond_to?(:each)
         body.each { |chunk| stream.write(chunk) }
       else
@@ -1197,6 +1210,7 @@ module Raptor
       env[Http::REMOTE_ADDR] = remote_addr
       env[Http::SERVER_SOFTWARE] = Http::SERVER_SOFTWARE_VALUE
       env[Http::HTTP_VERSION] = SERVER_PROTOCOL
+      env[RESPONSE_TRAILERS] = {}
 
       populate_server_name_and_port(env)
 

@@ -88,6 +88,9 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
 Use an `ssl://` bind for HTTP/2 negotiated with ALPN, or an `h2c://` bind for cleartext HTTP/2 clients using prior
 knowledge. Each `h2c://` listener accepts HTTP/2 only.
 
+HTTP/2 applications can populate `env["raptor.response_trailers"]` with trailing response headers. Values may be
+strings or arrays of strings.
+
 ```ruby
 # raptor.rb
 
