@@ -170,7 +170,7 @@ outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#acquire-instance_method" title="#acquire (instance method)">#<strong>acquire</strong>(stream_id, max_bytes, end_stream: false)  &#x21d2; Integer </a>
+      <a href="#acquire-instance_method" title="#acquire (instance method)">#<strong>acquire</strong>(stream_id, max_bytes)  &#x21d2; Integer </a>
     
 
     
@@ -383,7 +383,7 @@ outbound <code>DATA</code> frames respect RFC 7540 section 5.2.</p>
       <div class="method_details first">
   <h3 class="signature first" id="acquire-instance_method">
   
-    #<strong>acquire</strong>(stream_id, max_bytes, end_stream: false)  &#x21d2; <tt>Integer</tt> 
+    #<strong>acquire</strong>(stream_id, max_bytes)  &#x21d2; <tt>Integer</tt> 
   
 
   
@@ -429,35 +429,6 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       
     </li>
   
-    <li>
-      
-        <span class='name'>end_stream</span>
-      
-      
-        <span class='type'>(<tt>Boolean</tt>)</span>
-      
-      
-        <em class="default">(defaults to: <tt>false</tt>)</em>
-      
-      
-        &mdash;
-        <div class='inline'><p>true when this is the final frame on the stream</p></div>
-      
-    </li>
-  
-    <li>
-      
-        <span class='name'>end_stream:</span>
-      
-      
-        <span class='type'>(<tt>Boolean</tt>)</span>
-      
-      
-        <em class="default">(defaults to: <tt>false</tt>)</em>
-      
-      
-    </li>
-  
 </ul>
 
 <p class="tag_title">Returns:</p>
@@ -483,6 +454,7 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       <pre class="lines">
 
 
+105
 106
 107
 108
@@ -501,33 +473,14 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
 121
 122
 123
-124
-125
-126
-127
-128
-129
-130
-131
-132
-133
-134</pre>
+124</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 106</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 105</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_acquire'>acquire</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_max_bytes'>max_bytes</span><span class='comma'>,</span> <span class='label'>end_stream:</span> <span class='kw'>false</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_acquire'>acquire</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_max_bytes'>max_bytes</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_initial'>initial</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
   <span class='id identifier rubyid_capped'>capped</span> <span class='op'>=</span> <span class='id identifier rubyid_max_bytes'>max_bytes</span> <span class='op'>&lt;</span> <span class='const'><span class='object_link'><a href="../Http2.html#MAX_FRAME_SIZE-constant" title="Raptor::Http2::MAX_FRAME_SIZE (constant)">MAX_FRAME_SIZE</a></span></span> <span class='op'>?</span> <span class='id identifier rubyid_max_bytes'>max_bytes</span> <span class='op'>:</span> <span class='const'><span class='object_link'><a href="../Http2.html#MAX_FRAME_SIZE-constant" title="Raptor::Http2::MAX_FRAME_SIZE (constant)">MAX_FRAME_SIZE</a></span></span>
-
-  <span class='kw'>if</span> <span class='id identifier rubyid_end_stream'>end_stream</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_capped'>capped</span> <span class='op'>&lt;=</span> <span class='id identifier rubyid_initial'>initial</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
-    <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
-      <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='id identifier rubyid_reserve_connection'>reserve_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_capped'>capped</span><span class='rparen'>)</span>
-      <span class='kw'>return</span> <span class='id identifier rubyid_granted'>granted</span> <span class='kw'>if</span> <span class='id identifier rubyid_granted'>granted</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span>
-
-      <span class='id identifier rubyid_sleep'>sleep</span> <span class='const'><span class='object_link'><a href="#ACQUIRE_POLL_INTERVAL-constant" title="Raptor::Http2::FlowControl::ACQUIRE_POLL_INTERVAL (constant)">ACQUIRE_POLL_INTERVAL</a></span></span>
-    <span class='kw'>end</span>
-  <span class='kw'>end</span>
 
   <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
     <span class='id identifier rubyid_stream_window'>stream_window</span> <span class='op'>=</span> <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='lbracket'>[</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='id identifier rubyid_initial'>initial</span>
@@ -592,12 +545,12 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       <pre class="lines">
 
 
-142
-143
-144</pre>
+132
+133
+134</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 142</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 132</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_add_connection_window'>add_connection_window</span><span class='lparen'>(</span><span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='ivar'>@connection_window</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_window'>window</span><span class='op'>|</span> <span class='id identifier rubyid_window'>window</span> <span class='op'>+</span> <span class='id identifier rubyid_increment'>increment</span> <span class='rbrace'>}</span>
@@ -663,16 +616,16 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       <pre class="lines">
 
 
-153
-154
-155
-156
-157
-158
-159</pre>
+143
+144
+145
+146
+147
+148
+149</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 153</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 143</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_add_stream_window'>add_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_increment'>increment</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_initial'>initial</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -728,20 +681,20 @@ windows. The returned size is capped at <code>MAX_FRAME_SIZE</code>.</p>
       <pre class="lines">
 
 
-185
-186
-187
-188
-189
-190
-191
-192
-193
-194
-195</pre>
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 185</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 175</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_discard_stream'>discard_stream</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@stream_windows</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_key?'>key?</span><span class='lparen'>(</span><span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
@@ -816,17 +769,17 @@ exhausted).</p>
       <pre class="lines">
 
 
-207
-208
-209
-210
-211
-212
-213
-214</pre>
+197
+198
+199
+200
+201
+202
+203
+204</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 207</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 197</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reserve_connection'>reserve_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_capped'>capped</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_granted'>granted</span> <span class='op'>=</span> <span class='int'>0</span>
@@ -884,19 +837,19 @@ existing stream window by the delta as required by RFC 7540 section 6.9.2.</p>
       <pre class="lines">
 
 
-168
-169
-170
-171
-172
-173
-174
-175
-176
-177</pre>
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 168</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 158</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_set_initial_stream_window'>set_initial_stream_window</span><span class='lparen'>(</span><span class='id identifier rubyid_new_size'>new_size</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_old'>old</span> <span class='op'>=</span> <span class='ivar'>@initial_stream_window</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -918,7 +871,7 @@ existing stream window by the delta as required by RFC 7540 section 6.9.2.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Sep 26 09:19:07 2026 by
+  Generated on Sun Sep 27 09:12:17 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
