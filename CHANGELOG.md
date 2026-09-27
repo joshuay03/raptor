@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Support cleartext HTTP/2 bindings
 - Accept HTTP/2 request trailers
 - Propagate HTTP/2 stream cancellation to response bodies
 - Support Rack response lifecycle over HTTP/2

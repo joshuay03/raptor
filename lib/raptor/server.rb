@@ -182,6 +182,18 @@ module Raptor
         return true
       end
 
+      if listener.is_a?(Binder::H2cListener)
+        @http2.eager_accept(
+          tcp_client,
+          tcp_client.object_id,
+          @reactor,
+          @thread_pool,
+          remote_addr,
+          HTTP_SCHEME
+        )
+        return true
+      end
+
       @http1.eager_accept(
         tcp_client,
         tcp_client.object_id,

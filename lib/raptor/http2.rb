@@ -813,7 +813,7 @@ module Raptor
         return
       end
 
-      while socket.pending.positive?
+      while socket.respond_to?(:pending) && socket.pending.positive?
         buffer << socket.read_nonblock(socket.pending)
       end
 
@@ -926,7 +926,7 @@ module Raptor
       buffer = String.new
       buffer << data
 
-      while socket.pending.positive?
+      while socket.respond_to?(:pending) && socket.pending.positive?
         buffer << socket.read_nonblock(socket.pending)
       end
 

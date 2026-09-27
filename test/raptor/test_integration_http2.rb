@@ -35,6 +35,18 @@ module Raptor
       end
     end
 
+    def test_cleartext_http2_get_request
+      @options[:binds] = ["h2c://127.0.0.1:0"]
+
+      with_http2_server do |port|
+        responses = http2_get(port, "/", ssl: false)
+
+        assert_equal 1, responses.size
+        assert_equal "200", responses[0][:status]
+        assert_equal "Hello, World!", responses[0][:body]
+      end
+    end
+
     def test_http2_request_method
       with_http2_server("request_method.ru") do |port|
         responses = http2_request(port, "POST", "/", body: "data")
@@ -152,7 +164,11 @@ module Raptor
       cluster_pid = fork { without_output { cluster.run } }
       cluster.instance_variable_get(:@binder).close
 
-      wait_for_ssl_server(server_port)
+      if @options[:binds].first.start_with?("ssl://")
+        wait_for_ssl_server(server_port)
+      else
+        wait_for_cleartext_server(server_port)
+      end
 
       yield server_port
     ensure
@@ -193,17 +209,28 @@ module Raptor
       end
     end
 
-    def http2_get(port, path)
-      http2_request(port, "GET", path)
+    def wait_for_cleartext_server(port)
+      Timeout.timeout(10) do
+        loop do
+          TCPSocket.new("127.0.0.1", port).close
+          break
+        rescue Errno::ECONNREFUSED
+          sleep 0.1
+        end
+      end
     end
 
-    def http2_request(port, method, path, body: nil)
+    def http2_get(port, path, ssl: true)
+      http2_request(port, "GET", path, ssl: ssl)
+    end
+
+    def http2_request(port, method, path, body: nil, ssl: true)
       responses = []
 
-      ssl_socket = connect_http2(port)
+      socket = connect_http2(port, ssl: ssl)
       conn = HTTP2::Client.new
 
-      conn.on(:frame) { |bytes| ssl_socket.write(bytes) }
+      conn.on(:frame) { |bytes| socket.write(bytes) }
 
       stream = conn.new_stream
       response = { headers: {}, body: +"" }
@@ -224,7 +251,7 @@ module Raptor
       request_headers = {
         ":method" => method,
         ":path" => path,
-        ":scheme" => "https",
+        ":scheme" => ssl ? "https" : "http",
         ":authority" => "localhost:#{port}"
       }
 
@@ -235,11 +262,11 @@ module Raptor
         stream.headers(request_headers, end_stream: true)
       end
 
-      read_http2_responses(ssl_socket, conn)
+      read_http2_responses(socket, conn)
 
       responses
     ensure
-      ssl_socket&.close rescue nil
+      socket&.close rescue nil
     end
 
     def http2_concurrent_gets(port, paths)
@@ -282,8 +309,10 @@ module Raptor
       ssl_socket&.close rescue nil
     end
 
-    def connect_http2(port)
+    def connect_http2(port, ssl: true)
       tcp_socket = TCPSocket.new("127.0.0.1", port)
+      return tcp_socket unless ssl
+
       ssl_context = OpenSSL::SSL::SSLContext.new
       ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
       ssl_context.alpn_protocols = ["h2"]
@@ -294,10 +323,10 @@ module Raptor
       ssl_socket
     end
 
-    def read_http2_responses(ssl_socket, conn)
+    def read_http2_responses(socket, conn)
       Timeout.timeout(5) do
         loop do
-          data = ssl_socket.readpartial(65_536)
+          data = socket.readpartial(65_536)
           conn << data
         rescue EOFError
           break

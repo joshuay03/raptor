@@ -85,6 +85,9 @@ The config file is a Ruby file that evaluates to a hash of options. By default R
 `config/raptor.rb` from the working directory; pass `-c PATH` to point at a specific file. Settings are nested under
 `connection:` (shared across protocols), `http1:` (HTTP/1.1-specific), and `http2:` (HTTP/2-specific).
 
+Use an `ssl://` bind for HTTP/2 negotiated with ALPN, or an `h2c://` bind for cleartext HTTP/2 clients using prior
+knowledge. Each `h2c://` listener accepts HTTP/2 only.
+
 ```ruby
 # raptor.rb
 

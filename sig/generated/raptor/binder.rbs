@@ -1,9 +1,9 @@
 # Generated from lib/raptor/binder.rb with RBS::Inline
 
 module Raptor
-  # Binds `tcp://`, `unix://`, and `ssl://` URIs to listening sockets and
-  # holds them for the server. Reconstructs listeners from inherited file
-  # descriptors when provided (systemd socket activation, hot restart).
+  # Binds TCP, Unix, SSL, and cleartext HTTP/2 URIs to listening sockets
+  # and holds them for the server. Reconstructs listeners from inherited
+  # file descriptors when provided (systemd socket activation, hot restart).
   class Binder
     SOCKET_BACKLOG: ::Integer
 
@@ -27,9 +27,21 @@ module Raptor
       def members: () -> [ :tcp_server, :ssl_context ]
     end
 
-    @uri_listeners: Hash[String, Array[TCPServer | UNIXServer | SslListener]]
+    # Marks a TCPServer as accepting cleartext HTTP/2 connections.
+    class H2cListener < Data
+      attr_reader tcp_server(): untyped
 
-    @listeners: Array[TCPServer | UNIXServer | SslListener]
+      def self.new: (untyped tcp_server) -> instance
+                  | (tcp_server: untyped) -> instance
+
+      def self.members: () -> [ :tcp_server ]
+
+      def members: () -> [ :tcp_server ]
+    end
+
+    @uri_listeners: Hash[String, Array[TCPServer | UNIXServer | SslListener | H2cListener]]
+
+    @listeners: Array[TCPServer | UNIXServer | SslListener | H2cListener]
 
     @inherited_fds: Hash[String, Array[Integer]]
 
@@ -49,7 +61,7 @@ module Raptor
 
     # Returns the array of listening sockets.
     #
-    # @return [Array<TCPServer, UNIXServer, SslListener>]
+    # @return [Array<TCPServer, UNIXServer, SslListener, H2cListener>]
     attr_reader listeners: untyped
 
     # Creates a new Binder and binds each URI. `localhost` expands to both
@@ -66,7 +78,8 @@ module Raptor
     def initialize: (Array[String] bind_uris, ?socket_backlog: Integer, ?inherited_fds: Hash[String, Array[Integer]]) -> void
 
     # Returns the bound addresses as strings: TCP as `host:port`, Unix as
-    # the socket path, SSL as `ssl://host:port`.
+    # the socket path, SSL as `ssl://host:port`, and cleartext HTTP/2 as
+    # `h2c://host:port`.
     #
     # @return [Array<String>]
     #
@@ -124,22 +137,22 @@ module Raptor
     # Creates fresh listeners for the given URI.
     #
     # @param uri [URI] the parsed bind URI
-    # @return [Array<TCPServer, UNIXServer, SslListener>]
+    # @return [Array<TCPServer, UNIXServer, SslListener, H2cListener>]
     # @raise [UnknownBindSchemeError] if the URI scheme is not supported
     #
-    # @rbs (URI::Generic uri) -> Array[TCPServer | UNIXServer | SslListener]
-    def create_listeners: (URI::Generic uri) -> Array[TCPServer | UNIXServer | SslListener]
+    # @rbs (URI::Generic uri) -> Array[TCPServer | UNIXServer | SslListener | H2cListener]
+    def create_listeners: (URI::Generic uri) -> Array[TCPServer | UNIXServer | SslListener | H2cListener]
 
     # Reconstructs listeners for the given URI from inherited file
     # descriptors.
     #
     # @param uri [URI] the parsed bind URI the FDs were bound to
     # @param filenos [Array<Integer>] file descriptors to wrap
-    # @return [Array<TCPServer, UNIXServer, SslListener>]
+    # @return [Array<TCPServer, UNIXServer, SslListener, H2cListener>]
     # @raise [UnknownBindSchemeError] if the URI scheme is not supported
     #
-    # @rbs (URI::Generic uri, Array[Integer] filenos) -> Array[TCPServer | UNIXServer | SslListener]
-    def restore_listeners: (URI::Generic uri, Array[Integer] filenos) -> Array[TCPServer | UNIXServer | SslListener]
+    # @rbs (URI::Generic uri, Array[Integer] filenos) -> Array[TCPServer | UNIXServer | SslListener | H2cListener]
+    def restore_listeners: (URI::Generic uri, Array[Integer] filenos) -> Array[TCPServer | UNIXServer | SslListener | H2cListener]
 
     # Creates TCP server sockets for the given host and port.
     #
