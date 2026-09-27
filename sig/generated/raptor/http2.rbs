@@ -249,6 +249,8 @@ module Raptor
 
     ERROR_INTERNAL_ERROR: ::Integer
 
+    ERROR_REFUSED_STREAM: ::Integer
+
     DEFAULT_WINDOW_SIZE: ::Integer
 
     MAX_FRAME_SIZE: ::Integer
@@ -270,6 +272,8 @@ module Raptor
     #
     # @rbs (Array[[String, String]] headers) -> bool
     def self.invalid_pseudo_headers?: (Array[[ String, String ]] headers) -> bool
+
+    @running: AtomicBoolean
 
     @initial_settings_frame: String
 
@@ -316,6 +320,15 @@ module Raptor
     #
     # @rbs () -> Writer
     def create_writer: () -> Writer
+
+    # Stops new stream dispatch and asks clients to finish streams already
+    # handed to the application.
+    #
+    # @param reactor [Reactor] the reactor managing HTTP/2 connections
+    # @return [void]
+    #
+    # @rbs (Reactor reactor) -> void
+    def shutdown: (Reactor reactor) -> void
 
     # Returns a Ractor-safe proc that parses HTTP/2 frames from the
     # state hash's buffered bytes.

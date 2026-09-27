@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Gracefully drain HTTP/2 connections
 - Support cleartext HTTP/2 bindings
 - Accept HTTP/2 request trailers
 - Propagate HTTP/2 stream cancellation to response bodies

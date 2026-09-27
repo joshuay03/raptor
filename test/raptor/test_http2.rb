@@ -39,6 +39,19 @@ module Raptor
       assert_equal [[nil, nil, nil], [nil, nil, nil]], values
     end
 
+    def test_shutdown_sends_goaway
+      frame = nil
+      reactor = Object.new
+      reactor.define_singleton_method(:drain_http2) { |&block| frame = block.call(5) }
+      handler = Http2.new(proc {}, 9292, http2_options: {max_concurrent_streams: 100})
+
+      handler.shutdown(reactor)
+
+      parsed, = Http2Parser.new.parse_frame(frame)
+      assert_equal :goaway, parsed[:type]
+      assert_equal [5, Http2::ERROR_NO_ERROR], parsed[:payload].unpack("NN")
+    end
+
     def test_flow_control_acquire_caps_grant_at_max_frame_size
       flow_control = Http2::FlowControl.new
 

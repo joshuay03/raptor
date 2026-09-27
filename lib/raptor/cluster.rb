@@ -943,12 +943,13 @@ module Raptor
       end
 
       server_thread.join
+      http1.shutdown
+      http2.shutdown(reactor)
+      drain_thread_pool(thread_pool)
       reactor.shutdown
       reactor_thread.join
       http1_ractor_pool.shutdown
       http2_ractor_pool&.shutdown
-      http1.shutdown
-      drain_thread_pool(thread_pool)
       stats_thread.join
 
       run_seed_loop(index) if promote_to_seed

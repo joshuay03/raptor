@@ -70,6 +70,10 @@ module Raptor
 
     @id_to_flow_control: Hash[Integer, untyped]
 
+    @id_to_http2_last_stream: Hash[Integer, Integer]
+
+    @id_to_http2_drain_stream: Hash[Integer, Integer]
+
     # Creates a new Reactor instance.
     #
     # @param http1_ractor_pool [RactorPool] ractor pool for HTTP/1.x parsing
@@ -161,6 +165,26 @@ module Raptor
     #
     # @rbs (Integer id) -> untyped?
     def flow_control_for: (Integer id) -> untyped?
+
+    # Records an HTTP/2 stream before application dispatch, rejecting streams
+    # that arrived after graceful draining began.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @return [Boolean] whether the stream may be dispatched
+    #
+    # @rbs (Integer id, Integer stream_id) -> bool
+    def dispatch_http2_stream: (Integer id, Integer stream_id) -> bool
+
+    # Sends GOAWAY on every HTTP/2 connection and fixes the last stream each
+    # connection may dispatch while existing application work drains.
+    #
+    # @yieldparam stream_id [Integer] last dispatched stream identifier
+    # @yieldreturn [String] serialized GOAWAY frame
+    # @return [void]
+    #
+    # @rbs () { (Integer stream_id) -> String } -> void
+    def drain_http2: () { (Integer stream_id) -> String } -> void
 
     # Stores an HTTP/2 connection's socket, state, writer, and flow
     # controller in the reactor's per-connection maps.

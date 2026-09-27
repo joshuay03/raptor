@@ -67,6 +67,8 @@ module Raptor
     # @rbs @id_to_timeout: Hash[Integer, TimeoutClient]
     # @rbs @id_to_writer: Hash[Integer, untyped]
     # @rbs @id_to_flow_control: Hash[Integer, untyped]
+    # @rbs @id_to_http2_last_stream: Hash[Integer, Integer]
+    # @rbs @id_to_http2_drain_stream: Hash[Integer, Integer]
 
     # Creates a new Reactor instance.
     #
@@ -98,6 +100,8 @@ module Raptor
       @id_to_timeout = {}
       @id_to_writer = {}
       @id_to_flow_control = {}
+      @id_to_http2_last_stream = {}
+      @id_to_http2_drain_stream = {}
     end
 
     # Starts the reactor's main event loop in a new thread. Runs until
@@ -152,6 +156,8 @@ module Raptor
         @id_to_timeout.clear
         @id_to_writer.clear
         @id_to_flow_control.clear
+        @id_to_http2_last_stream.clear
+        @id_to_http2_drain_stream.clear
         @timeouts.clear!
         @selector.close
       end
@@ -271,6 +277,42 @@ module Raptor
       @id_to_flow_control[id]
     end
 
+    # Records an HTTP/2 stream before application dispatch, rejecting streams
+    # that arrived after graceful draining began.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @return [Boolean] whether the stream may be dispatched
+    #
+    # @rbs (Integer id, Integer stream_id) -> bool
+    def dispatch_http2_stream(id, stream_id)
+      if (last_stream = @id_to_http2_drain_stream[id])
+        return stream_id <= last_stream
+      end
+
+      current = @id_to_http2_last_stream[id] || 0
+      @id_to_http2_last_stream[id] = stream_id if stream_id > current
+      true
+    end
+
+    # Sends GOAWAY on every HTTP/2 connection and fixes the last stream each
+    # connection may dispatch while existing application work drains.
+    #
+    # @yieldparam stream_id [Integer] last dispatched stream identifier
+    # @yieldreturn [String] serialized GOAWAY frame
+    # @return [void]
+    #
+    # @rbs () { (Integer stream_id) -> String } -> void
+    def drain_http2
+      @id_to_flow_control.each_key do |id|
+        last_stream = @id_to_http2_last_stream[id] || 0
+        @id_to_http2_drain_stream[id] = last_stream
+        writer = @id_to_writer[id]
+        socket = @id_to_socket[id]
+        writer.write_frames(socket, [yield(last_stream)]) if writer && socket
+      end
+    end
+
     # Stores an HTTP/2 connection's socket, state, writer, and flow
     # controller in the reactor's per-connection maps.
     #
@@ -287,6 +329,7 @@ module Raptor
       @socket_to_state[socket] = state
       @id_to_writer[id] = writer
       @id_to_flow_control[id] = flow_control
+      @id_to_http2_last_stream[id] = 0
     end
 
     # Registers an attached socket for future reactor-driven reads.
@@ -337,6 +380,8 @@ module Raptor
       @socket_to_state.delete(socket)
       @id_to_writer.delete(id)
       @id_to_flow_control.delete(id)&.close
+      @id_to_http2_last_stream.delete(id)
+      @id_to_http2_drain_stream.delete(id)
       socket.close rescue nil
     end
 
@@ -443,6 +488,8 @@ module Raptor
       @id_to_socket.delete(state[:id])
       @id_to_writer.delete(state[:id])
       @id_to_flow_control.delete(state[:id])&.close
+      @id_to_http2_last_stream.delete(state[:id])
+      @id_to_http2_drain_stream.delete(state[:id])
       socket.close
     end
 

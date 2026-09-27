@@ -4,6 +4,7 @@
 require "stringio"
 
 require "atomic-ruby/atom"
+require "atomic-ruby/atomic_boolean"
 require "atomic-ruby/atomic_condition_variable"
 require "rack"
 
@@ -391,6 +392,7 @@ module Raptor
     ERROR_NO_ERROR = 0x0
     ERROR_PROTOCOL_ERROR = 0x1
     ERROR_INTERNAL_ERROR = 0x2
+    ERROR_REFUSED_STREAM = 0x7
 
     DEFAULT_WINDOW_SIZE = 65_535
     MAX_FRAME_SIZE = 16_384
@@ -438,6 +440,7 @@ module Raptor
     # @rbs @clean_fiber_locals: bool
     # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
     # @rbs @initial_settings_frame: String
+    # @rbs @running: AtomicBoolean
 
     # Returns the initial server SETTINGS frame to send on every new
     # HTTP/2 connection.
@@ -468,6 +471,7 @@ module Raptor
       @clean_thread_locals = clean_thread_locals
       @clean_fiber_locals = clean_fiber_locals
       @on_error = on_error
+      @running = AtomicBoolean.new(true)
 
       parser = Http2Parser.new
       settings_payload = parser.build_settings(
@@ -484,6 +488,22 @@ module Raptor
     # @rbs () -> Writer
     def create_writer
       Writer.new(write_timeout: @write_timeout)
+    end
+
+    # Stops new stream dispatch and asks clients to finish streams already
+    # handed to the application.
+    #
+    # @param reactor [Reactor] the reactor managing HTTP/2 connections
+    # @return [void]
+    #
+    # @rbs (Reactor reactor) -> void
+    def shutdown(reactor)
+      @running.make_false
+      parser = Http2Parser.new
+      reactor.drain_http2 do |stream_id|
+        payload = [stream_id, ERROR_NO_ERROR].pack("NN")
+        parser.build_frame(:goaway, 0, 0, payload)
+      end
     end
 
     # Returns a Ractor-safe proc that parses HTTP/2 frames from the
@@ -790,6 +810,11 @@ module Raptor
     #
     # @rbs (OpenSSL::SSL::SSLSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
     def eager_accept(socket, id, reactor, thread_pool, remote_addr, url_scheme)
+      unless @running.true?
+        socket.close rescue nil
+        return
+      end
+
       writer = create_writer
       flow_control = FlowControl.new
       initial_state = {
@@ -800,6 +825,10 @@ module Raptor
       }
 
       reactor.attach_http2(id: id, socket: socket, state: initial_state, writer: writer, flow_control: flow_control)
+      unless @running.true?
+        reactor.close_connection(id)
+        return
+      end
 
       socket.write(@initial_settings_frame) rescue nil
 
@@ -860,6 +889,11 @@ module Raptor
         result[:completed_requests]&.each do |request|
           stream_id = request[:stream_id]
           remote_addr = result[:remote_addr] || Server::DEFAULT_REMOTE_ADDR
+
+          unless reactor.dispatch_http2_stream(result[:id], stream_id)
+            write_http2_reset_stream(socket, writer, stream_id, ERROR_REFUSED_STREAM)
+            next
+          end
 
           thread_pool << proc do
             dispatch_stream_request(

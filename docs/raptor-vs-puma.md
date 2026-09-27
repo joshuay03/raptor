@@ -356,6 +356,8 @@ Flow control uses similar CAS-protected atoms. The connection-level window and t
 
 Frame processing also has an eager loop. After processing one batch of frames, the h2 handler tries to `read_nonblock` one more time to see if the next batch is already available. Up to eight rounds are consumed inline before handing back to the reactor, and the loop bails out early once the app thread pool has more queued work than worker slots so one busy connection cannot starve the collector. This is the same principle as the HTTP/1.1 eager keep-alive: amortise the reactor round-trip when the client is actively sending, but back off under saturation.
 
+During worker shutdown, Raptor stops accepting connections and sends GOAWAY with the last stream handed to the Rack application. Later streams are refused while the application pool drains. The reactor remains active during that period so in-flight responses can receive flow-control updates and finish before their connections close.
+
 ### Raptor request flow diagram
 
 ```mermaid
