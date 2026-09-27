@@ -548,7 +548,7 @@ module Raptor
         end
 
         write_access_log(rack_env, status, response_size, remote_addr) if @access_log_io && !hijacked
-        call_response_finished(rack_env, status, headers, nil)
+        Http.call_response_finished(rack_env, status, headers, nil)
         keep_alive && !hijacked
       rescue => error
         keep_alive = false
@@ -579,7 +579,7 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Hash[String, untyped]? rack_env, Integer? status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
     def handle_app_error(socket, rack_env, status, headers, error, response_started:, hijacked:)
-      call_response_finished(rack_env, status, headers, error) if rack_env
+      Http.call_response_finished(rack_env, status, headers, error)
       socket.write(INTERNAL_SERVER_ERROR_RESPONSE) rescue nil unless response_started || hijacked
 
       if @on_error
@@ -1255,24 +1255,6 @@ module Raptor
           response << chunk
         end
         socket_write(socket, response)
-      end
-    end
-
-    # Calls every `rack.response_finished` callback in reverse
-    # registration order, rescuing any that raise.
-    #
-    # @param env [Hash, nil] the Rack environment
-    # @param status [Integer, nil] the response status code
-    # @param headers [Hash, nil] the response headers
-    # @param error [Exception, nil] any error raised during processing, or nil on success
-    # @return [void]
-    #
-    # @rbs (Hash[String, untyped] env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
-    def call_response_finished(env, status, headers, error)
-      return unless env && env[Rack::RACK_RESPONSE_FINISHED].is_a?(Array)
-
-      env[Rack::RACK_RESPONSE_FINISHED].reverse_each do |callable|
-        callable.call(env, status, headers, error) rescue nil
       end
     end
 

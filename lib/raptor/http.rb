@@ -107,6 +107,24 @@ module Raptor
       end
     end
 
+    # Calls every `rack.response_finished` callback in reverse
+    # registration order, rescuing any that raise.
+    #
+    # @param env [Hash, nil] the Rack environment
+    # @param status [Integer, nil] the response status code
+    # @param headers [Hash, nil] the response headers
+    # @param error [Exception, nil] any error raised during processing, or nil on success
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped]? env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
+    def self.call_response_finished(env, status, headers, error)
+      return unless env && env[Rack::RACK_RESPONSE_FINISHED].is_a?(Array)
+
+      env[Rack::RACK_RESPONSE_FINISHED].reverse_each do |callable|
+        callable.call(env, status, headers, error) rescue nil
+      end
+    end
+
     # Writes a Common Log Format entry to `io`. Write failures are silently
     # ignored.
     #

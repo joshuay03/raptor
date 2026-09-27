@@ -61,6 +61,18 @@ module Raptor
     # @rbs (Hash[String, untyped] env_template, Integer? max_body_size) -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
     def self.parser_worker: (Hash[String, untyped] env_template, Integer? max_body_size) -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
 
+    # Calls every `rack.response_finished` callback in reverse
+    # registration order, rescuing any that raise.
+    #
+    # @param env [Hash, nil] the Rack environment
+    # @param status [Integer, nil] the response status code
+    # @param headers [Hash, nil] the response headers
+    # @param error [Exception, nil] any error raised during processing, or nil on success
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped]? env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
+    def self.call_response_finished: (Hash[String, untyped]? env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
+
     # Writes a Common Log Format entry to `io`. Write failures are silently
     # ignored.
     #

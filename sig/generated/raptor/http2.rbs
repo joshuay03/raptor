@@ -216,6 +216,8 @@ module Raptor
 
     ERROR_PROTOCOL_ERROR: ::Integer
 
+    ERROR_INTERNAL_ERROR: ::Integer
+
     DEFAULT_WINDOW_SIZE: ::Integer
 
     MAX_FRAME_SIZE: ::Integer
@@ -418,8 +420,30 @@ module Raptor
     # @param request_method [String] request method used to suppress HEAD response bodies
     # @return [String] the response body size in bytes
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) -> String
-    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) -> String
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) ?{ () -> void } -> String
+    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) ?{ () -> void } -> String
+
+    # Sends an HTTP 103 Early Hints response.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param hints [Hash] response headers to send as early hints
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
+    def send_early_hints: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
+
+    # Resets one HTTP/2 stream with the given error code.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param error_code [Integer] the HTTP/2 error code
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer error_code) -> void
+    def write_http2_reset_stream: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer error_code) -> void
 
     # Writes a 500 error response as HTTP/2 frames.
     #
@@ -447,11 +471,14 @@ module Raptor
     #
     # @param headers [Array<Array(String, String)>] HTTP/2 header pairs
     # @param body [String] the request body
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param remote_addr [String] the client IP address
     # @return [Hash] fully populated Rack environment hash
     #
-    # @rbs (Array[[String, String]] headers, String body, remote_addr: String) -> Hash[String, untyped]
-    def build_rack_env: (Array[[ String, String ]] headers, String body, remote_addr: String) -> Hash[String, untyped]
+    # @rbs (Array[[String, String]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
+    def build_rack_env: (Array[[ String, String ]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
 
     # Populates SERVER_NAME and SERVER_PORT from the HTTP_HOST header.
     #

@@ -341,6 +341,7 @@ module Raptor
 
     ERROR_NO_ERROR = 0x0
     ERROR_PROTOCOL_ERROR = 0x1
+    ERROR_INTERNAL_ERROR = 0x2
 
     DEFAULT_WINDOW_SIZE = 65_535
     MAX_FRAME_SIZE = 16_384
@@ -866,7 +867,12 @@ module Raptor
     #
     # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
     def perform_stream_request(socket, writer, flow_control, stream_id, headers, body, remote_addr:)
-      env = build_rack_env(headers, body, remote_addr: remote_addr)
+      env = nil
+      status = nil
+      response_headers = nil
+      response_started = false
+
+      env = build_rack_env(headers, body, socket, writer, stream_id, remote_addr: remote_addr)
       status, response_headers, response_body = @app.call(env)
 
       response_size = write_http2_response(
@@ -878,10 +884,17 @@ module Raptor
         response_headers,
         response_body,
         request_method: env[Rack::REQUEST_METHOD]
-      )
+      ) { response_started = true }
+      response_body.close if response_body.respond_to?(:close)
       write_access_log(env, status, response_size, remote_addr) if @access_log_io
+      Http.call_response_finished(env, status, response_headers, nil)
     rescue => error
-      write_http2_error_response(socket, writer, stream_id)
+      Http.call_response_finished(env, status, response_headers, error)
+      if response_started
+        write_http2_reset_stream(socket, writer, stream_id, ERROR_INTERNAL_ERROR)
+      else
+        write_http2_error_response(socket, writer, stream_id)
+      end
 
       if @on_error
         @on_error.call(env, error) rescue nil
@@ -889,7 +902,6 @@ module Raptor
         raise
       end
     ensure
-      response_body.close if response_body.respond_to?(:close)
       flow_control.discard_stream(stream_id) if flow_control
     end
 
@@ -906,7 +918,7 @@ module Raptor
     # @param request_method [String] request method used to suppress HEAD response bodies
     # @return [String] the response body size in bytes
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) -> String
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) ?{ () -> void } -> String
     def write_http2_response(socket, writer, flow_control, stream_id, status, headers, body, request_method:)
       parser = Http2Parser.new
 
@@ -914,10 +926,12 @@ module Raptor
       no_body = request_method == "HEAD" || (status >= 100 && status < 200) || status == 204 || status == 304
       if no_body
         writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers)])
+        yield if block_given?
         return "0"
       end
 
       writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded_headers)])
+      yield if block_given?
 
       stream = ResponseStream.new(socket, writer, flow_control, stream_id)
       if body.respond_to?(:each)
@@ -928,6 +942,38 @@ module Raptor
       stream.close
 
       stream.bytes_written.to_s
+    end
+
+    # Sends an HTTP 103 Early Hints response.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param hints [Hash] response headers to send as early hints
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
+    def send_early_hints(socket, writer, stream_id, hints)
+      return if hints.empty?
+
+      parser = Http2Parser.new
+      encoded = parser.encode_response_headers(103, hints)
+      writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded)])
+    end
+
+    # Resets one HTTP/2 stream with the given error code.
+    #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param error_code [Integer] the HTTP/2 error code
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer error_code) -> void
+    def write_http2_reset_stream(socket, writer, stream_id, error_code)
+      parser = Http2Parser.new
+      frame = parser.build_frame(:rst_stream, 0, stream_id, [error_code].pack("N"))
+      writer.write_frames(socket, [frame])
     end
 
     # Writes a 500 error response as HTTP/2 frames.
@@ -966,11 +1012,14 @@ module Raptor
     #
     # @param headers [Array<Array(String, String)>] HTTP/2 header pairs
     # @param body [String] the request body
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param remote_addr [String] the client IP address
     # @return [Hash] fully populated Rack environment hash
     #
-    # @rbs (Array[[String, String]] headers, String body, remote_addr: String) -> Hash[String, untyped]
-    def build_rack_env(headers, body, remote_addr:)
+    # @rbs (Array[[String, String]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
+    def build_rack_env(headers, body, socket, writer, stream_id, remote_addr:)
       env = {}
 
       headers.each do |name, value|
@@ -999,6 +1048,9 @@ module Raptor
       env[Rack::RACK_INPUT] = StringIO.new(body).set_encoding(Encoding::ASCII_8BIT)
       env[Rack::RACK_ERRORS] = $stderr
       env[Rack::RACK_RESPONSE_FINISHED] = []
+      env[Rack::RACK_EARLY_HINTS] = proc do |hints|
+        send_early_hints(socket, writer, stream_id, hints) rescue nil
+      end
       env[Rack::RACK_IS_HIJACK] = false
 
       env[Rack::SCRIPT_NAME] = "" unless env.key?(Rack::SCRIPT_NAME)

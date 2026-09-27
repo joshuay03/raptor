@@ -143,6 +143,42 @@ module Raptor
       assert frames.last.getbyte(4).anybits?(Http2::FLAG_END_STREAM)
     end
 
+    def test_perform_stream_request_supports_response_lifecycle
+      callback_arguments = nil
+      app = proc do |env|
+        env[Rack::RACK_EARLY_HINTS].call("link" => "</style.css>; rel=preload")
+        env[Rack::RACK_RESPONSE_FINISHED] << proc { |*arguments| callback_arguments = arguments }
+        [200, {"content-type" => "text/plain"}, ["body"]]
+      end
+
+      frames = perform_stream_request(app)
+
+      assert_equal [HEADERS_FRAME_TYPE, HEADERS_FRAME_TYPE, DATA_FRAME_TYPE, DATA_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
+      assert_equal ["103", "200"], decode_header_blocks(frames).map { |headers| headers.assoc(":status").last }
+      assert_equal [200, {"content-type" => "text/plain"}, nil], callback_arguments.drop(1)
+    end
+
+    def test_perform_stream_request_handles_body_errors
+      callback_error = nil
+      handled_error = nil
+      error = RuntimeError.new("stream failed")
+      body = Object.new
+      body.define_singleton_method(:each) do |&block|
+        block.call("body")
+        raise error
+      end
+      app = proc do |env|
+        env[Rack::RACK_RESPONSE_FINISHED] << proc { |_env, _status, _headers, response_error| callback_error = response_error }
+        [200, {}, body]
+      end
+
+      frames = perform_stream_request(app, on_error: proc { |_env, response_error| handled_error = response_error })
+
+      assert_equal [HEADERS_FRAME_TYPE, DATA_FRAME_TYPE, RST_STREAM_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
+      assert_same error, callback_error
+      assert_same error, handled_error
+    end
+
     def test_process_frames_rejects_even_client_stream_id
       result = process_frames_with(headers_frame(stream_id: 2))
 
@@ -279,6 +315,39 @@ module Raptor
     end
 
     private
+
+    def perform_stream_request(app, on_error: nil)
+      frames = []
+      writer = Object.new
+      writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
+      handler = Http2.new(app, 9292, http2_options: {max_concurrent_streams: 100}, on_error: on_error)
+      headers = [[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "example.com"]]
+
+      handler.send(
+        :perform_stream_request,
+        nil,
+        writer,
+        Http2::FlowControl.new,
+        1,
+        headers,
+        "",
+        remote_addr: "127.0.0.1"
+      )
+
+      frames
+    end
+
+    def decode_header_blocks(frames)
+      parser = Http2Parser.new
+      table = []
+
+      frames.filter_map do |frame|
+        next unless frame.getbyte(3) == HEADERS_FRAME_TYPE
+
+        headers, table = parser.parse_headers(frame.byteslice(9..-1), table)
+        headers
+      end
+    end
 
     def write_http2_response(request_method: "GET", status: 200, body: ["body"], frames: [])
       writer = Object.new
