@@ -11,8 +11,9 @@ module Raptor
   class TestHttp2 < TestCase
     parallelize_me!
 
-    GOAWAY_FRAME_TYPE = 0x7
+    HEADERS_FRAME_TYPE = 0x1
     RST_STREAM_FRAME_TYPE = 0x3
+    GOAWAY_FRAME_TYPE = 0x7
 
     def test_dispatch_cleans_thread_and_fiber_locals
       handler = Http2.allocate
@@ -87,6 +88,20 @@ module Raptor
       client&.close
       accepted&.close
       server&.close
+    end
+
+    def test_write_http2_response_omits_body_for_head_request
+      frames = write_http2_response(request_method: "HEAD", status: 200, body: ["body"])
+
+      assert_equal [HEADERS_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
+      assert frames.first.getbyte(4).anybits?(Http2::FLAG_END_STREAM)
+    end
+
+    def test_write_http2_response_omits_body_for_no_entity_status
+      frames = write_http2_response(request_method: "GET", status: 204, body: ["body"])
+
+      assert_equal [HEADERS_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
+      assert frames.first.getbyte(4).anybits?(Http2::FLAG_END_STREAM)
     end
 
     def test_process_frames_rejects_even_client_stream_id
@@ -225,6 +240,26 @@ module Raptor
     end
 
     private
+
+    def write_http2_response(request_method:, status:, body:)
+      frames = []
+      writer = Object.new
+      writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
+
+      Http2.allocate.send(
+        :write_http2_response,
+        nil,
+        writer,
+        Http2::FlowControl.new,
+        1,
+        status,
+        {},
+        body,
+        request_method: request_method
+      )
+
+      frames
+    end
 
     def process_frames_with(frame_bytes)
       Http2.process_frames(

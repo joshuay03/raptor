@@ -339,6 +339,8 @@ From there the shape is similar to HTTP/1.1:
 3. Completed requests (once `HEADERS` and `DATA` are complete for a stream) go to the thread pool as separate work items. **A single connection can be servicing many streams in parallel across the thread pool.**
 4. Each stream's response is written back through the connection's `Writer`, which serialises frame writes across threads without a mutex.
 
+Responses to `HEAD` requests and statuses that prohibit a message body end with the response `HEADERS` frame.
+
 The `Writer` is worth a paragraph. Naive per-connection writing would need a mutex around every socket write. Contention grows with concurrent streams. Raptor's `Writer` stores the "pending frames" queue in an `Atom` whose value is either `:idle` (nobody is writing) or an array of frames waiting to go out. A thread that wants to write does a CAS:
 
 - If current value is `:idle`, the thread claims the writer by CAS-ing to its own array of frames, then loops draining any additional frames other threads have appended.

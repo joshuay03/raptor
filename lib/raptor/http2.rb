@@ -753,7 +753,16 @@ module Raptor
       env = build_rack_env(headers, body, remote_addr: remote_addr)
       status, response_headers, response_body = @app.call(env)
 
-      response_size = write_http2_response(socket, writer, flow_control, stream_id, status, response_headers, response_body)
+      response_size = write_http2_response(
+        socket,
+        writer,
+        flow_control,
+        stream_id,
+        status,
+        response_headers,
+        response_body,
+        request_method: env[Rack::REQUEST_METHOD]
+      )
       write_access_log(env, status, response_size, remote_addr) if @access_log_io
     rescue => error
       write_http2_error_response(socket, writer, stream_id)
@@ -778,13 +787,20 @@ module Raptor
     # @param status [Integer] HTTP status code
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body responding to each
+    # @param request_method [String] request method used to suppress HEAD response bodies
     # @return [String] the response body size in bytes
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body) -> String
-    def write_http2_response(socket, writer, flow_control, stream_id, status, headers, body)
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, request_method: String) -> String
+    def write_http2_response(socket, writer, flow_control, stream_id, status, headers, body, request_method:)
       parser = Http2Parser.new
 
       encoded_headers = parser.encode_response_headers(status, headers)
+      no_body = request_method == "HEAD" || (status >= 100 && status < 200) || status == 204 || status == 304
+      if no_body
+        writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers)])
+        return "0"
+      end
+
       body_chunks = []
       body_bytes = 0
       body.each do |chunk|

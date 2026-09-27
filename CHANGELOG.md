@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Suppress HTTP/2 response bodies when required
+
 ## [0.20.2] - 2026-09-26
 
 - Close idle connections before reforking workers
