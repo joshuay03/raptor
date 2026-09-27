@@ -106,9 +106,9 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Binds <code>tcp://</code>, <code>unix://</code>, and <code>ssl://</code> URIs to listening sockets and
-holds them for the server. Reconstructs listeners from inherited file
-descriptors when provided (systemd socket activation, hot restart).</p>
+    <p>Binds TCP, Unix, SSL, and cleartext HTTP/2 URIs to listening sockets
+and holds them for the server. Reconstructs listeners from inherited
+file descriptors when provided (systemd socket activation, hot restart).</p>
 
   </div>
 </div>
@@ -121,7 +121,7 @@ descriptors when provided (systemd socket activation, hot restart).</p>
     
   
     
-      <strong class="classes">Classes:</strong> <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>, <span class='object_link'><a href="Binder/UnknownBindSchemeError.html" title="Raptor::Binder::UnknownBindSchemeError (class)">UnknownBindSchemeError</a></span>
+      <strong class="classes">Classes:</strong> <span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span>, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>, <span class='object_link'><a href="Binder/UnknownBindSchemeError.html" title="Raptor::Binder::UnknownBindSchemeError (class)">UnknownBindSchemeError</a></span>
     
   
 </p>
@@ -200,7 +200,7 @@ descriptors when provided (systemd socket activation, hot restart).</p>
       <li class="public ">
   <span class="summary_signature">
     
-      <a href="#listeners-instance_method" title="#listeners (instance method)">#<strong>listeners</strong>  &#x21d2; Array&lt;TCPServer, UNIXServer, SslListener&gt; </a>
+      <a href="#listeners-instance_method" title="#listeners (instance method)">#<strong>listeners</strong>  &#x21d2; Array&lt;TCPServer, UNIXServer, SslListener, H2cListener&gt; </a>
     
 
     
@@ -281,7 +281,7 @@ descriptors when provided (systemd socket activation, hot restart).</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns the bound addresses as strings: TCP as <code>host:port</code>, Unix as the socket path, SSL as <code>ssl://host:port</code>.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns the bound addresses as strings: TCP as <code>host:port</code>, Unix as the socket path, SSL as <code>ssl://host:port</code>, and cleartext HTTP/2 as <code>h2c://host:port</code>.</p></div></span>
   
 </li>
 
@@ -355,7 +355,7 @@ descriptors when provided (systemd socket activation, hot restart).</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#create_listeners-instance_method" title="#create_listeners (instance method)">#<strong>create_listeners</strong>(uri)  &#x21d2; Array&lt;TCPServer, UNIXServer, SslListener&gt; </a>
+      <a href="#create_listeners-instance_method" title="#create_listeners (instance method)">#<strong>create_listeners</strong>(uri)  &#x21d2; Array&lt;TCPServer, UNIXServer, SslListener, H2cListener&gt; </a>
     
 
     
@@ -577,7 +577,7 @@ descriptors when provided (systemd socket activation, hot restart).</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#restore_listeners-instance_method" title="#restore_listeners (instance method)">#<strong>restore_listeners</strong>(uri, filenos)  &#x21d2; Array&lt;TCPServer, UNIXServer, SslListener&gt; </a>
+      <a href="#restore_listeners-instance_method" title="#restore_listeners (instance method)">#<strong>restore_listeners</strong>(uri, filenos)  &#x21d2; Array&lt;TCPServer, UNIXServer, SslListener, H2cListener&gt; </a>
     
 
     
@@ -743,17 +743,17 @@ for a URI the listener is rebuilt from those instead of binding fresh.</p>
       <pre class="lines">
 
 
-66
-67
-68
-69
-70
-71
-72
-73</pre>
+82
+83
+84
+85
+86
+87
+88
+89</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 66</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 82</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='comma'>,</span> <span class='label'>socket_backlog:</span> <span class='const'><span class='object_link'><a href="#SOCKET_BACKLOG-constant" title="Raptor::Binder::SOCKET_BACKLOG (constant)">SOCKET_BACKLOG</a></span></span><span class='comma'>,</span> <span class='label'>inherited_fds:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
   <span class='ivar'>@bind_uris</span> <span class='op'>=</span> <span class='id identifier rubyid_bind_uris'>bind_uris</span>
@@ -812,12 +812,12 @@ for a URI the listener is rebuilt from those instead of binding fresh.</p>
       <pre class="lines">
 
 
-43
-44
-45</pre>
+59
+60
+61</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 43</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 59</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_bind_uris'>bind_uris</span>
   <span class='ivar'>@bind_uris</span>
@@ -832,7 +832,7 @@ for a URI the listener is rebuilt from those instead of binding fresh.</p>
       <div class="method_details ">
   <h3 class="signature " id="listeners-instance_method">
   
-    #<strong>listeners</strong>  &#x21d2; <tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>&gt;</tt>  <span class="extras">(readonly)</span>
+    #<strong>listeners</strong>  &#x21d2; <tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>, <span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span>&gt;</tt>  <span class="extras">(readonly)</span>
   
 
   
@@ -852,7 +852,7 @@ for a URI the listener is rebuilt from those instead of binding fresh.</p>
     <li>
       
       
-        <span class='type'>(<tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>&gt;</tt>)</span>
+        <span class='type'>(<tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>, <span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span>&gt;</tt>)</span>
       
       
       
@@ -866,12 +866,12 @@ for a URI the listener is rebuilt from those instead of binding fresh.</p>
       <pre class="lines">
 
 
-53
-54
-55</pre>
+69
+70
+71</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 53</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 69</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_listeners'>listeners</span>
   <span class='ivar'>@listeners</span>
@@ -920,12 +920,12 @@ for a URI the listener is rebuilt from those instead of binding fresh.</p>
       <pre class="lines">
 
 
-48
-49
-50</pre>
+64
+65
+66</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 48</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 64</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_socket_backlog'>socket_backlog</span>
   <span class='ivar'>@socket_backlog</span>
@@ -954,7 +954,8 @@ for a URI the listener is rebuilt from those instead of binding fresh.</p>
 </h3><div class="docstring">
   <div class="discussion">
     <p>Returns the bound addresses as strings: TCP as <code>host:port</code>, Unix as
-the socket path, SSL as <code>ssl://host:port</code>.</p>
+the socket path, SSL as <code>ssl://host:port</code>, and cleartext HTTP/2 as
+<code>h2c://host:port</code>.</p>
 
   </div>
 </div>
@@ -980,23 +981,26 @@ the socket path, SSL as <code>ssl://host:port</code>.</p>
       <pre class="lines">
 
 
-81
-82
-83
-84
-85
-86
-87
-88
-89
-90
-91
-92
-93
-94</pre>
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 81</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 98</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_addresses'>addresses</span>
   <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span>
@@ -1006,6 +1010,9 @@ the socket path, SSL as <code>ssl://host:port</code>.</p>
     <span class='kw'>when</span> <span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span>
       <span class='id identifier rubyid_address'>address</span> <span class='op'>=</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_local_address'>local_address</span>
       <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>ssl://</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_address'>address</span><span class='period'>.</span><span class='id identifier rubyid_ip_address'>ip_address</span><span class='embexpr_end'>}</span><span class='tstring_content'>:</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_address'>address</span><span class='period'>.</span><span class='id identifier rubyid_ip_port'>ip_port</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+    <span class='kw'>when</span> <span class='const'><span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span></span>
+      <span class='id identifier rubyid_address'>address</span> <span class='op'>=</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_local_address'>local_address</span>
+      <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>h2c://</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_address'>address</span><span class='period'>.</span><span class='id identifier rubyid_ip_address'>ip_address</span><span class='embexpr_end'>}</span><span class='tstring_content'>:</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_address'>address</span><span class='period'>.</span><span class='id identifier rubyid_ip_port'>ip_port</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
     <span class='kw'>else</span>
       <span class='id identifier rubyid_address'>address</span> <span class='op'>=</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_local_address'>local_address</span>
       <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_address'>address</span><span class='period'>.</span><span class='id identifier rubyid_ip_address'>ip_address</span><span class='embexpr_end'>}</span><span class='tstring_content'>:</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_address'>address</span><span class='period'>.</span><span class='id identifier rubyid_ip_port'>ip_port</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
@@ -1073,20 +1080,20 @@ HTTP/1.1 ALPN negotiation.</p>
       <pre class="lines">
 
 
-293
-294
-295
-296
-297
-298
-299
-300
-301
-302
-303</pre>
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 293</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 319</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_build_ssl_context'>build_ssl_context</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_params'>ssl_params</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>openssl</span><span class='tstring_end'>&quot;</span></span>
@@ -1129,12 +1136,12 @@ survive <code>Kernel.exec</code>.</p>
       <pre class="lines">
 
 
-142
-143
-144</pre>
+164
+165
+166</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 142</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 164</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_clear_close_on_exec'>clear_close_on_exec</span>
   <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_to_io'>to_io</span><span class='period'>.</span><span class='id identifier rubyid_close_on_exec'>close_on_exec</span> <span class='op'>=</span> <span class='kw'>false</span> <span class='rbrace'>}</span>
@@ -1168,12 +1175,12 @@ survive <code>Kernel.exec</code>.</p>
       <pre class="lines">
 
 
-123
-124
-125</pre>
+145
+146
+147</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 123</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 145</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close'>close</span>
   <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:close</span><span class='rparen'>)</span>
@@ -1186,7 +1193,7 @@ survive <code>Kernel.exec</code>.</p>
       <div class="method_details ">
   <h3 class="signature " id="create_listeners-instance_method">
   
-    #<strong>create_listeners</strong>(uri)  &#x21d2; <tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>&gt;</tt> 
+    #<strong>create_listeners</strong>(uri)  &#x21d2; <tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>, <span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span>&gt;</tt> 
   
 
   
@@ -1224,7 +1231,7 @@ survive <code>Kernel.exec</code>.</p>
     <li>
       
       
-        <span class='type'>(<tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>&gt;</tt>)</span>
+        <span class='type'>(<tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>, <span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span>&gt;</tt>)</span>
       
       
       
@@ -1254,26 +1261,30 @@ survive <code>Kernel.exec</code>.</p>
       <pre class="lines">
 
 
-171
-172
-173
-174
-175
-176
-177
-178
-179
-180
-181
-182</pre>
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 171</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 193</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_listeners'>create_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='rparen'>)</span>
   <span class='kw'>case</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_scheme'>scheme</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tcp</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_create_tcp_listeners'>create_tcp_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_port'>port</span><span class='rparen'>)</span>
+  <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>h2c</span><span class='tstring_end'>&quot;</span></span>
+    <span class='id identifier rubyid_create_tcp_listeners'>create_tcp_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_port'>port</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='const'><span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Binder/H2cListener.html#new-class_method" title="Raptor::Binder::H2cListener.new (method)">new</a></span></span><span class='lparen'>(</span><span class='label'>tcp_server:</span> <span class='id identifier rubyid_listener'>listener</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>unix</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_create_unix_listeners'>create_unix_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>ssl</span><span class='tstring_end'>&quot;</span></span>
@@ -1373,14 +1384,14 @@ survive <code>Kernel.exec</code>.</p>
       <pre class="lines">
 
 
-280
-281
-282
-283
-284</pre>
+306
+307
+308
+309
+310</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 280</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 306</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_ssl_listeners'>create_ssl_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='comma'>,</span> <span class='id identifier rubyid_ssl_params'>ssl_params</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_tcp_servers'>tcp_servers</span> <span class='op'>=</span> <span class='id identifier rubyid_create_tcp_listeners'>create_tcp_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='rparen'>)</span>
@@ -1464,28 +1475,28 @@ survive <code>Kernel.exec</code>.</p>
       <pre class="lines">
 
 
-215
-216
-217
-218
-219
-220
-221
-222
-223
-224
-225
-226
-227
-228
-229
-230
-231
-232
-233</pre>
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 215</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 241</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_tcp_listeners'>create_tcp_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_host'>host</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>localhost</span><span class='tstring_end'>&quot;</span></span>
@@ -1587,23 +1598,23 @@ the master's clean exit.</p>
       <pre class="lines">
 
 
-244
-245
-246
-247
-248
-249
-250
-251
-252
-253
-254
-255
-256
-257</pre>
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 244</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 270</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_unix_listeners'>create_unix_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
@@ -1661,15 +1672,15 @@ the master's clean exit.</p>
       <pre class="lines">
 
 
-114
-115
-116</pre>
+136
+137
+138</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 114</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 136</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_http2?'>http2?</span>
-  <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_any?'>any?</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+  <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_any?'>any?</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span><span class='rparen'>)</span> <span class='op'>||</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span></span><span class='rparen'>)</span> <span class='rbrace'>}</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -1713,12 +1724,12 @@ the master's clean exit.</p>
       <pre class="lines">
 
 
-132
-133
-134</pre>
+154
+155
+156</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 132</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 154</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_inheritable_fds'>inheritable_fds</span>
   <span class='ivar'>@uri_listeners</span><span class='period'>.</span><span class='id identifier rubyid_transform_values'>transform_values</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listeners'>listeners</span><span class='op'>|</span> <span class='id identifier rubyid_listeners'>listeners</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_to_io'>to_io</span><span class='period'>.</span><span class='id identifier rubyid_fileno'>fileno</span> <span class='rbrace'>}</span> <span class='rbrace'>}</span>
@@ -1768,16 +1779,16 @@ the master's clean exit.</p>
       <pre class="lines">
 
 
-310
-311
-312
-313
-314
-315
-316</pre>
+336
+337
+338
+339
+340
+341
+342</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 310</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 336</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_loopback_addresses'>loopback_addresses</span>
   <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_ip_address_list'>ip_address_list</span><span class='period'>.</span><span class='id identifier rubyid_filter_map'>filter_map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='op'>|</span>
@@ -1832,17 +1843,17 @@ descriptors for URIs supplied in <code>@inherited_fds</code>.</p>
       <pre class="lines">
 
 
-155
-156
-157
-158
-159
-160
-161
-162</pre>
+177
+178
+179
+180
+181
+182
+183
+184</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 155</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 177</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_parse'>parse</span>
   <span class='ivar'>@uri_listeners</span> <span class='op'>=</span> <span class='ivar'>@bind_uris</span><span class='period'>.</span><span class='id identifier rubyid_to_h'>to_h</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='op'>|</span>
@@ -1901,13 +1912,13 @@ forked workers won't delete a socket their master still owns.</p>
       <pre class="lines">
 
 
-267
-268
-269
-270</pre>
+293
+294
+295
+296</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 267</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 293</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_register_unix_socket_cleanup'>register_unix_socket_cleanup</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_master_pid'>master_pid</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span>
@@ -1921,7 +1932,7 @@ forked workers won't delete a socket their master still owns.</p>
       <div class="method_details ">
   <h3 class="signature " id="restore_listeners-instance_method">
   
-    #<strong>restore_listeners</strong>(uri, filenos)  &#x21d2; <tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>&gt;</tt> 
+    #<strong>restore_listeners</strong>(uri, filenos)  &#x21d2; <tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>, <span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span>&gt;</tt> 
   
 
   
@@ -1974,7 +1985,7 @@ descriptors.</p>
     <li>
       
       
-        <span class='type'>(<tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>&gt;</tt>)</span>
+        <span class='type'>(<tt>Array&lt;TCPServer, UNIXServer, <span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span>, <span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span>&gt;</tt>)</span>
       
       
       
@@ -2004,28 +2015,32 @@ descriptors.</p>
       <pre class="lines">
 
 
-193
-194
-195
-196
-197
-198
-199
-200
-201
-202
-203
-204
-205
-206</pre>
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 193</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 217</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_restore_listeners'>restore_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='comma'>,</span> <span class='id identifier rubyid_filenos'>filenos</span><span class='rparen'>)</span>
   <span class='kw'>case</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_scheme'>scheme</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tcp</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_filenos'>filenos</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fileno'>fileno</span><span class='op'>|</span> <span class='const'>TCPServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fileno'>fileno</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+  <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>h2c</span><span class='tstring_end'>&quot;</span></span>
+    <span class='id identifier rubyid_filenos'>filenos</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fileno'>fileno</span><span class='op'>|</span> <span class='const'><span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Binder/H2cListener.html#new-class_method" title="Raptor::Binder::H2cListener.new (method)">new</a></span></span><span class='lparen'>(</span><span class='label'>tcp_server:</span> <span class='const'>TCPServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fileno'>fileno</span><span class='rparen'>)</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
   <span class='kw'>when</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>unix</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_register_unix_socket_cleanup'>register_unix_socket_cleanup</span><span class='lparen'>(</span><span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_filenos'>filenos</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_fileno'>fileno</span><span class='op'>|</span> <span class='const'>UNIXServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_fileno'>fileno</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
@@ -2079,18 +2094,22 @@ is configured.</p>
       <pre class="lines">
 
 
-102
-103
-104
-105
-106
-107</pre>
+122
+123
+124
+125
+126
+127
+128
+129</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 102</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/binder.rb', line 122</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_server_port'>server_port</span>
-  <span class='id identifier rubyid_tcp_listener'>tcp_listener</span> <span class='op'>=</span> <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_find'>find</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>TCPServer</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span><span class='rparen'>)</span> <span class='rbrace'>}</span>
+  <span class='id identifier rubyid_tcp_listener'>tcp_listener</span> <span class='op'>=</span> <span class='ivar'>@listeners</span><span class='period'>.</span><span class='id identifier rubyid_find'>find</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span>
+    <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>TCPServer</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Binder/SslListener.html" title="Raptor::Binder::SslListener (class)">SslListener</a></span></span><span class='rparen'>)</span> <span class='op'>||</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="Binder/H2cListener.html" title="Raptor::Binder::H2cListener (class)">H2cListener</a></span></span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
   <span class='kw'>return</span> <span class='int'>0</span> <span class='kw'>unless</span> <span class='id identifier rubyid_tcp_listener'>tcp_listener</span>
 
   <span class='id identifier rubyid_tcp_listener'>tcp_listener</span><span class='period'>.</span><span class='id identifier rubyid_local_address'>local_address</span><span class='period'>.</span><span class='id identifier rubyid_ip_port'>ip_port</span>
@@ -2105,7 +2124,7 @@ is configured.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Sep 27 09:17:41 2026 by
+  Generated on Sun Sep 27 09:21:26 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
