@@ -33,6 +33,8 @@ module Raptor
       assert_equal 1000, options(cli)[:http1][:max_keepalive_requests]
       assert_nil options(cli)[:http2][:ractors]
       assert_equal 100, options(cli)[:http2][:max_concurrent_streams]
+      assert_equal 10, options(cli)[:http2][:keepalive_interval]
+      assert_equal 5, options(cli)[:http2][:keepalive_timeout]
       assert_equal 25, options(cli)[:worker_drain_timeout]
       assert_equal "tmp/raptor.json", options(cli)[:stats_file]
       assert_nil options(cli)[:control_url]
@@ -306,6 +308,18 @@ module Raptor
       cli = CLI.new(["--http2-max-concurrent-streams", "250"])
 
       assert_equal 250, options(cli)[:http2][:max_concurrent_streams]
+    end
+
+    def test_http2_keepalive_interval
+      cli = CLI.new(["--http2-keepalive-interval", "30"])
+
+      assert_equal 30, options(cli)[:http2][:keepalive_interval]
+    end
+
+    def test_http2_keepalive_timeout
+      cli = CLI.new(["--http2-keepalive-timeout", "15"])
+
+      assert_equal 15, options(cli)[:http2][:keepalive_timeout]
     end
 
     def test_worker_drain_timeout

@@ -24,5 +24,100 @@ module Raptor
       assert reactor.dispatch_http2_stream(1, 3)
       refute reactor.dispatch_http2_stream(1, 5)
     end
+
+    def test_http2_keepalive
+      reactor, socket, writer, flow_control = build_http2_reactor
+      before = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      reactor.send(:register, socket)
+      client = reactor.instance_variable_get(:@id_to_timeout).delete(1)
+      reactor.instance_variable_get(:@timeouts).delete!(client)
+
+      assert_in_delta before + 10, client.timeout_at, 0.1
+      reactor.send(:handle_timeout, client, client.timeout_at)
+
+      assert_equal ["ping"], writer.frames
+      client = reactor.instance_variable_get(:@id_to_timeout).delete(1)
+      reactor.instance_variable_get(:@timeouts).delete!(client)
+      assert_in_delta before + 15, client.timeout_at, 0.1
+
+      reactor.send(:handle_timeout, client, client.timeout_at)
+
+      assert socket.closed?
+      assert flow_control.closed?
+    end
+
+    def test_http2_keepalive_acknowledgement
+      reactor, = build_http2_reactor
+      keepalive = reactor.instance_variable_get(:@id_to_http2_keepalive)[1]
+      keepalive[:deadline] = 105.0
+
+      reactor.acknowledge_http2_ping(1, ["different"])
+      assert_equal 105.0, keepalive[:deadline]
+
+      reactor.acknowledge_http2_ping(1, ["payload"])
+      refute keepalive.key?(:deadline)
+    end
+
+    def test_http2_initial_timeout
+      reactor, socket, writer, = build_http2_reactor
+      reactor.instance_variable_get(:@socket_to_state)[socket][:http2_preface_received] = false
+      before = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      reactor.send(:register, socket)
+      client = reactor.instance_variable_get(:@id_to_timeout)[1]
+
+      assert_in_delta before + 30, client.timeout_at, 0.1
+      reactor.send(:handle_timeout, client, client.timeout_at)
+
+      assert_empty writer.frames
+      assert socket.closed?
+    end
+
+    private
+
+    def build_http2_reactor
+      reactor = Reactor.new(
+        nil,
+        nil,
+        nil,
+        connection_options: {first_data_timeout: 30, chunk_data_timeout: 10},
+        http1_options: {persistent_data_timeout: 65},
+        http2_options: {keepalive_interval: 10, keepalive_timeout: 5}
+      )
+
+      reactor.instance_variable_get(:@selector).close
+      selector = Object.new
+      selector.define_singleton_method(:register) do |_socket, _interest|
+        monitor = Object.new
+        monitor.define_singleton_method(:value=) { |_value| }
+        monitor
+      end
+      selector.define_singleton_method(:deregister) { |_socket| }
+      reactor.instance_variable_set(:@selector, selector)
+
+      socket = Object.new
+      socket.define_singleton_method(:close) { @closed = true }
+      socket.define_singleton_method(:closed?) { @closed || false }
+
+      writer = Object.new
+      writer.define_singleton_method(:frames) { @frames ||= [] }
+      writer.define_singleton_method(:write_frames) { |_socket, frames| self.frames.concat(frames) }
+
+      flow_control = Object.new
+      flow_control.define_singleton_method(:close) { @closed = true }
+      flow_control.define_singleton_method(:closed?) { @closed || false }
+
+      reactor.attach_http2(
+        id: 1,
+        socket: socket,
+        state: {id: 1, protocol: :http2, http2_preface_received: true},
+        writer: writer,
+        flow_control: flow_control,
+        ping_frame: "ping",
+        ping_payload: "payload"
+      )
+
+      [reactor, socket, writer, flow_control]
+    end
   end
 end

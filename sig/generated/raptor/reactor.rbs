@@ -1,10 +1,9 @@
 # Generated from lib/raptor/reactor.rb with RBS::Inline
 
 module Raptor
-  # Multiplexes client connections and closes them when they overrun
-  # their per-phase timeouts (first data, subsequent chunks, and
-  # keep-alive idle). Feeds ready bytes to the parser pipeline and hands
-  # completed requests back to the caller-provided handlers.
+  # Multiplexes client connections, manages connection deadlines, feeds
+  # ready bytes to the parser pipeline, and hands completed requests back
+  # to the caller-provided handlers.
   class Reactor
     # A client connection node ordered by absolute expiry time so the
     # soonest-to-expire is always at the tree's minimum.
@@ -54,6 +53,10 @@ module Raptor
 
     @persistent_data_timeout: Integer
 
+    @http2_keepalive_interval: Integer
+
+    @http2_keepalive_timeout: Integer
+
     @selector: NIO::Selector
 
     @queue: Queue[TCPSocket]
@@ -74,6 +77,8 @@ module Raptor
 
     @id_to_http2_drain_stream: Hash[Integer, Integer]
 
+    @id_to_http2_keepalive: Hash[Integer, Hash[Symbol, untyped]]
+
     # Creates a new Reactor instance.
     #
     # @param http1_ractor_pool [RactorPool] ractor pool for HTTP/1.x parsing
@@ -84,10 +89,13 @@ module Raptor
     # @option connection_options [Integer] :chunk_data_timeout timeout for subsequent chunks
     # @param http1_options [Hash] HTTP/1.1-specific configuration
     # @option http1_options [Integer] :persistent_data_timeout timeout for keep-alive idle connections
+    # @param http2_options [Hash] HTTP/2-specific configuration
+    # @option http2_options [Integer] :keepalive_interval idle time before sending a PING
+    # @option http2_options [Integer] :keepalive_timeout time to await a PING acknowledgement
     # @return [void]
     #
-    # @rbs (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
-    def initialize: (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
+    # @rbs (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
+    def initialize: (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
 
     # Starts the reactor's main event loop in a new thread. Runs until
     # the registration queue is closed and drained.
@@ -194,10 +202,21 @@ module Raptor
     # @param state [Hash] initial connection state
     # @param writer [Http2::Writer] per-connection frame writer
     # @param flow_control [Http2::FlowControl] per-connection outbound flow controller
+    # @param ping_frame [String] serialized PING frame for keepalive probes
+    # @param ping_payload [String] payload expected in the corresponding acknowledgement
     # @return [void]
     #
-    # @rbs (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped) -> void
-    def attach_http2: (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped) -> void
+    # @rbs (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped, ping_frame: String, ping_payload: String) -> void
+    def attach_http2: (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped, ping_frame: String, ping_payload: String) -> void
+
+    # Records acknowledgements for server keepalive probes.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param payloads [Array<String>, nil] acknowledged PING payloads
+    # @return [void]
+    #
+    # @rbs (Integer id, Array[String]? payloads) -> void
+    def acknowledge_http2_ping: (Integer id, Array[String]? payloads) -> void
 
     # Registers an attached socket for future reactor-driven reads.
     #
@@ -250,6 +269,25 @@ module Raptor
     #
     # @rbs (TCPSocket socket) -> void
     def register: (TCPSocket socket) -> void
+
+    # Adds a connection deadline to the timeout tree.
+    #
+    # @param state [Hash] client connection state
+    # @param timeout_at [Float] absolute monotonic expiry time
+    # @return [void]
+    #
+    # @rbs (Hash[Symbol, untyped] state, Float timeout_at) -> void
+    def track_timeout: (Hash[Symbol, untyped] state, Float timeout_at) -> void
+
+    # Handles an expired connection deadline, sending an HTTP/2 keepalive
+    # probe before closing the connection when its acknowledgement is late.
+    #
+    # @param client [TimeoutClient] expired client
+    # @param now [Float] current monotonic timestamp
+    # @return [void]
+    #
+    # @rbs (TimeoutClient client, Float now) -> void
+    def handle_timeout: (TimeoutClient client, Float now) -> void
 
     # Handles socket wakeup by deregistering and queuing for processing.
     #

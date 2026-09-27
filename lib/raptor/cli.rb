@@ -56,6 +56,8 @@ module Raptor
       http2: {
         ractors: nil,
         max_concurrent_streams: 100,
+        keepalive_interval: 10,
+        keepalive_timeout: 5,
       },
       worker_boot_timeout: 60,
       worker_timeout: 60,
@@ -348,6 +350,14 @@ module Raptor
 
         opts.on("--http2-max-concurrent-streams NUM", Integer, "Maximum HTTP/2 concurrent streams per connection (default: 100)") do |num|
           @options[:http2][:max_concurrent_streams] = num
+        end
+
+        opts.on("--http2-keepalive-interval SECONDS", Integer, "HTTP/2 idle time before sending a PING, or 0 to disable (default: 10)") do |seconds|
+          @options[:http2][:keepalive_interval] = seconds
+        end
+
+        opts.on("--http2-keepalive-timeout SECONDS", Integer, "HTTP/2 PING acknowledgement timeout in seconds (default: 5)") do |seconds|
+          @options[:http2][:keepalive_timeout] = seconds
         end
 
         opts.on("--worker-boot-timeout SECONDS", Integer, "Worker boot timeout in seconds (default: 60)") do |timeout|

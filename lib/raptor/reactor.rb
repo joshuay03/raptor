@@ -5,10 +5,9 @@ require "nio"
 require "red-black-tree"
 
 module Raptor
-  # Multiplexes client connections and closes them when they overrun
-  # their per-phase timeouts (first data, subsequent chunks, and
-  # keep-alive idle). Feeds ready bytes to the parser pipeline and hands
-  # completed requests back to the caller-provided handlers.
+  # Multiplexes client connections, manages connection deadlines, feeds
+  # ready bytes to the parser pipeline, and hands completed requests back
+  # to the caller-provided handlers.
   #
   class Reactor
     # A client connection node ordered by absolute expiry time so the
@@ -59,6 +58,8 @@ module Raptor
     # @rbs @first_data_timeout: Integer
     # @rbs @chunk_data_timeout: Integer
     # @rbs @persistent_data_timeout: Integer
+    # @rbs @http2_keepalive_interval: Integer
+    # @rbs @http2_keepalive_timeout: Integer
     # @rbs @selector: NIO::Selector
     # @rbs @queue: Queue[TCPSocket]
     # @rbs @timeouts: RedBlackTree[TimeoutClient]
@@ -69,6 +70,7 @@ module Raptor
     # @rbs @id_to_flow_control: Hash[Integer, untyped]
     # @rbs @id_to_http2_last_stream: Hash[Integer, Integer]
     # @rbs @id_to_http2_drain_stream: Hash[Integer, Integer]
+    # @rbs @id_to_http2_keepalive: Hash[Integer, Hash[Symbol, untyped]]
 
     # Creates a new Reactor instance.
     #
@@ -80,16 +82,21 @@ module Raptor
     # @option connection_options [Integer] :chunk_data_timeout timeout for subsequent chunks
     # @param http1_options [Hash] HTTP/1.1-specific configuration
     # @option http1_options [Integer] :persistent_data_timeout timeout for keep-alive idle connections
+    # @param http2_options [Hash] HTTP/2-specific configuration
+    # @option http2_options [Integer] :keepalive_interval idle time before sending a PING
+    # @option http2_options [Integer] :keepalive_timeout time to await a PING acknowledgement
     # @return [void]
     #
-    # @rbs (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped]) -> void
-    def initialize(http1_ractor_pool, http2_ractor_pool, thread_pool, connection_options:, http1_options:)
+    # @rbs (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
+    def initialize(http1_ractor_pool, http2_ractor_pool, thread_pool, connection_options:, http1_options:, http2_options:)
       @http1_ractor_pool = http1_ractor_pool
       @http2_ractor_pool = http2_ractor_pool
       @thread_pool = thread_pool
       @first_data_timeout = connection_options[:first_data_timeout]
       @chunk_data_timeout = connection_options[:chunk_data_timeout]
       @persistent_data_timeout = http1_options[:persistent_data_timeout]
+      @http2_keepalive_interval = http2_options[:keepalive_interval]
+      @http2_keepalive_timeout = http2_options[:keepalive_timeout]
 
       @selector = NIO::Selector.new
       @queue = Queue.new
@@ -102,6 +109,7 @@ module Raptor
       @id_to_flow_control = {}
       @id_to_http2_last_stream = {}
       @id_to_http2_drain_stream = {}
+      @id_to_http2_keepalive = {}
     end
 
     # Starts the reactor's main event loop in a new thread. Runs until
@@ -133,12 +141,7 @@ module Raptor
               @timeouts.delete!(to_client)
               id = to_client.client_data[:id]
               @id_to_timeout.delete(id)
-              socket = @id_to_socket[id]
-              next unless socket
-
-              @selector.deregister(socket)
-              socket.write(TIMEOUT_RESPONSE) rescue nil
-              cleanup(socket)
+              handle_timeout(to_client, now)
             end
 
             until @queue.empty?
@@ -158,6 +161,7 @@ module Raptor
         @id_to_flow_control.clear
         @id_to_http2_last_stream.clear
         @id_to_http2_drain_stream.clear
+        @id_to_http2_keepalive.clear
         @timeouts.clear!
         @selector.close
       end
@@ -321,15 +325,34 @@ module Raptor
     # @param state [Hash] initial connection state
     # @param writer [Http2::Writer] per-connection frame writer
     # @param flow_control [Http2::FlowControl] per-connection outbound flow controller
+    # @param ping_frame [String] serialized PING frame for keepalive probes
+    # @param ping_payload [String] payload expected in the corresponding acknowledgement
     # @return [void]
     #
-    # @rbs (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped) -> void
-    def attach_http2(id:, socket:, state:, writer:, flow_control:)
+    # @rbs (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped, ping_frame: String, ping_payload: String) -> void
+    def attach_http2(id:, socket:, state:, writer:, flow_control:, ping_frame:, ping_payload:)
       @id_to_socket[id] = socket
       @socket_to_state[socket] = state
       @id_to_writer[id] = writer
       @id_to_flow_control[id] = flow_control
       @id_to_http2_last_stream[id] = 0
+      if @http2_keepalive_interval.positive?
+        @id_to_http2_keepalive[id] = {frame: ping_frame, payload: ping_payload}
+      end
+    end
+
+    # Records acknowledgements for server keepalive probes.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param payloads [Array<String>, nil] acknowledged PING payloads
+    # @return [void]
+    #
+    # @rbs (Integer id, Array[String]? payloads) -> void
+    def acknowledge_http2_ping(id, payloads)
+      keepalive = @id_to_http2_keepalive[id]
+      return unless keepalive && payloads&.include?(keepalive[:payload])
+
+      keepalive.delete(:deadline)
     end
 
     # Registers an attached socket for future reactor-driven reads.
@@ -382,6 +405,7 @@ module Raptor
       @id_to_flow_control.delete(id)&.close
       @id_to_http2_last_stream.delete(id)
       @id_to_http2_drain_stream.delete(id)
+      @id_to_http2_keepalive.delete(id)
       socket.close rescue nil
     end
 
@@ -418,17 +442,63 @@ module Raptor
       @selector.register(socket, :r).value = socket
 
       state = @socket_to_state[socket]
-      client = TimeoutClient.new(state)
-      timeout = if state[:persisted]
-        @persistent_data_timeout
+      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      timeout_at = if state[:protocol] == :http2
+        if state[:http2_preface_received]
+          keepalive = @id_to_http2_keepalive[state[:id]]
+          keepalive && (keepalive[:deadline] || now + @http2_keepalive_interval)
+        else
+          now + @first_data_timeout
+        end
+      elsif state[:persisted]
+        now + @persistent_data_timeout
       elsif first_data_received?(state)
-        @chunk_data_timeout
+        now + @chunk_data_timeout
       else
-        @first_data_timeout
+        now + @first_data_timeout
       end
-      client.timeout_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+      track_timeout(state, timeout_at) if timeout_at
+    end
+
+    # Adds a connection deadline to the timeout tree.
+    #
+    # @param state [Hash] client connection state
+    # @param timeout_at [Float] absolute monotonic expiry time
+    # @return [void]
+    #
+    # @rbs (Hash[Symbol, untyped] state, Float timeout_at) -> void
+    def track_timeout(state, timeout_at)
+      client = TimeoutClient.new(state)
+      client.timeout_at = timeout_at
       @timeouts << client
       @id_to_timeout[state[:id]] = client
+    end
+
+    # Handles an expired connection deadline, sending an HTTP/2 keepalive
+    # probe before closing the connection when its acknowledgement is late.
+    #
+    # @param client [TimeoutClient] expired client
+    # @param now [Float] current monotonic timestamp
+    # @return [void]
+    #
+    # @rbs (TimeoutClient client, Float now) -> void
+    def handle_timeout(client, now)
+      state = client.client_data
+      id = state[:id]
+      socket = @id_to_socket[id]
+      return unless socket
+
+      keepalive = @id_to_http2_keepalive[id] if state[:http2_preface_received]
+      if keepalive && !keepalive[:deadline]
+        keepalive[:deadline] = now + @http2_keepalive_timeout
+        @id_to_writer[id].write_frames(socket, [keepalive[:frame]])
+        track_timeout(state, keepalive[:deadline])
+        return
+      end
+
+      @selector.deregister(socket)
+      socket.write(TIMEOUT_RESPONSE) rescue nil unless state[:protocol] == :http2
+      cleanup(socket)
     end
 
     # Handles socket wakeup by deregistering and queuing for processing.
@@ -441,7 +511,7 @@ module Raptor
       @selector.deregister(socket)
       state = @socket_to_state[socket]
       to_client = @id_to_timeout.delete(state[:id])
-      @timeouts.delete!(to_client)
+      @timeouts.delete!(to_client) if to_client
       read_and_queue_for_parse(socket, state)
     end
 
@@ -490,6 +560,7 @@ module Raptor
       @id_to_flow_control.delete(state[:id])&.close
       @id_to_http2_last_stream.delete(state[:id])
       @id_to_http2_drain_stream.delete(state[:id])
+      @id_to_http2_keepalive.delete(state[:id])
       socket.close
     end
 

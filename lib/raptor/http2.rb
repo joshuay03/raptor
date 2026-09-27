@@ -546,6 +546,7 @@ module Raptor
       completed_requests = []
       cancelled_streams = []
       window_updates = []
+      ping_acknowledgements = []
       peer_initial_window_size = nil
       connection_window = data[:http2_window] || DEFAULT_WINDOW_SIZE
       preface_received = data[:http2_preface_received] || false
@@ -558,7 +559,7 @@ module Raptor
           buffer = buffer.byteslice(24..-1) || ""
           preface_received = true
         else
-          return build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, cancelled_streams, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, false)
+          return build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, cancelled_streams, window_updates, ping_acknowledgements, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, false)
         end
       end
 
@@ -670,7 +671,9 @@ module Raptor
           window_updates << [frame[:stream_id], increment]
 
         when :ping
-          if frame[:flags].nobits?(FLAG_ACK)
+          if frame[:flags].anybits?(FLAG_ACK)
+            ping_acknowledgements << frame[:payload]
+          else
             outgoing_frames << parser.build_frame(:ping, FLAG_ACK, 0, frame[:payload])
           end
 
@@ -690,7 +693,7 @@ module Raptor
         outgoing_frames << parser.build_frame(:goaway, 0, 0, goaway_payload)
       end
 
-      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, cancelled_streams, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, !!goaway_error)
+      build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, cancelled_streams, window_updates, ping_acknowledgements, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, !!goaway_error)
     end
 
     # Applies one complete request header block to its stream, resetting
@@ -773,6 +776,7 @@ module Raptor
     # @param completed_requests [Array<Hash>] fully received stream requests
     # @param cancelled_streams [Array<Integer>] streams reset by the peer
     # @param window_updates [Array<Array(Integer, Integer)>] inbound WINDOW_UPDATE pairs as [stream_id, increment]
+    # @param ping_acknowledgements [Array<String>] acknowledged PING payloads
     # @param peer_initial_window_size [Integer, nil] new SETTINGS_INITIAL_WINDOW_SIZE announced by the peer
     # @param connection_window [Integer] current connection flow control window
     # @param preface_received [Boolean] whether the connection preface has been received
@@ -781,8 +785,8 @@ module Raptor
     # @param close_connection [Boolean] whether the connection should be closed after writing outgoing frames
     # @return [Hash] frozen result hash
     #
-    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[Integer, Integer]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
-    def self.build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, cancelled_streams, window_updates, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, close_connection)
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[Integer, Integer]] window_updates, Array[String] ping_acknowledgements, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
+    def self.build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, cancelled_streams, window_updates, ping_acknowledgements, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, close_connection)
       result = {
         id: data[:id],
         protocol: :http2,
@@ -801,6 +805,7 @@ module Raptor
       }
       result[:cancelled_streams] = cancelled_streams unless cancelled_streams.empty?
       result[:window_updates] = window_updates unless window_updates.empty?
+      result[:ping_acknowledgements] = ping_acknowledgements unless ping_acknowledgements.empty?
       result[:peer_initial_window_size] = peer_initial_window_size if peer_initial_window_size
       Ractor.make_shareable(result)
     end
@@ -828,6 +833,8 @@ module Raptor
 
       writer = create_writer
       flow_control = FlowControl.new
+      ping_payload = [id].pack("Q>")
+      ping_frame = Http2Parser.new.build_frame(:ping, 0, 0, ping_payload).freeze
       initial_state = {
         id: id,
         protocol: :http2,
@@ -835,7 +842,15 @@ module Raptor
         url_scheme: url_scheme
       }
 
-      reactor.attach_http2(id: id, socket: socket, state: initial_state, writer: writer, flow_control: flow_control)
+      reactor.attach_http2(
+        id: id,
+        socket: socket,
+        state: initial_state,
+        writer: writer,
+        flow_control: flow_control,
+        ping_frame: ping_frame,
+        ping_payload: ping_payload
+      )
       unless @running.true?
         reactor.close_connection(id)
         return
@@ -884,6 +899,7 @@ module Raptor
 
       rounds = 0
       loop do
+        reactor.acknowledge_http2_ping(result[:id], result[:ping_acknowledgements])
         result[:cancelled_streams]&.each { |stream_id| flow_control.cancel_stream(stream_id) }
 
         if flow_control && (result[:window_updates] || result[:peer_initial_window_size])

@@ -425,6 +425,27 @@ module Raptor
       assert_equal 32_768, result[:peer_initial_window_size]
     end
 
+    def test_process_frames_responds_to_ping
+      parser = Http2Parser.new
+      ping = parser.build_frame(:ping, 0, 0, "12345678")
+
+      result = process_frames_with(ping)
+      response = parser.parse_frame(result[:outgoing_frames].first).first
+
+      assert_equal :ping, response[:type]
+      assert response[:flags].anybits?(Http2::FLAG_ACK)
+      assert_equal "12345678", response[:payload]
+    end
+
+    def test_process_frames_extracts_ping_acknowledgements
+      parser = Http2Parser.new
+      ping = parser.build_frame(:ping, Http2::FLAG_ACK, 0, "12345678")
+
+      result = process_frames_with(ping)
+
+      assert_equal ["12345678"], result[:ping_acknowledgements]
+    end
+
     private
 
     def perform_stream_request(app, flow_control: Http2::FlowControl.new, on_error: nil)

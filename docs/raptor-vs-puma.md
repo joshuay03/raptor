@@ -289,7 +289,7 @@ Three timeout classes are tracked:
 - `chunk_data_timeout` (10s): applied once data has started arriving but the request is incomplete.
 - `persistent_data_timeout` (65s): applied to a keep-alive socket sitting idle between requests.
 
-On timeout, the reactor writes `HTTP/1.1 408 Request Timeout` and closes.
+An incomplete HTTP/1.1 request receives `408 Request Timeout` before the connection closes. Once an HTTP/2 connection has received its preface, its deadline instead sends a PING; an acknowledgement restores the idle deadline, while a missing acknowledgement closes the connection.
 
 ### HTTP/1.1 request lifecycle
 
@@ -413,7 +413,7 @@ flowchart TB
         KA -->|"yes"| EAG
         EAG -.->|"bytes ready, parse+dispatch on same thread"| ATP
         EAG -->|"no bytes, reactor.persist"| RCT
-        RCT -->|"timeout expired"| TO["write 408, close"]
+        RCT -->|"deadline expired"| TO["PING or close"]
 
         STA -.->|"writes slot"| SHM[("mmap shared memory")]
     end
@@ -495,7 +495,7 @@ For external monitoring, `control_url` can expose a read-only `GET /stats` endpo
 
 **Puma.** Not implemented. Puma's [position](https://github.com/puma/puma/issues/2697) is that HTTP/2 belongs at the edge (nginx, Caddy, ALB), which terminates it and speaks HTTP/1.1 to the app server. That's a reasonable call for the deployments Puma is aimed at, and it's where most Rails production actually sits.
 
-**Raptor.** Native C parser plus HPACK, per-stream flow control, lock-free frame writer, stream multiplexing over a single connection, and response trailers exposed through `env["raptor.response_trailers"]`. Once a request is complete it takes the same path as HTTP/1.1 and enters the same thread pool. Under HTTP/2, a single client connection can be issuing many concurrent requests, and Raptor services all of them in parallel on the same thread pool.
+**Raptor.** Native C parser plus HPACK, per-stream flow control, lock-free frame writer, stream multiplexing over a single connection, configurable PING keepalive, and response trailers exposed through `env["raptor.response_trailers"]`. Once a request is complete it takes the same path as HTTP/1.1 and enters the same thread pool. Under HTTP/2, a single client connection can be issuing many concurrent requests, and Raptor services all of them in parallel on the same thread pool.
 
 Whether that matters depends on your setup. If you terminate TLS at an edge proxy that already speaks HTTP/2, both servers see HTTP/1.1 and it doesn't matter which of them you pick on this axis. If you're building an all-Ruby stack with no proxy in front, serving direct HTTP/2 clients, or measuring the app server itself, HTTP/2 support is where Raptor and Puma stop being comparable.
 

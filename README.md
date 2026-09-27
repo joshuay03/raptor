@@ -91,6 +91,9 @@ knowledge. Each `h2c://` listener accepts HTTP/2 only.
 HTTP/2 applications can populate `env["raptor.response_trailers"]` with trailing response headers. Values may be
 strings or arrays of strings.
 
+Idle HTTP/2 connections receive a PING after `keepalive_interval` seconds and close when its acknowledgement does not
+arrive within `keepalive_timeout`. Set `keepalive_interval` to `0` to disable these probes.
+
 ```ruby
 # raptor.rb
 
@@ -122,6 +125,8 @@ strings or arrays of strings.
   http2: {
     ractors: nil,
     max_concurrent_streams: 100,
+    keepalive_interval: 10,
+    keepalive_timeout: 5,
   },
   worker_boot_timeout: 60,
   worker_timeout: 60,

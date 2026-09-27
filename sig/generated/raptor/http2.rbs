@@ -392,6 +392,7 @@ module Raptor
     # @param completed_requests [Array<Hash>] fully received stream requests
     # @param cancelled_streams [Array<Integer>] streams reset by the peer
     # @param window_updates [Array<Array(Integer, Integer)>] inbound WINDOW_UPDATE pairs as [stream_id, increment]
+    # @param ping_acknowledgements [Array<String>] acknowledged PING payloads
     # @param peer_initial_window_size [Integer, nil] new SETTINGS_INITIAL_WINDOW_SIZE announced by the peer
     # @param connection_window [Integer] current connection flow control window
     # @param preface_received [Boolean] whether the connection preface has been received
@@ -400,8 +401,8 @@ module Raptor
     # @param close_connection [Boolean] whether the connection should be closed after writing outgoing frames
     # @return [Hash] frozen result hash
     #
-    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[Integer, Integer]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
-    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[ Integer, Integer ]] window_updates, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
+    # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[Integer, Integer]] window_updates, Array[String] ping_acknowledgements, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
+    def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[ Integer, Integer ]] window_updates, Array[String] ping_acknowledgements, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
 
     # Sends the server SETTINGS frame on a freshly negotiated HTTP/2
     # connection, then eagerly reads and parses the first client frame

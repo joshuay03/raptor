@@ -876,7 +876,8 @@ module Raptor
         http2_ractor_pool,
         thread_pool,
         connection_options: @connection_options,
-        http1_options: @http1_options
+        http1_options: @http1_options,
+        http2_options: @http2_options
       )
       reactor_thread = reactor.run
 
