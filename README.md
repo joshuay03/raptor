@@ -37,7 +37,7 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 ```
 > bundle exec raptor -w 10 -t 3 hello_world.ru
 [Raptor 72876|Main|Main] Cluster initializing:
-[Raptor 72876|Main|Main] ├─ Version: 0.20.2
+[Raptor 72876|Main|Main] ├─ Version: 0.21.0
 [Raptor 72876|Main|Main] ├─ Ruby Version: ruby 4.0.6 (2026-07-14 revision 03b6d3f889) +YJIT +PRISM [arm64-darwin23]
 [Raptor 72876|Main|Main] ├─ Environment: development
 [Raptor 72876|Main|Main] ├─ Master PID: 72876
@@ -242,7 +242,7 @@ unbounded configured limit. The control server is read-only and currently expose
 
 ## (Micro) Benchmarks
 
-Raptor 0.20.2 vs Puma 8.0.2 vs Falcon 0.57.0 across two workload profiles. **IO-bound** is a GET endpoint that
+Raptor 0.21.0 vs Puma 8.0.2 vs Falcon 0.57.0 across two workload profiles. **IO-bound** is a GET endpoint that
 interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
 cache calls. **CPU-bound** is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of JSON item
 building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
@@ -256,24 +256,24 @@ disabled, and both threaded servers allow 999 requests per HTTP/1.1 keep-alive c
 Each cell reports the median throughput and median p95 latency independently across 3 runs, so the two numbers in a row
 may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
 state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
-((max - min) / 2 / median) between runs of a single cell was ±12.4% for throughput and ±16.5% for p95.
+((max - min) / 2 / median) between runs of a single cell was ±22.1% for throughput and ±26.6% for p95.
 
 | Protocol              | Workload | Raptor mode | Raptor req/s | Raptor p95 | Puma req/s  | Puma p95  | vs Puma req/s | vs Puma p95  | Falcon req/s | Falcon p95 | vs Falcon req/s | vs Falcon p95 |
 | --------------------- | -------- | ----------- | ------------ | ---------- | ----------- | --------- | ------------- | ------------ | ------------ | ---------- | --------------- | ------------- |
-| HTTP/1.1              | IO       | Fixed       | 2.90k req/s  | 81.10 ms   | 1.41k req/s | 141.50 ms | 105.8% higher | 42.7% lower  | 12.26k req/s | 14.00 ms   | 76.4% lower     | 479.3% higher |
-| HTTP/1.1              | IO       | Scaling     | 6.24k req/s  | 36.20 ms   | 1.41k req/s | 141.50 ms | 343.2% higher | 74.4% lower  | 12.26k req/s | 14.00 ms   | 49.1% lower     | 158.6% higher |
-| HTTP/1.1              | CPU      | Fixed       | 7.21k req/s  | 37.90 ms   | 8.20k req/s | 23.20 ms  | 12.1% lower   | 63.4% higher | 5.28k req/s  | 35.00 ms   | 36.6% higher    | 8.3% higher   |
-| HTTP/1.1              | CPU      | Scaling     | 6.04k req/s  | 41.60 ms   | 8.20k req/s | 23.20 ms  | 26.4% lower   | 79.3% higher | 5.28k req/s  | 35.00 ms   | 14.4% higher    | 18.9% higher  |
-| HTTP/1.1 (keep-alive) | IO       | Fixed       | 2.35k req/s  | 73.50 ms   | 1.37k req/s | 124.50 ms | 71.2% higher  | 41.0% lower  | 6.35k req/s  | 27.50 ms   | 63.0% lower     | 167.3% higher |
-| HTTP/1.1 (keep-alive) | IO       | Scaling     | 7.83k req/s  | 23.20 ms   | 1.37k req/s | 124.50 ms | 470.1% higher | 81.4% lower  | 6.35k req/s  | 27.50 ms   | 23.2% higher    | 15.6% lower   |
-| HTTP/1.1 (keep-alive) | CPU      | Fixed       | 7.14k req/s  | 28.60 ms   | 7.85k req/s | 24.50 ms  | 9.1% lower    | 16.7% higher | 5.56k req/s  | 41.60 ms   | 28.4% higher    | 31.2% lower   |
-| HTTP/1.1 (keep-alive) | CPU      | Scaling     | 7.48k req/s  | 26.20 ms   | 7.85k req/s | 24.50 ms  | 4.8% lower    | 6.9% higher  | 5.56k req/s  | 41.60 ms   | 34.5% higher    | 37.0% lower   |
-| HTTP/2                | IO       | Fixed       | 1.13k req/s  | 174.70 ms  | N/A         | N/A       | -             | -            | 7.18k req/s  | 26.37 ms   | 84.3% lower     | 562.5% higher |
-| HTTP/2                | IO       | Scaling     | 6.48k req/s  | 29.15 ms   | N/A         | N/A       | -             | -            | 7.18k req/s  | 26.37 ms   | 9.7% lower      | 10.6% higher  |
-| HTTP/2                | CPU      | Fixed       | 6.31k req/s  | 31.74 ms   | N/A         | N/A       | -             | -            | 6.85k req/s  | 51.60 ms   | 7.9% lower      | 38.5% lower   |
-| HTTP/2                | CPU      | Scaling     | 6.70k req/s  | 31.91 ms   | N/A         | N/A       | -             | -            | 6.85k req/s  | 51.60 ms   | 2.2% lower      | 38.2% lower   |
+| HTTP/1.1              | IO       | Fixed       | 2.83k req/s  | 84.00 ms   | 1.51k req/s | 126.00 ms | 87.5% higher  | 33.3% lower  | 12.19k req/s | 14.10 ms   | 76.8% lower     | 495.7% higher |
+| HTTP/1.1              | IO       | Scaling     | 7.12k req/s  | 31.00 ms   | 1.51k req/s | 126.00 ms | 371.2% higher | 75.4% lower  | 12.19k req/s | 14.10 ms   | 41.6% lower     | 119.9% higher |
+| HTTP/1.1              | CPU      | Fixed       | 7.42k req/s  | 37.30 ms   | 8.63k req/s | 21.30 ms  | 14.0% lower   | 75.1% higher | 6.55k req/s  | 28.10 ms   | 13.2% higher    | 32.7% higher  |
+| HTTP/1.1              | CPU      | Scaling     | 6.66k req/s  | 37.70 ms   | 8.63k req/s | 21.30 ms  | 22.8% lower   | 77.0% higher | 6.55k req/s  | 28.10 ms   | 1.6% higher     | 34.2% higher  |
+| HTTP/1.1 (keep-alive) | IO       | Fixed       | 2.43k req/s  | 65.40 ms   | 1.47k req/s | 106.30 ms | 65.2% higher  | 38.5% lower  | 6.22k req/s  | 28.10 ms   | 61.0% lower     | 132.7% higher |
+| HTTP/1.1 (keep-alive) | IO       | Scaling     | 7.77k req/s  | 23.40 ms   | 1.47k req/s | 106.30 ms | 428.4% higher | 78.0% lower  | 6.22k req/s  | 28.10 ms   | 24.9% higher    | 16.7% lower   |
+| HTTP/1.1 (keep-alive) | CPU      | Fixed       | 7.46k req/s  | 26.60 ms   | 8.46k req/s | 22.80 ms  | 11.8% lower   | 16.7% higher | 6.92k req/s  | 33.80 ms   | 7.9% higher     | 21.3% lower   |
+| HTTP/1.1 (keep-alive) | CPU      | Scaling     | 7.53k req/s  | 26.50 ms   | 8.46k req/s | 22.80 ms  | 11.0% lower   | 16.2% higher | 6.92k req/s  | 33.80 ms   | 8.9% higher     | 21.6% lower   |
+| HTTP/2                | IO       | Fixed       | 1.25k req/s  | 138.74 ms  | N/A         | N/A       | -             | -            | 6.17k req/s  | 28.61 ms   | 79.7% lower     | 384.9% higher |
+| HTTP/2                | IO       | Scaling     | 6.20k req/s  | 30.00 ms   | N/A         | N/A       | -             | -            | 6.17k req/s  | 28.61 ms   | 0.5% higher     | 4.9% higher   |
+| HTTP/2                | CPU      | Fixed       | 6.84k req/s  | 32.02 ms   | N/A         | N/A       | -             | -            | 7.90k req/s  | 56.51 ms   | 13.4% lower     | 43.3% lower   |
+| HTTP/2                | CPU      | Scaling     | 7.12k req/s  | 31.07 ms   | N/A         | N/A       | -             | -            | 7.90k req/s  | 56.51 ms   | 9.9% lower      | 45.0% lower   |
 
-> ruby 4.0.6 (2026-07-14 revision 03b6d3f889) +YJIT +PRISM [aarch64-linux]
+> ruby 4.0.7 (2026-09-15 revision 229531a6cf) +YJIT +PRISM [aarch64-linux]
 > 10 worker processes; fixed Raptor and Puma run 3 threads per worker; scaling Raptor starts at 3 with no fixed limit;
 > Falcon runs unbounded fibers per worker; 120 concurrent HTTP/1.1 client connections; 40 concurrent HTTP/2 client
 > connections × 3 streams each

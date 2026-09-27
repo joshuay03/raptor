@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-27
+
 - Add HTTP/2 keepalive
 - Support HTTP/2 response trailers
 - Gracefully drain HTTP/2 connections
