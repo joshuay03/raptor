@@ -123,32 +123,6 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
 <p>The config file is a Ruby file that evaluates to a hash of options. By default Raptor loads <code>raptor.rb</code> then
 <code>config/raptor.rb</code> from the working directory; pass <code>-c PATH</code> to point at a specific file. Settings are nested under
 <code>connection:</code> (shared across protocols), <code>http1:</code> (HTTP/1.1-specific), and <code>http2:</code> (HTTP/2-specific).</p>
-<p>Use an <code>ssl://</code> bind for HTTP/2 negotiated with ALPN, or an <code>h2c://</code> bind for cleartext HTTP/2 clients using prior
-knowledge. Each <code>h2c://</code> listener accepts HTTP/2 only.</p>
-<p>HTTP/2 applications can populate <code>env[&quot;raptor.response_trailers&quot;]</code> with trailing response headers. Values may be
-strings or arrays of strings.</p>
-<p>Long-lived HTTP/2 responses can return a <code>Raptor::DetachedBody</code> so they do not occupy an application thread while
-waiting for data. Its buffer is bounded; <code>try_write</code> returns <code>:accepted</code>, <code>:full</code>, or <code>:closed</code> without blocking.
-<code>on_close</code> receives <code>:closed</code>, <code>:cancelled</code>, <code>:connection_closed</code>, <code>:shutdown</code>, or <code>:full</code>.</p>
-<pre class="code ruby"><code class="ruby"><span class='id identifier rubyid_body'>body</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Raptor.html" title="Raptor (module)">Raptor</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Raptor/DetachedBody.html" title="Raptor::DetachedBody (class)">DetachedBody</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Raptor/DetachedBody.html#initialize-instance_method" title="Raptor::DetachedBody#initialize (method)">new</a></span></span>
-
-<span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_on_open'>on_open</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_stream'>stream</span><span class='op'>|</span>
-  <span class='id identifier rubyid_subscriptions'>subscriptions</span><span class='period'>.</span><span class='id identifier rubyid_register'>register</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_stream'>stream</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_stream'>stream</span><span class='period'>.</span><span class='id identifier rubyid_try_write'>try_write</span><span class='lparen'>(</span><span class='id identifier rubyid_initial_message'>initial_message</span><span class='rparen'>)</span>
-<span class='kw'>end</span>
-
-<span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_on_close'>on_close</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid__reason'>_reason</span><span class='op'>|</span> <span class='id identifier rubyid_subscriptions'>subscriptions</span><span class='period'>.</span><span class='id identifier rubyid_unregister'>unregister</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
-
-<span class='lbracket'>[</span><span class='int'>200</span><span class='comma'>,</span> <span class='lbrace'>{</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>content-type</span><span class='tstring_end'>&quot;</span></span> <span class='op'>=&gt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>application/grpc</span><span class='tstring_end'>&quot;</span></span><span class='rbrace'>}</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='rbracket'>]</span>
-
-<span class='comment'># From another thread:
-</span><span class='id identifier rubyid_subscriptions'>subscriptions</span><span class='period'>.</span><span class='id identifier rubyid_fetch'>fetch</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span><span class='op'>&amp;.</span><span class='id identifier rubyid_try_write'>try_write</span><span class='lparen'>(</span><span class='id identifier rubyid_message'>message</span><span class='rparen'>)</span>
-
-<span class='comment'># To finish successfully:
-</span><span class='id identifier rubyid_subscriptions'>subscriptions</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span><span class='op'>&amp;.</span><span class='id identifier rubyid_close'>close</span><span class='lparen'>(</span><span class='label'>trailers:</span> <span class='lbrace'>{</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>grpc-status</span><span class='tstring_end'>&quot;</span></span> <span class='op'>=&gt;</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>0</span><span class='tstring_end'>&quot;</span></span><span class='rbrace'>}</span><span class='rparen'>)</span>
-</code></pre>
-<p>Idle HTTP/2 connections receive a PING after <code>keepalive_interval</code> seconds and close when its acknowledgement does not
-arrive within <code>keepalive_timeout</code>. Set <code>keepalive_interval</code> to <code>0</code> to disable these probes.</p>
 <pre class="code ruby"><code class="ruby"><span class='comment'># raptor.rb
 </span>
 <span class='comment'># Every key below is set to its default value; only include the ones you want to override.
@@ -535,7 +509,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Mon Sep 28 09:43:00 2026 by
+  Generated on Mon Sep 28 09:48:38 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
