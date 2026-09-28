@@ -6,6 +6,71 @@ module Raptor
   class TestReactor < TestCase
     # Runs serially so forked integration servers never inherit live reactor sockets.
 
+    def test_http1_detached_body_writes
+      callbacks = Queue.new
+      thread_pool = Object.new
+      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(thread_pool)
+      body = DetachedBody.new
+      9.times { body.try_write("x") }
+      body.close(trailers: {"x-status" => "complete"})
+
+      assert reactor.attach_http1_body(socket, 1, body, http1_state, proc {})
+      response = Timeout.timeout(1) { reader.read }
+
+      assert_equal(("1\r\nx\r\n" * 9) + "0\r\nx-status: complete\r\n\r\n", response)
+      assert_predicate body, :closed?
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
+    def test_http1_detached_body_cancellation
+      callbacks = Queue.new
+      thread_pool = Object.new
+      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(thread_pool)
+      reason = nil
+      body = DetachedBody.new
+      body.on_close { |closed| reason = closed }
+
+      assert reactor.attach_http1_body(socket, 1, body, http1_state, proc {})
+      reader.close
+      Timeout.timeout(1) { callbacks.pop.call }
+
+      assert_equal :connection_closed, reason
+      assert_predicate body, :closed?
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
+    def test_http1_detached_body_shutdown
+      callbacks = Queue.new
+      thread_pool = Object.new
+      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(thread_pool)
+      reason = nil
+      body = DetachedBody.new
+      body.on_close { |closed| reason = closed }
+
+      assert reactor.attach_http1_body(socket, 1, body, http1_state, proc {})
+      reactor.drain_detached_bodies(0.01)
+      Timeout.timeout(1) { callbacks.pop.call }
+
+      assert_equal :shutdown, reason
+      assert_predicate body, :closed?
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
     def test_http2_stream_dispatch_during_drain
       frames = []
       writer = Object.new
@@ -221,6 +286,22 @@ module Raptor
         http1_options: {persistent_data_timeout: 65},
         http2_options: {keepalive_interval: 10, keepalive_timeout: 5}
       )
+    end
+
+    def build_running_http1_reactor(thread_pool)
+      reader, socket = Socket.pair(:UNIX, :STREAM)
+      reactor = build_reactor(thread_pool)
+      [reactor, reactor.run, reader, socket]
+    end
+
+    def http1_state
+      {
+        chunked: true,
+        keep_alive: false,
+        request_count: 1,
+        remote_addr: "127.0.0.1",
+        url_scheme: "http",
+      }
     end
 
     def build_running_http2_reactor(thread_pool)

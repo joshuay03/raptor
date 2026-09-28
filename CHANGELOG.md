@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add detached HTTP/1.1 response bodies
 - Add detached HTTP/2 response bodies
 - Move HTTP/2 writes to the reactor
 

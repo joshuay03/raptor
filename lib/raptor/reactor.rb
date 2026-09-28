@@ -99,6 +99,41 @@ module Raptor
       end
     end
 
+    # Tracks reactor-owned I/O state for an HTTP/1.x detached response.
+    #
+    class Http1IO < ConnectionIO
+      # @rbs attr_accessor body: DetachedBody?
+      attr_accessor :body
+
+      # @rbs attr_accessor finishing: bool
+      attr_accessor :finishing
+
+      # @rbs attr_reader budget: DetachedBody::Budget
+      attr_reader :budget
+
+      # @rbs attr_reader input: String
+      attr_reader :input
+
+      # @rbs attr_reader state: Hash[Symbol, untyped]
+      attr_reader :state
+
+      # @rbs (DetachedBody body, Hash[Symbol, untyped] state) -> void
+      def initialize(body, state)
+        super()
+        @body = body
+        @state = state
+        @budget = DetachedBody::Budget.new(DETACHED_CONNECTION_BUFFER_SIZE)
+        @input = String.new(encoding: Encoding::ASCII_8BIT)
+        @reading = true
+        @finishing = false
+      end
+
+      # @rbs () -> bool
+      def empty?
+        super && !body
+      end
+    end
+
     # Tracks reactor-owned I/O state for an HTTP/2 connection.
     #
     class Http2IO < ConnectionIO
@@ -131,6 +166,7 @@ module Raptor
 
     CHUNK_SIZE = 64 * 1024
     DETACHED_CONNECTION_BUFFER_SIZE = 1024 * 1024
+    DETACHED_MAX_CHUNKS = 8
     DETACHED_MAX_FRAMES = 8
     DETACHED_WORKER_BUFFER_SIZE = 16 * 1024 * 1024
     TIMEOUT_RESPONSE = "HTTP/1.1 408 Request Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -369,6 +405,23 @@ module Raptor
     # @rbs (Integer id) -> untyped?
     def flow_control_for(id)
       @id_to_flow_control[id]
+    end
+
+    # Attaches a detached response body to an HTTP/1.x connection.
+    #
+    # @rbs (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> bool
+    def attach_http1_body(socket, id, body, state, finished)
+      attached = AtomicCountDownLatch.new(1)
+      @io_queue << [:attach_http1, id, socket, body, attached, finished, state]
+      @selector.wakeup rescue nil
+      attached.wait
+      return false if body.closed?
+
+      body.open
+      true
+    rescue
+      remove_connection(id)
+      raise
     end
 
     # Records an HTTP/2 stream before application dispatch, rejecting streams
@@ -631,7 +684,7 @@ module Raptor
     def drain_io_queue
       connections = {}
       while (operation = @io_queue.pop)
-        type, id, value, body, attached, finished = operation
+        type, id, value, body, attached, finished, state = operation
         case type
         when :write
           data = value
@@ -646,6 +699,14 @@ module Raptor
             attached.count_down
           end
           connections[id] = true
+        when :attach_http1
+          begin
+            attach_http1_detached_body(value, id, body, state, finished)
+          ensure
+            attached.count_down
+          end
+        when :ready_http1
+          flush_http1_detached_body(id)
         when :ready_http2
           mark_http2_detached_body_ready(id, value)
           connections[id] = true
@@ -666,8 +727,112 @@ module Raptor
       connections.each_key do |id|
         io = @id_to_io[id]
         flush_output(id, io) if io && !io.wait
-        flush_http2_detached_bodies(id) if io && !io.wait && !io.detached.empty?
+        flush_http2_detached_bodies(id) if io.is_a?(Http2IO) && !io.wait && !io.detached.empty?
       end
+    end
+
+    # Adds a detached body to an HTTP/1.x connection.
+    #
+    # @rbs (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> void
+    def attach_http1_detached_body(socket, id, body, state, finished)
+      io = Http1IO.new(body, state)
+      dispatch = proc { |callback| @thread_pool << callback }
+      wake = proc do
+        @io_queue << [:ready_http1, id]
+        @selector.wakeup rescue nil
+      end
+      unless body.attach([io.budget, @detached_budget], wake, dispatch, finished)
+        socket.close rescue nil
+        return
+      end
+
+      @id_to_socket[id] = socket
+      @socket_to_state[socket] = {id: id, protocol: :http1, detached: true}
+      @id_to_io[id] = io
+      @detached_count.swap { |count| count + 1 }
+      update_monitor(id, io)
+    end
+
+    # Writes buffered HTTP/1.x body chunks without blocking.
+    #
+    # @rbs (Integer id) -> void
+    def flush_http1_detached_body(id)
+      io = @id_to_io[id]
+      return unless io.is_a?(Http1IO) && !io.wait && io.output.empty?
+
+      DETACHED_MAX_CHUNKS.times do
+        size = io.body&.next_size
+        break unless size
+
+        if size.zero?
+          queue_output(io, Http1.encode_trailers(io.body.trailers)) if io.state[:chunked]
+          io.finishing = true
+          flush_output(id, io)
+          break
+        end
+
+        chunk = io.body.shift(size)
+        queue_output(io, io.state[:chunked] ? Http1.encode_chunk(chunk) : chunk)
+        flush_output(id, io)
+        break if io.wait
+      end
+
+      if !io.finishing && !io.wait && io.body&.next_size
+        @io_queue << [:ready_http1, id]
+        @selector.wakeup rescue nil
+      end
+    end
+
+    # Finishes an HTTP/1.x detached response and either reuses or closes its connection.
+    #
+    # @rbs (Integer id, Http1IO io) -> void
+    def finish_http1_detached_body(id, io)
+      socket = @id_to_socket[id]
+      return unless socket
+
+      body = io.body
+      io.body = nil
+      body.finish(:closed)
+      detached_body_removed
+      @id_to_io.delete(id)
+      deregister(socket, io)
+      clear_write_timeout(io)
+
+      if io.state[:keep_alive]
+        state = {
+          id: id,
+          request_count: io.state[:request_count],
+          remote_addr: io.state[:remote_addr],
+          url_scheme: io.state[:url_scheme],
+          persisted: true,
+        }
+        unless io.input.empty?
+          state[:buffer] = io.input
+          @socket_to_state[socket] = state
+          @http1_ractor_pool << Ractor.make_shareable(state)
+          return
+        end
+
+        persist(socket, id, io.state[:request_count], remote_addr: io.state[:remote_addr], url_scheme: io.state[:url_scheme])
+      else
+        @socket_to_state.delete(socket)
+        @id_to_socket.delete(id)
+        socket.close rescue nil
+      end
+    end
+
+    # Cancels an HTTP/1.x detached response and closes its connection.
+    #
+    # @rbs (Integer id, Symbol reason) -> void
+    def remove_http1_detached_body(id, reason)
+      io = @id_to_io[id]
+      return unless io.is_a?(Http1IO) && io.body
+
+      body = io.body
+      io.body = nil
+      body.finish(reason)
+      detached_body_removed
+      remove_connection(id)
     end
 
     # Adds a detached body to an HTTP/2 stream.
@@ -788,13 +953,17 @@ module Raptor
       detached_body_removed
     end
 
-    # Cancels every detached stream during worker shutdown.
+    # Cancels every detached response during worker shutdown.
     #
     # @rbs () -> void
     def cancel_detached_bodies
-      @id_to_io.each do |id, io|
-        io.detached.each_key.to_a.each do |stream_id|
-          remove_http2_detached_body(id, stream_id, :shutdown)
+      @id_to_io.to_a.each do |id, io|
+        if io.is_a?(Http1IO)
+          remove_http1_detached_body(id, :shutdown)
+        else
+          io.detached.each_key.to_a.each do |stream_id|
+            remove_http2_detached_body(id, stream_id, :shutdown)
+          end
         end
       end
     end
@@ -897,7 +1066,9 @@ module Raptor
       end
 
       io.wait = nil
-      if io.closing
+      if io.is_a?(Http1IO) && io.finishing
+        finish_http1_detached_body(id, io)
+      elsif io.closing
         remove_connection(id)
       else
         update_monitor(id, io)
@@ -1077,6 +1248,11 @@ module Raptor
       state = @socket_to_state[socket]
       return unless state
 
+      if state[:detached]
+        handle_http1_detached_monitor(monitor, state[:id])
+        return
+      end
+
       unless state[:protocol] == :http2
         wakeup!(socket)
         return
@@ -1101,6 +1277,34 @@ module Raptor
       to_client = @id_to_timeout.delete(id)
       @timeouts.delete!(to_client) if to_client
       read_and_queue_for_parse(socket, state)
+    end
+
+    # Handles readiness for an HTTP/1.x detached response.
+    #
+    # @rbs (NIO::Monitor monitor, Integer id) -> void
+    def handle_http1_detached_monitor(monitor, id)
+      socket = monitor.value
+      io = @id_to_io[id]
+      return unless io.is_a?(Http1IO)
+
+      wait = io.wait
+      if (wait == :read && monitor.readable?) || (wait == :write && monitor.writable?)
+        flush_output(id, io)
+        return unless @id_to_io.key?(id)
+
+        flush_http1_detached_body(id) unless io.wait
+      end
+
+      return unless io.reading && monitor.readable?
+
+      io.input << socket.read_nonblock(CHUNK_SIZE)
+      io.reading = false
+      update_monitor(id, io)
+    rescue IO::WaitReadable
+    rescue IO::WaitWritable
+      wait_for_write(id, io, :write)
+    rescue EOFError, IOError, SystemCallError, OpenSSL::SSL::SSLError
+      remove_connection(id)
     end
 
     # Handles socket wakeup by deregistering and queuing for processing.
@@ -1165,7 +1369,13 @@ module Raptor
       @id_to_http2_last_stream.delete(state[:id])
       @id_to_http2_drain_stream.delete(state[:id])
       @id_to_http2_keepalive.delete(state[:id])
-      if io
+      if io.is_a?(Http1IO)
+        if io.body
+          io.body.finish(:connection_closed)
+          io.body = nil
+          detached_body_removed
+        end
+      elsif io
         io.detached.each_value do |body|
           body.finish(:connection_closed)
           detached_body_removed

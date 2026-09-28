@@ -8,6 +8,7 @@ require "tempfile"
 require "atomic-ruby/atomic_boolean"
 require "rack"
 
+require_relative "detached_body"
 require_relative "http"
 require_relative "raptor_http"
 require_relative "thread_locals"
@@ -95,6 +96,28 @@ module Raptor
       end
 
       false
+    end
+
+    # Encodes one HTTP/1.1 response chunk.
+    #
+    # @rbs (String chunk) -> String
+    def self.encode_chunk(chunk)
+      HttpParser.chunked_encode(String.new, chunk)
+    end
+
+    # Encodes the final HTTP/1.1 response chunk and its trailers.
+    #
+    # @rbs (Hash[String, String | Array[String]] trailers) -> String
+    def self.encode_trailers(trailers)
+      normalized = trailers.each_with_object({}) do |(key, value), headers|
+        name = key.match?(/[A-Z]/) ? key.downcase : key
+        next if name.start_with?(RACK_HEADER_PREFIX) || name == "status"
+
+        headers[name] = value
+      end
+      response = +"0\r\n"
+      HttpParser.format_headers(response, normalized)
+      response << "\r\n"
     end
 
     # Advances an HTTP/1.x request parse from the state hash's buffered
@@ -492,7 +515,7 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
     def process_client(socket, id, env, parse_data, body, reactor, thread_pool, request_count, remote_addr, url_scheme)
-      keep_alive = process_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme)
+      keep_alive = process_request(socket, id, env, parse_data, body, reactor, request_count, remote_addr, url_scheme)
       eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme) if keep_alive
     end
 
@@ -501,20 +524,22 @@ module Raptor
     # for another request.
     #
     # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique client identifier
     # @param env [Hash] partial env hash from the HTTP parser
     # @param parse_data [Hash] metadata from the parsing pass
     # @param body [String, nil] decoded request body
+    # @param reactor [Reactor] the reactor managing the client connection
     # @param request_count [Integer] number of requests handled on this connection
     # @param remote_addr [String] client IP address
     # @param url_scheme [String] "http" or "https"
     # @return [Boolean] true if the connection should be kept alive
     #
-    # @rbs (TCPSocket socket, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Integer request_count, String remote_addr, String url_scheme) -> bool
-    def process_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme)
+    # @rbs (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, Integer request_count, String remote_addr, String url_scheme) -> bool
+    def process_request(socket, id, env, parse_data, body, reactor, request_count, remote_addr, url_scheme)
       if @clean_fiber_locals
-        Fiber.new { perform_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme) }.resume
+        Fiber.new { perform_request(socket, id, env, parse_data, body, reactor, request_count, remote_addr, url_scheme) }.resume
       else
-        perform_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme)
+        perform_request(socket, id, env, parse_data, body, reactor, request_count, remote_addr, url_scheme)
       end
     ensure
       ThreadLocals.clear if @clean_thread_locals
@@ -522,13 +547,14 @@ module Raptor
 
     # Calls the Rack app and writes its response for one request.
     #
-    # @rbs (TCPSocket socket, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Integer request_count, String remote_addr, String url_scheme) -> bool
-    def perform_request(socket, env, parse_data, body, request_count, remote_addr, url_scheme)
+    # @rbs (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, Integer request_count, String remote_addr, String url_scheme) -> bool
+    def perform_request(socket, id, env, parse_data, body, reactor, request_count, remote_addr, url_scheme)
       rack_env = nil
       status = nil
       headers = nil
       hijacked = false
       keep_alive = false
+      detached = false
       response_started = false
 
       begin
@@ -540,16 +566,40 @@ module Raptor
           body.close if body.respond_to?(:close)
         else
           hijacked = headers.is_a?(Hash) && !!headers[Rack::RACK_HIJACK]
-          streaming = body.respond_to?(:call) && !body.respond_to?(:each)
-          keep_alive = (hijacked || streaming) ? false : keep_alive?(rack_env, request_count)
-          response_size = response_size(headers, body) if @access_log_io && !hijacked
-          response_started = true
-          write_response(socket, rack_env, status, headers, body, keep_alive: keep_alive)
+          no_body = rack_env[Rack::REQUEST_METHOD] == "HEAD" || (status >= 100 && status < 200) || status == 204 || status == 304
+          detached = body.is_a?(DetachedBody) && !no_body
+          if detached
+            chunked = rack_env[Rack::SERVER_PROTOCOL] == HTTP_11
+            keep_alive = chunked && keep_alive?(rack_env, request_count)
+            response_started = true
+            write_detached_response(socket, status, headers, chunked: chunked, keep_alive: keep_alive)
+            finished = proc do |reason|
+              error = IOError.new("detached response closed") unless reason == :closed
+              write_access_log(rack_env, status, "-", remote_addr) if @access_log_io
+              Http.call_response_finished(rack_env, status, headers, error)
+            end
+            reactor.attach_http1_body(
+              socket,
+              id,
+              body,
+              {chunked: chunked, keep_alive: keep_alive, request_count: request_count, remote_addr: remote_addr, url_scheme: url_scheme},
+              finished
+            )
+          else
+            streaming = body.respond_to?(:call) && !body.respond_to?(:each)
+            keep_alive = (hijacked || streaming) ? false : keep_alive?(rack_env, request_count)
+            response_size = response_size(headers, body) if @access_log_io && !hijacked
+            response_started = true
+            write_response(socket, rack_env, status, headers, body, keep_alive: keep_alive)
+            body.finish(:closed) if body.is_a?(DetachedBody)
+          end
         end
 
-        write_access_log(rack_env, status, response_size, remote_addr) if @access_log_io && !hijacked
-        Http.call_response_finished(rack_env, status, headers, nil)
-        keep_alive && !hijacked
+        unless detached
+          write_access_log(rack_env, status, response_size, remote_addr) if @access_log_io && !hijacked
+          Http.call_response_finished(rack_env, status, headers, nil)
+        end
+        keep_alive && !hijacked && !detached
       rescue => error
         keep_alive = false
         handle_app_error(socket, rack_env, status, headers, error, response_started: response_started, hijacked: hijacked)
@@ -557,7 +607,7 @@ module Raptor
         rack_input = rack_env && rack_env[Rack::RACK_INPUT]
         rack_input.close! rescue nil if rack_input.respond_to?(:close!)
 
-        unless hijacked || keep_alive
+        unless hijacked || keep_alive || detached
           socket.close rescue nil
         end
       end
@@ -666,9 +716,11 @@ module Raptor
 
         keep_alive = process_request(
           socket,
+          id,
           env,
           parse_data,
           body,
+          reactor,
           request_count,
           remote_addr,
           url_scheme
@@ -892,6 +944,24 @@ module Raptor
       end
       response << "\r\n"
 
+      socket_write(socket, response)
+    end
+
+    # Starts a detached response, chunked on HTTP/1.1 and ended by closing
+    # the connection on HTTP/1.0.
+    #
+    # @rbs (TCPSocket socket, Integer status, Hash[String, String | Array[String]] headers, chunked: bool, keep_alive: bool) -> void
+    def write_detached_response(socket, status, headers, chunked:, keep_alive:)
+      validate_status(status)
+      headers = normalize_headers(headers)
+      validate_headers(headers, status, false)
+      headers.delete(Rack::CONTENT_LENGTH)
+      headers[Rack::TRANSFER_ENCODING] = TRANSFER_ENCODING_CHUNKED if chunked
+      headers["connection"] = keep_alive ? CONNECTION_KEEPALIVE : CONNECTION_CLOSE
+
+      response = build_status_line(chunked ? HTTP_11 : HTTP_10, status)
+      HttpParser.format_headers(response, headers)
+      response << "\r\n"
       socket_write(socket, response)
     end
 

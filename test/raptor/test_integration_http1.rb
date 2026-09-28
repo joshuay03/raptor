@@ -16,6 +16,49 @@ module Raptor
       end
     end
 
+    def test_detached_response
+      with_server("detached_body.ru") do |uri|
+        response = raw_request(
+          uri,
+          "GET / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/transfer-encoding: chunked/i, response)
+        assert_includes response, "5\r\nfirst\r\n7\r\n second\r\n"
+        assert_includes response, "0\r\nx-stream-status: complete\r\n\r\n"
+      end
+    end
+
+    def test_detached_response_for_http10
+      with_server("detached_body.ru") do |uri|
+        response = raw_request(uri, "GET / HTTP/1.0\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
+
+        assert_match(/\AHTTP\/1\.0 200/, response)
+        refute_match(/transfer-encoding/i, response)
+        assert response.end_with?("\r\n\r\nfirst second")
+      end
+    end
+
+    def test_detached_responses_on_persistent_connection
+      with_server("detached_body.ru") do |uri|
+        socket = TCPSocket.new(uri.host, uri.port)
+        socket.write("GET /first HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
+        response = +""
+        Timeout.timeout(5) do
+          response << socket.readpartial(1024) until response.include?("\r\n\r\n")
+        end
+        socket.write("GET /second HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
+        response << Timeout.timeout(5) { socket.read }
+
+        assert_equal 2, response.scan(/HTTP\/1\.1 200/).size
+        assert_equal 2, response.scan("5\r\nfirst\r\n7\r\n second\r\n").size
+      ensure
+        socket&.close
+      end
+    end
+
     def test_head_request_returns_no_body
       with_server("head_request.ru") do |uri|
         response = Net::HTTP.start(uri.host, uri.port) do |http|

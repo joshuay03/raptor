@@ -67,6 +67,30 @@ module Raptor
       def empty?: () -> bool
     end
 
+    # Tracks reactor-owned I/O state for an HTTP/1.x detached response.
+    class Http1IO < ConnectionIO
+      # @rbs attr_accessor body: DetachedBody?
+      attr_accessor body: untyped
+
+      # @rbs attr_accessor finishing: bool
+      attr_accessor finishing: untyped
+
+      # @rbs attr_reader budget: DetachedBody::Budget
+      attr_reader budget: untyped
+
+      # @rbs attr_reader input: String
+      attr_reader input: untyped
+
+      # @rbs attr_reader state: Hash[Symbol, untyped]
+      attr_reader state: untyped
+
+      # @rbs (DetachedBody body, Hash[Symbol, untyped] state) -> void
+      def initialize: (DetachedBody body, Hash[Symbol, untyped] state) -> void
+
+      # @rbs () -> bool
+      def empty?: () -> bool
+    end
+
     # Tracks reactor-owned I/O state for an HTTP/2 connection.
     class Http2IO < ConnectionIO
       # @rbs attr_reader detached: Hash[Integer, DetachedBody]
@@ -91,6 +115,8 @@ module Raptor
     CHUNK_SIZE: untyped
 
     DETACHED_CONNECTION_BUFFER_SIZE: untyped
+
+    DETACHED_MAX_CHUNKS: ::Integer
 
     DETACHED_MAX_FRAMES: ::Integer
 
@@ -245,6 +271,11 @@ module Raptor
     # @rbs (Integer id) -> untyped?
     def flow_control_for: (Integer id) -> untyped?
 
+    # Attaches a detached response body to an HTTP/1.x connection.
+    #
+    # @rbs (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> bool
+    def attach_http1_body: (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> bool
+
     # Records an HTTP/2 stream before application dispatch, rejecting streams
     # that arrived after graceful draining began.
     #
@@ -385,6 +416,26 @@ module Raptor
     # @rbs () -> void
     def drain_io_queue: () -> void
 
+    # Adds a detached body to an HTTP/1.x connection.
+    #
+    # @rbs (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> void
+    def attach_http1_detached_body: (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> void
+
+    # Writes buffered HTTP/1.x body chunks without blocking.
+    #
+    # @rbs (Integer id) -> void
+    def flush_http1_detached_body: (Integer id) -> void
+
+    # Finishes an HTTP/1.x detached response and either reuses or closes its connection.
+    #
+    # @rbs (Integer id, Http1IO io) -> void
+    def finish_http1_detached_body: (Integer id, Http1IO io) -> void
+
+    # Cancels an HTTP/1.x detached response and closes its connection.
+    #
+    # @rbs (Integer id, Symbol reason) -> void
+    def remove_http1_detached_body: (Integer id, Symbol reason) -> void
+
     # Adds a detached body to an HTTP/2 stream.
     #
     # @rbs (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> void
@@ -415,7 +466,7 @@ module Raptor
     # @rbs (Integer id, Integer stream_id, Symbol reason) -> void
     def remove_http2_detached_body: (Integer id, Integer stream_id, Symbol reason) -> void
 
-    # Cancels every detached stream during worker shutdown.
+    # Cancels every detached response during worker shutdown.
     #
     # @rbs () -> void
     def cancel_detached_bodies: () -> void
@@ -539,6 +590,11 @@ module Raptor
     #
     # @rbs (NIO::Monitor monitor) -> void
     def handle_monitor: (NIO::Monitor monitor) -> void
+
+    # Handles readiness for an HTTP/1.x detached response.
+    #
+    # @rbs (NIO::Monitor monitor, Integer id) -> void
+    def handle_http1_detached_monitor: (NIO::Monitor monitor, Integer id) -> void
 
     # Handles socket wakeup by deregistering and queuing for processing.
     #

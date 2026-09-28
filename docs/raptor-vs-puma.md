@@ -326,6 +326,8 @@ Puma has a similar shape. It checks buffered back-to-back requests, then eagerly
 
 The `reactor.persist` call re-registers the socket with the reactor using `persistent_data_timeout` (65s) as the new deadline. When the next bytes arrive, the reactor treats the socket like any other partially-read connection.
 
+A `Raptor::DetachedBody` returns the application thread while keeping the response open, chunked on HTTP/1.1 and ended by closing the connection on HTTP/1.0. The reactor owns the response until it closes, buffers later writes within fixed limits, and pauses the connection's next request without occupying an application thread.
+
 ### HTTP/2 request lifecycle
 
 Raptor speaks HTTP/2 on TLS connections where the client negotiates it via ALPN and on `h2c://` listeners for cleartext clients using prior knowledge. The binder sets `alpn_protocols = ["h2", "http/1.1"]` on the SSL context and the ALPN callback picks h2 whenever the client offers it. Puma does not do this. Puma's SSL context does not advertise `h2` in ALPN, so clients transparently fall back to HTTP/1.1.
