@@ -2,7 +2,10 @@
 # frozen_string_literal: true
 
 require "nio"
+require "openssl"
 require "red-black-tree"
+
+require "atomic-ruby/atomic_queue"
 
 module Raptor
   # Multiplexes client connections, manages connection deadlines, feeds
@@ -49,6 +52,47 @@ module Raptor
       end
     end
 
+    # Tracks reactor-owned output state for a connection.
+    #
+    class ConnectionIO
+      # @rbs attr_accessor offset: Integer
+      attr_accessor :offset
+
+      # @rbs attr_accessor wait: Symbol?
+      attr_accessor :wait
+
+      # @rbs attr_accessor reading: bool
+      attr_accessor :reading
+
+      # @rbs attr_accessor closing: bool
+      attr_accessor :closing
+
+      # @rbs attr_accessor monitor: NIO::Monitor?
+      attr_accessor :monitor
+
+      # @rbs attr_accessor timeout: TimeoutClient?
+      attr_accessor :timeout
+
+      # @rbs attr_reader output: Array[String]
+      attr_reader :output
+
+      # @rbs () -> void
+      def initialize
+        @output = []
+        @offset = 0
+        @wait = nil
+        @reading = false
+        @closing = false
+        @monitor = nil
+        @timeout = nil
+      end
+
+      # @rbs () -> bool
+      def empty?
+        output.empty?
+      end
+    end
+
     CHUNK_SIZE = 64 * 1024
     TIMEOUT_RESPONSE = "HTTP/1.1 408 Request Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 
@@ -58,10 +102,12 @@ module Raptor
     # @rbs @first_data_timeout: Integer
     # @rbs @chunk_data_timeout: Integer
     # @rbs @persistent_data_timeout: Integer
+    # @rbs @write_timeout: Integer
     # @rbs @http2_keepalive_interval: Integer
     # @rbs @http2_keepalive_timeout: Integer
     # @rbs @selector: NIO::Selector
     # @rbs @queue: Queue[TCPSocket]
+    # @rbs @io_queue: AtomicQueue
     # @rbs @timeouts: RedBlackTree[TimeoutClient]
     # @rbs @id_to_socket: Hash[Integer, TCPSocket]
     # @rbs @socket_to_state: Hash[TCPSocket, Hash[Symbol, untyped]]
@@ -71,6 +117,8 @@ module Raptor
     # @rbs @id_to_http2_last_stream: Hash[Integer, Integer]
     # @rbs @id_to_http2_drain_stream: Hash[Integer, Integer]
     # @rbs @id_to_http2_keepalive: Hash[Integer, Hash[Symbol, untyped]]
+    # @rbs @id_to_io: Hash[Integer, ConnectionIO]
+    # @rbs @thread: Thread?
 
     # Creates a new Reactor instance.
     #
@@ -94,12 +142,14 @@ module Raptor
       @thread_pool = thread_pool
       @first_data_timeout = connection_options[:first_data_timeout]
       @chunk_data_timeout = connection_options[:chunk_data_timeout]
+      @write_timeout = connection_options[:write_timeout]
       @persistent_data_timeout = http1_options[:persistent_data_timeout]
       @http2_keepalive_interval = http2_options[:keepalive_interval]
       @http2_keepalive_timeout = http2_options[:keepalive_timeout]
 
       @selector = NIO::Selector.new
       @queue = Queue.new
+      @io_queue = AtomicQueue.new
       @timeouts = RedBlackTree.new
 
       @id_to_socket = {}
@@ -110,10 +160,12 @@ module Raptor
       @id_to_http2_last_stream = {}
       @id_to_http2_drain_stream = {}
       @id_to_http2_keepalive = {}
+      @id_to_io = {}
+      @thread = nil
     end
 
     # Starts the reactor's main event loop in a new thread. Runs until
-    # the registration queue is closed and drained.
+    # shutdown work and pending writes are drained.
     #
     # @return [Thread] the thread running the reactor event loop
     #
@@ -121,28 +173,19 @@ module Raptor
     def run
       Thread.new do
         Thread.current.name = "Reactor"
+        @thread = Thread.current
 
-        until @queue.closed? && @queue.empty?
+        until stopped?
           begin
-            timeout = @timeouts.min&.timeout(Process.clock_gettime(Process::CLOCK_MONOTONIC))
+            now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            timeout = @timeouts.min&.timeout(now)
             @selector.select(timeout) do |monitor|
-              wakeup!(monitor.value)
+              handle_monitor(monitor)
             end
 
             now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-            expired = []
-            @timeouts.traverse do |to_client|
-              break unless to_client.timeout(now).zero?
-
-              expired << to_client
-            end
-
-            expired.each do |to_client|
-              @timeouts.delete!(to_client)
-              id = to_client.client_data[:id]
-              @id_to_timeout.delete(id)
-              handle_timeout(to_client, now)
-            end
+            expire_timeouts(now)
+            drain_io_queue
 
             until @queue.empty?
               register(@queue.pop)
@@ -162,7 +205,9 @@ module Raptor
         @id_to_http2_last_stream.clear
         @id_to_http2_drain_stream.clear
         @id_to_http2_keepalive.clear
+        @id_to_io.clear
         @timeouts.clear!
+        @thread = nil
         @selector.close
       end
     end
@@ -317,6 +362,28 @@ module Raptor
       end
     end
 
+    # Queues serialized HTTP/2 frames for a connection. Producers never
+    # write to the socket or wait for it to become writable.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param frames [Array<String>] frame bytes to write in order
+    # @return [void]
+    #
+    # @rbs (Integer id, Array[String] frames) -> void
+    def write_http2_frames(id, frames)
+      data = frames.join
+      return if data.empty?
+
+      if Thread.current.equal?(@thread)
+        io = @id_to_io[id]
+        queue_output(io, data)
+        flush_output(id, io) if io && !io.wait
+      else
+        @io_queue << [:write, id, data]
+        @selector.wakeup rescue nil
+      end
+    end
+
     # Stores an HTTP/2 connection's socket, state, writer, and flow
     # controller in the reactor's per-connection maps.
     #
@@ -336,6 +403,8 @@ module Raptor
       @id_to_writer[id] = writer
       @id_to_flow_control[id] = flow_control
       @id_to_http2_last_stream[id] = 0
+      @id_to_io[id] = ConnectionIO.new
+      writer.attach(self, id)
       if @http2_keepalive_interval.positive?
         @id_to_http2_keepalive[id] = {frame: ping_frame, payload: ping_payload}
       end
@@ -389,24 +458,15 @@ module Raptor
       socket.close
     end
 
-    # Closes the socket for the given connection and drops all reactor
-    # state associated with it.
+    # Closes a connection after writing any frames already queued for it.
     #
     # @param id [Integer] unique client identifier
     # @return [void]
     #
     # @rbs (Integer id) -> void
     def close_connection(id)
-      socket = @id_to_socket.delete(id)
-      return unless socket
-
-      @socket_to_state.delete(socket)
-      @id_to_writer.delete(id)
-      @id_to_flow_control.delete(id)&.close
-      @id_to_http2_last_stream.delete(id)
-      @id_to_http2_drain_stream.delete(id)
-      @id_to_http2_keepalive.delete(id)
-      socket.close rescue nil
+      @io_queue << [:close, id]
+      @selector.wakeup rescue nil
     end
 
     # Closes the registration queue and wakes the selector so the
@@ -432,6 +492,238 @@ module Raptor
 
     private
 
+    # Returns whether shutdown has no registrations or writes left to drain.
+    #
+    # @return [Boolean]
+    #
+    # @rbs () -> bool
+    def stopped?
+      @queue.closed? && @queue.empty? && @io_queue.empty? &&
+        @id_to_io.each_value.all?(&:empty?)
+    end
+
+    # Handles every expired connection deadline in order.
+    #
+    # @param now [Float] current monotonic timestamp
+    # @return [void]
+    #
+    # @rbs (Float now) -> void
+    def expire_timeouts(now)
+      while (client = @timeouts.min) && client.timeout(now).zero?
+        @timeouts.delete!(client)
+        id = client.client_data[:id]
+        if client.client_data[:write]
+          @id_to_io[id]&.timeout = nil
+          remove_connection(id)
+        else
+          @id_to_timeout.delete(id)
+          handle_timeout(client, now)
+        end
+      end
+    end
+
+    # Applies queued reactor-owned I/O operations.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def drain_io_queue
+      connections = {}
+      while (operation = @io_queue.pop)
+        type, id, data = operation
+        case type
+        when :write
+          queue_output(@id_to_io[id], data)
+          connections[id] = true
+        when :close
+          close_after_writes(id)
+        end
+      end
+
+      connections.each_key do |id|
+        io = @id_to_io[id]
+        flush_output(id, io) if io && !io.wait
+      end
+    end
+
+    # Closes a connection once its queued frames are written.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [void]
+    #
+    # @rbs (Integer id) -> void
+    def close_after_writes(id)
+      io = @id_to_io[id]
+      return unless io
+
+      if io.empty?
+        remove_connection(id)
+      else
+        io.closing = true
+      end
+    end
+
+    # Immediately closes a connection and drops its reactor state.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [void]
+    #
+    # @rbs (Integer id) -> void
+    def remove_connection(id)
+      socket = @id_to_socket[id]
+      cleanup(socket) if socket
+    end
+
+    # Adds bytes to one connection and writes as much as the socket accepts.
+    #
+    # @param io [ConnectionIO] connection I/O state
+    # @param data [String] serialized response bytes
+    # @return [void]
+    #
+    # @rbs (ConnectionIO? io, String data) -> void
+    def queue_output(io, data)
+      return unless io && !io.closing
+
+      if io.output.empty?
+        io.output << data
+      else
+        io.output[-1] << data
+      end
+    end
+
+    # Drains one connection's queued response bytes without blocking.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param io [ConnectionIO] connection I/O state
+    # @return [void]
+    #
+    # @rbs (Integer id, ConnectionIO? io) -> void
+    def flush_output(id, io)
+      socket = @id_to_socket[id]
+      return unless socket && io
+
+      while (data = io.output.first)
+        chunk = io.offset.zero? ? data : data.byteslice(io.offset..-1)
+
+        begin
+          written = socket.write_nonblock(chunk)
+        rescue IO::WaitReadable
+          wait_for_write(id, io, :read)
+          return
+        rescue IO::WaitWritable
+          wait_for_write(id, io, :write)
+          return
+        rescue IOError, SystemCallError, OpenSSL::SSL::SSLError
+          remove_connection(id)
+          return
+        end
+
+        if written.zero?
+          wait_for_write(id, io, :write)
+          return
+        end
+
+        clear_write_timeout(io)
+        io.offset += written
+        if io.offset == data.bytesize
+          io.output.shift
+          io.offset = 0
+        end
+      end
+
+      io.wait = nil
+      if io.closing
+        remove_connection(id)
+      else
+        update_monitor(id, io)
+      end
+    end
+
+    # Registers the readiness needed to continue a partial socket write.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param io [ConnectionIO] connection I/O state
+    # @param readiness [Symbol] `:read` or `:write`
+    # @return [void]
+    #
+    # @rbs (Integer id, ConnectionIO io, Symbol readiness) -> void
+    def wait_for_write(id, io, readiness)
+      io.wait = readiness
+      track_write_timeout(id, io)
+      update_monitor(id, io)
+    end
+
+    # Updates selector interest for one reactor-owned connection.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param io [ConnectionIO] connection I/O state
+    # @return [void]
+    #
+    # @rbs (Integer id, ConnectionIO io) -> void
+    def update_monitor(id, io)
+      socket = @id_to_socket[id]
+      return unless socket && io
+
+      read = io.reading || io.wait == :read
+      write = io.wait == :write
+      interests = if read && write
+        :rw
+      elsif read
+        :r
+      elsif write
+        :w
+      end
+
+      if io.monitor
+        io.monitor.interests = interests
+      elsif interests
+        io.monitor = @selector.register(socket, interests)
+        io.monitor.value = socket
+      end
+    end
+
+    # Starts or refreshes one connection's non-blocking write deadline.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param io [ConnectionIO] connection I/O state
+    # @return [void]
+    #
+    # @rbs (Integer id, ConnectionIO io) -> void
+    def track_write_timeout(id, io)
+      clear_write_timeout(io)
+      client = TimeoutClient.new({id: id, write: true})
+      client.timeout_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @write_timeout
+      @timeouts << client
+      io.timeout = client
+    end
+
+    # Removes one connection's non-blocking write deadline.
+    #
+    # @param io [ConnectionIO, nil] connection I/O state
+    # @return [void]
+    #
+    # @rbs (ConnectionIO? io) -> void
+    def clear_write_timeout(io)
+      client = io&.timeout
+      @timeouts.delete!(client) if client
+      io.timeout = nil if io
+    end
+
+    # Removes a socket from selector tracking.
+    #
+    # @param socket [TCPSocket] socket to deregister
+    # @param io [ConnectionIO, nil] connection I/O state
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, ConnectionIO? io) -> void
+    def deregister(socket, io)
+      return unless io&.monitor || @selector.registered?(socket)
+
+      @selector.deregister(socket)
+      io.monitor = nil if io
+    rescue IOError
+    end
+
     # Registers a socket with the NIO selector and sets up timeout tracking.
     #
     # @param socket [TCPSocket] the socket to register
@@ -439,9 +731,17 @@ module Raptor
     #
     # @rbs (TCPSocket socket) -> void
     def register(socket)
-      @selector.register(socket, :r).value = socket
-
       state = @socket_to_state[socket]
+      return unless state
+
+      if state[:protocol] == :http2
+        io = @id_to_io[state[:id]]
+        io.reading = true
+        update_monitor(state[:id], io)
+      else
+        @selector.register(socket, :r).value = socket
+      end
+
       now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       timeout_at = if state[:protocol] == :http2
         if state[:http2_preface_received]
@@ -496,9 +796,45 @@ module Raptor
         return
       end
 
-      @selector.deregister(socket)
       socket.write(TIMEOUT_RESPONSE) rescue nil unless state[:protocol] == :http2
       cleanup(socket)
+    end
+
+    # Dispatches readable and writable events without allowing application
+    # threads to take ownership of HTTP/2 sockets.
+    #
+    # @param monitor [NIO::Monitor] ready selector monitor
+    # @return [void]
+    #
+    # @rbs (NIO::Monitor monitor) -> void
+    def handle_monitor(monitor)
+      socket = monitor.value
+      state = @socket_to_state[socket]
+      return unless state
+
+      unless state[:protocol] == :http2
+        wakeup!(socket)
+        return
+      end
+
+      id = state[:id]
+      io = @id_to_io[id]
+      return unless io
+
+      wait = io.wait
+      if (wait == :read && monitor.readable?) || (wait == :write && monitor.writable?)
+        flush_output(id, io)
+        return unless @id_to_socket.key?(id)
+        return if io.wait == :read
+      end
+
+      return unless io.reading && monitor.readable?
+
+      io.reading = false
+      update_monitor(id, io)
+      to_client = @id_to_timeout.delete(id)
+      @timeouts.delete!(to_client) if to_client
+      read_and_queue_for_parse(socket, state)
     end
 
     # Handles socket wakeup by deregistering and queuing for processing.
@@ -555,13 +891,18 @@ module Raptor
     # @rbs (TCPSocket socket) -> void
     def cleanup(socket)
       state = @socket_to_state.delete(socket)
+      io = @id_to_io.delete(state[:id])
+      deregister(socket, io)
       @id_to_socket.delete(state[:id])
       @id_to_writer.delete(state[:id])
       @id_to_flow_control.delete(state[:id])&.close
       @id_to_http2_last_stream.delete(state[:id])
       @id_to_http2_drain_stream.delete(state[:id])
       @id_to_http2_keepalive.delete(state[:id])
-      socket.close
+      client = @id_to_timeout.delete(state[:id])
+      @timeouts.delete!(client) if client
+      clear_write_timeout(io)
+      socket.close rescue nil
     end
 
     # Returns true when the request has been fully parsed.

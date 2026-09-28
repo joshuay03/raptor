@@ -4,7 +4,7 @@ require "test_helper"
 
 module Raptor
   class TestReactor < TestCase
-    parallelize_me!
+    # Runs serially so forked integration servers never inherit live reactor sockets.
 
     def test_http2_stream_dispatch_during_drain
       frames = []
@@ -23,6 +23,76 @@ module Raptor
       assert_equal ["goaway-3"], frames
       assert reactor.dispatch_http2_stream(1, 3)
       refute reactor.dispatch_http2_stream(1, 5)
+    end
+
+    def test_http2_response_writes
+      reader, socket = Socket.pair(:UNIX, :STREAM)
+      write_thread = nil
+      socket.define_singleton_method(:write_nonblock) do |*arguments|
+        write_thread = Thread.current
+        super(*arguments)
+      end
+      reactor = build_reactor
+      writer = Http2::Writer.new(write_timeout: 5)
+      flow_control = Http2::FlowControl.new
+      reactor.attach_http2(
+        id: 1,
+        socket: socket,
+        state: {id: 1, protocol: :http2, http2_preface_received: true},
+        writer: writer,
+        flow_control: flow_control,
+        ping_frame: "ping",
+        ping_payload: "payload"
+      )
+      reactor_thread = reactor.run
+
+      writer.write_frames(socket, ["hello"])
+      writer.write_frames(socket, [" world"])
+      reactor.close_connection(1)
+
+      assert_equal "hello world", Timeout.timeout(1) { reader.readpartial(11) }
+      assert_nil Timeout.timeout(1) { reader.read(1) }
+      assert_same reactor_thread, write_thread
+    ensure
+      reactor&.shutdown
+      reactor_thread&.join
+      reader&.close
+      socket&.close
+    end
+
+    def test_http2_partial_response_writes
+      reactor, socket, = build_http2_reactor
+      writer = Http2::Writer.new(write_timeout: 5)
+      writer.attach(reactor, 1)
+      reactor.instance_variable_get(:@id_to_writer)[1] = writer
+      attempts = 0
+      written = String.new
+      socket.define_singleton_method(:write_nonblock) do |data|
+        attempts += 1
+        if attempts == 1
+          written << data.byteslice(0, 3)
+          3
+        elsif attempts == 2
+          raise IO::EAGAINWaitWritable
+        else
+          written << data
+          data.bytesize
+        end
+      end
+      reactor.instance_variable_set(:@thread, Thread.current)
+
+      writer.write_frames(socket, ["response"])
+
+      io = reactor.instance_variable_get(:@id_to_io)[1]
+      assert_equal :write, io.wait
+      monitor = io.monitor
+      monitor.readiness = :w
+      reactor.send(:handle_monitor, monitor)
+
+      assert_equal 3, attempts
+      assert_equal "response", written
+      assert_empty io.output
+      assert_nil io.timeout
     end
 
     def test_http2_keepalive
@@ -75,24 +145,36 @@ module Raptor
 
     private
 
-    def build_http2_reactor
-      reactor = Reactor.new(
+    def build_reactor
+      Reactor.new(
         nil,
         nil,
         nil,
-        connection_options: {first_data_timeout: 30, chunk_data_timeout: 10},
+        connection_options: {first_data_timeout: 30, chunk_data_timeout: 10, write_timeout: 5},
         http1_options: {persistent_data_timeout: 65},
         http2_options: {keepalive_interval: 10, keepalive_timeout: 5}
       )
+    end
+
+    def build_http2_reactor
+      reactor = build_reactor
 
       reactor.instance_variable_get(:@selector).close
       selector = Object.new
+      selector.define_singleton_method(:registered?) { |_socket| false }
       selector.define_singleton_method(:register) do |_socket, _interest|
         monitor = Object.new
-        monitor.define_singleton_method(:value=) { |_value| }
+        monitor.define_singleton_method(:value=) { |value| @value = value }
+        monitor.define_singleton_method(:value) { @value }
+        monitor.define_singleton_method(:interests=) { |interests| @interests = interests }
+        monitor.define_singleton_method(:interests) { @interests }
+        monitor.define_singleton_method(:readiness=) { |readiness| @readiness = readiness }
+        monitor.define_singleton_method(:readable?) { @readiness == :r || @readiness == :rw }
+        monitor.define_singleton_method(:writable?) { @readiness == :w || @readiness == :rw }
         monitor
       end
       selector.define_singleton_method(:deregister) { |_socket| }
+      selector.define_singleton_method(:wakeup) {}
       reactor.instance_variable_set(:@selector, selector)
 
       socket = Object.new
@@ -101,6 +183,7 @@ module Raptor
 
       writer = Object.new
       writer.define_singleton_method(:frames) { @frames ||= [] }
+      writer.define_singleton_method(:attach) { |_reactor, _id| }
       writer.define_singleton_method(:write_frames) { |_socket, frames| self.frames.concat(frames) }
 
       flow_control = Object.new

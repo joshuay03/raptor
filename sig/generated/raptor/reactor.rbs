@@ -37,6 +37,36 @@ module Raptor
       def <=>: (TimeoutClient other) -> Integer
     end
 
+    # Tracks reactor-owned output state for a connection.
+    class ConnectionIO
+      # @rbs attr_accessor offset: Integer
+      attr_accessor offset: untyped
+
+      # @rbs attr_accessor wait: Symbol?
+      attr_accessor wait: untyped
+
+      # @rbs attr_accessor reading: bool
+      attr_accessor reading: untyped
+
+      # @rbs attr_accessor closing: bool
+      attr_accessor closing: untyped
+
+      # @rbs attr_accessor monitor: NIO::Monitor?
+      attr_accessor monitor: untyped
+
+      # @rbs attr_accessor timeout: TimeoutClient?
+      attr_accessor timeout: untyped
+
+      # @rbs attr_reader output: Array[String]
+      attr_reader output: untyped
+
+      # @rbs () -> void
+      def initialize: () -> void
+
+      # @rbs () -> bool
+      def empty?: () -> bool
+    end
+
     CHUNK_SIZE: untyped
 
     TIMEOUT_RESPONSE: ::String
@@ -53,6 +83,8 @@ module Raptor
 
     @persistent_data_timeout: Integer
 
+    @write_timeout: Integer
+
     @http2_keepalive_interval: Integer
 
     @http2_keepalive_timeout: Integer
@@ -60,6 +92,8 @@ module Raptor
     @selector: NIO::Selector
 
     @queue: Queue[TCPSocket]
+
+    @io_queue: AtomicQueue
 
     @timeouts: RedBlackTree[TimeoutClient]
 
@@ -78,6 +112,10 @@ module Raptor
     @id_to_http2_drain_stream: Hash[Integer, Integer]
 
     @id_to_http2_keepalive: Hash[Integer, Hash[Symbol, untyped]]
+
+    @id_to_io: Hash[Integer, ConnectionIO]
+
+    @thread: Thread?
 
     # Creates a new Reactor instance.
     #
@@ -98,7 +136,7 @@ module Raptor
     def initialize: (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
 
     # Starts the reactor's main event loop in a new thread. Runs until
-    # the registration queue is closed and drained.
+    # shutdown work and pending writes are drained.
     #
     # @return [Thread] the thread running the reactor event loop
     #
@@ -194,6 +232,16 @@ module Raptor
     # @rbs () { (Integer stream_id) -> String } -> void
     def drain_http2: () { (Integer stream_id) -> String } -> void
 
+    # Queues serialized HTTP/2 frames for a connection. Producers never
+    # write to the socket or wait for it to become writable.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param frames [Array<String>] frame bytes to write in order
+    # @return [void]
+    #
+    # @rbs (Integer id, Array[String] frames) -> void
+    def write_http2_frames: (Integer id, Array[String] frames) -> void
+
     # Stores an HTTP/2 connection's socket, state, writer, and flow
     # controller in the reactor's per-connection maps.
     #
@@ -235,8 +283,7 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] state) -> void
     def update_http2_state: (Hash[Symbol, untyped] state) -> void
 
-    # Closes the socket for the given connection and drops all reactor
-    # state associated with it.
+    # Closes a connection after writing any frames already queued for it.
     #
     # @param id [Integer] unique client identifier
     # @return [void]
@@ -261,6 +308,107 @@ module Raptor
     def backlog: () -> Integer
 
     private
+
+    # Returns whether shutdown has no registrations or writes left to drain.
+    #
+    # @return [Boolean]
+    #
+    # @rbs () -> bool
+    def stopped?: () -> bool
+
+    # Handles every expired connection deadline in order.
+    #
+    # @param now [Float] current monotonic timestamp
+    # @return [void]
+    #
+    # @rbs (Float now) -> void
+    def expire_timeouts: (Float now) -> void
+
+    # Applies queued reactor-owned I/O operations.
+    #
+    # @return [void]
+    #
+    # @rbs () -> void
+    def drain_io_queue: () -> void
+
+    # Closes a connection once its queued frames are written.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [void]
+    #
+    # @rbs (Integer id) -> void
+    def close_after_writes: (Integer id) -> void
+
+    # Immediately closes a connection and drops its reactor state.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [void]
+    #
+    # @rbs (Integer id) -> void
+    def remove_connection: (Integer id) -> void
+
+    # Adds bytes to one connection and writes as much as the socket accepts.
+    #
+    # @param io [ConnectionIO] connection I/O state
+    # @param data [String] serialized response bytes
+    # @return [void]
+    #
+    # @rbs (ConnectionIO? io, String data) -> void
+    def queue_output: (ConnectionIO? io, String data) -> void
+
+    # Drains one connection's queued response bytes without blocking.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param io [ConnectionIO] connection I/O state
+    # @return [void]
+    #
+    # @rbs (Integer id, ConnectionIO? io) -> void
+    def flush_output: (Integer id, ConnectionIO? io) -> void
+
+    # Registers the readiness needed to continue a partial socket write.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param io [ConnectionIO] connection I/O state
+    # @param readiness [Symbol] `:read` or `:write`
+    # @return [void]
+    #
+    # @rbs (Integer id, ConnectionIO io, Symbol readiness) -> void
+    def wait_for_write: (Integer id, ConnectionIO io, Symbol readiness) -> void
+
+    # Updates selector interest for one reactor-owned connection.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param io [ConnectionIO] connection I/O state
+    # @return [void]
+    #
+    # @rbs (Integer id, ConnectionIO io) -> void
+    def update_monitor: (Integer id, ConnectionIO io) -> void
+
+    # Starts or refreshes one connection's non-blocking write deadline.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param io [ConnectionIO] connection I/O state
+    # @return [void]
+    #
+    # @rbs (Integer id, ConnectionIO io) -> void
+    def track_write_timeout: (Integer id, ConnectionIO io) -> void
+
+    # Removes one connection's non-blocking write deadline.
+    #
+    # @param io [ConnectionIO, nil] connection I/O state
+    # @return [void]
+    #
+    # @rbs (ConnectionIO? io) -> void
+    def clear_write_timeout: (ConnectionIO? io) -> void
+
+    # Removes a socket from selector tracking.
+    #
+    # @param socket [TCPSocket] socket to deregister
+    # @param io [ConnectionIO, nil] connection I/O state
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, ConnectionIO? io) -> void
+    def deregister: (TCPSocket socket, ConnectionIO? io) -> void
 
     # Registers a socket with the NIO selector and sets up timeout tracking.
     #
@@ -288,6 +436,15 @@ module Raptor
     #
     # @rbs (TimeoutClient client, Float now) -> void
     def handle_timeout: (TimeoutClient client, Float now) -> void
+
+    # Dispatches readable and writable events without allowing application
+    # threads to take ownership of HTTP/2 sockets.
+    #
+    # @param monitor [NIO::Monitor] ready selector monitor
+    # @return [void]
+    #
+    # @rbs (NIO::Monitor monitor) -> void
+    def handle_monitor: (NIO::Monitor monitor) -> void
 
     # Handles socket wakeup by deregistering and queuing for processing.
     #

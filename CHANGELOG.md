@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Move HTTP/2 writes to the reactor
+
 ## [0.21.0] - 2026-09-27
 
 - Add HTTP/2 keepalive

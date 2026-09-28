@@ -18,13 +18,12 @@ module Raptor
   class Http2
     RESPONSE_TRAILERS = "raptor.response_trailers"
 
-    # Serialises concurrent frame writes on a single HTTP/2 connection so
-    # exactly one thread is writing at any moment.
+    # Queues concurrent frame writes while the reactor remains the sole
+    # owner of the connection socket.
     #
     class Writer
-      IDLE = :idle
-
-      # @rbs @state: Atom
+      # @rbs @reactor: Reactor?
+      # @rbs @connection_id: Integer?
       # @rbs @write_timeout: Integer
 
       # Creates a new Writer.
@@ -34,44 +33,38 @@ module Raptor
       #
       # @rbs (write_timeout: Integer) -> void
       def initialize(write_timeout:)
-        @state = Atom.new(IDLE)
+        @reactor = nil
+        @connection_id = nil
         @write_timeout = write_timeout
       end
 
-      # Writes frames to the socket, coordinating with concurrent writers
-      # so that exactly one thread is actively writing at any time.
+      # Routes subsequent frame writes through the connection's reactor.
       #
-      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-      # @param frames [Array<String>] frame bytes to write in order
+      # @param reactor [Reactor] the reactor that owns the connection
+      # @param connection_id [Integer] unique connection identifier
       # @return [void]
       #
-      # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String] frames) -> void
+      # @rbs (Reactor reactor, Integer connection_id) -> void
+      def attach(reactor, connection_id)
+        @reactor = reactor
+        @connection_id = connection_id
+      end
+
+      # Queues frames for the reactor to write. Before attachment, writes
+      # directly so the writer remains usable during connection setup.
+      #
+      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+      # @param frames [Array<String>, nil] frame bytes to write in order
+      # @return [void]
+      #
+      # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
       def write_frames(socket, frames)
         return if !frames || frames.empty?
 
-        claimed = false
-        @state.swap do |current|
-          if current.equal?(IDLE)
-            claimed = true
-            frames
-          else
-            claimed = false
-            current + frames
-          end
-        end
-
-        return unless claimed
-
-        loop do
-          pending = nil
-          @state.swap do |current|
-            pending = current
-            current.empty? ? IDLE : []
-          end
-
-          break if pending.empty?
-
-          Http.socket_write(socket, pending.join, timeout: @write_timeout) rescue nil
+        if @reactor
+          @reactor.write_http2_frames(@connection_id, frames)
+        else
+          Http.socket_write(socket, frames.join, timeout: @write_timeout) rescue nil
         end
       end
     end

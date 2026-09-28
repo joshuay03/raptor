@@ -43,7 +43,7 @@ The rest of this doc explains why the shape looks like that.
 | I/O multiplexing       | `nio4r` reactor for keep-alive idle and slow reads      | `nio4r` reactor for the same, plus a red-black tree for O(log n) timeouts    |
 | Cluster dispatch       | Workers race on inherited listeners with a load-proportional accept delay | Two-choice load-aware BPF dispatch for TCP on Linux; shared-listener fallback |
 | Work queue             | Ruby `Queue` coordinated under the pool mutex             | Lock-free Michael-Scott FIFO queue                                            |
-| HTTP/2                 | Not implemented                                         | Native C parser + HPACK, lock-free per-connection frame writer               |
+| HTTP/2                 | Not implemented                                         | Native C parser + HPACK, reactor-owned frame scheduler                        |
 | Keep-alive fast path   | Same-thread inline dispatch when spare threads exist    | Same-thread inline dispatch for bytes that are already waiting               |
 | Native extensions      | 1 (Ragel HTTP/1 parser + MiniSSL)                       | 3, all Ractor-safe (Ragel HTTP/1 parser; HTTP/2 parser + HPACK; `writev`, `sched_setaffinity`, `prctl` wrappers) |
 | Shared state (worker↔master) | Pipes and signals                                 | Anonymous shared-memory `mmap` region                                        |
@@ -337,20 +337,13 @@ From there the shape is similar to HTTP/1.1:
 1. Reactor reads frames.
 2. The HTTP/2 parser (native C, with an HPACK decoder using a static Huffman table) parses the frames in the HTTP/2 Ractor pool.
 3. Completed requests (once `HEADERS` and `DATA` are complete for a stream) go to the thread pool as separate work items. **A single connection can be servicing many streams in parallel across the thread pool.**
-4. Each stream's response is written back through the connection's `Writer`, which serialises frame writes across threads without a mutex.
+4. Each stream's response frames are queued for the reactor, which owns every socket write after connection setup.
 
 Responses to `HEAD` requests and statuses that prohibit a message body end with the response `HEADERS` frame.
 Early hints and response-finished callbacks follow the same Rack lifecycle as HTTP/1.1.
 Trailing request `HEADERS` complete an open request. Rack has no standard request-trailer key, so Raptor validates them without adding them to the environment.
 
-The `Writer` is worth a paragraph. Naive per-connection writing would need a mutex around every socket write. Contention grows with concurrent streams. Raptor's `Writer` stores the "pending frames" queue in an `Atom` whose value is either `:idle` (nobody is writing) or an array of frames waiting to go out. A thread that wants to write does a CAS:
-
-- If current value is `:idle`, the thread claims the writer by CAS-ing to its own array of frames, then loops draining any additional frames other threads have appended.
-- If current value is an array (someone is already writing), the thread CAS-appends its frames and returns immediately; the current writer will pick them up and flush them.
-
-So under contention, only one thread does socket I/O at a time (because a socket can only be written to serially anyway), but no thread ever blocks on a lock. The "loser" of the CAS hands its frames off to the "winner" and returns immediately to whatever it was doing next, whether that is starting another stream, waiting for the next work item, or servicing a different connection.
-
-Once the writer thread has claimed a batch of pending frames, it concatenates them into a single buffer and issues one socket write for the whole batch. Frames handed off concurrently can share that write, while sequential body chunks reach the socket as the Rack body yields or writes them.
+The `Writer` hands serialized frames to the reactor, which writes as the socket becomes ready and closes clients that stop reading. Application threads never wait for socket writability, and the connection has a single I/O owner without a per-connection mutex.
 
 Flow control uses similar CAS-protected atoms. The connection-level window and the per-stream windows live in separate `Atom` cells. `acquire` atomically reserves connection capacity and, where per-stream tracking is needed, deducts the same grant from that stream's window. If either window is exhausted, the caller parks on an `AtomicConditionVariable`; a `WINDOW_UPDATE`, stream reset, or connection shutdown wakes it.
 
@@ -408,7 +401,8 @@ flowchart TB
         COL --> CHK
         CHK -->|"no, more bytes needed"| RCT
         CHK -->|"yes, push proc"| ATP
-        ATP -->|"app.call + write"| KA
+        ATP -->|"HTTP/2 response frames"| RCT
+        ATP -->|"HTTP/1.1 response write"| KA
         KA -->|"no, close"| CLS["close socket"]
         KA -->|"yes"| EAG
         EAG -.->|"bytes ready, parse+dispatch on same thread"| ATP
@@ -495,11 +489,11 @@ For external monitoring, `control_url` can expose a read-only `GET /stats` endpo
 
 **Puma.** Not implemented. Puma's [position](https://github.com/puma/puma/issues/2697) is that HTTP/2 belongs at the edge (nginx, Caddy, ALB), which terminates it and speaks HTTP/1.1 to the app server. That's a reasonable call for the deployments Puma is aimed at, and it's where most Rails production actually sits.
 
-**Raptor.** Native C parser plus HPACK, per-stream flow control, lock-free frame writer, stream multiplexing over a single connection, configurable PING keepalive, and response trailers exposed through `env["raptor.response_trailers"]`. Once a request is complete it takes the same path as HTTP/1.1 and enters the same thread pool. Under HTTP/2, a single client connection can be issuing many concurrent requests, and Raptor services all of them in parallel on the same thread pool.
+**Raptor.** Native C parser plus HPACK, per-stream flow control, reactor-owned response writes, stream multiplexing over a single connection, configurable PING keepalive, and response trailers exposed through `env["raptor.response_trailers"]`. Once a request is complete it takes the same path as HTTP/1.1 and enters the same thread pool. Under HTTP/2, a single client connection can be issuing many concurrent requests, and Raptor services all of them in parallel on the same thread pool.
 
 Whether that matters depends on your setup. If you terminate TLS at an edge proxy that already speaks HTTP/2, both servers see HTTP/1.1 and it doesn't matter which of them you pick on this axis. If you're building an all-Ruby stack with no proxy in front, serving direct HTTP/2 clients, or measuring the app server itself, HTTP/2 support is where Raptor and Puma stop being comparable.
 
-At the throughput numbers the benchmark shows, a small set of concurrent connections multiplex many streams, so responses from several app threads share each socket. The writer's CAS-based handoff keeps one active socket writer without parking the other app threads behind a per-connection mutex.
+At the throughput numbers the benchmark shows, a small set of concurrent connections multiplex many streams, so responses from several app threads share each socket. Those threads queue frames while the reactor owns non-blocking writes for the connection.
 
 ### Response writing
 
@@ -610,7 +604,7 @@ Falcon also speaks HTTP/2 natively, so it's the interesting comparison there rat
 
 The benchmark's h2 listener uses TLS, while Raptor's BPF reuseport path only wraps plain TCP listeners. BPF dispatch therefore cannot explain the h2 variance. With 40 physical connections spread across 10 workers, each carrying three streams, placement and per-connection scheduling have coarse granularity; more instrumentation is needed before assigning the variance to a specific mechanism.
 
-Raptor's HTTP/2 CPU-bound throughput remains in the same broad range as its HTTP/1.1 result while multiplexing streams onto shared sockets. The lock-free `Writer` and flow-control atoms are part of how it coordinates that work, but this benchmark does not provide a mutex-based Raptor control case from which to quantify their individual effect.
+Raptor's HTTP/2 CPU-bound throughput remains in the same broad range as its HTTP/1.1 result while multiplexing streams onto shared sockets. The reactor-owned frame scheduler and flow-control atoms are part of how it coordinates that work, but this benchmark does not provide an alternative Raptor control case from which to quantify their individual effect.
 
 ## Part V: What Raptor gives up
 

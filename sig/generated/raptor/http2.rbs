@@ -5,12 +5,12 @@ module Raptor
   class Http2
     RESPONSE_TRAILERS: ::String
 
-    # Serialises concurrent frame writes on a single HTTP/2 connection so
-    # exactly one thread is writing at any moment.
+    # Queues concurrent frame writes while the reactor remains the sole
+    # owner of the connection socket.
     class Writer
-      IDLE: ::Symbol
+      @reactor: Reactor?
 
-      @state: Atom
+      @connection_id: Integer?
 
       @write_timeout: Integer
 
@@ -22,15 +22,24 @@ module Raptor
       # @rbs (write_timeout: Integer) -> void
       def initialize: (write_timeout: Integer) -> void
 
-      # Writes frames to the socket, coordinating with concurrent writers
-      # so that exactly one thread is actively writing at any time.
+      # Routes subsequent frame writes through the connection's reactor.
       #
-      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-      # @param frames [Array<String>] frame bytes to write in order
+      # @param reactor [Reactor] the reactor that owns the connection
+      # @param connection_id [Integer] unique connection identifier
       # @return [void]
       #
-      # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String] frames) -> void
-      def write_frames: (OpenSSL::SSL::SSLSocket socket, Array[String] frames) -> void
+      # @rbs (Reactor reactor, Integer connection_id) -> void
+      def attach: (Reactor reactor, Integer connection_id) -> void
+
+      # Queues frames for the reactor to write. Before attachment, writes
+      # directly so the writer remains usable during connection setup.
+      #
+      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+      # @param frames [Array<String>, nil] frame bytes to write in order
+      # @return [void]
+      #
+      # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
+      def write_frames: (OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
     end
 
     class StreamClosedError < StandardError
