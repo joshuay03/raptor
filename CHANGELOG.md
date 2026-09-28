@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add detached HTTP/2 response bodies
 - Move HTTP/2 writes to the reactor
 
 ## [0.21.0] - 2026-09-27

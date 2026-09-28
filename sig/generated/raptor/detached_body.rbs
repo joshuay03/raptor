@@ -1,0 +1,127 @@
+# Generated from lib/raptor/detached_body.rb with RBS::Inline
+
+module Raptor
+  # A bounded response body that may be written after its application thread
+  # has returned.
+  class DetachedBody
+    DEFAULT_MAX_BUFFER_SIZE: untyped
+
+    # Tracks buffered bytes shared by a group of detached bodies.
+    class Budget
+      @max_size: Integer
+
+      @size: Atom
+
+      # @rbs (Integer max_size) -> void
+      def initialize: (Integer max_size) -> void
+
+      # @rbs (Integer bytes) -> bool
+      def reserve: (Integer bytes) -> bool
+
+      # @rbs (Integer bytes) -> void
+      def release: (Integer bytes) -> void
+    end
+
+    @on_close: (^(Symbol) -> void)?
+
+    @on_open: (^(DetachedBody) -> void)?
+
+    @finished: ^(Symbol) -> void
+
+    @dispatch: ^(Proc) -> void
+
+    @wake: ^() -> void
+
+    @budgets: Array[Budget]
+
+    @state: Atom
+
+    @max_buffer_size: Integer
+
+    # Creates a detached body with a bounded byte buffer.
+    #
+    # @param max_buffer_size [Integer] maximum body bytes waiting to be written
+    # @return [void]
+    #
+    # @rbs (?max_buffer_size: Integer) -> void
+    def initialize: (?max_buffer_size: Integer) -> void
+
+    # Registers a callback for when the server accepts the response stream.
+    #
+    # @yieldparam stream [DetachedBody] the opened response stream
+    # @return [DetachedBody]
+    #
+    # @rbs () { (DetachedBody stream) -> void } -> DetachedBody
+    def on_open: () { (DetachedBody stream) -> void } -> DetachedBody
+
+    # Registers a callback for when the response stream closes.
+    #
+    # @yieldparam reason [Symbol] why the stream closed
+    # @return [DetachedBody]
+    #
+    # @rbs () { (Symbol reason) -> void } -> DetachedBody
+    def on_close: () { (Symbol reason) -> void } -> DetachedBody
+
+    # Adds body bytes without waiting for socket or flow-control capacity.
+    #
+    # @param chunk [String] response body bytes
+    # @return [Symbol] `:accepted`, `:full`, or `:closed`
+    #
+    # @rbs (String chunk) -> Symbol
+    def try_write: (String chunk) -> Symbol
+
+    # Finishes the body after all accepted bytes have been written.
+    #
+    # @param trailers [Hash] trailing response headers
+    # @return [void]
+    #
+    # @rbs (?trailers: Hash[String, String | Array[String]]) -> void
+    def close: (?trailers: Hash[String, String | Array[String]]) -> void
+
+    # Returns whether the stream has closed.
+    #
+    # @return [Boolean]
+    #
+    # @rbs () -> bool
+    def closed?: () -> bool
+
+    # Connects the body to its reactor-owned response stream.
+    #
+    # @rbs (Array[Budget] budgets, ^() -> void wake, ^(Proc) -> void dispatch, ^(Symbol) -> void finished) -> bool
+    def attach: (Array[Budget] budgets, ^() -> void wake, ^(Proc) -> void dispatch, ^(Symbol) -> void finished) -> bool
+
+    # Notifies the application that its response stream is ready.
+    #
+    # @rbs () -> void
+    def open: () -> void
+
+    # Returns the size of the next buffered chunk, 0 when closing, or nil
+    # while waiting for more data.
+    #
+    # @rbs () -> Integer?
+    def next_size: () -> Integer?
+
+    # Removes up to `max_bytes` from the next buffered chunk.
+    #
+    # @rbs (Integer max_bytes) -> String?
+    def shift: (Integer max_bytes) -> String?
+
+    # Returns the response trailers supplied when the body closed.
+    #
+    # @rbs () -> Hash[String, String | Array[String]]
+    def trailers: () -> Hash[String, String | Array[String]]
+
+    # Closes the stream and invokes its callback exactly once.
+    #
+    # @rbs (Symbol reason) -> void
+    def finish: (Symbol reason) -> void
+
+    private
+
+    # @rbs (Integer bytes) -> bool
+    def reserve: (Integer bytes) -> bool
+
+    # @rbs (Integer bytes) -> void
+    def release: (Integer bytes) -> void
+  end
+end

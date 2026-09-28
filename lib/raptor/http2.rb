@@ -8,6 +8,7 @@ require "atomic-ruby/atomic_boolean"
 require "atomic-ruby/atomic_condition_variable"
 require "rack"
 
+require_relative "detached_body"
 require_relative "http"
 require_relative "raptor_http2"
 require_relative "thread_locals"
@@ -67,6 +68,13 @@ module Raptor
           Http.socket_write(socket, frames.join, timeout: @write_timeout) rescue nil
         end
       end
+
+      # Attaches a response body that outlives its application thread.
+      #
+      # @rbs (Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
+      def attach_body(stream_id, body, finished)
+        @reactor.attach_http2_body(@connection_id, stream_id, body, finished)
+      end
     end
 
     class StreamClosedError < StandardError
@@ -124,6 +132,30 @@ module Raptor
             granted
           end
         end
+      end
+
+      # Reserves outbound capacity without waiting for a window update.
+      #
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @param max_bytes [Integer] the largest size the caller would like to send
+      # @return [Integer] available bytes, or 0 when flow control is exhausted
+      #
+      # @rbs (Integer stream_id, Integer max_bytes) -> Integer
+      def try_acquire(stream_id, max_bytes)
+        check(stream_id)
+        initial = @initial_stream_window.value
+        stream_window = @stream_windows.value[stream_id] || initial
+        capped = [max_bytes, MAX_FRAME_SIZE, stream_window].min
+        return 0 unless capped.positive?
+
+        granted = reserve_connection(capped)
+        if granted.positive?
+          @stream_windows.swap do |windows|
+            current = windows[stream_id] || initial
+            windows.merge(stream_id => current - granted)
+          end
+        end
+        granted
       end
 
       # Increments the connection-level send window by `increment` bytes.
@@ -893,10 +925,14 @@ module Raptor
       rounds = 0
       loop do
         reactor.acknowledge_http2_ping(result[:id], result[:ping_acknowledgements])
-        result[:cancelled_streams]&.each { |stream_id| flow_control.cancel_stream(stream_id) }
+        result[:cancelled_streams]&.each do |stream_id|
+          flow_control.cancel_stream(stream_id)
+          reactor.cancel_http2_body(result[:id], stream_id)
+        end
 
-        if flow_control && (result[:window_updates] || result[:peer_initial_window_size])
+        if flow_control && (result[:window_updates]&.any? || result[:peer_initial_window_size])
           apply_flow_control_updates(flow_control, result)
+          reactor.resume_http2_bodies(result[:id])
         end
 
         writer.write_frames(socket, result[:outgoing_frames])
@@ -1018,10 +1054,25 @@ module Raptor
       status = nil
       response_headers = nil
       response_started = false
+      detached = false
 
       flow_control.check(stream_id)
       env = build_rack_env(headers, body, socket, writer, flow_control, stream_id, remote_addr: remote_addr)
       status, response_headers, response_body = @app.call(env)
+
+      no_body = env[Rack::REQUEST_METHOD] == "HEAD" || (status >= 100 && status < 200) || status == 204 || status == 304
+      if response_body.is_a?(DetachedBody) && !no_body
+        finished = proc do |reason|
+          error = StreamClosedError.new unless reason == :closed
+          write_access_log(env, status, "-", remote_addr) if @access_log_io
+          Http.call_response_finished(env, status, response_headers, error)
+          flow_control.discard_stream(stream_id)
+        end
+        detached = write_http2_detached_response(socket, writer, flow_control, stream_id, status, response_headers, response_body, finished) do
+          response_started = true
+        end
+        return
+      end
 
       response_size = write_http2_response(
         socket,
@@ -1034,7 +1085,11 @@ module Raptor
         trailers: env[RESPONSE_TRAILERS],
         request_method: env[Rack::REQUEST_METHOD]
       ) { response_started = true }
-      response_body.close if response_body.respond_to?(:close)
+      if response_body.is_a?(DetachedBody)
+        response_body.finish(:closed)
+      elsif response_body.respond_to?(:close)
+        response_body.close
+      end
       write_access_log(env, status, response_size, remote_addr) if @access_log_io
       Http.call_response_finished(env, status, response_headers, nil)
     rescue StreamClosedError => error
@@ -1053,7 +1108,21 @@ module Raptor
         raise
       end
     ensure
-      flow_control.discard_stream(stream_id) if flow_control
+      flow_control.discard_stream(stream_id) if flow_control && !detached
+    end
+
+    # Starts a detached HTTP/2 response after writing its response headers.
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> bool
+    def write_http2_detached_response(socket, writer, flow_control, stream_id, status, headers, body, finished)
+      flow_control.check(stream_id)
+      parser = Http2Parser.new
+      encoded = parser.encode_response_headers(status, headers)
+      writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_HEADERS, stream_id, encoded)])
+      yield
+      attached = writer.attach_body(stream_id, body, finished)
+      write_http2_reset_stream(socket, writer, stream_id, ERROR_REFUSED_STREAM) unless attached
+      true
     end
 
     # Writes a Rack response as HTTP/2 frames to the socket, partitioning

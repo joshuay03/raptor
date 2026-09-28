@@ -115,6 +115,16 @@ module Raptor
       end
     end
 
+    def test_http2_detached_body
+      with_http2_server("detached_body.ru") do |port|
+        responses = http2_get(port, "/")
+
+        assert_equal "200", responses[0][:status]
+        assert_equal "first second", responses[0][:body]
+        assert_equal "complete", responses[0][:headers]["x-stream-status"]
+      end
+    end
+
     def test_slow_ssl_handshake_does_not_block_other_connections
       with_http2_server do |port|
         slow_client = TCPSocket.new("127.0.0.1", port)

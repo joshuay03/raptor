@@ -345,11 +345,11 @@ Trailing request `HEADERS` complete an open request. Rack has no standard reques
 
 The `Writer` hands serialized frames to the reactor, which writes as the socket becomes ready and closes clients that stop reading. Application threads never wait for socket writability, and the connection has a single I/O owner without a per-connection mutex.
 
-Flow control uses similar CAS-protected atoms. The connection-level window and the per-stream windows live in separate `Atom` cells. `acquire` atomically reserves connection capacity and, where per-stream tracking is needed, deducts the same grant from that stream's window. If either window is exhausted, the caller parks on an `AtomicConditionVariable`; a `WINDOW_UPDATE`, stream reset, or connection shutdown wakes it.
+Flow control uses similar CAS-protected atoms. Ordinary Rack bodies wait for connection and stream capacity as they yield. A `Raptor::DetachedBody` instead returns its application thread immediately; the reactor schedules its bounded buffer as capacity becomes available and closes it when the client cancels. This keeps long-lived streams from consuming one application thread each.
 
 Frame processing also has an eager loop. After processing one batch of frames, the h2 handler tries to `read_nonblock` one more time to see if the next batch is already available. Up to eight rounds are consumed inline before handing back to the reactor, and the loop bails out early once the app thread pool has more queued work than worker slots so one busy connection cannot starve the collector. This is the same principle as the HTTP/1.1 eager keep-alive: amortise the reactor round-trip when the client is actively sending, but back off under saturation.
 
-During worker shutdown, Raptor stops accepting connections and sends GOAWAY with the last stream handed to the Rack application. Later streams are refused while the application pool drains. The reactor remains active during that period so in-flight responses can receive flow-control updates and finish before their connections close.
+During worker shutdown, Raptor stops accepting connections and sends GOAWAY with the last stream handed to the Rack application. Later streams are refused while application work and detached bodies drain. The reactor remains active so in-flight responses can receive flow-control updates; detached bodies still open when the drain period expires are cancelled before their connections close.
 
 ### Raptor request flow diagram
 
@@ -489,7 +489,7 @@ For external monitoring, `control_url` can expose a read-only `GET /stats` endpo
 
 **Puma.** Not implemented. Puma's [position](https://github.com/puma/puma/issues/2697) is that HTTP/2 belongs at the edge (nginx, Caddy, ALB), which terminates it and speaks HTTP/1.1 to the app server. That's a reasonable call for the deployments Puma is aimed at, and it's where most Rails production actually sits.
 
-**Raptor.** Native C parser plus HPACK, per-stream flow control, reactor-owned response writes, stream multiplexing over a single connection, configurable PING keepalive, and response trailers exposed through `env["raptor.response_trailers"]`. Once a request is complete it takes the same path as HTTP/1.1 and enters the same thread pool. Under HTTP/2, a single client connection can be issuing many concurrent requests, and Raptor services all of them in parallel on the same thread pool.
+**Raptor.** Native C parser plus HPACK, per-stream flow control, reactor-owned response writes, detached long-lived responses, stream multiplexing over a single connection, configurable PING keepalive, and response trailers exposed through `env["raptor.response_trailers"]`. Once a request is complete it takes the same path as HTTP/1.1 and enters the same thread pool. Under HTTP/2, a single client connection can be issuing many concurrent requests, and Raptor services all of them in parallel on the same thread pool.
 
 Whether that matters depends on your setup. If you terminate TLS at an edge proxy that already speaks HTTP/2, both servers see HTTP/1.1 and it doesn't matter which of them you pick on this axis. If you're building an all-Ruby stack with no proxy in front, serving direct HTTP/2 clients, or measuring the app server itself, HTTP/2 support is where Raptor and Puma stop being comparable.
 

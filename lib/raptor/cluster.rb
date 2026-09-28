@@ -946,6 +946,7 @@ module Raptor
       server_thread.join
       http1.shutdown
       http2.shutdown(reactor)
+      reactor.drain_detached_bodies(@worker_drain_timeout)
       drain_thread_pool(thread_pool)
       reactor.shutdown
       reactor_thread.join

@@ -58,6 +58,16 @@ module Raptor
       assert_equal Http2::MAX_FRAME_SIZE, flow_control.acquire(1, 100_000)
     end
 
+    def test_flow_control_try_acquire
+      flow_control = Http2::FlowControl.new
+      drain_windows(flow_control, stream_id: 1)
+
+      assert_equal 0, flow_control.try_acquire(1, 100)
+      flow_control.add_connection_window(40)
+      flow_control.add_stream_window(1, 40)
+      assert_equal 40, flow_control.try_acquire(1, 100)
+    end
+
     def test_flow_control_acquire_blocks_until_stream_window_replenished
       flow_control = Http2::FlowControl.new
       drain_windows(flow_control, stream_id: 1)

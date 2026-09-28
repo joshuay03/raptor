@@ -4,8 +4,14 @@
 require "nio"
 require "openssl"
 require "red-black-tree"
+require "timeout"
 
 require "atomic-ruby/atomic_queue"
+require "atomic-ruby/atom"
+require "atomic-ruby/atomic_condition_variable"
+require "atomic-ruby/atomic_count_down_latch"
+
+require_relative "detached_body"
 
 module Raptor
   # Multiplexes client connections, manages connection deadlines, feeds
@@ -93,7 +99,40 @@ module Raptor
       end
     end
 
+    # Tracks reactor-owned I/O state for an HTTP/2 connection.
+    #
+    class Http2IO < ConnectionIO
+      # @rbs attr_reader detached: Hash[Integer, DetachedBody]
+      attr_reader :detached
+
+      # @rbs attr_reader ready: Array[Integer]
+      attr_reader :ready
+
+      # @rbs attr_reader ready_streams: Hash[Integer, bool]
+      attr_reader :ready_streams
+
+      # @rbs attr_reader budget: DetachedBody::Budget
+      attr_reader :budget
+
+      # @rbs () -> void
+      def initialize
+        super
+        @detached = {}
+        @ready = []
+        @ready_streams = {}
+        @budget = DetachedBody::Budget.new(DETACHED_CONNECTION_BUFFER_SIZE)
+      end
+
+      # @rbs () -> bool
+      def empty?
+        super && detached.empty?
+      end
+    end
+
     CHUNK_SIZE = 64 * 1024
+    DETACHED_CONNECTION_BUFFER_SIZE = 1024 * 1024
+    DETACHED_MAX_FRAMES = 8
+    DETACHED_WORKER_BUFFER_SIZE = 16 * 1024 * 1024
     TIMEOUT_RESPONSE = "HTTP/1.1 408 Request Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 
     # @rbs @thread_pool: untyped
@@ -118,6 +157,9 @@ module Raptor
     # @rbs @id_to_http2_drain_stream: Hash[Integer, Integer]
     # @rbs @id_to_http2_keepalive: Hash[Integer, Hash[Symbol, untyped]]
     # @rbs @id_to_io: Hash[Integer, ConnectionIO]
+    # @rbs @detached_budget: DetachedBody::Budget
+    # @rbs @detached_count: Atom
+    # @rbs @detached_drained: AtomicConditionVariable
     # @rbs @thread: Thread?
 
     # Creates a new Reactor instance.
@@ -161,6 +203,9 @@ module Raptor
       @id_to_http2_drain_stream = {}
       @id_to_http2_keepalive = {}
       @id_to_io = {}
+      @detached_budget = DetachedBody::Budget.new(DETACHED_WORKER_BUFFER_SIZE)
+      @detached_count = Atom.new(0)
+      @detached_drained = AtomicConditionVariable.new
       @thread = nil
     end
 
@@ -384,6 +429,62 @@ module Raptor
       end
     end
 
+    # Attaches a detached response body to an HTTP/2 stream.
+    #
+    # @rbs (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
+    def attach_http2_body(id, stream_id, body, finished)
+      attached = AtomicCountDownLatch.new(1)
+      @io_queue << [:attach_http2, id, stream_id, body, attached, finished]
+      @selector.wakeup rescue nil
+      attached.wait
+      return false if body.closed?
+
+      body.open
+      true
+    rescue
+      cancel_http2_body(id, stream_id)
+      raise
+    end
+
+    # Reconsiders detached streams after an outbound window update.
+    #
+    # @rbs (Integer id) -> void
+    def resume_http2_bodies(id)
+      return if @detached_count.value.zero?
+
+      @io_queue << [:resume_http2, id]
+      @selector.wakeup rescue nil
+    end
+
+    # Cancels a detached response stream.
+    #
+    # @rbs (Integer id, Integer stream_id) -> void
+    def cancel_http2_body(id, stream_id)
+      return if @detached_count.value.zero?
+
+      @io_queue << [:cancel_http2, id, stream_id]
+      @selector.wakeup rescue nil
+    end
+
+    # Waits for detached responses to finish, then cancels any that outlive
+    # the worker drain period.
+    #
+    # @rbs (Numeric timeout) -> void
+    def drain_detached_bodies(timeout)
+      barrier = AtomicCountDownLatch.new(1)
+      @io_queue << [:barrier, nil, barrier]
+      @selector.wakeup rescue nil
+      barrier.wait
+
+      Timeout.timeout(timeout) do
+        @detached_drained.wait { @detached_count.value.zero? }
+      end
+    rescue Timeout::Error
+      @io_queue << [:cancel_all]
+      @selector.wakeup rescue nil
+      @detached_drained.wait { @detached_count.value.zero? }
+    end
+
     # Stores an HTTP/2 connection's socket, state, writer, and flow
     # controller in the reactor's per-connection maps.
     #
@@ -403,7 +504,7 @@ module Raptor
       @id_to_writer[id] = writer
       @id_to_flow_control[id] = flow_control
       @id_to_http2_last_stream[id] = 0
-      @id_to_io[id] = ConnectionIO.new
+      @id_to_io[id] = Http2IO.new
       writer.attach(self, id)
       if @http2_keepalive_interval.positive?
         @id_to_http2_keepalive[id] = {frame: ping_frame, payload: ping_payload}
@@ -530,20 +631,184 @@ module Raptor
     def drain_io_queue
       connections = {}
       while (operation = @io_queue.pop)
-        type, id, data = operation
+        type, id, value, body, attached, finished = operation
         case type
         when :write
+          data = value
           queue_output(@id_to_io[id], data)
           connections[id] = true
         when :close
           close_after_writes(id)
+        when :attach_http2
+          begin
+            attach_http2_detached_body(id, value, body, finished)
+          ensure
+            attached.count_down
+          end
+          connections[id] = true
+        when :ready_http2
+          mark_http2_detached_body_ready(id, value)
+          connections[id] = true
+        when :flush_http2
+          connections[id] = true
+        when :resume_http2
+          resume_http2_detached_bodies(id)
+          connections[id] = true
+        when :cancel_http2
+          remove_http2_detached_body(id, value, :cancelled)
+        when :cancel_all
+          cancel_detached_bodies
+        when :barrier
+          value.count_down
         end
       end
 
       connections.each_key do |id|
         io = @id_to_io[id]
         flush_output(id, io) if io && !io.wait
+        flush_http2_detached_bodies(id) if io && !io.wait && !io.detached.empty?
       end
+    end
+
+    # Adds a detached body to an HTTP/2 stream.
+    #
+    # @rbs (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> void
+    def attach_http2_detached_body(id, stream_id, body, finished)
+      io = @id_to_io[id]
+      dispatch = proc { |callback| @thread_pool << callback }
+      unless io
+        body.attach([], proc {}, dispatch, finished)
+        body.finish(:connection_closed)
+        return
+      end
+
+      wake = proc do
+        @io_queue << [:ready_http2, id, stream_id]
+        @selector.wakeup rescue nil
+      end
+      return unless body.attach([io.budget, @detached_budget], wake, dispatch, finished)
+
+      io.detached[stream_id] = body
+      @detached_count.swap { |count| count + 1 }
+    end
+
+    # Marks an HTTP/2 detached stream eligible for fair scheduling.
+    #
+    # @rbs (Integer id, Integer stream_id) -> void
+    def mark_http2_detached_body_ready(id, stream_id)
+      io = @id_to_io[id]
+      return unless io&.detached&.key?(stream_id) && !io.ready_streams.key?(stream_id)
+
+      io.ready << stream_id
+      io.ready_streams[stream_id] = true
+    end
+
+    # Marks every HTTP/2 detached stream eligible after flow-control capacity changes.
+    #
+    # @rbs (Integer id) -> void
+    def resume_http2_detached_bodies(id)
+      io = @id_to_io[id]
+      return unless io
+
+      io.detached.each_key { |stream_id| mark_http2_detached_body_ready(id, stream_id) }
+    end
+
+    # Writes HTTP/2 detached streams in round-robin order without waiting for flow control.
+    #
+    # @rbs (Integer id) -> void
+    def flush_http2_detached_bodies(id)
+      io = @id_to_io[id]
+      flow_control = @id_to_flow_control[id]
+      socket = @id_to_socket[id]
+      return unless io && flow_control && socket
+
+      DETACHED_MAX_FRAMES.times do
+        break if io.wait || !io.output.empty?
+
+        stream_id = io.ready.shift
+        break unless stream_id
+
+        io.ready_streams.delete(stream_id)
+        body = io.detached[stream_id]
+        next unless body
+
+        size = body.next_size
+        next unless size
+
+        if size.zero?
+          finish_http2_detached_body(id, stream_id, body)
+          next
+        end
+
+        granted = flow_control.try_acquire(stream_id, size)
+        next if granted.zero?
+
+        chunk = body.shift(granted)
+        parser = Http2Parser.new
+        queue_output(io, parser.build_frame(:data, 0, stream_id, chunk))
+        flush_output(id, io)
+        mark_http2_detached_body_ready(id, stream_id) if body.next_size
+      rescue Http2::StreamClosedError
+        remove_http2_detached_body(id, stream_id, :cancelled)
+      end
+
+      if !io.wait && io.output.empty? && !io.ready.empty?
+        @io_queue << [:flush_http2, id]
+        @selector.wakeup rescue nil
+      end
+    end
+
+    # Finishes an HTTP/2 detached stream with DATA or trailing HEADERS.
+    #
+    # @rbs (Integer id, Integer stream_id, DetachedBody body) -> void
+    def finish_http2_detached_body(id, stream_id, body)
+      parser = Http2Parser.new
+      frame = if body.trailers.empty?
+        parser.build_frame(:data, Http2::FLAG_END_STREAM, stream_id, nil)
+      else
+        encoded = parser.encode_response_trailers(body.trailers)
+        parser.build_frame(:headers, Http2::FLAG_END_STREAM | Http2::FLAG_END_HEADERS, stream_id, encoded)
+      end
+      io = @id_to_io[id]
+      queue_output(io, frame)
+      flush_output(id, io)
+      remove_http2_detached_body(id, stream_id, :closed)
+    end
+
+    # Removes an HTTP/2 detached stream and schedules its close callback.
+    #
+    # @rbs (Integer id, Integer stream_id, Symbol reason) -> void
+    def remove_http2_detached_body(id, stream_id, reason)
+      io = @id_to_io[id]
+      body = io&.detached&.delete(stream_id)
+      return unless body
+
+      io.ready_streams.delete(stream_id)
+      body.finish(reason)
+      detached_body_removed
+    end
+
+    # Cancels every detached stream during worker shutdown.
+    #
+    # @rbs () -> void
+    def cancel_detached_bodies
+      @id_to_io.each do |id, io|
+        io.detached.each_key.to_a.each do |stream_id|
+          remove_http2_detached_body(id, stream_id, :shutdown)
+        end
+      end
+    end
+
+    # Records one detached stream finishing.
+    #
+    # @rbs () -> void
+    def detached_body_removed
+      remaining = nil
+      @detached_count.swap do |count|
+        remaining = count - 1
+        remaining
+      end
+      @detached_drained.broadcast if remaining.zero?
     end
 
     # Closes a connection once its queued frames are written.
@@ -826,6 +1091,7 @@ module Raptor
         flush_output(id, io)
         return unless @id_to_socket.key?(id)
         return if io.wait == :read
+        flush_http2_detached_bodies(id) unless io.detached.empty?
       end
 
       return unless io.reading && monitor.readable?
@@ -899,6 +1165,12 @@ module Raptor
       @id_to_http2_last_stream.delete(state[:id])
       @id_to_http2_drain_stream.delete(state[:id])
       @id_to_http2_keepalive.delete(state[:id])
+      if io
+        io.detached.each_value do |body|
+          body.finish(:connection_closed)
+          detached_body_removed
+        end
+      end
       client = @id_to_timeout.delete(state[:id])
       @timeouts.delete!(client) if client
       clear_write_timeout(io)

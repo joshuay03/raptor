@@ -67,35 +67,62 @@ module Raptor
       def empty?: () -> bool
     end
 
+    # Tracks reactor-owned I/O state for an HTTP/2 connection.
+    class Http2IO < ConnectionIO
+      # @rbs attr_reader detached: Hash[Integer, DetachedBody]
+      attr_reader detached: untyped
+
+      # @rbs attr_reader ready: Array[Integer]
+      attr_reader ready: untyped
+
+      # @rbs attr_reader ready_streams: Hash[Integer, bool]
+      attr_reader ready_streams: untyped
+
+      # @rbs attr_reader budget: DetachedBody::Budget
+      attr_reader budget: untyped
+
+      # @rbs () -> void
+      def initialize: () -> void
+
+      # @rbs () -> bool
+      def empty?: () -> bool
+    end
+
     CHUNK_SIZE: untyped
+
+    DETACHED_CONNECTION_BUFFER_SIZE: untyped
+
+    DETACHED_MAX_FRAMES: ::Integer
+
+    DETACHED_WORKER_BUFFER_SIZE: untyped
 
     TIMEOUT_RESPONSE: ::String
 
-    @thread_pool: untyped
-
-    @http1_ractor_pool: untyped
-
-    @http2_ractor_pool: untyped
-
-    @first_data_timeout: Integer
-
-    @chunk_data_timeout: Integer
-
-    @persistent_data_timeout: Integer
-
-    @write_timeout: Integer
-
-    @http2_keepalive_interval: Integer
-
-    @http2_keepalive_timeout: Integer
-
-    @selector: NIO::Selector
-
-    @queue: Queue[TCPSocket]
+    @timeouts: RedBlackTree[TimeoutClient]
 
     @io_queue: AtomicQueue
 
-    @timeouts: RedBlackTree[TimeoutClient]
+    @queue: Queue[TCPSocket]
+
+    @selector: NIO::Selector
+
+    @http2_keepalive_timeout: Integer
+
+    @http2_keepalive_interval: Integer
+
+    @write_timeout: Integer
+
+    @persistent_data_timeout: Integer
+
+    @chunk_data_timeout: Integer
+
+    @first_data_timeout: Integer
+
+    @http2_ractor_pool: untyped
+
+    @http1_ractor_pool: untyped
+
+    @thread_pool: untyped
 
     @id_to_socket: Hash[Integer, TCPSocket]
 
@@ -114,6 +141,12 @@ module Raptor
     @id_to_http2_keepalive: Hash[Integer, Hash[Symbol, untyped]]
 
     @id_to_io: Hash[Integer, ConnectionIO]
+
+    @detached_budget: DetachedBody::Budget
+
+    @detached_count: Atom
+
+    @detached_drained: AtomicConditionVariable
 
     @thread: Thread?
 
@@ -242,6 +275,27 @@ module Raptor
     # @rbs (Integer id, Array[String] frames) -> void
     def write_http2_frames: (Integer id, Array[String] frames) -> void
 
+    # Attaches a detached response body to an HTTP/2 stream.
+    #
+    # @rbs (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
+    def attach_http2_body: (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
+
+    # Reconsiders detached streams after an outbound window update.
+    #
+    # @rbs (Integer id) -> void
+    def resume_http2_bodies: (Integer id) -> void
+
+    # Cancels a detached response stream.
+    #
+    # @rbs (Integer id, Integer stream_id) -> void
+    def cancel_http2_body: (Integer id, Integer stream_id) -> void
+
+    # Waits for detached responses to finish, then cancels any that outlive
+    # the worker drain period.
+    #
+    # @rbs (Numeric timeout) -> void
+    def drain_detached_bodies: (Numeric timeout) -> void
+
     # Stores an HTTP/2 connection's socket, state, writer, and flow
     # controller in the reactor's per-connection maps.
     #
@@ -330,6 +384,46 @@ module Raptor
     #
     # @rbs () -> void
     def drain_io_queue: () -> void
+
+    # Adds a detached body to an HTTP/2 stream.
+    #
+    # @rbs (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> void
+    def attach_http2_detached_body: (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> void
+
+    # Marks an HTTP/2 detached stream eligible for fair scheduling.
+    #
+    # @rbs (Integer id, Integer stream_id) -> void
+    def mark_http2_detached_body_ready: (Integer id, Integer stream_id) -> void
+
+    # Marks every HTTP/2 detached stream eligible after flow-control capacity changes.
+    #
+    # @rbs (Integer id) -> void
+    def resume_http2_detached_bodies: (Integer id) -> void
+
+    # Writes HTTP/2 detached streams in round-robin order without waiting for flow control.
+    #
+    # @rbs (Integer id) -> void
+    def flush_http2_detached_bodies: (Integer id) -> void
+
+    # Finishes an HTTP/2 detached stream with DATA or trailing HEADERS.
+    #
+    # @rbs (Integer id, Integer stream_id, DetachedBody body) -> void
+    def finish_http2_detached_body: (Integer id, Integer stream_id, DetachedBody body) -> void
+
+    # Removes an HTTP/2 detached stream and schedules its close callback.
+    #
+    # @rbs (Integer id, Integer stream_id, Symbol reason) -> void
+    def remove_http2_detached_body: (Integer id, Integer stream_id, Symbol reason) -> void
+
+    # Cancels every detached stream during worker shutdown.
+    #
+    # @rbs () -> void
+    def cancel_detached_bodies: () -> void
+
+    # Records one detached stream finishing.
+    #
+    # @rbs () -> void
+    def detached_body_removed: () -> void
 
     # Closes a connection once its queued frames are written.
     #

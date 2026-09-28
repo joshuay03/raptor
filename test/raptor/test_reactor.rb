@@ -95,6 +95,73 @@ module Raptor
       assert_nil io.timeout
     end
 
+    def test_http2_detached_body_writes
+      callbacks = Queue.new
+      thread_pool = Object.new
+      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
+      reactor, reactor_thread, reader, socket = build_running_http2_reactor(thread_pool)
+      body = DetachedBody.new
+      9.times { body.try_write("x") }
+      body.close
+
+      assert reactor.attach_http2_body(1, 3, body, proc {})
+      parser = Http2Parser.new
+      expected = (parser.build_frame(:data, 0, 3, "x") * 9) +
+        parser.build_frame(:data, Http2::FLAG_END_STREAM, 3, nil)
+
+      assert_equal expected, Timeout.timeout(1) { reader.read(expected.bytesize) }
+      assert_predicate body, :closed?
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
+    def test_http2_detached_body_cancellation
+      callbacks = Queue.new
+      thread_pool = Object.new
+      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
+      reactor, reactor_thread, reader, socket = build_running_http2_reactor(thread_pool)
+      reason = nil
+      body = DetachedBody.new
+      body.on_close { |closed| reason = closed }
+
+      assert reactor.attach_http2_body(1, 3, body, proc {})
+      reactor.cancel_http2_body(1, 3)
+      Timeout.timeout(1) { callbacks.pop.call }
+
+      assert_equal :cancelled, reason
+      assert_predicate body, :closed?
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
+    def test_http2_detached_body_shutdown
+      callbacks = Queue.new
+      thread_pool = Object.new
+      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
+      reactor, reactor_thread, reader, socket = build_running_http2_reactor(thread_pool)
+      reason = nil
+      body = DetachedBody.new
+      body.on_close { |closed| reason = closed }
+
+      assert reactor.attach_http2_body(1, 3, body, proc {})
+      reactor.drain_detached_bodies(0.01)
+      Timeout.timeout(1) { callbacks.pop.call }
+
+      assert_equal :shutdown, reason
+      assert_predicate body, :closed?
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
     def test_http2_keepalive
       reactor, socket, writer, flow_control = build_http2_reactor
       before = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -145,15 +212,30 @@ module Raptor
 
     private
 
-    def build_reactor
+    def build_reactor(thread_pool = nil)
       Reactor.new(
         nil,
         nil,
-        nil,
+        thread_pool,
         connection_options: {first_data_timeout: 30, chunk_data_timeout: 10, write_timeout: 5},
         http1_options: {persistent_data_timeout: 65},
         http2_options: {keepalive_interval: 10, keepalive_timeout: 5}
       )
+    end
+
+    def build_running_http2_reactor(thread_pool)
+      reader, socket = Socket.pair(:UNIX, :STREAM)
+      reactor = build_reactor(thread_pool)
+      reactor.attach_http2(
+        id: 1,
+        socket: socket,
+        state: {id: 1, protocol: :http2, http2_preface_received: true},
+        writer: Http2::Writer.new(write_timeout: 5),
+        flow_control: Http2::FlowControl.new,
+        ping_frame: "ping",
+        ping_payload: "payload"
+      )
+      [reactor, reactor.run, reader, socket]
     end
 
     def build_http2_reactor

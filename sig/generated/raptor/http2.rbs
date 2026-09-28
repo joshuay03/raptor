@@ -40,6 +40,11 @@ module Raptor
       #
       # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
       def write_frames: (OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
+
+      # Attaches a response body that outlives its application thread.
+      #
+      # @rbs (Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
+      def attach_body: (Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
     end
 
     class StreamClosedError < StandardError
@@ -50,15 +55,15 @@ module Raptor
     # Coordinates outbound flow control and stream cancellation without
     # polling or mutexes.
     class FlowControl
-      @connection_window: Atom
-
-      @stream_windows: Atom
-
-      @initial_stream_window: Atom
+      @available: AtomicConditionVariable
 
       @cancelled_streams: Atom
 
-      @available: AtomicConditionVariable
+      @initial_stream_window: Atom
+
+      @stream_windows: Atom
+
+      @connection_window: Atom
 
       # Creates a new FlowControl with the spec-default windows.
       #
@@ -77,6 +82,15 @@ module Raptor
       #
       # @rbs (Integer stream_id, Integer max_bytes) -> Integer
       def acquire: (Integer stream_id, Integer max_bytes) -> Integer
+
+      # Reserves outbound capacity without waiting for a window update.
+      #
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @param max_bytes [Integer] the largest size the caller would like to send
+      # @return [Integer] available bytes, or 0 when flow control is exhausted
+      #
+      # @rbs (Integer stream_id, Integer max_bytes) -> Integer
+      def try_acquire: (Integer stream_id, Integer max_bytes) -> Integer
 
       # Increments the connection-level send window by `increment` bytes.
       #
@@ -482,6 +496,11 @@ module Raptor
     #
     # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
     def perform_stream_request: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[ String, String ]] headers, String body, remote_addr: String) -> void
+
+    # Starts a detached HTTP/2 response after writing its response headers.
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> bool
+    def write_http2_detached_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> bool
 
     # Writes a Rack response as HTTP/2 frames to the socket, partitioning
     # DATA frames through `flow_control` to fit within the peer's windows.
