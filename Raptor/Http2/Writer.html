@@ -106,8 +106,8 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>Serialises concurrent frame writes on a single HTTP/2 connection so
-exactly one thread is writing at any moment.</p>
+    <p>Queues concurrent frame writes while the reactor remains the sole
+owner of the connection socket.</p>
 
   </div>
 </div>
@@ -115,44 +115,6 @@ exactly one thread is writing at any moment.</p>
   
 
 </div>
-  
-    <h2>
-      Constant Summary
-      <small><a href="#" class="constants_summary_toggle">collapse</a></small>
-    </h2>
-
-    <dl class="constants">
-      
-        <dt id="IDLE-constant" class="">IDLE =
-          <div class="docstring">
-  <div class="discussion">
-    
-
-  </div>
-</div>
-<div class="tags">
-  
-<p class="tag_title">Returns:</p>
-<ul class="return">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>::Symbol</tt>)</span>
-      
-      
-      
-    </li>
-  
-</ul>
-
-</div>
-        </dt>
-        <dd><pre class="code"><span class='symbol'>:idle</span></pre></dd>
-      
-    </dl>
-  
-
 
 
 
@@ -166,6 +128,28 @@ exactly one thread is writing at any moment.</p>
     </h2>
 
     <ul class="summary">
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#attach-instance_method" title="#attach (instance method)">#<strong>attach</strong>(reactor, connection_id)  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Routes subsequent frame writes through the connection's reactor.</p></div></span>
+  
+</li>
+
       
         <li class="public ">
   <span class="summary_signature">
@@ -208,7 +192,7 @@ exactly one thread is writing at any moment.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Writes frames to the socket, coordinating with concurrent writers so that exactly one thread is actively writing at any time.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Queues frames for the reactor to write.</p></div></span>
   
 </li>
 
@@ -273,16 +257,18 @@ exactly one thread is writing at any moment.</p>
       <pre class="lines">
 
 
+35
 36
 37
 38
 39</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 36</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 35</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='label'>write_timeout:</span><span class='rparen'>)</span>
-  <span class='ivar'>@state</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#IDLE-constant" title="Raptor::Http2::Writer::IDLE (constant)">IDLE</a></span></span><span class='rparen'>)</span>
+  <span class='ivar'>@reactor</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='ivar'>@connection_id</span> <span class='op'>=</span> <span class='kw'>nil</span>
   <span class='ivar'>@write_timeout</span> <span class='op'>=</span> <span class='id identifier rubyid_write_timeout'>write_timeout</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -298,7 +284,80 @@ exactly one thread is writing at any moment.</p>
 
     
       <div class="method_details first">
-  <h3 class="signature first" id="write_frames-instance_method">
+  <h3 class="signature first" id="attach-instance_method">
+  
+    #<strong>attach</strong>(reactor, connection_id)  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Routes subsequent frame writes through the connection's reactor.</p>
+
+  </div>
+</div>
+<div class="tags">
+  <p class="tag_title">Parameters:</p>
+<ul class="param">
+  
+    <li>
+      
+        <span class='name'>reactor</span>
+      
+      
+        <span class='type'>(<tt><span class='object_link'><a href="../Reactor.html" title="Raptor::Reactor (class)">Reactor</a></span></tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the reactor that owns the connection</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>connection_id</span>
+      
+      
+        <span class='type'>(<tt>Integer</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>unique connection identifier</p></div>
+      
+    </li>
+  
+</ul>
+
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+48
+49
+50
+51</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 48</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_attach'>attach</span><span class='lparen'>(</span><span class='id identifier rubyid_reactor'>reactor</span><span class='comma'>,</span> <span class='id identifier rubyid_connection_id'>connection_id</span><span class='rparen'>)</span>
+  <span class='ivar'>@reactor</span> <span class='op'>=</span> <span class='id identifier rubyid_reactor'>reactor</span>
+  <span class='ivar'>@connection_id</span> <span class='op'>=</span> <span class='id identifier rubyid_connection_id'>connection_id</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="write_frames-instance_method">
   
     #<strong>write_frames</strong>(socket, frames)  &#x21d2; <tt>void</tt> 
   
@@ -308,8 +367,8 @@ exactly one thread is writing at any moment.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Writes frames to the socket, coordinating with concurrent writers
-so that exactly one thread is actively writing at any time.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Queues frames for the reactor to write. Before attachment, writes
+directly so the writer remains usable during connection setup.</p>
 
   </div>
 </div>
@@ -336,7 +395,7 @@ so that exactly one thread is actively writing at any time.</p>
         <span class='name'>frames</span>
       
       
-        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
+        <span class='type'>(<tt>Array&lt;String&gt;</tt>, <tt>nil</tt>)</span>
       
       
       
@@ -354,18 +413,6 @@ so that exactly one thread is actively writing at any time.</p>
       <pre class="lines">
 
 
-49
-50
-51
-52
-53
-54
-55
-56
-57
-58
-59
-60
 61
 62
 63
@@ -374,44 +421,18 @@ so that exactly one thread is actively writing at any time.</p>
 66
 67
 68
-69
-70
-71
-72
-73
-74
-75
-76</pre>
+69</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 49</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 61</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_frames'>write_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_frames'>frames</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='op'>!</span><span class='id identifier rubyid_frames'>frames</span> <span class='op'>||</span> <span class='id identifier rubyid_frames'>frames</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
 
-  <span class='id identifier rubyid_claimed'>claimed</span> <span class='op'>=</span> <span class='kw'>false</span>
-  <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_current'>current</span><span class='op'>|</span>
-    <span class='kw'>if</span> <span class='id identifier rubyid_current'>current</span><span class='period'>.</span><span class='id identifier rubyid_equal?'>equal?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#IDLE-constant" title="Raptor::Http2::Writer::IDLE (constant)">IDLE</a></span></span><span class='rparen'>)</span>
-      <span class='id identifier rubyid_claimed'>claimed</span> <span class='op'>=</span> <span class='kw'>true</span>
-      <span class='id identifier rubyid_frames'>frames</span>
-    <span class='kw'>else</span>
-      <span class='id identifier rubyid_claimed'>claimed</span> <span class='op'>=</span> <span class='kw'>false</span>
-      <span class='id identifier rubyid_current'>current</span> <span class='op'>+</span> <span class='id identifier rubyid_frames'>frames</span>
-    <span class='kw'>end</span>
-  <span class='kw'>end</span>
-
-  <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_claimed'>claimed</span>
-
-  <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
-    <span class='id identifier rubyid_pending'>pending</span> <span class='op'>=</span> <span class='kw'>nil</span>
-    <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_current'>current</span><span class='op'>|</span>
-      <span class='id identifier rubyid_pending'>pending</span> <span class='op'>=</span> <span class='id identifier rubyid_current'>current</span>
-      <span class='id identifier rubyid_current'>current</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>?</span> <span class='const'><span class='object_link'><a href="#IDLE-constant" title="Raptor::Http2::Writer::IDLE (constant)">IDLE</a></span></span> <span class='op'>:</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
-    <span class='kw'>end</span>
-
-    <span class='kw'>break</span> <span class='kw'>if</span> <span class='id identifier rubyid_pending'>pending</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
-
-    <span class='const'><span class='object_link'><a href="../Http.html" title="Raptor::Http (module)">Http</a></span></span><span class='period'>.</span><span class='id identifier rubyid_socket_write'><span class='object_link'><a href="../Http.html#socket_write-class_method" title="Raptor::Http.socket_write (method)">socket_write</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_pending'>pending</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='ivar'>@write_timeout</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
+  <span class='kw'>if</span> <span class='ivar'>@reactor</span>
+    <span class='ivar'>@reactor</span><span class='period'>.</span><span class='id identifier rubyid_write_http2_frames'>write_http2_frames</span><span class='lparen'>(</span><span class='ivar'>@connection_id</span><span class='comma'>,</span> <span class='id identifier rubyid_frames'>frames</span><span class='rparen'>)</span>
+  <span class='kw'>else</span>
+    <span class='const'><span class='object_link'><a href="../Http.html" title="Raptor::Http (module)">Http</a></span></span><span class='period'>.</span><span class='id identifier rubyid_socket_write'><span class='object_link'><a href="../Http.html#socket_write-class_method" title="Raptor::Http.socket_write (method)">socket_write</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_frames'>frames</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='ivar'>@write_timeout</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -424,7 +445,7 @@ so that exactly one thread is actively writing at any time.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Sep 27 10:48:11 2026 by
+  Generated on Mon Sep 28 09:05:59 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
