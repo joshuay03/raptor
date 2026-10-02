@@ -446,7 +446,7 @@ has returned.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#trailers-instance_method" title="#trailers (instance method)">#<strong>trailers</strong>  &#x21d2; Hash[String, String | Array[String]] </a>
+      <a href="#trailers-instance_method" title="#trailers (instance method)">#<strong>trailers</strong>  &#x21d2; Hash </a>
     
 
     
@@ -615,9 +615,54 @@ has returned.</p>
         <span class='name'>budgets</span>
       
       
-        <span class='type'>(<tt>Array[<span class='object_link'><a href="DetachedBody/Budget.html" title="Raptor::DetachedBody::Budget (class)">Budget</a></span>]</tt>)</span>
+        <span class='type'>(<tt>Array&lt;<span class='object_link'><a href="DetachedBody/Budget.html" title="Raptor::DetachedBody::Budget (class)">Budget</a></span>&gt;</tt>)</span>
       
       
+      
+        &mdash;
+        <div class='inline'><p>buffer budgets shared with other bodies</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>wake</span>
+      
+      
+        <span class='type'>(<tt>Proc</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>called when buffered data or a close is ready to write</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>dispatch</span>
+      
+      
+        <span class='type'>(<tt>Proc</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>schedules application callbacks off the reactor thread</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>finished</span>
+      
+      
+        <span class='type'>(<tt>Proc</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>called with the close reason after <code>on_close</code></p></div>
       
     </li>
   
@@ -633,6 +678,9 @@ has returned.</p>
       
       
       
+        &mdash;
+        <div class='inline'><p>false when the bytes already buffered exceed a budget</p></div>
+      
     </li>
   
 </ul>
@@ -643,12 +691,6 @@ has returned.</p>
       <pre class="lines">
 
 
-173
-174
-175
-176
-177
-178
 179
 180
 181
@@ -660,10 +702,16 @@ has returned.</p>
 187
 188
 189
-190</pre>
+190
+191
+192
+193
+194
+195
+196</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 173</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 179</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_attach'>attach</span><span class='lparen'>(</span><span class='id identifier rubyid_budgets'>budgets</span><span class='comma'>,</span> <span class='id identifier rubyid_wake'>wake</span><span class='comma'>,</span> <span class='id identifier rubyid_dispatch'>dispatch</span><span class='comma'>,</span> <span class='id identifier rubyid_finished'>finished</span><span class='rparen'>)</span>
   <span class='ivar'>@wake</span> <span class='op'>=</span> <span class='id identifier rubyid_wake'>wake</span>
@@ -868,6 +916,9 @@ has returned.</p>
       
       
       
+        &mdash;
+        <div class='inline'><p>why the stream closed</p></div>
+      
     </li>
   
 </ul>
@@ -879,34 +930,34 @@ has returned.</p>
       <pre class="lines">
 
 
-247
-248
-249
-250
-251
-252
-253
-254
-255
-256
-257
-258
-259
-260
-261
-262
-263
-264
 265
 266
 267
 268
 269
 270
-271</pre>
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 247</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 265</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_finish'>finish</span><span class='lparen'>(</span><span class='id identifier rubyid_reason'>reason</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_callback'>callback</span> <span class='op'>=</span> <span class='kw'>false</span>
@@ -976,13 +1027,13 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-205
-206
-207
-208</pre>
+215
+216
+217
+218</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 205</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 215</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_next_size'>next_size</span>
   <span class='id identifier rubyid_state'>state</span> <span class='op'>=</span> <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -1213,14 +1264,14 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-195
-196
-197
-198
-199</pre>
+203
+204
+205
+206
+207</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 195</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 203</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_open'>open</span>
   <span class='id identifier rubyid_callback'>callback</span> <span class='op'>=</span> <span class='ivar'>@on_open</span>
@@ -1271,12 +1322,12 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-289
-290
-291</pre>
+307
+308
+309</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 289</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 307</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_release'>release</span><span class='lparen'>(</span><span class='id identifier rubyid_bytes'>bytes</span><span class='rparen'>)</span>
   <span class='ivar'>@budgets</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_budget'>budget</span><span class='op'>|</span> <span class='id identifier rubyid_budget'>budget</span><span class='period'>.</span><span class='id identifier rubyid_release'>release</span><span class='lparen'>(</span><span class='id identifier rubyid_bytes'>bytes</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
@@ -1338,20 +1389,20 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-276
-277
-278
-279
-280
-281
-282
-283
-284
-285
-286</pre>
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 276</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 294</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reserve'>reserve</span><span class='lparen'>(</span><span class='id identifier rubyid_bytes'>bytes</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_reserved'>reserved</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
@@ -1397,6 +1448,9 @@ while waiting for more data.</p>
       
       
       
+        &mdash;
+        <div class='inline'><p>the largest chunk to return</p></div>
+      
     </li>
   
 </ul>
@@ -1411,6 +1465,9 @@ while waiting for more data.</p>
       
       
       
+        &mdash;
+        <div class='inline'><p>the removed bytes, or nil when nothing is buffered</p></div>
+      
     </li>
   
 </ul>
@@ -1421,19 +1478,6 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-213
-214
-215
-216
-217
-218
-219
-220
-221
-222
-223
-224
-225
 226
 227
 228
@@ -1443,10 +1487,23 @@ while waiting for more data.</p>
 232
 233
 234
-235</pre>
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 213</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 226</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shift'>shift</span><span class='lparen'>(</span><span class='id identifier rubyid_max_bytes'>max_bytes</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_chunk'>chunk</span> <span class='op'>=</span> <span class='kw'>nil</span>
@@ -1479,7 +1536,7 @@ while waiting for more data.</p>
       <div class="method_details ">
   <h3 class="signature " id="trailers-instance_method">
   
-    #<strong>trailers</strong>  &#x21d2; <tt>Hash[String, String | Array[String]]</tt> 
+    #<strong>trailers</strong>  &#x21d2; <tt>Hash</tt> 
   
 
   
@@ -1499,9 +1556,12 @@ while waiting for more data.</p>
     <li>
       
       
-        <span class='type'>(<tt>Hash[String, String | Array[String]]</tt>)</span>
+        <span class='type'>(<tt>Hash</tt>)</span>
       
       
+      
+        &mdash;
+        <div class='inline'><p>trailing response headers</p></div>
       
     </li>
   
@@ -1513,12 +1573,12 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-240
-241
-242</pre>
+255
+256
+257</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 240</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 255</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_trailers'>trailers</span>
   <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='lbracket'>[</span><span class='symbol'>:trailers</span><span class='rbracket'>]</span>
@@ -1678,7 +1738,7 @@ while waiting for more data.</p>
 </div>
 
       <div id="footer">
-  Generated on Fri Oct  2 21:09:28 2026 by
+  Generated on Fri Oct  2 22:26:42 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
