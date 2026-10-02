@@ -47,7 +47,7 @@ module Raptor
       client = UNIXSocket.new(socket_path)
 
       Timeout.timeout(1) do
-        Thread.pass until server.instance_variable_get(:@client)
+        Thread.pass until server.instance_variable_get(:@client).value
         server.shutdown
       end
 

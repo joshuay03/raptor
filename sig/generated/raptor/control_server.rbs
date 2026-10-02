@@ -3,19 +3,17 @@
 module Raptor
   # Serves cluster statistics over a Unix socket.
   class ControlServer
+    SHUTDOWN: ::Symbol
+
     @path: String
 
     @stats: ^() -> Hash[Symbol, untyped]
 
     @server: UNIXServer?
 
-    @client: UNIXSocket?
+    @client: Atom
 
     @thread: Thread?
-
-    @running: bool
-
-    @mutex: Mutex
 
     # Creates a control server for `url` without binding it.
     #

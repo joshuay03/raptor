@@ -5,17 +5,19 @@ require "json"
 require "socket"
 require "uri"
 
+require "atomic-ruby/atom"
+
 module Raptor
   # Serves cluster statistics over a Unix socket.
   #
   class ControlServer
+    SHUTDOWN = :shutdown
+
     # @rbs @path: String
     # @rbs @stats: ^() -> Hash[Symbol, untyped]
     # @rbs @server: UNIXServer?
-    # @rbs @client: UNIXSocket?
+    # @rbs @client: Atom
     # @rbs @thread: Thread?
-    # @rbs @running: bool
-    # @rbs @mutex: Mutex
 
     # Creates a control server for `url` without binding it.
     #
@@ -32,10 +34,8 @@ module Raptor
       @path = uri.path
       @stats = stats
       @server = nil
-      @client = nil
+      @client = Atom.new(nil)
       @thread = nil
-      @running = false
-      @mutex = Mutex.new
     end
 
     # Binds the Unix socket.
@@ -54,7 +54,6 @@ module Raptor
     #
     # @rbs () -> void
     def start
-      @running = true
       owner_pid = Process.pid
       at_exit { File.delete(@path) rescue nil if Process.pid == owner_pid }
 
@@ -71,11 +70,13 @@ module Raptor
     #
     # @rbs () -> void
     def shutdown
-      @running = false
-      @mutex.synchronize do
-        @server&.close
-        @client&.close
+      client = nil
+      @client.swap do |current|
+        client = current
+        SHUTDOWN
       end
+      @server&.close
+      client.close if client.is_a?(UNIXSocket)
       @thread&.join
       File.delete(@path) rescue nil
     end
@@ -105,15 +106,19 @@ module Raptor
     #
     # @rbs () -> void
     def serve
-      while @running
+      until @client.value == SHUTDOWN
         readable, = IO.select([@server], nil, nil, 1)
         next unless readable
 
-        @mutex.synchronize do
-          client = @server.accept_nonblock(exception: false)
-          @client = client if client.is_a?(UNIXSocket)
+        client = @server.accept_nonblock(exception: false)
+        next unless client.is_a?(UNIXSocket)
+
+        if @client.swap { |current| current == SHUTDOWN ? current : client } == SHUTDOWN
+          client.close
+          return
         end
-        handle(@client) if @client
+
+        handle(client)
       end
     rescue IOError, Errno::EBADF
     end
@@ -139,7 +144,7 @@ module Raptor
     rescue IOError, SystemCallError
     ensure
       client.close rescue nil
-      @mutex.synchronize { @client = nil }
+      @client.swap { |current| current.equal?(client) ? nil : current }
     end
   end
 end
