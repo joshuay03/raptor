@@ -374,7 +374,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Attaches a detached response body to an HTTP/1.1 connection.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Attaches a detached response body to an HTTP/1.x connection.</p></div></span>
   
 </li>
 
@@ -396,7 +396,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Adds a detached body to an HTTP/1.1 connection.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Adds a detached body to an HTTP/1.x connection.</p></div></span>
   
 </li>
 
@@ -814,7 +814,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Finishes an HTTP/1.1 detached response and either reuses or closes its connection.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Finishes an HTTP/1.x detached response and either reuses or closes its connection.</p></div></span>
   
 </li>
 
@@ -902,7 +902,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Writes buffered HTTP/1.1 body chunks without blocking.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Writes buffered HTTP/1.x body chunks without blocking.</p></div></span>
   
 </li>
 
@@ -968,7 +968,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Handles readiness for an HTTP/1.1 detached response.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Handles readiness for an HTTP/1.x detached response.</p></div></span>
   
 </li>
 
@@ -1212,7 +1212,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Cancels an HTTP/1.1 detached response and closes its connection.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Cancels an HTTP/1.x detached response and closes its connection.</p></div></span>
   
 </li>
 
@@ -2097,7 +2097,7 @@ to the caller-provided handlers.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Attaches a detached response body to an HTTP/1.1 connection.</p>
+    <p>Attaches a detached response body to an HTTP/1.x connection.</p>
 
   </div>
 </div>
@@ -2217,7 +2217,7 @@ to the caller-provided handlers.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Adds a detached body to an HTTP/1.1 connection.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Adds a detached body to an HTTP/1.x connection.</p>
 
   </div>
 </div>
@@ -3949,7 +3949,7 @@ connection may dispatch while existing application work drains.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Finishes an HTTP/1.1 detached response and either reuses or closes its connection.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Finishes an HTTP/1.x detached response and either reuses or closes its connection.</p>
 
   </div>
 </div>
@@ -4319,7 +4319,7 @@ one was supplied when the connection was added.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Writes buffered HTTP/1.1 body chunks without blocking.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Writes buffered HTTP/1.x body chunks without blocking.</p>
 
   </div>
 </div>
@@ -4386,14 +4386,14 @@ one was supplied when the connection was added.</p>
     <span class='kw'>break</span> <span class='kw'>unless</span> <span class='id identifier rubyid_size'>size</span>
 
     <span class='kw'>if</span> <span class='id identifier rubyid_size'>size</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
-      <span class='id identifier rubyid_queue_output'>queue_output</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_encode_trailers'><span class='object_link'><a href="Http1.html#encode_trailers-class_method" title="Raptor::Http1.encode_trailers (method)">encode_trailers</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_trailers'>trailers</span><span class='rparen'>)</span><span class='rparen'>)</span>
+      <span class='id identifier rubyid_queue_output'>queue_output</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_encode_trailers'><span class='object_link'><a href="Http1.html#encode_trailers-class_method" title="Raptor::Http1.encode_trailers (method)">encode_trailers</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_trailers'>trailers</span><span class='rparen'>)</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:chunked</span><span class='rbracket'>]</span>
       <span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_finishing'>finishing</span> <span class='op'>=</span> <span class='kw'>true</span>
       <span class='id identifier rubyid_flush_output'>flush_output</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
       <span class='kw'>break</span>
     <span class='kw'>end</span>
 
     <span class='id identifier rubyid_chunk'>chunk</span> <span class='op'>=</span> <span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_body'>body</span><span class='period'>.</span><span class='id identifier rubyid_shift'>shift</span><span class='lparen'>(</span><span class='id identifier rubyid_size'>size</span><span class='rparen'>)</span>
-    <span class='id identifier rubyid_queue_output'>queue_output</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_encode_chunk'><span class='object_link'><a href="Http1.html#encode_chunk-class_method" title="Raptor::Http1.encode_chunk (method)">encode_chunk</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_queue_output'>queue_output</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:chunked</span><span class='rbracket'>]</span> <span class='op'>?</span> <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_encode_chunk'><span class='object_link'><a href="Http1.html#encode_chunk-class_method" title="Raptor::Http1.encode_chunk (method)">encode_chunk</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span> <span class='op'>:</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_flush_output'>flush_output</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
     <span class='kw'>break</span> <span class='kw'>if</span> <span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_wait'>wait</span>
   <span class='kw'>end</span>
@@ -4698,7 +4698,7 @@ one was supplied when the connection was added.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Handles readiness for an HTTP/1.1 detached response.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Handles readiness for an HTTP/1.x detached response.</p>
 
   </div>
 </div>
@@ -5720,7 +5720,7 @@ open so the worker can write the response.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Cancels an HTTP/1.1 detached response and closes its connection.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Cancels an HTTP/1.x detached response and closes its connection.</p>
 
   </div>
 </div>
@@ -7118,7 +7118,7 @@ was supplied when the connection was added.</p>
 </div>
 
       <div id="footer">
-  Generated on Fri Oct  2 12:10:00 2026 by
+  Generated on Fri Oct  2 12:20:24 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
