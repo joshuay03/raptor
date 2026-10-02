@@ -118,10 +118,10 @@ Hello, World!%
 <p>Rails apps using <code>SOLID_QUEUE_IN_PUMA</code> run jobs through <code>config/puma.rb</code>, which Raptor does not load. Run <code>bin/jobs</code> as
 a separately supervised process or container instead.</p>
 <h2 id="Configuration">Configuration</h2>
-<p>Raptor accepts configuration via command-line flags, a Ruby config file, or both (CLI flags override config file
-values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
-<p>The config file is a Ruby file that evaluates to a hash of options. By default Raptor loads <code>raptor.rb</code> then
-<code>config/raptor.rb</code> from the working directory; pass <code>-c PATH</code> to point at a specific file.</p>
+<p>Raptor reads options from a Ruby config file, environment variables, and command-line flags, in increasing order of
+precedence. Run <code>bundle exec raptor --help</code> for the full flag list.</p>
+<p>The config file evaluates to a hash of options. By default Raptor loads <code>raptor.rb</code> then <code>config/raptor.rb</code> from the
+working directory; pass <code>-c PATH</code> to point at a specific file.</p>
 <pre class="code ruby"><code class="ruby"><span class='comment'># raptor.rb
 </span>
 <span class='comment'># Every key below is set to its default value; only include the ones you want to override.
@@ -172,29 +172,16 @@ values). Run <code>bundle exec raptor --help</code> for the full flag list.</p>
   <span class='label'>access_log_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
 <span class='rbrace'>}</span>
 </code></pre>
-<p><code>threads</code> sets the number of application threads each worker keeps running. By default, Raptor adds temporary threads
-without a fixed limit when queued work is held up by blocking operations. It does not add threads when waiting for the
-GVL is the bottleneck, and temporary threads leave after the queue drains. Set <code>max_threads</code> to cap growth, or set it
-to the same value as <code>threads</code> for a fixed pool.</p>
-<p>Set <code>cpu_affinity</code> to <code>true</code> to pin each worker to a distinct CPU when the worker count fits within the process's
-allowed CPU set. It is off by default because container runtimes commonly expose CPUs that are shared with other
-containers.</p>
-<p>Raptor clears application thread locals after each request by default. Set <code>clean_thread_locals</code> to <code>false</code> to disable
-it. Set <code>clean_fiber_locals</code> to <code>true</code> to run each request in a fresh Fiber, isolating Fiber-local state as well.</p>
-<p><code>RAPTOR_WORKERS</code>, <code>RAPTOR_THREADS</code>, and <code>RAPTOR_MAX_THREADS</code> can set the corresponding options without a config file.
-Config files override defaults, environment variables override config files, and command-line options override both.
-<code>RAPTOR_MAX_THREADS=unlimited</code> leaves adaptive growth uncapped.</p>
-<p><code>before_worker_boot</code> and <code>before_worker_shutdown</code> hooks receive the worker index.</p>
+<p><code>RAPTOR_WORKERS</code>, <code>RAPTOR_THREADS</code>, and <code>RAPTOR_MAX_THREADS</code> set the corresponding options without a config file;
+<code>RAPTOR_MAX_THREADS=unlimited</code> leaves thread growth uncapped.</p>
 <h2 id="Bindings">Bindings</h2>
-<p>Raptor accepts multiple <code>binds:</code> URIs across three schemes.</p>
+<p><code>binds:</code> accepts any combination of:</p>
 <ul>
-<li><code>tcp://host:port</code> for TCP. Host can be a specific IP, <code>0.0.0.0</code> / <code>[::]</code>, or <code>localhost</code> (expanded to both IPv4 and
-IPv6 loopback addresses).</li>
-<li><code>unix:///path/to/socket</code> for a Unix domain socket. Stale sockets left by crashed processes are cleaned up
-automatically.</li>
-<li><code>ssl://host:port?cert=/path/to.crt&amp;key=/path/to.key</code> for TLS. HTTP/1.1 and HTTP/2 are negotiated via ALPN.</li>
+<li><code>tcp://host:port</code> for TCP. <code>localhost</code> binds both IPv4 and IPv6 loopback addresses.</li>
+<li><code>unix:///path/to/socket</code> for a Unix domain socket.</li>
+<li><code>ssl://host:port?cert=/path/to.crt&amp;key=/path/to.key</code> for TLS, negotiating HTTP/1.1 or HTTP/2 via ALPN.</li>
+<li><code>h2c://host:port</code> for cleartext HTTP/2.</li>
 </ul>
-<p>Multiple binds can be combined freely.</p>
 <h2 id="Signals">Signals</h2>
 <p>Send to the master process.</p>
 <table>
@@ -227,19 +214,12 @@ automatically.</li>
 </tr>
 </tbody>
 </table>
-<h2 id="Restarts">Restarts</h2>
-<ul>
-<li><strong>Phased restart</strong> (<code>USR1</code>) replaces workers one at a time, waiting for each new worker to boot before retiring the
-previous one. The master process keeps running, so existing workers continue serving until they are individually
-replaced. Use to pick up code changes that don't affect the master's boot path.</li>
-<li><strong>Hot restart</strong> (<code>USR2</code>) re-execs the master process with its original command line, inheriting the listening sockets
-so accepted connections continue to be served across the swap. The successor master re-runs initialization from
-scratch. Use to pick up changes that affect master-level state (config layout, dependency upgrades, Raptor itself).</li>
-</ul>
+<p>A phased restart replaces workers one at a time while the master keeps running, picking up application code changes.
+A hot restart re-execs the master with its original command line and inherited listening sockets, picking up changes
+to configuration, dependencies, or Raptor itself.</p>
 <h2 id="systemd">systemd</h2>
-<p>Raptor implements socket activation (<code>LISTEN_FDS</code>) and <code>sd_notify</code>, so it integrates cleanly with <code>Type=notify</code> units.
-When the socket unit is active, systemd hands the pre-bound listening file descriptors to Raptor, which serves them in
-place of <code>binds:</code>. <code>READY=1</code>, <code>STOPPING=1</code>, and <code>RELOADING=1</code> lifecycle messages are emitted automatically.</p>
+<p>Raptor supports socket activation and <code>sd_notify</code>, so it works with <code>Type=notify</code> units. When the socket unit is
+active, Raptor serves the listening sockets systemd passes in place of <code>binds:</code>.</p>
 <pre class="code ini"><code class="ini"># /etc/systemd/system/myapp.socket
 [Socket]
 ListenStream=0.0.0.0:9292
@@ -256,18 +236,15 @@ ExecReload=/bin/kill -USR2 $MAINPID
 KillMode=mixed
 </code></pre>
 <h2 id="Stats">Stats</h2>
-<p>Each worker writes per-worker stats (request count, busy and available threads, backlog, last check-in) to shared
-memory and to a JSON file (default <code>tmp/raptor.json</code>; set via <code>stats_file</code>).</p>
+<p>Workers publish their stats to <code>stats_file</code> (default <code>tmp/raptor.json</code>):</p>
 <pre class="code ruby"><code class="ruby">&gt; bundle exec raptor stats
 Master PID: 91348
 Worker 0 (phase 0): pid=91350, requests=1234, busy=2/3, backlog=0, booted, last_checkin=10:42:01
 Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_checkin=10:42:01
 ...
 </code></pre>
-<p>Set <code>control_url</code> to a Unix socket URL such as <code>unix:///tmp/raptor-control.sock</code> to expose cluster stats over <code>/stats</code>.
-For adaptive pools, <code>max_threads</code> in each worker's status is its current thread count, so
-<code>pool_capacity / max_threads</code> measures the capacity available at that moment rather than comparing against an
-unbounded configured limit. The control server is read-only and currently exposes only <code>/stats</code>.</p>
+<p>Set <code>control_url</code> to a Unix socket URL such as <code>unix:///tmp/raptor-control.sock</code> to serve the same stats over
+<code>GET /stats</code>.</p>
 <h2 id="_Micro__Benchmarks">(Micro) Benchmarks</h2>
 <p>Raptor 0.21.0 vs Puma 8.0.2 vs Falcon 0.57.0 across two workload profiles. <strong>IO-bound</strong> is a GET endpoint that
 interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
@@ -508,7 +485,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Fri Oct  2 12:20:22 2026 by
+  Generated on Fri Oct  2 12:20:40 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
