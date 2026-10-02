@@ -114,6 +114,44 @@
   
 
 </div>
+  
+    <h2>
+      Constant Summary
+      <small><a href="#" class="constants_summary_toggle">collapse</a></small>
+    </h2>
+
+    <dl class="constants">
+      
+        <dt id="SHUTDOWN-constant" class="">SHUTDOWN =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::Symbol</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='symbol'>:shutdown</span></pre></dd>
+      
+    </dl>
+  
+
 
 
 
@@ -378,8 +416,6 @@
       <pre class="lines">
 
 
-28
-29
 30
 31
 32
@@ -392,7 +428,7 @@
 39</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 28</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 30</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_url'>url</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_stats'>stats</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_uri'>uri</span> <span class='op'>=</span> <span class='const'>URI</span><span class='lparen'>(</span><span class='id identifier rubyid_url'>url</span><span class='rparen'>)</span>
@@ -401,10 +437,8 @@
   <span class='ivar'>@path</span> <span class='op'>=</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_path'>path</span>
   <span class='ivar'>@stats</span> <span class='op'>=</span> <span class='id identifier rubyid_stats'>stats</span>
   <span class='ivar'>@server</span> <span class='op'>=</span> <span class='kw'>nil</span>
-  <span class='ivar'>@client</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='ivar'>@client</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='ivar'>@thread</span> <span class='op'>=</span> <span class='kw'>nil</span>
-  <span class='ivar'>@running</span> <span class='op'>=</span> <span class='kw'>false</span>
-  <span class='ivar'>@mutex</span> <span class='op'>=</span> <span class='const'>Mutex</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -501,11 +535,6 @@
       <pre class="lines">
 
 
-127
-128
-129
-130
-131
 132
 133
 134
@@ -517,10 +546,15 @@
 140
 141
 142
-143</pre>
+143
+144
+145
+146
+147
+148</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 127</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 132</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle'>handle</span><span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_request_line'>request_line</span> <span class='op'>=</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_gets'>gets</span>
@@ -537,7 +571,7 @@
 <span class='kw'>rescue</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='const'>SystemCallError</span>
 <span class='kw'>ensure</span>
   <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
-  <span class='ivar'>@mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='lbrace'>{</span> <span class='ivar'>@client</span> <span class='op'>=</span> <span class='kw'>nil</span> <span class='rbrace'>}</span>
+  <span class='ivar'>@client</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_current'>current</span><span class='op'>|</span> <span class='id identifier rubyid_current'>current</span><span class='period'>.</span><span class='id identifier rubyid_equal?'>equal?</span><span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span><span class='rparen'>)</span> <span class='op'>?</span> <span class='kw'>nil</span> <span class='op'>:</span> <span class='id identifier rubyid_current'>current</span> <span class='rbrace'>}</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -584,7 +618,6 @@
       <pre class="lines">
 
 
-91
 92
 93
 94
@@ -593,10 +626,11 @@
 97
 98
 99
-100</pre>
+100
+101</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 91</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 92</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_stale_socket'>remove_stale_socket</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span>
@@ -637,7 +671,6 @@
       <pre class="lines">
 
 
-107
 108
 109
 110
@@ -649,21 +682,30 @@
 116
 117
 118
-119</pre>
+119
+120
+121
+122
+123
+124</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 107</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 108</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_serve'>serve</span>
-  <span class='kw'>while</span> <span class='ivar'>@running</span>
+  <span class='kw'>until</span> <span class='ivar'>@client</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="#SHUTDOWN-constant" title="Raptor::ControlServer::SHUTDOWN (constant)">SHUTDOWN</a></span></span>
     <span class='id identifier rubyid_readable'>readable</span><span class='comma'>,</span> <span class='op'>=</span> <span class='const'>IO</span><span class='period'>.</span><span class='id identifier rubyid_select'>select</span><span class='lparen'>(</span><span class='lbracket'>[</span><span class='ivar'>@server</span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='kw'>nil</span><span class='comma'>,</span> <span class='int'>1</span><span class='rparen'>)</span>
     <span class='kw'>next</span> <span class='kw'>unless</span> <span class='id identifier rubyid_readable'>readable</span>
 
-    <span class='ivar'>@mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
-      <span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='ivar'>@server</span><span class='period'>.</span><span class='id identifier rubyid_accept_nonblock'>accept_nonblock</span><span class='lparen'>(</span><span class='label'>exception:</span> <span class='kw'>false</span><span class='rparen'>)</span>
-      <span class='ivar'>@client</span> <span class='op'>=</span> <span class='id identifier rubyid_client'>client</span> <span class='kw'>if</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>UNIXSocket</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='ivar'>@server</span><span class='period'>.</span><span class='id identifier rubyid_accept_nonblock'>accept_nonblock</span><span class='lparen'>(</span><span class='label'>exception:</span> <span class='kw'>false</span><span class='rparen'>)</span>
+    <span class='kw'>next</span> <span class='kw'>unless</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>UNIXSocket</span><span class='rparen'>)</span>
+
+    <span class='kw'>if</span> <span class='ivar'>@client</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_current'>current</span><span class='op'>|</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="#SHUTDOWN-constant" title="Raptor::ControlServer::SHUTDOWN (constant)">SHUTDOWN</a></span></span> <span class='op'>?</span> <span class='id identifier rubyid_current'>current</span> <span class='op'>:</span> <span class='id identifier rubyid_client'>client</span> <span class='rbrace'>}</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="#SHUTDOWN-constant" title="Raptor::ControlServer::SHUTDOWN (constant)">SHUTDOWN</a></span></span>
+      <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span>
+      <span class='kw'>return</span>
     <span class='kw'>end</span>
-    <span class='id identifier rubyid_handle'>handle</span><span class='lparen'>(</span><span class='ivar'>@client</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='ivar'>@client</span>
+
+    <span class='id identifier rubyid_handle'>handle</span><span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 <span class='kw'>rescue</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='const'>Errno</span><span class='op'>::</span><span class='const'>EBADF</span>
 <span class='kw'>end</span></pre>
@@ -696,6 +738,7 @@
       <pre class="lines">
 
 
+72
 73
 74
 75
@@ -704,17 +747,20 @@
 78
 79
 80
-81</pre>
+81
+82</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 73</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 72</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
-  <span class='ivar'>@running</span> <span class='op'>=</span> <span class='kw'>false</span>
-  <span class='ivar'>@mutex</span><span class='period'>.</span><span class='id identifier rubyid_synchronize'>synchronize</span> <span class='kw'>do</span>
-    <span class='ivar'>@server</span><span class='op'>&amp;.</span><span class='id identifier rubyid_close'>close</span>
-    <span class='ivar'>@client</span><span class='op'>&amp;.</span><span class='id identifier rubyid_close'>close</span>
+  <span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='ivar'>@client</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_current'>current</span><span class='op'>|</span>
+    <span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='id identifier rubyid_current'>current</span>
+    <span class='const'><span class='object_link'><a href="#SHUTDOWN-constant" title="Raptor::ControlServer::SHUTDOWN (constant)">SHUTDOWN</a></span></span>
   <span class='kw'>end</span>
+  <span class='ivar'>@server</span><span class='op'>&amp;.</span><span class='id identifier rubyid_close'>close</span>
+  <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span> <span class='kw'>if</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>UNIXSocket</span><span class='rparen'>)</span>
   <span class='ivar'>@thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_join'>join</span>
   <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
 <span class='kw'>end</span></pre>
@@ -756,14 +802,12 @@
 62
 63
 64
-65
-66</pre>
+65</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 56</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start'>start</span>
-  <span class='ivar'>@running</span> <span class='op'>=</span> <span class='kw'>true</span>
   <span class='id identifier rubyid_owner_pid'>owner_pid</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span>
   <span class='id identifier rubyid_at_exit'>at_exit</span> <span class='lbrace'>{</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span> <span class='kw'>if</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span> <span class='op'>==</span> <span class='id identifier rubyid_owner_pid'>owner_pid</span> <span class='rbrace'>}</span>
 
@@ -783,7 +827,7 @@
 </div>
 
       <div id="footer">
-  Generated on Fri Oct  2 22:44:09 2026 by
+  Generated on Fri Oct  2 22:51:06 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
