@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require_relative "raptor/version"
-require_relative "raptor/detached_body"
 
 # Main module for the Raptor web server.
 #

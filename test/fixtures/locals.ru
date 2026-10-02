@@ -10,7 +10,7 @@ run proc { |env|
     body = [
       Thread.current[:fiber_local],
       Thread.current.thread_variable_get(:thread_local),
-      Fiber[:storage],
+      Fiber[:storage]
     ].inspect
   end
 

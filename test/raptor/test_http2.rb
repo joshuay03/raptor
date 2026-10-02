@@ -25,7 +25,7 @@ module Raptor
         values << [
           Thread.current[:raptor_test_fiber],
           Thread.current.thread_variable_get(:raptor_test_thread),
-          Fiber[:raptor_test_storage],
+          Fiber[:raptor_test_storage]
         ]
         Thread.current[:raptor_test_fiber] = "fiber"
         Thread.current.thread_variable_set(:raptor_test_thread, "thread")
@@ -43,7 +43,7 @@ module Raptor
       frame = nil
       reactor = Object.new
       reactor.define_singleton_method(:drain_http2) { |&block| frame = block.call(5) }
-      handler = Http2.new(proc {}, 9292, http2_options: {max_concurrent_streams: 100})
+      handler = Http2.new(proc {}, 9292, http2_options: { max_concurrent_streams: 100 })
 
       handler.shutdown(reactor)
 
@@ -195,20 +195,20 @@ module Raptor
       app = proc do |env|
         env[Rack::RACK_EARLY_HINTS].call("link" => "</style.css>; rel=preload")
         env[Rack::RACK_RESPONSE_FINISHED] << proc { |*arguments| callback_arguments = arguments }
-        [200, {"content-type" => "text/plain"}, ["body"]]
+        [200, { "content-type" => "text/plain" }, ["body"]]
       end
 
       frames = perform_stream_request(app)
 
       assert_equal [HEADERS_FRAME_TYPE, HEADERS_FRAME_TYPE, DATA_FRAME_TYPE, DATA_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
       assert_equal ["103", "200"], decode_header_blocks(frames).map { |headers| headers.assoc(":status").last }
-      assert_equal [200, {"content-type" => "text/plain"}, nil], callback_arguments.drop(1)
+      assert_equal [200, { "content-type" => "text/plain" }, nil], callback_arguments.drop(1)
     end
 
     def test_perform_stream_request_writes_response_trailers
       app = proc do |env|
         env[Http2::RESPONSE_TRAILERS]["grpc-status"] = "0"
-        [200, {"content-type" => "application/grpc"}, ["body"]]
+        [200, { "content-type" => "application/grpc" }, ["body"]]
       end
 
       frames = perform_stream_request(app)
@@ -462,7 +462,7 @@ module Raptor
       frames = []
       writer = Object.new
       writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
-      handler = Http2.new(app, 9292, http2_options: {max_concurrent_streams: 100}, on_error: on_error)
+      handler = Http2.new(app, 9292, http2_options: { max_concurrent_streams: 100 }, on_error: on_error)
       headers = [[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "example.com"]]
 
       handler.send(

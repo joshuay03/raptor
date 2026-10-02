@@ -2,15 +2,15 @@
 
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
-require "raptor"
-require "minitest/autorun"
-
 require "net/http"
 require "socket"
 require "tempfile"
 require "timeout"
 require "uri"
 
+require "minitest/autorun"
+
+require "raptor"
 require "raptor/cli"
 require "raptor/cluster"
 

@@ -26,6 +26,14 @@ module Raptor
       def message: () -> String
     end
 
+    # Returns whether an HTTP status forbids an entity body.
+    #
+    # @param status [Integer] the response status code
+    # @return [Boolean]
+    #
+    # @rbs (Integer status) -> bool
+    def self.no_entity_body_status?: (Integer status) -> bool
+
     # Writes `string` in full, retrying on partial writes. Bounded by
     # `timeout` so a slow client can't pin the writing thread.
     #

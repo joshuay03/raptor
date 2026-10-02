@@ -33,7 +33,7 @@ module Raptor
       callbacks.shift.call
       assert_same body, opened
       assert_equal :accepted, body.try_write("message")
-      trailers = {"grpc-status" => +"0"}
+      trailers = { "grpc-status" => +"0" }
       body.close(trailers: trailers)
       trailers["grpc-status"] << "1"
 
@@ -41,7 +41,7 @@ module Raptor
       assert_equal 7, body.next_size
       assert_equal "message", body.shift(7)
       assert_equal 0, body.next_size
-      assert_equal({"grpc-status" => "0"}, body.trailers)
+      assert_equal({ "grpc-status" => "0" }, body.trailers)
 
       body.finish(:closed)
       body.finish(:cancelled)

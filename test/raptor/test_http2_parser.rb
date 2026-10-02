@@ -28,35 +28,35 @@ module Raptor
 
     def test_encode_response_headers_prepends_status_pseudo_header
       parser = Http2Parser.new
-      encoded = parser.encode_response_headers(200, {"content-type" => "text/plain"})
+      encoded = parser.encode_response_headers(200, { "content-type" => "text/plain" })
 
       assert_equal [[":status", "200"], ["content-type", "text/plain"]], parser.parse_headers(encoded, []).first
     end
 
     def test_encode_response_headers_lowercases_names
       parser = Http2Parser.new
-      encoded = parser.encode_response_headers(200, {"Content-Type" => "text/plain"})
+      encoded = parser.encode_response_headers(200, { "Content-Type" => "text/plain" })
 
       assert_equal [[":status", "200"], ["content-type", "text/plain"]], parser.parse_headers(encoded, []).first
     end
 
     def test_encode_response_headers_expands_array_values
       parser = Http2Parser.new
-      encoded = parser.encode_response_headers(200, {"set-cookie" => ["a=1", "b=2"]})
+      encoded = parser.encode_response_headers(200, { "set-cookie" => ["a=1", "b=2"] })
 
       assert_equal [[":status", "200"], ["set-cookie", "a=1"], ["set-cookie", "b=2"]], parser.parse_headers(encoded, []).first
     end
 
     def test_encode_response_headers_drops_rack_prefixed_keys
       parser = Http2Parser.new
-      encoded = parser.encode_response_headers(200, {"rack.hijack" => "x", "content-type" => "text/plain"})
+      encoded = parser.encode_response_headers(200, { "rack.hijack" => "x", "content-type" => "text/plain" })
 
       assert_equal [[":status", "200"], ["content-type", "text/plain"]], parser.parse_headers(encoded, []).first
     end
 
     def test_encode_response_headers_drops_hop_by_hop_headers
       parser = Http2Parser.new
-      hop_by_hop = {"connection" => "x", "transfer-encoding" => "x", "keep-alive" => "x", "upgrade" => "x", "proxy-connection" => "x"}
+      hop_by_hop = { "connection" => "x", "transfer-encoding" => "x", "keep-alive" => "x", "upgrade" => "x", "proxy-connection" => "x" }
       encoded = parser.encode_response_headers(200, hop_by_hop.merge("content-type" => "text/plain"))
 
       assert_equal [[":status", "200"], ["content-type", "text/plain"]], parser.parse_headers(encoded, []).first
@@ -64,7 +64,7 @@ module Raptor
 
     def test_encode_response_headers_coerces_non_string_values
       parser = Http2Parser.new
-      encoded = parser.encode_response_headers(200, {"content-length" => 42})
+      encoded = parser.encode_response_headers(200, { "content-length" => 42 })
 
       assert_equal [[":status", "200"], ["content-length", "42"]], parser.parse_headers(encoded, []).first
     end
@@ -78,7 +78,7 @@ module Raptor
 
     def test_encode_response_trailers
       parser = Http2Parser.new
-      encoded = parser.encode_response_trailers({"Grpc-Status" => "0", ":status" => "500"})
+      encoded = parser.encode_response_trailers({ "Grpc-Status" => "0", ":status" => "500" })
 
       assert_equal [["grpc-status", "0"]], parser.parse_headers(encoded, []).first
     end

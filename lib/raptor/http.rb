@@ -27,6 +27,16 @@ module Raptor
       def message = "could not write response"
     end
 
+    # Returns whether an HTTP status forbids an entity body.
+    #
+    # @param status [Integer] the response status code
+    # @return [Boolean]
+    #
+    # @rbs (Integer status) -> bool
+    def self.no_entity_body_status?(status)
+      (status >= 100 && status < 200) || status == 204 || status == 304
+    end
+
     # Writes `string` in full, retrying on partial writes. Bounded by
     # `timeout` so a slow client can't pin the writing thread.
     #

@@ -67,7 +67,7 @@ module Raptor
 
         assert_equal 200, response.code.to_i
         assert_equal "text/plain", response["content-type"]
-        assert !response.body || response.body.empty?
+        assert_empty response.body.to_s
       end
     end
 
@@ -295,7 +295,7 @@ module Raptor
 
         assert_equal 204, response.code.to_i
         assert_nil response["content-type"]
-        assert !response.body || response.body.empty?
+        assert_empty response.body.to_s
       end
     end
 
@@ -314,7 +314,7 @@ module Raptor
 
         assert_equal 304, response.code.to_i
         assert_nil response["content-type"]
-        assert !response.body || response.body.empty?
+        assert_empty response.body.to_s
       end
     end
 

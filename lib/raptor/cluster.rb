@@ -1,11 +1,11 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
-require "concurrent/utility/processor_counter"
 require "json"
 require "time"
 
 require "atomic-ruby/atomic_thread_pool"
+require "concurrent/utility/processor_counter"
 require "rack/builder"
 require "ractor-pool"
 
@@ -339,8 +339,8 @@ module Raptor
             pool_capacity: [capacity - total_work, 0].max,
             busy_threads: active,
             max_threads: capacity,
-            requests_count: stat.fetch(:requests, 0),
-          },
+            requests_count: stat.fetch(:requests, 0)
+          }
         }
       end
 
@@ -350,7 +350,7 @@ module Raptor
         phase: @phase,
         booted_workers: worker_status.count { |worker| worker[:booted] },
         old_workers: worker_status.count { |worker| worker[:phase] != @phase },
-        worker_status: worker_status,
+        worker_status: worker_status
       }
     end
 

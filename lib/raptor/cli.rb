@@ -1,9 +1,10 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
-require "concurrent/utility/processor_counter"
 require "json"
 require "optparse"
+
+require "concurrent/utility/processor_counter"
 
 require_relative "cluster"
 
@@ -46,18 +47,18 @@ module Raptor
         chunk_data_timeout: 10,
         write_timeout: 5,
         max_body_size: nil,
-        body_spool_threshold: 1024 * 1024,
+        body_spool_threshold: 1024 * 1024
       },
       http1: {
         ractors: nil,
         persistent_data_timeout: 65,
-        max_keepalive_requests: 1000,
+        max_keepalive_requests: 1000
       },
       http2: {
         ractors: nil,
         max_concurrent_streams: 100,
         keepalive_interval: 10,
-        keepalive_timeout: 5,
+        keepalive_timeout: 5
       },
       worker_boot_timeout: 60,
       worker_timeout: 60,

@@ -82,6 +82,11 @@ module Raptor
 
     private
 
+    # Removes a stale socket while refusing to replace an active server.
+    #
+    # @return [void]
+    # @raise [RuntimeError] if another server is listening on the socket
+    #
     # @rbs () -> void
     def remove_stale_socket
       return unless File.exist?(@path)
@@ -94,6 +99,10 @@ module Raptor
       end
     end
 
+    # Accepts and handles control requests until shutdown begins.
+    #
+    # @return [void]
+    #
     # @rbs () -> void
     def serve
       while @running
@@ -109,6 +118,11 @@ module Raptor
     rescue IOError, Errno::EBADF
     end
 
+    # Writes the response for one control-socket request.
+    #
+    # @param client [UNIXSocket] connected control client
+    # @return [void]
+    #
     # @rbs (UNIXSocket client) -> void
     def handle(client)
       request_line = client.gets

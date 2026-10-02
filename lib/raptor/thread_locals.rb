@@ -9,12 +9,14 @@ module Raptor
     PRESERVED_KEYS = [
       :raptor_http_parser,
       :raptor_read_buffer,
-      :raptor_response_buffer,
+      :raptor_response_buffer
     ].freeze
 
     # Returns a reusable value stored on the current thread.
     #
-    # @return [Object]
+    # @param key [Symbol] thread-variable key used to cache the value
+    # @yieldreturn [Object] value to store when the key is unset
+    # @return [Object] the existing or newly stored value
     #
     # @rbs (Symbol key) { () -> untyped } -> untyped
     def self.fetch(key)

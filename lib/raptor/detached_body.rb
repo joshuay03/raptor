@@ -16,12 +16,22 @@ module Raptor
       # @rbs @max_size: Integer
       # @rbs @size: Atom
 
+      # Creates a shared budget with the given byte limit.
+      #
+      # @param max_size [Integer] maximum bytes that may be reserved
+      # @return [void]
+      #
       # @rbs (Integer max_size) -> void
       def initialize(max_size)
         @max_size = max_size
         @size = Atom.new(0)
       end
 
+      # Reserves bytes when they fit within the shared limit.
+      #
+      # @param bytes [Integer] number of bytes to reserve
+      # @return [Boolean] whether the bytes were reserved
+      #
       # @rbs (Integer bytes) -> bool
       def reserve(bytes)
         reserved = false
@@ -32,6 +42,11 @@ module Raptor
         reserved
       end
 
+      # Releases bytes previously charged to the shared limit.
+      #
+      # @param bytes [Integer] number of bytes to release
+      # @return [void]
+      #
       # @rbs (Integer bytes) -> void
       def release(bytes)
         @size.swap { |size| size - bytes }
@@ -57,7 +72,7 @@ module Raptor
       raise ArgumentError, "max_buffer_size must be positive" unless max_buffer_size.positive?
 
       @max_buffer_size = max_buffer_size
-      @state = Atom.new({chunks: [], size: 0, closing: false, closed: false, notified: false, trailers: {}})
+      @state = Atom.new({ chunks: [], size: 0, closing: false, closed: false, notified: false, trailers: {} })
       @budgets = []
       @wake = proc {}
       @dispatch = proc { |callback| callback.call }
@@ -169,6 +184,12 @@ module Raptor
 
     # Connects the body to its reactor-owned response stream.
     #
+    # @param budgets [Array<Budget>] buffer budgets shared with other bodies
+    # @param wake [Proc] called when buffered data or a close is ready to write
+    # @param dispatch [Proc] schedules application callbacks off the reactor thread
+    # @param finished [Proc] called with the close reason after `on_close`
+    # @return [Boolean] false when the bytes already buffered exceed a budget
+    #
     # @rbs (Array[Budget] budgets, ^() -> void wake, ^(Proc) -> void dispatch, ^(Symbol) -> void finished) -> bool
     def attach(budgets, wake, dispatch, finished)
       @wake = wake
@@ -191,6 +212,8 @@ module Raptor
 
     # Notifies the application that its response stream is ready.
     #
+    # @return [void]
+    #
     # @rbs () -> void
     def open
       callback = @on_open
@@ -201,6 +224,8 @@ module Raptor
     # Returns the size of the next buffered chunk, 0 when closing, or nil
     # while waiting for more data.
     #
+    # @return [Integer, nil]
+    #
     # @rbs () -> Integer?
     def next_size
       state = @state.value
@@ -208,6 +233,9 @@ module Raptor
     end
 
     # Removes up to `max_bytes` from the next buffered chunk.
+    #
+    # @param max_bytes [Integer] the largest chunk to return
+    # @return [String, nil] the removed bytes, or nil when nothing is buffered
     #
     # @rbs (Integer max_bytes) -> String?
     def shift(max_bytes)
@@ -236,12 +264,17 @@ module Raptor
 
     # Returns the response trailers supplied when the body closed.
     #
+    # @return [Hash] trailing response headers
+    #
     # @rbs () -> Hash[String, String | Array[String]]
     def trailers
       @state.value[:trailers]
     end
 
     # Closes the stream and invokes its callback exactly once.
+    #
+    # @param reason [Symbol] why the stream closed
+    # @return [void]
     #
     # @rbs (Symbol reason) -> void
     def finish(reason)
@@ -272,6 +305,11 @@ module Raptor
 
     private
 
+    # Reserves bytes from every budget attached to this body.
+    #
+    # @param bytes [Integer] number of bytes to reserve
+    # @return [Boolean] whether every budget accepted the reservation
+    #
     # @rbs (Integer bytes) -> bool
     def reserve(bytes)
       reserved = []
@@ -285,6 +323,11 @@ module Raptor
       true
     end
 
+    # Releases bytes from every budget attached to this body.
+    #
+    # @param bytes [Integer] number of bytes to release
+    # @return [void]
+    #
     # @rbs (Integer bytes) -> void
     def release(bytes)
       @budgets.each { |budget| budget.release(bytes) }

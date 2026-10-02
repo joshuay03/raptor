@@ -60,9 +60,17 @@ module Raptor
       # @rbs attr_reader output: Array[String]
       attr_reader output: untyped
 
+      # Creates empty connection I/O state for reactor-owned writes.
+      #
+      # @return [void]
+      #
       # @rbs () -> void
       def initialize: () -> void
 
+      # Returns whether the connection has no output waiting to be written.
+      #
+      # @return [Boolean]
+      #
       # @rbs () -> bool
       def empty?: () -> bool
     end
@@ -84,9 +92,19 @@ module Raptor
       # @rbs attr_reader state: Hash[Symbol, untyped]
       attr_reader state: untyped
 
+      # Creates I/O state for an HTTP/1.x detached response.
+      #
+      # @param body [DetachedBody] the response body
+      # @param state [Hash] connection state restored after the response finishes
+      # @return [void]
+      #
       # @rbs (DetachedBody body, Hash[Symbol, untyped] state) -> void
       def initialize: (DetachedBody body, Hash[Symbol, untyped] state) -> void
 
+      # Returns whether the connection has no output or detached body remaining.
+      #
+      # @return [Boolean]
+      #
       # @rbs () -> bool
       def empty?: () -> bool
     end
@@ -105,9 +123,17 @@ module Raptor
       # @rbs attr_reader budget: DetachedBody::Budget
       attr_reader budget: untyped
 
+      # Creates empty I/O state for an HTTP/2 connection and its detached streams.
+      #
+      # @return [void]
+      #
       # @rbs () -> void
       def initialize: () -> void
 
+      # Returns whether the connection has no output or detached streams remaining.
+      #
+      # @return [Boolean]
+      #
       # @rbs () -> bool
       def empty?: () -> bool
     end
@@ -116,9 +142,7 @@ module Raptor
 
     DETACHED_CONNECTION_BUFFER_SIZE: untyped
 
-    DETACHED_MAX_CHUNKS: ::Integer
-
-    DETACHED_MAX_FRAMES: ::Integer
+    DETACHED_WRITE_BATCH: ::Integer
 
     DETACHED_WORKER_BUFFER_SIZE: untyped
 
@@ -184,6 +208,7 @@ module Raptor
     # @param connection_options [Hash] per-connection timeout configuration
     # @option connection_options [Integer] :first_data_timeout timeout for initial data
     # @option connection_options [Integer] :chunk_data_timeout timeout for subsequent chunks
+    # @option connection_options [Integer] :write_timeout timeout for non-blocking writes
     # @param http1_options [Hash] HTTP/1.1-specific configuration
     # @option http1_options [Integer] :persistent_data_timeout timeout for keep-alive idle connections
     # @param http2_options [Hash] HTTP/2-specific configuration
@@ -273,6 +298,13 @@ module Raptor
 
     # Attaches a detached response body to an HTTP/1.x connection.
     #
+    # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique client identifier
+    # @param body [DetachedBody] the response body
+    # @param state [Hash] connection state restored once the response finishes
+    # @param finished [Proc] called with the close reason
+    # @return [Boolean] whether the body was attached
+    #
     # @rbs (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> bool
     def attach_http1_body: (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> bool
 
@@ -308,21 +340,37 @@ module Raptor
 
     # Attaches a detached response body to an HTTP/2 stream.
     #
+    # @param id [Integer] unique connection identifier
+    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param body [DetachedBody] the response body
+    # @param finished [Proc] called with the close reason
+    # @return [Boolean] whether the body was attached
+    #
     # @rbs (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
     def attach_http2_body: (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
 
     # Reconsiders detached streams after an outbound window update.
+    #
+    # @param id [Integer] unique connection identifier
+    # @return [void]
     #
     # @rbs (Integer id) -> void
     def resume_http2_bodies: (Integer id) -> void
 
     # Cancels a detached response stream.
     #
+    # @param id [Integer] unique connection identifier
+    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @return [void]
+    #
     # @rbs (Integer id, Integer stream_id) -> void
     def cancel_http2_body: (Integer id, Integer stream_id) -> void
 
     # Waits for detached responses to finish, then cancels any that outlive
     # the worker drain period.
+    #
+    # @param timeout [Numeric] seconds to wait before cancelling open bodies
+    # @return [void]
     #
     # @rbs (Numeric timeout) -> void
     def drain_detached_bodies: (Numeric timeout) -> void
@@ -418,60 +466,108 @@ module Raptor
 
     # Adds a detached body to an HTTP/1.x connection.
     #
+    # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique client identifier
+    # @param body [DetachedBody] the response body
+    # @param state [Hash] connection state restored once the response finishes
+    # @param finished [Proc] called with the close reason
+    # @return [void]
+    #
     # @rbs (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> void
     def attach_http1_detached_body: (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> void
 
     # Writes buffered HTTP/1.x body chunks without blocking.
+    #
+    # @param id [Integer] unique client identifier
+    # @return [void]
     #
     # @rbs (Integer id) -> void
     def flush_http1_detached_body: (Integer id) -> void
 
     # Finishes an HTTP/1.x detached response and either reuses or closes its connection.
     #
+    # @param id [Integer] unique client identifier
+    # @param io [Http1IO] connection I/O state
+    # @return [void]
+    #
     # @rbs (Integer id, Http1IO io) -> void
     def finish_http1_detached_body: (Integer id, Http1IO io) -> void
 
     # Cancels an HTTP/1.x detached response and closes its connection.
+    #
+    # @param id [Integer] unique client identifier
+    # @param reason [Symbol] why the response closed
+    # @return [void]
     #
     # @rbs (Integer id, Symbol reason) -> void
     def remove_http1_detached_body: (Integer id, Symbol reason) -> void
 
     # Adds a detached body to an HTTP/2 stream.
     #
+    # @param id [Integer] unique connection identifier
+    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param body [DetachedBody] the response body
+    # @param finished [Proc] called with the close reason
+    # @return [void]
+    #
     # @rbs (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> void
     def attach_http2_detached_body: (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> void
 
     # Marks an HTTP/2 detached stream eligible for fair scheduling.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @return [void]
     #
     # @rbs (Integer id, Integer stream_id) -> void
     def mark_http2_detached_body_ready: (Integer id, Integer stream_id) -> void
 
     # Marks every HTTP/2 detached stream eligible after flow-control capacity changes.
     #
+    # @param id [Integer] unique connection identifier
+    # @return [void]
+    #
     # @rbs (Integer id) -> void
     def resume_http2_detached_bodies: (Integer id) -> void
 
     # Writes HTTP/2 detached streams in round-robin order without waiting for flow control.
+    #
+    # @param id [Integer] unique connection identifier
+    # @return [void]
     #
     # @rbs (Integer id) -> void
     def flush_http2_detached_bodies: (Integer id) -> void
 
     # Finishes an HTTP/2 detached stream with DATA or trailing HEADERS.
     #
+    # @param id [Integer] unique connection identifier
+    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param body [DetachedBody] the response body
+    # @return [void]
+    #
     # @rbs (Integer id, Integer stream_id, DetachedBody body) -> void
     def finish_http2_detached_body: (Integer id, Integer stream_id, DetachedBody body) -> void
 
     # Removes an HTTP/2 detached stream and schedules its close callback.
+    #
+    # @param id [Integer] unique connection identifier
+    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param reason [Symbol] why the stream closed
+    # @return [void]
     #
     # @rbs (Integer id, Integer stream_id, Symbol reason) -> void
     def remove_http2_detached_body: (Integer id, Integer stream_id, Symbol reason) -> void
 
     # Cancels every detached response during worker shutdown.
     #
+    # @return [void]
+    #
     # @rbs () -> void
     def cancel_detached_bodies: () -> void
 
     # Records one detached stream finishing.
+    #
+    # @return [void]
     #
     # @rbs () -> void
     def detached_body_removed: () -> void
@@ -592,6 +688,10 @@ module Raptor
     def handle_monitor: (NIO::Monitor monitor) -> void
 
     # Handles readiness for an HTTP/1.x detached response.
+    #
+    # @param monitor [NIO::Monitor] ready selector monitor
+    # @param id [Integer] unique client identifier
+    # @return [void]
     #
     # @rbs (NIO::Monitor monitor, Integer id) -> void
     def handle_http1_detached_monitor: (NIO::Monitor monitor, Integer id) -> void

@@ -100,12 +100,18 @@ module Raptor
 
     # Encodes one HTTP/1.1 response chunk.
     #
+    # @param chunk [String] response body bytes
+    # @return [String] the encoded chunk
+    #
     # @rbs (String chunk) -> String
     def self.encode_chunk(chunk)
       HttpParser.chunked_encode(String.new, chunk)
     end
 
     # Encodes the final HTTP/1.1 response chunk and its trailers.
+    #
+    # @param trailers [Hash] trailing response headers
+    # @return [String] the final chunk followed by the trailer section
     #
     # @rbs (Hash[String, String | Array[String]] trailers) -> String
     def self.encode_trailers(trailers)
@@ -547,6 +553,17 @@ module Raptor
 
     # Calls the Rack app and writes its response for one request.
     #
+    # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique client identifier
+    # @param env [Hash] partial env hash from the HTTP parser
+    # @param parse_data [Hash] metadata from the parsing pass
+    # @param body [String, nil] decoded request body
+    # @param reactor [Reactor] the reactor managing the client connection
+    # @param request_count [Integer] number of requests handled on this connection
+    # @param remote_addr [String] client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @return [Boolean] true if the connection should be kept alive
+    #
     # @rbs (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, Integer request_count, String remote_addr, String url_scheme) -> bool
     def perform_request(socket, id, env, parse_data, body, reactor, request_count, remote_addr, url_scheme)
       rack_env = nil
@@ -566,7 +583,7 @@ module Raptor
           body.close if body.respond_to?(:close)
         else
           hijacked = headers.is_a?(Hash) && !!headers[Rack::RACK_HIJACK]
-          no_body = rack_env[Rack::REQUEST_METHOD] == "HEAD" || (status >= 100 && status < 200) || status == 204 || status == 304
+          no_body = rack_env[Rack::REQUEST_METHOD] == "HEAD" || Http.no_entity_body_status?(status)
           detached = body.is_a?(DetachedBody) && !no_body
           if detached
             chunked = rack_env[Rack::SERVER_PROTOCOL] == HTTP_11
@@ -582,7 +599,7 @@ module Raptor
               socket,
               id,
               body,
-              {chunked: chunked, keep_alive: keep_alive, request_count: request_count, remote_addr: remote_addr, url_scheme: url_scheme},
+              { chunked: chunked, keep_alive: keep_alive, request_count: request_count, remote_addr: remote_addr, url_scheme: url_scheme },
               finished
             )
           else
@@ -950,6 +967,13 @@ module Raptor
     # Starts a detached response, chunked on HTTP/1.1 and ended by closing
     # the connection on HTTP/1.0.
     #
+    # @param socket [TCPSocket] the client socket to write to
+    # @param status [Integer] HTTP status code
+    # @param headers [Hash] response headers from the Rack application
+    # @param chunked [Boolean] whether to use chunked transfer encoding
+    # @param keep_alive [Boolean] whether to send a keep-alive connection header
+    # @return [void]
+    #
     # @rbs (TCPSocket socket, Integer status, Hash[String, String | Array[String]] headers, chunked: bool, keep_alive: bool) -> void
     def write_detached_response(socket, status, headers, chunked:, keep_alive:)
       validate_status(status)
@@ -980,7 +1004,7 @@ module Raptor
       validate_status(status)
       response_hijack = headers.is_a?(Hash) ? headers.delete(Rack::RACK_HIJACK) : nil
       headers = normalize_headers(headers)
-      no_entity_body = (status >= 100 && status < 200) || status == 204 || status == 304
+      no_entity_body = Http.no_entity_body_status?(status)
       validate_headers(headers, status, no_entity_body)
 
       headers["connection"] = keep_alive ? CONNECTION_KEEPALIVE : CONNECTION_CLOSE

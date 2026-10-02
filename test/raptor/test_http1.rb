@@ -33,7 +33,7 @@ module Raptor
       handler.send(:eager_keepalive, socket, 1, nil, thread_pool, 1, "127.0.0.1", "http")
 
       assert_equal 1, queued.length
-      assert_equal false, processed
+      refute processed
     end
 
     def test_eager_keepalive_persists_idle_connections

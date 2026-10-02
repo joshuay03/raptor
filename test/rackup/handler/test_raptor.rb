@@ -169,7 +169,7 @@ module Rackup
             stats_file: "tmp/c.json",
             control_url: "unix:///tmp/c.sock",
             pid_file: "tmp/c.pid",
-            on_error: ->(_env, _error) {},
+            on_error: ->(_env, _error) {}
           }
         RUBY
           opts = build(Config: path)

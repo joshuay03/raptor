@@ -4,8 +4,6 @@ require "test_helper"
 
 module Raptor
   class TestReactor < TestCase
-    # Runs serially so forked integration servers never inherit live reactor sockets.
-
     def test_http1_detached_body_writes
       callbacks = Queue.new
       thread_pool = Object.new
@@ -13,7 +11,7 @@ module Raptor
       reactor, reactor_thread, reader, socket = build_running_http1_reactor(thread_pool)
       body = DetachedBody.new
       9.times { body.try_write("x") }
-      body.close(trailers: {"x-status" => "complete"})
+      body.close(trailers: { "x-status" => "complete" })
 
       assert reactor.attach_http1_body(socket, 1, body, http1_state, proc {})
       response = Timeout.timeout(1) { reader.read }
@@ -76,9 +74,9 @@ module Raptor
       writer = Object.new
       writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
       reactor = Reactor.allocate
-      reactor.instance_variable_set(:@id_to_socket, {1 => Object.new})
-      reactor.instance_variable_set(:@id_to_writer, {1 => writer})
-      reactor.instance_variable_set(:@id_to_flow_control, {1 => Object.new})
+      reactor.instance_variable_set(:@id_to_socket, { 1 => Object.new })
+      reactor.instance_variable_set(:@id_to_writer, { 1 => writer })
+      reactor.instance_variable_set(:@id_to_flow_control, { 1 => Object.new })
       reactor.instance_variable_set(:@id_to_http2_last_stream, {})
       reactor.instance_variable_set(:@id_to_http2_drain_stream, {})
 
@@ -103,7 +101,7 @@ module Raptor
       reactor.attach_http2(
         id: 1,
         socket: socket,
-        state: {id: 1, protocol: :http2, http2_preface_received: true},
+        state: { id: 1, protocol: :http2, http2_preface_received: true },
         writer: writer,
         flow_control: flow_control,
         ping_frame: "ping",
@@ -282,9 +280,9 @@ module Raptor
         nil,
         nil,
         thread_pool,
-        connection_options: {first_data_timeout: 30, chunk_data_timeout: 10, write_timeout: 5},
-        http1_options: {persistent_data_timeout: 65},
-        http2_options: {keepalive_interval: 10, keepalive_timeout: 5}
+        connection_options: { first_data_timeout: 30, chunk_data_timeout: 10, write_timeout: 5 },
+        http1_options: { persistent_data_timeout: 65 },
+        http2_options: { keepalive_interval: 10, keepalive_timeout: 5 }
       )
     end
 
@@ -300,7 +298,7 @@ module Raptor
         keep_alive: false,
         request_count: 1,
         remote_addr: "127.0.0.1",
-        url_scheme: "http",
+        url_scheme: "http"
       }
     end
 
@@ -310,7 +308,7 @@ module Raptor
       reactor.attach_http2(
         id: 1,
         socket: socket,
-        state: {id: 1, protocol: :http2, http2_preface_received: true},
+        state: { id: 1, protocol: :http2, http2_preface_received: true },
         writer: Http2::Writer.new(write_timeout: 5),
         flow_control: Http2::FlowControl.new,
         ping_frame: "ping",
@@ -356,7 +354,7 @@ module Raptor
       reactor.attach_http2(
         id: 1,
         socket: socket,
-        state: {id: 1, protocol: :http2, http2_preface_received: true},
+        state: { id: 1, protocol: :http2, http2_preface_received: true },
         writer: writer,
         flow_control: flow_control,
         ping_frame: "ping",

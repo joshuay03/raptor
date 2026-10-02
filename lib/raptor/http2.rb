@@ -71,6 +71,11 @@ module Raptor
 
       # Attaches a response body that outlives its application thread.
       #
+      # @param stream_id [Integer] the HTTP/2 stream identifier
+      # @param body [DetachedBody] the response body
+      # @param finished [Proc] called with the close reason
+      # @return [Boolean] whether the reactor accepted the body
+      #
       # @rbs (Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
       def attach_body(stream_id, body, finished)
         @reactor.attach_http2_body(@connection_id, stream_id, body, finished)
@@ -1048,6 +1053,15 @@ module Raptor
 
     # Calls the Rack app and writes its response for one stream.
     #
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
+    # @param flow_control [FlowControl] per-connection outbound flow controller
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param headers [Array<Array(String, String)>] request headers
+    # @param body [String] request body
+    # @param remote_addr [String] the client IP address
+    # @return [void]
+    #
     # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
     def perform_stream_request(socket, writer, flow_control, stream_id, headers, body, remote_addr:)
       env = nil
@@ -1060,7 +1074,7 @@ module Raptor
       env = build_rack_env(headers, body, socket, writer, flow_control, stream_id, remote_addr: remote_addr)
       status, response_headers, response_body = @app.call(env)
 
-      no_body = env[Rack::REQUEST_METHOD] == "HEAD" || (status >= 100 && status < 200) || status == 204 || status == 304
+      no_body = env[Rack::REQUEST_METHOD] == "HEAD" || Http.no_entity_body_status?(status)
       if response_body.is_a?(DetachedBody) && !no_body
         finished = proc do |reason|
           error = StreamClosedError.new unless reason == :closed
@@ -1068,9 +1082,10 @@ module Raptor
           Http.call_response_finished(env, status, response_headers, error)
           flow_control.discard_stream(stream_id)
         end
-        detached = write_http2_detached_response(socket, writer, flow_control, stream_id, status, response_headers, response_body, finished) do
+        write_http2_detached_response(socket, writer, flow_control, stream_id, status, response_headers, response_body, finished) do
           response_started = true
         end
+        detached = true
         return
       end
 
@@ -1113,7 +1128,18 @@ module Raptor
 
     # Starts a detached HTTP/2 response after writing its response headers.
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> bool
+    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] lock-free frame writer for the connection
+    # @param flow_control [FlowControl] per-connection outbound flow controller
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param status [Integer] HTTP status code
+    # @param headers [Hash] response headers from the Rack application
+    # @param body [DetachedBody] the response body
+    # @param finished [Proc] called with the close reason
+    # @yield once the response headers are queued
+    # @return [void]
+    #
+    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> void
     def write_http2_detached_response(socket, writer, flow_control, stream_id, status, headers, body, finished)
       flow_control.check(stream_id)
       parser = Http2Parser.new
@@ -1122,7 +1148,6 @@ module Raptor
       yield
       attached = writer.attach_body(stream_id, body, finished)
       write_http2_reset_stream(socket, writer, stream_id, ERROR_REFUSED_STREAM) unless attached
-      true
     end
 
     # Writes a Rack response as HTTP/2 frames to the socket, partitioning
@@ -1145,7 +1170,7 @@ module Raptor
 
       encoded_headers = parser.encode_response_headers(status, headers)
       flow_control.check(stream_id)
-      no_body = request_method == "HEAD" || (status >= 100 && status < 200) || status == 204 || status == 304
+      no_body = request_method == "HEAD" || Http.no_entity_body_status?(status)
       if no_body
         writer.write_frames(socket, [parser.build_frame(:headers, FLAG_END_STREAM | FLAG_END_HEADERS, stream_id, encoded_headers)])
         yield if block_given?
