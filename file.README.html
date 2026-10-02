@@ -118,10 +118,10 @@ Hello, World!%
 <p>Rails apps using <code>SOLID_QUEUE_IN_PUMA</code> run jobs through <code>config/puma.rb</code>, which Raptor does not load. Run <code>bin/jobs</code> as
 a separately supervised process or container instead.</p>
 <h2 id="Configuration">Configuration</h2>
-<p>Raptor reads options from a Ruby config file, environment variables, and command-line flags, in increasing order of
+<p>Raptor reads options from a Ruby config file, environment variables, and command line flags, in increasing order of
 precedence. Run <code>bundle exec raptor --help</code> for the full flag list.</p>
 <p>The config file evaluates to a hash of options. By default Raptor loads <code>raptor.rb</code> then <code>config/raptor.rb</code> from the
-working directory; pass <code>-c PATH</code> to point at a specific file.</p>
+working directory. Pass <code>-c PATH</code> to point at a specific file.</p>
 <pre class="code ruby"><code class="ruby"><span class='comment'># raptor.rb
 </span>
 <span class='comment'># Every key below is set to its default value; only include the ones you want to override.
@@ -172,10 +172,12 @@ working directory; pass <code>-c PATH</code> to point at a specific file.</p>
   <span class='label'>access_log_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
 <span class='rbrace'>}</span>
 </code></pre>
-<p><code>RAPTOR_WORKERS</code>, <code>RAPTOR_THREADS</code>, and <code>RAPTOR_MAX_THREADS</code> set the corresponding options without a config file;
-<code>RAPTOR_MAX_THREADS=unlimited</code> leaves thread growth uncapped.</p>
+<p><code>RAPTOR_WORKERS</code>, <code>RAPTOR_THREADS</code>, and <code>RAPTOR_MAX_THREADS</code> set the corresponding options without a config file.</p>
+<p>By default each worker adds threads beyond <code>threads</code> only while queued requests are waiting on blocking work such as
+database or network calls. It stops adding them once Ruby execution becomes the bottleneck, and the extra threads
+retire when the queue is idle. Set <code>max_threads</code> to cap this growth, or set it to <code>threads</code> for a fixed pool.</p>
 <h2 id="Bindings">Bindings</h2>
-<p><code>binds:</code> accepts any combination of:</p>
+<p><code>binds</code> accepts any combination of these URIs.</p>
 <ul>
 <li><code>tcp://host:port</code> for TCP. <code>localhost</code> binds both IPv4 and IPv6 loopback addresses.</li>
 <li><code>unix:///path/to/socket</code> for a Unix domain socket.</li>
@@ -210,16 +212,16 @@ working directory; pass <code>-c PATH</code> to point at a specific file.</p>
 </tr>
 <tr>
 <td><code>USR2</code></td>
-<td>Hot restart (re-exec master, inheriting listening sockets)</td>
+<td>Hot restart (restart master, keeping listening sockets)</td>
 </tr>
 </tbody>
 </table>
 <p>A phased restart replaces workers one at a time while the master keeps running, picking up application code changes.
-A hot restart re-execs the master with its original command line and inherited listening sockets, picking up changes
+A hot restart starts a new master with the original command line and the same listening sockets, picking up changes
 to configuration, dependencies, or Raptor itself.</p>
 <h2 id="systemd">systemd</h2>
 <p>Raptor supports socket activation and <code>sd_notify</code>, so it works with <code>Type=notify</code> units. When the socket unit is
-active, Raptor serves the listening sockets systemd passes in place of <code>binds:</code>.</p>
+active, Raptor serves the listening sockets systemd passes in place of <code>binds</code>.</p>
 <pre class="code ini"><code class="ini"># /etc/systemd/system/myapp.socket
 [Socket]
 ListenStream=0.0.0.0:9292
@@ -236,7 +238,7 @@ ExecReload=/bin/kill -USR2 $MAINPID
 KillMode=mixed
 </code></pre>
 <h2 id="Stats">Stats</h2>
-<p>Workers publish their stats to <code>stats_file</code> (default <code>tmp/raptor.json</code>):</p>
+<p>Workers publish their stats to <code>stats_file</code>, which defaults to <code>tmp/raptor.json</code>.</p>
 <pre class="code ruby"><code class="ruby">&gt; bundle exec raptor stats
 Master PID: 91348
 Worker 0 (phase 0): pid=91350, requests=1234, busy=2/3, backlog=0, booted, last_checkin=10:42:01
@@ -485,7 +487,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Fri Oct  2 12:20:40 2026 by
+  Generated on Fri Oct  2 20:39:24 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
