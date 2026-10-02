@@ -78,21 +78,11 @@ a separately supervised process or container instead.
 
 ## Configuration
 
-Raptor accepts configuration via command-line flags, a Ruby config file, or both (CLI flags override config file
-values). Run `bundle exec raptor --help` for the full flag list.
+Raptor reads options from a Ruby config file, environment variables, and command line flags, in increasing order of
+precedence. Run `bundle exec raptor --help` for the full flag list.
 
-The config file is a Ruby file that evaluates to a hash of options. By default Raptor loads `raptor.rb` then
-`config/raptor.rb` from the working directory; pass `-c PATH` to point at a specific file. Settings are nested under
-`connection:` (shared across protocols), `http1:` (HTTP/1.1-specific), and `http2:` (HTTP/2-specific).
-
-Use an `ssl://` bind for HTTP/2 negotiated with ALPN, or an `h2c://` bind for cleartext HTTP/2 clients using prior
-knowledge. Each `h2c://` listener accepts HTTP/2 only.
-
-HTTP/2 applications can populate `env["raptor.response_trailers"]` with trailing response headers. Values may be
-strings or arrays of strings.
-
-Idle HTTP/2 connections receive a PING after `keepalive_interval` seconds and close when its acknowledgement does not
-arrive within `keepalive_timeout`. Set `keepalive_interval` to `0` to disable these probes.
+The config file evaluates to a hash of options. By default Raptor loads `raptor.rb` then `config/raptor.rb` from the
+working directory. Pass `-c PATH` to point at a specific file.
 
 ```ruby
 # raptor.rb
@@ -146,35 +136,20 @@ arrive within `keepalive_timeout`. Set `keepalive_interval` to `0` to disable th
 }
 ```
 
-`threads` sets the number of application threads each worker keeps running. By default, Raptor adds temporary threads
-without a fixed limit when queued work is held up by blocking operations. It does not add threads when waiting for the
-GVL is the bottleneck, and temporary threads leave after the queue drains. Set `max_threads` to cap growth, or set it
-to the same value as `threads` for a fixed pool.
+`RAPTOR_WORKERS`, `RAPTOR_THREADS`, and `RAPTOR_MAX_THREADS` set the corresponding options without a config file.
 
-Set `cpu_affinity` to `true` to pin each worker to a distinct CPU when the worker count fits within the process's
-allowed CPU set. It is off by default because container runtimes commonly expose CPUs that are shared with other
-containers.
-
-Raptor clears application thread locals after each request by default. Set `clean_thread_locals` to `false` to disable
-it. Set `clean_fiber_locals` to `true` to run each request in a fresh Fiber, isolating Fiber-local state as well.
-
-`RAPTOR_WORKERS`, `RAPTOR_THREADS`, and `RAPTOR_MAX_THREADS` can set the corresponding options without a config file.
-Config files override defaults, environment variables override config files, and command-line options override both.
-`RAPTOR_MAX_THREADS=unlimited` leaves adaptive growth uncapped.
-
-`before_worker_boot` and `before_worker_shutdown` hooks receive the worker index.
+By default each worker adds threads beyond `threads` only while queued requests are waiting on blocking work such as
+database or network calls. It stops adding them once Ruby execution becomes the bottleneck, and the extra threads
+retire when the queue is idle. Set `max_threads` to cap this growth, or set it to `threads` for a fixed pool.
 
 ## Bindings
 
-Raptor accepts multiple `binds:` URIs across three schemes.
+`binds` accepts any combination of these URIs.
 
-- `tcp://host:port` for TCP. Host can be a specific IP, `0.0.0.0` / `[::]`, or `localhost` (expanded to both IPv4 and
-  IPv6 loopback addresses).
-- `unix:///path/to/socket` for a Unix domain socket. Stale sockets left by crashed processes are cleaned up
-  automatically.
-- `ssl://host:port?cert=/path/to.crt&key=/path/to.key` for TLS. HTTP/1.1 and HTTP/2 are negotiated via ALPN.
-
-Multiple binds can be combined freely.
+- `tcp://host:port` for TCP. `localhost` binds both IPv4 and IPv6 loopback addresses.
+- `unix:///path/to/socket` for a Unix domain socket.
+- `ssl://host:port?cert=/path/to.crt&key=/path/to.key` for TLS, negotiating HTTP/1.1 or HTTP/2 via ALPN.
+- `h2c://host:port` for cleartext HTTP/2.
 
 ## Signals
 
@@ -186,22 +161,16 @@ Send to the master process.
 | `TERM` | Graceful shutdown                                           |
 | `HUP`  | Reopen `stdout_file`, `stderr_file`, and `access_log_file`  |
 | `USR1` | Phased restart (rolling worker replacement)                 |
-| `USR2` | Hot restart (re-exec master, inheriting listening sockets)  |
+| `USR2` | Hot restart (restart master, keeping listening sockets)     |
 
-## Restarts
-
-- **Phased restart** (`USR1`) replaces workers one at a time, waiting for each new worker to boot before retiring the
-  previous one. The master process keeps running, so existing workers continue serving until they are individually
-  replaced. Use to pick up code changes that don't affect the master's boot path.
-- **Hot restart** (`USR2`) re-execs the master process with its original command line, inheriting the listening sockets
-  so accepted connections continue to be served across the swap. The successor master re-runs initialization from
-  scratch. Use to pick up changes that affect master-level state (config layout, dependency upgrades, Raptor itself).
+A phased restart replaces workers one at a time while the master keeps running, picking up application code changes.
+A hot restart starts a new master with the original command line and the same listening sockets, picking up changes
+to configuration, dependencies, or Raptor itself.
 
 ## systemd
 
-Raptor implements socket activation (`LISTEN_FDS`) and `sd_notify`, so it integrates cleanly with `Type=notify` units.
-When the socket unit is active, systemd hands the pre-bound listening file descriptors to Raptor, which serves them in
-place of `binds:`. `READY=1`, `STOPPING=1`, and `RELOADING=1` lifecycle messages are emitted automatically.
+Raptor supports socket activation and `sd_notify`, so it works with `Type=notify` units. When the socket unit is
+active, Raptor serves the listening sockets systemd passes in place of `binds`.
 
 ```ini
 # /etc/systemd/system/myapp.socket
@@ -224,8 +193,7 @@ KillMode=mixed
 
 ## Stats
 
-Each worker writes per-worker stats (request count, busy and available threads, backlog, last check-in) to shared
-memory and to a JSON file (default `tmp/raptor.json`; set via `stats_file`).
+Workers publish their stats to `stats_file`, which defaults to `tmp/raptor.json`.
 
 ```
 > bundle exec raptor stats
@@ -235,10 +203,8 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 ...
 ```
 
-Set `control_url` to a Unix socket URL such as `unix:///tmp/raptor-control.sock` to expose cluster stats over `/stats`.
-For adaptive pools, `max_threads` in each worker's status is its current thread count, so
-`pool_capacity / max_threads` measures the capacity available at that moment rather than comparing against an
-unbounded configured limit. The control server is read-only and currently exposes only `/stats`.
+Set `control_url` to a Unix socket URL such as `unix:///tmp/raptor-control.sock` to serve the same stats over
+`GET /stats`.
 
 ## (Micro) Benchmarks
 
