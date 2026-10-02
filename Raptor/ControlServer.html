@@ -167,7 +167,7 @@
   
 
   
-    <span class="summary_desc"><div class='inline'></div></span>
+    <span class="summary_desc"><div class='inline'><p>Writes the response for one control-socket request.</p></div></span>
   
 </li>
 
@@ -213,7 +213,7 @@
   
 
   
-    <span class="summary_desc"><div class='inline'></div></span>
+    <span class="summary_desc"><div class='inline'><p>Removes a stale socket while refusing to replace an active server.</p></div></span>
   
 </li>
 
@@ -235,7 +235,7 @@
   
 
   
-    <span class="summary_desc"><div class='inline'></div></span>
+    <span class="summary_desc"><div class='inline'><p>Accepts and handles control requests until shutdown begins.</p></div></span>
   
 </li>
 
@@ -470,7 +470,7 @@
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Writes the response for one control-socket request.</p>
 
   </div>
 </div>
@@ -487,6 +487,9 @@
       
       
       
+        &mdash;
+        <div class='inline'><p>connected control client</p></div>
+      
     </li>
   
 </ul>
@@ -498,26 +501,26 @@
       <pre class="lines">
 
 
-113
-114
-115
-116
-117
-118
-119
-120
-121
-122
-123
-124
-125
-126
 127
 128
-129</pre>
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 113</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 127</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle'>handle</span><span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_request_line'>request_line</span> <span class='op'>=</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_gets'>gets</span>
@@ -552,12 +555,28 @@
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Removes a stale socket while refusing to replace an active server.</p>
 
   </div>
 </div>
 <div class="tags">
   
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>RuntimeError</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>if another server is listening on the socket</p></div>
+      
+    </li>
+  
+</ul>
 
 </div><table class="source_code">
   <tr>
@@ -565,19 +584,19 @@
       <pre class="lines">
 
 
-86
-87
-88
-89
-90
 91
 92
 93
 94
-95</pre>
+95
+96
+97
+98
+99
+100</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 86</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 91</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_stale_socket'>remove_stale_socket</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span>
@@ -605,7 +624,7 @@
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Accepts and handles control requests until shutdown begins.</p>
 
   </div>
 </div>
@@ -618,22 +637,22 @@
       <pre class="lines">
 
 
-98
-99
-100
-101
-102
-103
-104
-105
-106
 107
 108
 109
-110</pre>
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 98</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 107</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_serve'>serve</span>
   <span class='kw'>while</span> <span class='ivar'>@running</span>
@@ -764,7 +783,7 @@
 </div>
 
       <div id="footer">
-  Generated on Fri Oct  2 22:26:42 2026 by
+  Generated on Fri Oct  2 22:43:58 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
