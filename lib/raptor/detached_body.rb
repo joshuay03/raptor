@@ -81,7 +81,8 @@ module Raptor
       @on_close = nil
     end
 
-    # Registers a callback for when the server accepts the response stream.
+    # Registers a callback that runs on the request thread once the server
+    # accepts the response stream.
     #
     # @yieldparam stream [DetachedBody] the opened response stream
     # @return [DetachedBody]
@@ -216,8 +217,7 @@ module Raptor
     #
     # @rbs () -> void
     def open
-      callback = @on_open
-      @dispatch.call(proc { callback.call(self) }) if callback
+      @on_open&.call(self)
       @wake.call if @state.value[:notified]
     end
 

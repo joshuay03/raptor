@@ -30,7 +30,6 @@ module Raptor
 
       assert body.attach([], proc { wakes += 1 }, proc { |callback| callbacks << callback }, proc {})
       body.open
-      callbacks.shift.call
       assert_same body, opened
       assert_equal :accepted, body.try_write("message")
       trailers = { "grpc-status" => +"0" }

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Run `DetachedBody#on_open` callbacks on the request thread
 - Attach detached response bodies without polling
 
 ## [0.22.0] - 2026-10-03
