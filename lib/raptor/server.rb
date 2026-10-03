@@ -268,6 +268,9 @@ module Raptor
         Log.rescued_error(error)
         ssl_socket.close rescue nil
         false
+      rescue SystemCallError
+        ssl_socket.close rescue nil
+        false
       end
     end
 

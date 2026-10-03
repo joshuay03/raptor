@@ -892,7 +892,7 @@ module Raptor
       rescue IO::WaitReadable
         reactor.watch(id)
         return
-      rescue EOFError, IOError
+      rescue EOFError, IOError, SystemCallError
         reactor.close_connection(id)
         return
       end
@@ -1013,7 +1013,7 @@ module Raptor
 
       data = begin
         socket.read_nonblock(EAGER_READ_BUFFER_SIZE)
-      rescue IO::WaitReadable, EOFError, IOError
+      rescue IO::WaitReadable, EOFError, IOError, SystemCallError
         return
       end
 

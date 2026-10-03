@@ -1445,7 +1445,7 @@ module Raptor
         @queue << socket
         @selector.wakeup
         return
-      rescue EOFError
+      rescue EOFError, IOError, SystemCallError, OpenSSL::SSL::SSLError
         cleanup(socket)
         return
       end

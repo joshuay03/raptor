@@ -69,6 +69,21 @@ module Raptor
       socket&.close
     end
 
+    def test_http1_connection_reset
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(nil)
+      socket.define_singleton_method(:read_nonblock) { |*| raise Errno::ECONNRESET }
+
+      reactor.add(id: 1, socket: socket, remote_addr: "127.0.0.1", url_scheme: "http")
+
+      assert_predicate socket, :closed?
+      assert_nil reactor.socket_for(1)
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
     def test_http2_stream_dispatch_during_drain
       frames = []
       writer = Object.new

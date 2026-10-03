@@ -307,7 +307,7 @@ module Raptor
       rescue IO::WaitReadable
         reactor.add(id: id, socket: socket, remote_addr: remote_addr, url_scheme: url_scheme)
         return
-      rescue EOFError, IOError
+      rescue EOFError, IOError, SystemCallError
         socket.close rescue nil
         return
       end
@@ -688,7 +688,7 @@ module Raptor
         rescue IO::WaitReadable
           reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
           return
-        rescue EOFError
+        rescue EOFError, IOError, SystemCallError
           socket.close rescue nil
           return
         end
