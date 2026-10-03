@@ -615,6 +615,36 @@ module Raptor
       File.delete(rotated_path) rescue nil
     end
 
+    def test_server_thread_survives_reset_connections
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+
+      cluster_pid = fork do
+        TCPSocket.prepend(Module.new do
+          define_method(:remote_address) do
+            Thread.current[:_test_remote_address_count] = (Thread.current[:_test_remote_address_count] || 0) + 1
+            raise Errno::EINVAL if Thread.current[:_test_remote_address_count] == 1
+
+            super()
+          end
+        end)
+        without_output { cluster.run }
+      end
+      cluster.instance_variable_get(:@binder).close
+
+      wait_for_server(server_port)
+
+      response = raw_split_request(server_port)
+
+      assert_match(/200 OK/, response)
+      assert_match(/Hello, World!/, response)
+    ensure
+      if cluster_pid
+        Process.kill("TERM", cluster_pid) rescue nil
+        Process.wait(cluster_pid) rescue nil
+      end
+    end
+
     def test_reactor_thread_survives_unexpected_error
       cluster = without_output { Cluster.new(@options) }
       server_port = cluster.instance_variable_get(:@server_port)

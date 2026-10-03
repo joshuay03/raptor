@@ -167,10 +167,11 @@ module Raptor
         return false
       end
 
-      if tcp_client.is_a?(TCPSocket)
-        remote_addr = tcp_client.remote_address.ip_address
-      else
-        remote_addr = DEFAULT_REMOTE_ADDR
+      remote_addr = begin
+        tcp_client.is_a?(TCPSocket) ? tcp_client.remote_address.ip_address : DEFAULT_REMOTE_ADDR
+      rescue SystemCallError
+        tcp_client.close
+        return true
       end
 
       ReuseportBPF.update_accepted_load(@reactor.backlog + 1) if @bpf_active
