@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.22.2] - 2026-10-03
+
 - Load `Raptor::DetachedBody` with `require "raptor"`
 
 ## [0.22.1] - 2026-10-03
