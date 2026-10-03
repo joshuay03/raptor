@@ -350,7 +350,7 @@ has returned.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Registers a callback for when the server accepts the response stream.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Registers a callback that runs on the request thread once the server accepts the response stream.</p></div></span>
   
 </li>
 
@@ -691,7 +691,6 @@ has returned.</p>
       <pre class="lines">
 
 
-194
 195
 196
 197
@@ -708,10 +707,11 @@ has returned.</p>
 208
 209
 210
-211</pre>
+211
+212</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 194</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 195</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_attach'>attach</span><span class='lparen'>(</span><span class='id identifier rubyid_budgets'>budgets</span><span class='comma'>,</span> <span class='id identifier rubyid_wake'>wake</span><span class='comma'>,</span> <span class='id identifier rubyid_dispatch'>dispatch</span><span class='comma'>,</span> <span class='id identifier rubyid_finished'>finished</span><span class='rparen'>)</span>
   <span class='ivar'>@wake</span> <span class='op'>=</span> <span class='id identifier rubyid_wake'>wake</span>
@@ -793,7 +793,6 @@ has returned.</p>
       <pre class="lines">
 
 
-158
 159
 160
 161
@@ -809,10 +808,11 @@ has returned.</p>
 171
 172
 173
-174</pre>
+174
+175</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 158</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 159</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close'>close</span><span class='lparen'>(</span><span class='label'>trailers:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_trailers'>trailers</span> <span class='op'>=</span> <span class='id identifier rubyid_trailers'>trailers</span><span class='period'>.</span><span class='id identifier rubyid_to_h'>to_h</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_value'>value</span><span class='op'>|</span>
@@ -873,12 +873,12 @@ has returned.</p>
       <pre class="lines">
 
 
-181
 182
-183</pre>
+183
+184</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 181</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 182</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_closed?'>closed?</span>
   <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='lbracket'>[</span><span class='symbol'>:closed</span><span class='rbracket'>]</span>
@@ -1125,13 +1125,13 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-101
 102
 103
-104</pre>
+104
+105</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 101</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 102</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_close'>on_close</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='ivar'>@on_close</span> <span class='op'>=</span> <span class='id identifier rubyid_block'>block</span>
@@ -1153,7 +1153,8 @@ while waiting for more data.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Registers a callback for when the server accepts the response stream.</p>
+    <p>Registers a callback that runs on the request thread once the server
+accepts the response stream.</p>
 
   </div>
 </div>
@@ -1223,13 +1224,13 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-90
 91
 92
-93</pre>
+93
+94</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 90</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 91</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_open'>on_open</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='ivar'>@on_open</span> <span class='op'>=</span> <span class='id identifier rubyid_block'>block</span>
@@ -1264,18 +1265,16 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-218
 219
 220
 221
 222</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 218</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 219</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_open'>open</span>
-  <span class='id identifier rubyid_callback'>callback</span> <span class='op'>=</span> <span class='ivar'>@on_open</span>
-  <span class='ivar'>@dispatch</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_proc'>proc</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_callback'>callback</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='kw'>self</span><span class='rparen'>)</span> <span class='rbrace'>}</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_callback'>callback</span>
+  <span class='ivar'>@on_open</span><span class='op'>&amp;.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='kw'>self</span><span class='rparen'>)</span>
   <span class='ivar'>@wake</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span> <span class='kw'>if</span> <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='lbracket'>[</span><span class='symbol'>:notified</span><span class='rbracket'>]</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -1655,7 +1654,6 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-112
 113
 114
 115
@@ -1693,10 +1691,11 @@ while waiting for more data.</p>
 147
 148
 149
-150</pre>
+150
+151</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 112</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 113</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_try_write'>try_write</span><span class='lparen'>(</span><span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>TypeError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>body must yield String values</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>String</span><span class='rparen'>)</span>
@@ -1747,7 +1746,7 @@ while waiting for more data.</p>
 </div>
 
       <div id="footer">
-  Generated on Fri Oct  2 22:51:06 2026 by
+  Generated on Sat Oct  3 08:24:11 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
