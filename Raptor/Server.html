@@ -1223,7 +1223,10 @@ timeout or SSL error.</p>
 269
 270
 271
-272</pre>
+272
+273
+274
+275</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 253</span>
@@ -1244,6 +1247,9 @@ timeout or SSL error.</p>
     <span class='kw'>retry</span>
   <span class='kw'>rescue</span> <span class='const'>OpenSSL</span><span class='op'>::</span><span class='const'>SSL</span><span class='op'>::</span><span class='const'>SSLError</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_error'>error</span>
     <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_rescued_error'><span class='object_link'><a href="Log.html#rescued_error-class_method" title="Raptor::Log.rescued_error (method)">rescued_error</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_error'>error</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
+    <span class='kw'>false</span>
+  <span class='kw'>rescue</span> <span class='const'>SystemCallError</span>
     <span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
     <span class='kw'>false</span>
   <span class='kw'>end</span>
@@ -1582,9 +1588,6 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
       <pre class="lines">
 
 
-283
-284
-285
 286
 287
 288
@@ -1596,10 +1599,13 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 294
 295
 296
-297</pre>
+297
+298
+299
+300</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 283</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/server.rb', line 286</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_wait_for_handshake'>wait_for_handshake</span><span class='lparen'>(</span><span class='id identifier rubyid_ssl_socket'>ssl_socket</span><span class='comma'>,</span> <span class='id identifier rubyid_deadline'>deadline</span><span class='comma'>,</span> <span class='id identifier rubyid_direction'>direction</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_remaining'>remaining</span> <span class='op'>=</span> <span class='id identifier rubyid_deadline'>deadline</span> <span class='op'>-</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_MONOTONIC</span><span class='rparen'>)</span>
@@ -1626,7 +1632,7 @@ of the SSL handshake. Closes the socket and returns false on timeout.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Oct  3 09:40:56 2026 by
+  Generated on Sat Oct  3 11:17:39 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

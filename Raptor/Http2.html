@@ -2742,7 +2742,7 @@ Falls back to the reactor when no initial data is ready.</p>
   <span class='kw'>rescue</span> <span class='const'>IO</span><span class='op'>::</span><span class='const'>WaitReadable</span>
     <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_watch'>watch</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
     <span class='kw'>return</span>
-  <span class='kw'>rescue</span> <span class='const'>EOFError</span><span class='comma'>,</span> <span class='const'>IOError</span>
+  <span class='kw'>rescue</span> <span class='const'>EOFError</span><span class='comma'>,</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='const'>SystemCallError</span>
     <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_close_connection'>close_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
     <span class='kw'>return</span>
   <span class='kw'>end</span>
@@ -2848,7 +2848,7 @@ without waiting on the shared collector thread.</p>
 
   <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='kw'>begin</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_read_nonblock'>read_nonblock</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#EAGER_READ_BUFFER_SIZE-constant" title="Raptor::Http2::EAGER_READ_BUFFER_SIZE (constant)">EAGER_READ_BUFFER_SIZE</a></span></span><span class='rparen'>)</span>
-  <span class='kw'>rescue</span> <span class='const'>IO</span><span class='op'>::</span><span class='const'>WaitReadable</span><span class='comma'>,</span> <span class='const'>EOFError</span><span class='comma'>,</span> <span class='const'>IOError</span>
+  <span class='kw'>rescue</span> <span class='const'>IO</span><span class='op'>::</span><span class='const'>WaitReadable</span><span class='comma'>,</span> <span class='const'>EOFError</span><span class='comma'>,</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='const'>SystemCallError</span>
     <span class='kw'>return</span>
   <span class='kw'>end</span>
 
@@ -4418,7 +4418,7 @@ DATA frames through <code>flow_control</code> to fit within the peer's windows.<
 </div>
 
       <div id="footer">
-  Generated on Sat Oct  3 09:40:55 2026 by
+  Generated on Sat Oct  3 11:17:39 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

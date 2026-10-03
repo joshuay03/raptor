@@ -3632,7 +3632,7 @@ when complete. Falls back to the reactor when more data is needed.</p>
   <span class='kw'>rescue</span> <span class='const'>IO</span><span class='op'>::</span><span class='const'>WaitReadable</span>
     <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_add'>add</span><span class='lparen'>(</span><span class='label'>id:</span> <span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='label'>socket:</span> <span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='label'>remote_addr:</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='comma'>,</span> <span class='label'>url_scheme:</span> <span class='id identifier rubyid_url_scheme'>url_scheme</span><span class='rparen'>)</span>
     <span class='kw'>return</span>
-  <span class='kw'>rescue</span> <span class='const'>EOFError</span><span class='comma'>,</span> <span class='const'>IOError</span>
+  <span class='kw'>rescue</span> <span class='const'>EOFError</span><span class='comma'>,</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='const'>SystemCallError</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
     <span class='kw'>return</span>
   <span class='kw'>end</span>
@@ -3901,7 +3901,7 @@ that is already waiting.</p>
     <span class='kw'>rescue</span> <span class='const'>IO</span><span class='op'>::</span><span class='const'>WaitReadable</span>
       <span class='id identifier rubyid_reactor'>reactor</span><span class='period'>.</span><span class='id identifier rubyid_persist'>persist</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_request_count'>request_count</span><span class='comma'>,</span> <span class='label'>remote_addr:</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='comma'>,</span> <span class='label'>url_scheme:</span> <span class='id identifier rubyid_url_scheme'>url_scheme</span><span class='rparen'>)</span>
       <span class='kw'>return</span>
-    <span class='kw'>rescue</span> <span class='const'>EOFError</span>
+    <span class='kw'>rescue</span> <span class='const'>EOFError</span><span class='comma'>,</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='const'>SystemCallError</span>
       <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
       <span class='kw'>return</span>
     <span class='kw'>end</span>
@@ -8438,7 +8438,7 @@ supplied.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Oct  3 09:40:55 2026 by
+  Generated on Sat Oct  3 11:17:38 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
