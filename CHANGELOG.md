@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.22.3] - 2026-10-04
+
 - Keep workers accepting connections when clients reset during accept
 - Close reset client connections without logging backtraces
 
