@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Load `Raptor::DetachedBody` with `require "raptor"`
+
 ## [0.22.1] - 2026-10-03
 
 - Stop waiting for more HTTP/2 frames on the collector thread
