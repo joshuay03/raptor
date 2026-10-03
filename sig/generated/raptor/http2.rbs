@@ -262,8 +262,6 @@ module Raptor
       def closed?: () -> bool
     end
 
-    EAGER_READ_TIMEOUT: ::Float
-
     EAGER_READ_BUFFER_SIZE: untyped
 
     EAGER_MAX_ROUNDS: ::Integer
@@ -473,8 +471,8 @@ module Raptor
     # @rbs (FlowControl flow_control, Hash[Symbol, untyped] result) -> void
     def apply_flow_control_updates: (FlowControl flow_control, Hash[Symbol, untyped] result) -> void
 
-    # Reads the next frame batch from `socket` within a short window, or
-    # returns nil if nothing arrives in time.
+    # Reads the next frame batch from `socket` if it has already arrived,
+    # without waiting on the shared collector thread.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
     # @return [String, nil] the bytes read, or nil if nothing was available

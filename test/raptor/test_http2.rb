@@ -39,6 +39,20 @@ module Raptor
       assert_equal [[nil, nil, nil], [nil, nil, nil]], values
     end
 
+    def test_eager_read_next_batch_skips_idle_connections
+      handler = Http2.allocate
+
+      timeout = nil
+      socket = Object.new
+      socket.define_singleton_method(:wait_readable) do |value|
+        timeout = value
+        false
+      end
+
+      assert_nil handler.send(:eager_read_next_batch, socket)
+      assert_equal 0, timeout
+    end
+
     def test_shutdown_sends_goaway
       frame = nil
       reactor = Object.new

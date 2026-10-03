@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Stop waiting for more HTTP/2 frames on the collector thread
 - Run `DetachedBody#on_open` callbacks on the request thread
 - Attach detached response bodies without polling
 

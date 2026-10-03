@@ -421,7 +421,6 @@ module Raptor
       end
     end
 
-    EAGER_READ_TIMEOUT = 0.001
     EAGER_READ_BUFFER_SIZE = 64 * 1024
     EAGER_MAX_ROUNDS = 8
 
@@ -1002,15 +1001,15 @@ module Raptor
       end
     end
 
-    # Reads the next frame batch from `socket` within a short window, or
-    # returns nil if nothing arrives in time.
+    # Reads the next frame batch from `socket` if it has already arrived,
+    # without waiting on the shared collector thread.
     #
     # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
     # @return [String, nil] the bytes read, or nil if nothing was available
     #
     # @rbs (OpenSSL::SSL::SSLSocket socket) -> String?
     def eager_read_next_batch(socket)
-      return unless socket.wait_readable(EAGER_READ_TIMEOUT)
+      return unless socket.wait_readable(0)
 
       data = begin
         socket.read_nonblock(EAGER_READ_BUFFER_SIZE)
