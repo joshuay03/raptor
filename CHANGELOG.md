@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Attach detached response bodies without polling
+
 ## [0.22.0] - 2026-10-03
 
 - Add detached HTTP/1.1 response bodies

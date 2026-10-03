@@ -7,8 +7,8 @@ require "red-black-tree"
 require "timeout"
 
 require "atomic-ruby/atom"
+require "atomic-ruby/atomic_boolean"
 require "atomic-ruby/atomic_condition_variable"
-require "atomic-ruby/atomic_count_down_latch"
 require "atomic-ruby/atomic_queue"
 
 require_relative "detached_body"
@@ -211,6 +211,7 @@ module Raptor
     # @rbs @selector: NIO::Selector
     # @rbs @queue: Queue[TCPSocket]
     # @rbs @io_queue: AtomicQueue
+    # @rbs @io_applied: AtomicConditionVariable
     # @rbs @timeouts: RedBlackTree[TimeoutClient]
     # @rbs @id_to_socket: Hash[Integer, TCPSocket]
     # @rbs @socket_to_state: Hash[TCPSocket, Hash[Symbol, untyped]]
@@ -257,6 +258,7 @@ module Raptor
       @selector = NIO::Selector.new
       @queue = Queue.new
       @io_queue = AtomicQueue.new
+      @io_applied = AtomicConditionVariable.new
       @timeouts = RedBlackTree.new
 
       @id_to_socket = {}
@@ -447,10 +449,10 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Integer id, DetachedBody body, Hash[Symbol, untyped] state, ^(Symbol) -> void finished) -> bool
     def attach_http1_body(socket, id, body, state, finished)
-      attached = AtomicCountDownLatch.new(1)
+      attached = AtomicBoolean.new(false)
       @io_queue << [:attach_http1, id, socket, body, attached, finished, state]
       @selector.wakeup rescue nil
-      attached.wait
+      @io_applied.wait { attached.true? }
       return false if body.closed?
 
       body.open
@@ -528,10 +530,10 @@ module Raptor
     #
     # @rbs (Integer id, Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
     def attach_http2_body(id, stream_id, body, finished)
-      attached = AtomicCountDownLatch.new(1)
+      attached = AtomicBoolean.new(false)
       @io_queue << [:attach_http2, id, stream_id, body, attached, finished]
       @selector.wakeup rescue nil
-      attached.wait
+      @io_applied.wait { attached.true? }
       return false if body.closed?
 
       body.open
@@ -576,10 +578,10 @@ module Raptor
     #
     # @rbs (Numeric timeout) -> void
     def drain_detached_bodies(timeout)
-      barrier = AtomicCountDownLatch.new(1)
+      barrier = AtomicBoolean.new(false)
       @io_queue << [:barrier, nil, barrier]
       @selector.wakeup rescue nil
-      barrier.wait
+      @io_applied.wait { barrier.true? }
 
       Timeout.timeout(timeout) do
         @detached_drained.wait { @detached_count.value.zero? }
@@ -748,14 +750,16 @@ module Raptor
           begin
             attach_http2_detached_body(id, value, body, finished)
           ensure
-            attached.count_down
+            attached.make_true
+            @io_applied.broadcast
           end
           connections[id] = true
         when :attach_http1
           begin
             attach_http1_detached_body(value, id, body, state, finished)
           ensure
-            attached.count_down
+            attached.make_true
+            @io_applied.broadcast
           end
         when :ready_http1
           flush_http1_detached_body(id)
@@ -772,7 +776,8 @@ module Raptor
         when :cancel_all
           cancel_detached_bodies
         when :barrier
-          value.count_down
+          value.make_true
+          @io_applied.broadcast
         end
       end
 
