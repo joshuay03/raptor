@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Scale accept backpressure with the thread pool and yield at capacity
 - Raise `Http2ParserError` for malformed HPACK Huffman data
 
 ## [0.22.3] - 2026-10-04

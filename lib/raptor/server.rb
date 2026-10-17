@@ -8,6 +8,7 @@ require "atomic-ruby/atomic_boolean"
 
 require_relative "binder"
 require_relative "log"
+require_relative "raptor_native"
 require_relative "reuseport_bpf"
 
 module Raptor
@@ -73,8 +74,6 @@ module Raptor
       Thread.new do
         Thread.current.name = "Server"
 
-        backpressure_threshold = [(@thread_pool.size * BACKPRESSURE_THRESHOLD_MULTIPLIER).ceil, MIN_BACKPRESSURE_THRESHOLD].max
-
         while @running.true?
           begin
             ready_servers, = IO.select(@listeners, nil, nil, 1)
@@ -83,10 +82,10 @@ module Raptor
           end
 
           next unless ready_servers
-          next if @reactor.backlog >= backpressure_threshold
 
-          if @thread_pool.queue_size > @thread_pool.size
-            Thread.pass
+          backpressure_threshold = [(@thread_pool.size * BACKPRESSURE_THRESHOLD_MULTIPLIER).ceil, MIN_BACKPRESSURE_THRESHOLD].max
+          if @reactor.backlog >= backpressure_threshold || @thread_pool.queue_size > @thread_pool.size
+            CPU.yield
             next
           end
 

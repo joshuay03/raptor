@@ -4,6 +4,7 @@
 
 #include "ruby.h"
 #include "ruby/io.h"
+#include "ruby/thread.h"
 #include <errno.h>
 #include <limits.h>
 #include <sys/uio.h>
@@ -83,6 +84,23 @@ static VALUE cpu_count(VALUE self) {
 #endif
 }
 
+#ifdef __linux__
+static void *cpu_yield_without_gvl(void *unused) {
+  sched_yield();
+  return NULL;
+}
+#endif
+
+// Thread.pass cannot yield to native threads that have not rejoined
+// Ruby's ready queue.
+static VALUE cpu_yield(VALUE self) {
+  rb_thread_schedule();
+#ifdef __linux__
+  rb_thread_call_without_gvl(cpu_yield_without_gvl, NULL, NULL, NULL);
+#endif
+  return Qnil;
+}
+
 static VALUE subreaper_enable(VALUE self) {
 #if defined(__linux__) && defined(PR_SET_CHILD_SUBREAPER)
   if (prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) < 0) rb_sys_fail("prctl");
@@ -106,6 +124,7 @@ RUBY_FUNC_EXPORTED void Init_raptor_native(void) {
   VALUE mCPU = rb_define_module_under(mRaptor, "CPU");
   rb_define_singleton_method(mCPU, "pin", cpu_pin, 1);
   rb_define_singleton_method(mCPU, "count", cpu_count, 0);
+  rb_define_singleton_method(mCPU, "yield", cpu_yield, 0);
 
   VALUE mSubreaper = rb_define_module_under(mRaptor, "Subreaper");
   rb_define_singleton_method(mSubreaper, "enable", subreaper_enable, 0);
