@@ -1,9 +1,8 @@
 #!/usr/bin/env ruby
+
 # frozen_string_literal: true
 
 require "optparse"
-
-argv = ARGV.dup
 
 options = { fast: false, update_readme: false }
 OptionParser.new do |opts|
@@ -14,17 +13,17 @@ OptionParser.new do |opts|
   opts.on("--update-readme", "Replace the README's (Micro) Benchmarks section with the results") do
     options[:update_readme] = true
   end
-end.parse!
+end.parse(ARGV)
 
 unless File.exist?("/.dockerenv")
-  exec(File.expand_path("dev", __dir__), "bin/#{File.basename(__FILE__)}", *argv)
+  exec(File.expand_path("dev", __dir__), "bin/#{File.basename(__FILE__)}", *ARGV)
 end
 
 system("bundle", "update", "puma", "falcon", exception: true)
 system("bundle", "exec", "rake", "compile", "bpf:compile", exception: true)
 
 require "bundler/setup"
-require "concurrent/utility/processor_counter"
+
 require "fileutils"
 require "json"
 require "open3"
@@ -33,15 +32,21 @@ require "socket"
 require "tempfile"
 require "timeout"
 
+require "concurrent/utility/processor_counter"
+
 require_relative "../lib/raptor/version"
 
 WORKERS = Integer(Concurrent.available_processor_count)
 BASE_THREADS = 3
+MAX_SCALING_THREADS = 16
 CLIENTS_PER_SERVER_THREAD = 4
 HEY_CONNECTIONS = WORKERS * BASE_THREADS * CLIENTS_PER_SERVER_THREAD
 H2LOAD_STREAMS = 3
 H2LOAD_CONNECTIONS = HEY_CONNECTIONS / H2LOAD_STREAMS
 MAX_KEEPALIVE_REQUESTS = 999
+SSE_STREAMS_PER_WORKER = 2
+SSE_STREAMS = WORKERS * SSE_STREAMS_PER_WORKER
+SSE_OPEN_TIMEOUT_SECONDS = 2
 H1_PORT = 9292
 H2_PORT = 9443
 CERT_PATH = "tmp/bench.crt"
@@ -61,7 +66,8 @@ POST_BODY = JSON.generate(
 WORKLOADS = {
   io: { label: "IO", fixture: "test/fixtures/bench_io.ru", method: :get },
   cpu: { label: "CPU", fixture: "test/fixtures/bench_cpu.ru", method: :post }
-}
+}.freeze
+SSE_WORKLOAD = { label: "IO + SSE", fixture: "test/fixtures/bench_sse.ru", method: :get }.freeze
 
 if options[:fast]
   RUNS_PER_MODE = 1
@@ -196,7 +202,7 @@ end
 at_exit { reap_all_spawned_servers }
 
 %w[INT TERM].each do |signal|
-  Signal.trap(signal) { exit(1) }
+  trap(signal) { exit(1) }
 end
 
 def start_server(cmd, ports)
@@ -227,7 +233,10 @@ def stop_server(pid, ports, log_file)
   rescue Errno::ESRCH, Errno::ECHILD
   end
   kill_process_tree(pid, "KILL")
-  Process.waitall rescue nil
+  begin
+    loop { break unless Process.wait(-1, Process::WNOHANG) }
+  rescue Errno::ECHILD
+  end
   SPAWNED_SERVERS.delete(pid)
   ports.each { |port| wait_for_port_free(port) }
   log_file.close!
@@ -247,36 +256,79 @@ ensure
   stop_server(pid, ports, log_file) if pid
 end
 
-def run_hey(url:, keep_alive:, method:)
+def run_hey(url:, keep_alive:, method:, allow_timeouts: false)
   keep_alive_flag = keep_alive ? nil : "-disable-keepalive"
   method_args = method == :post ? ["-m", "POST", "-T", "application/json", "-D", POST_BODY_PATH] : []
   warmup = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{WARMUP_SECONDS}s", keep_alive_flag, *method_args, url].compact
   warmup_output, warmup_status = Open3.capture2(*warmup)
   abort_with_output "hey warmup failed", warmup_output unless warmup_status.success?
-  check_hey_clean(warmup_output, "warmup")
+  check_hey_clean(warmup_output, "warmup", allow_timeouts: allow_timeouts)
 
   measure = ["hey", "-c", HEY_CONNECTIONS.to_s, "-z", "#{MAIN_SECONDS}s", keep_alive_flag, *method_args, url].compact
   output, status = Open3.capture2(*measure)
   abort_with_output "hey failed", output unless status.success?
-  check_hey_clean(output, "measurement")
+  timeouts = check_hey_clean(output, "measurement", allow_timeouts: allow_timeouts)
 
   req_s_match = output.match(/Requests\/sec:\s+([\d.]+)/)
-  abort_with_output "could not parse hey req/s", output unless req_s_match
+  abort_with_output "Could not parse hey req/s", output unless req_s_match
 
   p95_match = output.match(/95%+\s+in\s+([\d.]+)/)
-  abort_with_output "could not parse hey p95", output unless p95_match
+  abort_with_output "Could not parse hey p95", output unless p95_match
 
-  { req_s: req_s_match[1].to_f, p95_ms: p95_match[1].to_f * 1000 }
+  { req_s: req_s_match[1].to_f, p95_ms: p95_match[1].to_f * 1000, timeouts: timeouts }
 end
 
-def check_hey_clean(output, phase)
-  abort_with_output "hey #{phase} produced errors", output if output.include?("Error distribution:")
+# Aborts on errors and non-2xx responses, except client timeouts when
+# `allow_timeouts` is set, and returns the number of timed out requests.
+def check_hey_clean(output, phase, allow_timeouts: false)
+  errors = output.partition("Error distribution:").last.scan(/\[(\d+)\]\s+(.*)/)
+  timeouts = errors.sum { |count, message| message.include?("Client.Timeout exceeded") ? count.to_i : 0 }
+  other_errors = errors.sum { |count, _message| count.to_i } - timeouts
+  abort_with_output "hey #{phase} produced errors", output if other_errors.positive? || (timeouts.positive? && !allow_timeouts)
 
   responses = output.scan(/\[(\d{3})\]\s+\d+ responses/).flatten
   abort_with_output "hey #{phase} received no responses", output if responses.empty?
 
   non_2xx = responses.reject { |code| code.start_with?("2") }
-  abort_with_output "hey #{phase} received non-2xx responses (#{non_2xx.uniq.join(', ')})", output if non_2xx.any?
+  abort_with_output "hey #{phase} received non-2xx responses (#{non_2xx.uniq.join(", ")})", output if non_2xx.any?
+
+  timeouts
+end
+
+# Holds SSE streams open during the block and reports how many failed to open.
+# Stalled sockets stay connected so their queued requests still contend for
+# server capacity; an early close aborts the run.
+def with_sse_streams(count)
+  sockets = []
+  stalled = 0
+  count.times do
+    socket = TCPSocket.new("127.0.0.1", H1_PORT)
+    sockets << socket
+    socket.write("GET /stream HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+    response = +""
+    response << socket.readpartial(1024) until response.include?("\r\n\r\n") || !socket.wait_readable(SSE_OPEN_TIMEOUT_SECONDS)
+    if response.empty?
+      stalled += 1
+    elsif !response.start_with?("HTTP/1.1 200")
+      abort_with_output "SSE stream did not open", response
+    end
+  end
+
+  closed = []
+  reader = Thread.new do
+    loop do
+      IO.select(sockets - closed)[0].each do |socket|
+        closed << socket if socket.read_nonblock(4096, exception: false).nil?
+      end
+    end
+  end
+  result = yield
+  abort "#{closed.length} SSE streams closed during the run" unless closed.empty?
+
+  result.merge(stalled_streams: stalled)
+ensure
+  reader&.kill
+  sockets&.each(&:close)
 end
 
 def run_h2load(url:, method:)
@@ -295,7 +347,7 @@ def run_h2load(url:, method:)
     check_h2load_clean(output, "measurement")
 
     req_s_match = output.match(/finished in [\d.]+s,\s+([\d.]+) req\/s/)
-    abort_with_output "could not parse h2load req/s", output unless req_s_match
+    abort_with_output "Could not parse h2load req/s", output unless req_s_match
 
     latencies_us = File.readlines(log_file.path).map { |line| line.split[2].to_i }.sort
     abort_with_output "h2load log file empty", output if latencies_us.empty?
@@ -310,17 +362,17 @@ end
 
 def check_h2load_clean(output, phase)
   requests = output.match(/(\d+) succeeded, (\d+) failed, (\d+) errored, (\d+) timeout/)
-  abort_with_output "could not parse h2load requests summary", output unless requests
+  abort_with_output "Could not parse h2load requests summary", output unless requests
 
   succeeded, failed, errored, timeout = requests.captures.map(&:to_i)
-  abort_with_output "h2load #{phase} reported #{failed} failed, #{errored} errored, #{timeout} timeout", output if failed > 0 || errored > 0 || timeout > 0
-  abort_with_output "h2load #{phase} received no successful responses", output if succeeded == 0
+  abort_with_output "h2load #{phase} reported #{failed} failed, #{errored} errored, #{timeout} timeout", output if failed.positive? || errored.positive? || timeout.positive?
+  abort_with_output "h2load #{phase} received no successful responses", output if succeeded.zero?
 
   status_codes = output.match(/status codes: \d+ 2xx, (\d+) 3xx, (\d+) 4xx, (\d+) 5xx/)
-  abort_with_output "could not parse h2load status codes", output unless status_codes
+  abort_with_output "Could not parse h2load status codes", output unless status_codes
 
   threes, fours, fives = status_codes.captures.map(&:to_i)
-  abort_with_output "h2load #{phase} received non-2xx responses: #{threes} 3xx, #{fours} 4xx, #{fives} 5xx", output if threes > 0 || fours > 0 || fives > 0
+  abort_with_output "h2load #{phase} received non-2xx responses: #{threes} 3xx, #{fours} 4xx, #{fives} 5xx", output if threes.positive? || fours.positive? || fives.positive?
 end
 
 def abort_with_output(message, output)
@@ -334,7 +386,7 @@ def benchmark(label)
   RUNS_PER_MODE.times do |index|
     result = yield
     results << result
-    log "  Run #{index + 1}/#{RUNS_PER_MODE}: #{result[:req_s].round} req/s, p95 #{format('%.2f', result[:p95_ms])} ms"
+    log "  Run #{index + 1}/#{RUNS_PER_MODE}: #{result[:req_s].round} req/s, p95 #{format("%.2f", result[:p95_ms])} ms#{format_failures(result)}"
     sleep BETWEEN_RUNS_SECONDS if index < RUNS_PER_MODE - 1
   end
 
@@ -342,11 +394,12 @@ def benchmark(label)
   p95_stats = stats_of(results.map { |result| result[:p95_ms] })
 
   if results.length > 1
-    log "  req/s: median #{req_s_stats[:median].round}, range #{req_s_stats[:min].round}-#{req_s_stats[:max].round} (σ #{format('%.1f', req_s_stats[:stddev])}, ±#{format('%.1f', req_s_stats[:spread_pct])}%)"
-    log "  p95:   median #{format('%.2f', p95_stats[:median])} ms, range #{format('%.2f', p95_stats[:min])}-#{format('%.2f', p95_stats[:max])} ms (σ #{format('%.2f', p95_stats[:stddev])}, ±#{format('%.1f', p95_stats[:spread_pct])}%)"
+    log "  req/s: median #{req_s_stats[:median].round}, range #{req_s_stats[:min].round}-#{req_s_stats[:max].round} (σ #{format("%.1f", req_s_stats[:stddev])}, ±#{format("%.1f", req_s_stats[:spread_pct])}%)"
+    log "  p95:   median #{format("%.2f", p95_stats[:median])} ms, range #{format("%.2f", p95_stats[:min])}-#{format("%.2f", p95_stats[:max])} ms (σ #{format("%.2f", p95_stats[:stddev])}, ±#{format("%.1f", p95_stats[:spread_pct])}%)"
   end
 
-  { req_s: req_s_stats[:median], p95_ms: p95_stats[:median], req_s_stats: req_s_stats, p95_stats: p95_stats }
+  timeouts, stalled_streams = %i[timeouts stalled_streams].map { |key| results.map { |result| result[key].to_i }.sort[results.length / 2] }
+  { req_s: req_s_stats[:median], p95_ms: p95_stats[:median], timeouts: timeouts, stalled_streams: stalled_streams, req_s_stats: req_s_stats, p95_stats: p95_stats }
 end
 
 def stats_of(values)
@@ -355,24 +408,31 @@ def stats_of(values)
   mean = values.sum / values.length.to_f
   variance = values.sum { |value| (value - mean) ** 2 } / values.length
   stddev = Math.sqrt(variance)
-  spread_pct = median == 0 ? 0.0 : ((sorted.last - sorted.first) / 2.0 / median) * 100
+  spread_pct = median.zero? ? 0.0 : ((sorted.last - sorted.first) / 2.0 / median) * 100
   { min: sorted.first, max: sorted.last, median: median, mean: mean, stddev: stddev, spread_pct: spread_pct }
 end
 
 def format_req_s(value)
   rounded = (value / 10.0).round * 10
   thousands = rounded / 1000.0
-  "#{format('%.2f', thousands)}k req/s"
+  "#{format("%.2f", thousands)}k req/s"
+end
+
+def format_failures(result)
+  failures = { "timeout" => result[:timeouts], "stalled stream" => result[:stalled_streams] }.filter_map do |noun, count|
+    "#{count} #{noun}#{"s" unless count == 1}" if count.to_i.positive?
+  end
+  failures.empty? ? "" : " (#{failures.join(", ")})"
 end
 
 def format_p95_ms(value)
-  "#{format('%.2f', value)} ms"
+  "#{format("%.2f", value)} ms"
 end
 
 def format_delta(subject, baseline)
   delta = ((subject - baseline) / baseline) * 100
   word = delta >= 0 ? "higher" : "lower"
-  "#{format('%.1f', delta.abs)}% #{word}"
+  "#{format("%.1f", delta.abs)}% #{word}"
 end
 
 def render_markdown_row(cells, widths)
@@ -381,20 +441,20 @@ end
 
 def puma_version
   output, status = Open3.capture2("bundle", "exec", "ruby", "-e", "require 'puma/const'; puts Puma::Const::PUMA_VERSION")
-  abort "could not read Puma version" unless status.success?
+  abort "Could not read Puma version" unless status.success?
 
   output.strip
 end
 
 def falcon_version
   output, status = Open3.capture2("bundle", "exec", "ruby", "-e", "require 'falcon/version'; puts Falcon::VERSION")
-  abort "could not read Falcon version" unless status.success?
+  abort "Could not read Falcon version" unless status.success?
 
   output.strip
 end
 
 def raptor_cmd(fixture, scaling:, protocol:)
-  max_threads_args = scaling ? [] : ["--max-threads", BASE_THREADS.to_s]
+  max_threads = scaling ? MAX_SCALING_THREADS : BASE_THREADS
   http1_args = protocol == :h1 ? ["--http1-max-keepalive-requests", MAX_KEEPALIVE_REQUESTS.to_s] : []
   bind = if protocol == :h2
     "ssl://0.0.0.0:#{H2_PORT}?cert=#{CERT_PATH}&key=#{KEY_PATH}"
@@ -405,7 +465,7 @@ def raptor_cmd(fixture, scaling:, protocol:)
     "bundle", "exec", "raptor",
     "-b", bind,
     "-w", WORKERS.to_s, "-t", BASE_THREADS.to_s,
-    *max_threads_args,
+    "--max-threads", max_threads.to_s,
     "--no-cpu-affinity",
     "--no-clean-thread-locals",
     "--no-clean-fiber-locals",
@@ -415,13 +475,14 @@ def raptor_cmd(fixture, scaling:, protocol:)
   ]
 end
 
-def puma_cmd(fixture)
+def puma_cmd(fixture, scaling:)
+  max_threads = scaling ? MAX_SCALING_THREADS : BASE_THREADS
   [
     { "PUMA_FIBER_PER_REQUEST" => nil },
     "bundle", "exec", "puma",
     "--no-config",
     "-b", "tcp://0.0.0.0:#{H1_PORT}",
-    "-w", WORKERS.to_s, "-t", "#{BASE_THREADS}:#{BASE_THREADS}",
+    "-w", WORKERS.to_s, "-t", "#{BASE_THREADS}:#{max_threads}",
     fixture
   ]
 end
@@ -445,10 +506,14 @@ def falcon_h2_cmd(fixture)
   ]
 end
 
-def bench_h1(server_label, cmd, ports, workload_label, method:, keep_alive:)
-  benchmark("#{server_label} HTTP/1.1#{keep_alive ? ' keep-alive' : ''} (#{workload_label})") do
+def bench_h1(server_label, cmd, ports, workload_label, method:, keep_alive:, sse_streams: 0)
+  benchmark("#{server_label} HTTP/1.1#{keep_alive ? " keep-alive" : ""} (#{workload_label})") do
     with_server(server_label, cmd, ports) do
-      run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: keep_alive, method: method)
+      if sse_streams.positive?
+        with_sse_streams(sse_streams) { run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: keep_alive, method: method, allow_timeouts: true) }
+      else
+        run_hey(url: "http://127.0.0.1:#{H1_PORT}/", keep_alive: keep_alive, method: method)
+      end
     end
   end
 end
@@ -480,38 +545,52 @@ WORKLOADS.each do |workload, config|
     raptor_scaling_h1: bench_h1("Raptor (scaling)", raptor_cmd(fixture, scaling: true, protocol: :h1), h1_ports, label, method: method, keep_alive: false),
     raptor_scaling_h1_ka: bench_h1("Raptor (scaling)", raptor_cmd(fixture, scaling: true, protocol: :h1), h1_ports, label, method: method, keep_alive: true),
     raptor_scaling_h2: bench_h2("Raptor (scaling)", raptor_cmd(fixture, scaling: true, protocol: :h2), h2_ports, label, method: method),
-    puma_h1: bench_h1("Puma", puma_cmd(fixture), h1_ports, label, method: method, keep_alive: false),
-    puma_h1_ka: bench_h1("Puma", puma_cmd(fixture), h1_ports, label, method: method, keep_alive: true),
+    puma_fixed_h1: bench_h1("Puma (fixed)", puma_cmd(fixture, scaling: false), h1_ports, label, method: method, keep_alive: false),
+    puma_fixed_h1_ka: bench_h1("Puma (fixed)", puma_cmd(fixture, scaling: false), h1_ports, label, method: method, keep_alive: true),
+    puma_scaling_h1: bench_h1("Puma (scaling)", puma_cmd(fixture, scaling: true), h1_ports, label, method: method, keep_alive: false),
+    puma_scaling_h1_ka: bench_h1("Puma (scaling)", puma_cmd(fixture, scaling: true), h1_ports, label, method: method, keep_alive: true),
     falcon_h1: bench_h1("Falcon", falcon_h1_cmd(fixture), h1_ports, label, method: method, keep_alive: false),
     falcon_h1_ka: bench_h1("Falcon", falcon_h1_cmd(fixture), h1_ports, label, method: method, keep_alive: true),
     falcon_h2: bench_h2("Falcon", falcon_h2_cmd(fixture), h2_ports, label, method: method)
   }
 end
 
+sse_fixture = SSE_WORKLOAD[:fixture]
+sse_label = SSE_WORKLOAD[:label]
+results[:sse] = {
+  raptor_fixed_h1_ka: bench_h1("Raptor (fixed)", raptor_cmd(sse_fixture, scaling: false, protocol: :h1), [H1_PORT], sse_label, method: :get, keep_alive: true, sse_streams: SSE_STREAMS),
+  raptor_scaling_h1_ka: bench_h1("Raptor (scaling)", raptor_cmd(sse_fixture, scaling: true, protocol: :h1), [H1_PORT], sse_label, method: :get, keep_alive: true, sse_streams: SSE_STREAMS),
+  puma_fixed_h1_ka: bench_h1("Puma (fixed)", puma_cmd(sse_fixture, scaling: false), [H1_PORT], sse_label, method: :get, keep_alive: true, sse_streams: SSE_STREAMS),
+  puma_scaling_h1_ka: bench_h1("Puma (scaling)", puma_cmd(sse_fixture, scaling: true), [H1_PORT], sse_label, method: :get, keep_alive: true, sse_streams: SSE_STREAMS),
+  falcon_h1_ka: bench_h1("Falcon", falcon_h1_cmd(sse_fixture), [H1_PORT], sse_label, method: :get, keep_alive: true, sse_streams: SSE_STREAMS)
+}
+
 PROTOCOLS = [
-  { label: "HTTP/1.1", key: :h1, puma_key: :puma_h1, falcon_key: :falcon_h1 },
-  { label: "HTTP/1.1 (keep-alive)", key: :h1_ka, puma_key: :puma_h1_ka, falcon_key: :falcon_h1_ka },
-  { label: "HTTP/2", key: :h2, puma_key: nil, falcon_key: :falcon_h2 }
-]
+  { label: "HTTP/1.1", key: :h1, puma: true, falcon_key: :falcon_h1 },
+  { label: "HTTP/1.1 (keep-alive)", key: :h1_ka, puma: true, falcon_key: :falcon_h1_ka },
+  { label: "HTTP/2", key: :h2, puma: false, falcon_key: :falcon_h2 }
+].freeze
 
 rows = []
 PROTOCOLS.each do |protocol|
-  WORKLOADS.each do |workload, config|
-    puma_value = protocol[:puma_key] ? results[workload][protocol[:puma_key]] : nil
+  WORKLOADS.merge(sse: SSE_WORKLOAD).each do |workload, config|
+    next unless results[workload].key?(:"raptor_fixed_#{protocol[:key]}")
+
     falcon_value = protocol[:falcon_key] ? results[workload][protocol[:falcon_key]] : nil
     { fixed: "Fixed", scaling: "Scaling" }.each do |mode, mode_label|
       raptor_value = results[workload][:"raptor_#{mode}_#{protocol[:key]}"]
+      puma_value = protocol[:puma] ? results[workload][:"puma_#{mode}_#{protocol[:key]}"] : nil
       rows << {
         protocol: protocol[:label],
         workload: config[:label],
-        raptor_mode: mode_label,
-        raptor_req_s: format_req_s(raptor_value[:req_s]),
+        mode: mode_label,
+        raptor_req_s: format_req_s(raptor_value[:req_s]) + format_failures(raptor_value),
         raptor_p95: format_p95_ms(raptor_value[:p95_ms]),
-        puma_req_s: puma_value ? format_req_s(puma_value[:req_s]) : "N/A",
+        puma_req_s: puma_value ? format_req_s(puma_value[:req_s]) + format_failures(puma_value) : "N/A",
         puma_p95: puma_value ? format_p95_ms(puma_value[:p95_ms]) : "N/A",
         vs_puma_req_s: puma_value ? format_delta(raptor_value[:req_s], puma_value[:req_s]) : "-",
         vs_puma_p95: puma_value ? format_delta(raptor_value[:p95_ms], puma_value[:p95_ms]) : "-",
-        falcon_req_s: falcon_value ? format_req_s(falcon_value[:req_s]) : "N/A",
+        falcon_req_s: falcon_value ? format_req_s(falcon_value[:req_s]) + format_failures(falcon_value) : "N/A",
         falcon_p95: falcon_value ? format_p95_ms(falcon_value[:p95_ms]) : "N/A",
         vs_falcon_req_s: falcon_value ? format_delta(raptor_value[:req_s], falcon_value[:req_s]) : "-",
         vs_falcon_p95: falcon_value ? format_delta(raptor_value[:p95_ms], falcon_value[:p95_ms]) : "-"
@@ -523,7 +602,7 @@ end
 HEADERS = {
   protocol: "Protocol",
   workload: "Workload",
-  raptor_mode: "Raptor mode",
+  mode: "Mode",
   raptor_req_s: "Raptor req/s",
   raptor_p95: "Raptor p95",
   puma_req_s: "Puma req/s",
@@ -534,7 +613,7 @@ HEADERS = {
   falcon_p95: "Falcon p95",
   vs_falcon_req_s: "vs Falcon req/s",
   vs_falcon_p95: "vs Falcon p95"
-}
+}.freeze
 widths = HEADERS.transform_values(&:length)
 rows.each do |row|
   row.each { |key, value| widths[key] = [widths[key], value.length].max }
@@ -551,28 +630,33 @@ worst_p95_spread = all_cells.map { |cell| cell[:p95_stats][:spread_pct] }.max
 section = <<~MD
   ## (Micro) Benchmarks
 
-  Raptor #{Raptor::VERSION} vs Puma #{puma_version} vs Falcon #{falcon_version} across two workload profiles. **IO-bound** is a GET endpoint that
-  interleaves 5-10 short sleeps (total 2.5-15ms) with small CPU work, simulating a read path that makes several DB or
-  cache calls. **CPU-bound** is a POST endpoint that accepts a small JSON body, interleaves 3-5 chunks of JSON item
-  building (total 450-1500 items) with sub-100µs sleeps, and returns the built array, simulating a write path that does
-  most of its work in Ruby with a few near-zero-cost cache hits.
+  Raptor #{Raptor::VERSION} vs Puma #{puma_version} vs Falcon #{falcon_version} across two workload profiles. **IO-bound** is a GET endpoint that spends
+  about 95% of each request waiting. It makes 5-10 simulated DB calls of 0.5-1.5ms each and renders a small JSON result
+  after each one. **CPU-bound** is a POST endpoint that spends about 85% of each request running Ruby. It accepts a small
+  JSON body, renders 2,100-7,000 JSON items in 3-5 chunks, each after a 25-50µs simulated cache hit, and returns a short
+  response. **IO + SSE** repeats the IO-bound keep-alive run while #{SSE_STREAMS_PER_WORKER} server-sent event streams per worker stay open,
+  each receiving an event every second. Raptor serves them with `Raptor::DetachedBody`, which hands the stream to the
+  reactor and frees the application thread, while Puma and Falcon stream from an Enumerator that sleeps between events.
+  Puma keeps accepting connections while every thread in a worker is busy, so a stream or request it accepts can wait
+  behind streams that never finish. Streams that got no response within #{SSE_OPEN_TIMEOUT_SECONDS} seconds and requests that hey gave up on
+  after 20 seconds are counted in parentheses.
 
-  Raptor is run in two modes: **Fixed** keeps #{BASE_THREADS} application threads per worker, matching Puma, while **Scaling** starts
-  with #{BASE_THREADS} and may add threads without a fixed limit when queued work is blocked outside the GVL. Both modes are compared
-  with both Puma and Falcon in the table below. Raptor request-local cleanup and Puma's Fiber-per-request mode are
-  disabled, and both threaded servers allow #{MAX_KEEPALIVE_REQUESTS} requests per HTTP/1.1 keep-alive connection.
+  Raptor and Puma are run in two modes: **Fixed** keeps #{BASE_THREADS} application threads per worker, while **Scaling** starts with #{BASE_THREADS}
+  and may grow to #{MAX_SCALING_THREADS}. Puma adds a thread whenever work is waiting, while Raptor only adds one when queued work is blocked
+  outside the GVL. Falcon is compared against both modes. Raptor request-local cleanup and Puma's Fiber-per-request mode
+  are disabled, and both threaded servers allow #{MAX_KEEPALIVE_REQUESTS} requests per HTTP/1.1 keep-alive connection.
 
   Each cell reports the median throughput and median p95 latency independently across #{RUNS_PER_MODE} #{RUNS_PER_MODE == 1 ? "run" : "runs"}, so the two numbers in a row
   may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
   state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
-  ((max - min) / 2 / median) between runs of a single cell was ±#{format('%.1f', worst_req_s_spread)}% for throughput and ±#{format('%.1f', worst_p95_spread)}% for p95.
+  ((max - min) / 2 / median) between runs of a single cell was ±#{format("%.1f", worst_req_s_spread)}% for throughput and ±#{format("%.1f", worst_p95_spread)}% for p95.
 
   #{table_lines.join("\n")}
 
   > #{RUBY_DESCRIPTION}
-  > #{WORKERS} worker processes; fixed Raptor and Puma run #{BASE_THREADS} threads per worker; scaling Raptor starts at #{BASE_THREADS} with no fixed limit;
+  > #{WORKERS} worker processes; fixed Raptor and Puma run #{BASE_THREADS} threads per worker; scaling Raptor and Puma run #{BASE_THREADS} to #{MAX_SCALING_THREADS};
   > Falcon runs unbounded fibers per worker; #{HEY_CONNECTIONS} concurrent HTTP/1.1 client connections; #{H2LOAD_CONNECTIONS} concurrent HTTP/2 client
-  > connections × #{H2LOAD_STREAMS} streams each
+  > connections × #{H2LOAD_STREAMS} streams each; #{SSE_STREAMS} open SSE streams in IO + SSE runs
 
   See [bin/benchmark](bin/benchmark) for more details.
 MD
@@ -585,5 +669,5 @@ if options[:update_readme]
   abort "Could not find existing (Micro) Benchmarks section in README.md" unless readme.match?(BENCHMARKS_SECTION_PATTERN)
 
   File.write(README_PATH, readme.sub(BENCHMARKS_SECTION_PATTERN, section))
-  log "README.md updated."
+  log "README.md updated"
 end

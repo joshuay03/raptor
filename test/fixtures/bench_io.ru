@@ -10,7 +10,7 @@ IO_SEQUENCES = Random.new(0).then { |rng|
 run proc { |_env|
   IO_SEQUENCES.sample.each do |wait|
     sleep wait
-    100.times.sum { |index| index * 2 }
+    JSON.generate(100.times.map { |index| { id: index, name: "row-#{index}", score: index * 1.5 } })
   end
   [200, { "content-type" => "application/json" }, [RESPONSE]]
 }

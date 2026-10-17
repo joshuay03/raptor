@@ -1,7 +1,7 @@
 FROM golang:bookworm AS hey-builder
 RUN CGO_ENABLED=0 go install github.com/rakyll/hey@latest
 
-FROM ruby:latest
+FROM rubylang/ruby:master-dev
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       clang \
       libbpf-dev \
       libelf-dev \
+      libssl-dev \
+      libyaml-dev \
       linux-libc-dev \
       nghttp2 \
       openssl \
