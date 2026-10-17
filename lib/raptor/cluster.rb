@@ -886,8 +886,7 @@ module Raptor
       worker_listeners = if @bpf_active
         bpf_listeners = ReuseportBPF.create_worker_listeners(@binder.bind_uris, index, @binder.socket_backlog)
         ReuseportBPF.enable_load_reporting(index)
-        non_tcp_listeners = @binder.listeners.reject { |listener| listener.is_a?(TCPServer) }
-        bpf_listeners + non_tcp_listeners
+        bpf_listeners + @binder.listeners
       else
         @binder.listeners
       end
