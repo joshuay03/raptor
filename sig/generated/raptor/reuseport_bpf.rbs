@@ -14,19 +14,23 @@ module Raptor
 
     BPF_OBJECT_PATH: untyped
 
-    self.@object: untyped
+    TCP_INFO_UNACKED_OFFSET: ::Integer
 
-    self.@program_fd: Integer
-
-    self.@socks_fd: Integer
-
-    self.@loads_fd: Integer?
-
-    self.@load_key: String
+    self.@accepted_load_value: String
 
     self.@load_value: String
 
-    self.@accepted_load_value: String
+    self.@load_key: String
+
+    self.@worker_listeners: Array[TCPServer]
+
+    self.@loads_fd: Integer?
+
+    self.@socks_fd: Integer
+
+    self.@program_fd: Integer
+
+    self.@object: untyped
 
     # Returns true when the preconditions for BPF-directed reuseport are
     # met on this platform.
@@ -68,7 +72,7 @@ module Raptor
     # @rbs (Integer worker_index) -> void
     def self.enable_load_reporting: (Integer worker_index) -> void
 
-    # Publishes this worker's current backlog to the BPF map.
+    # Publishes this worker's load to the BPF map.
     #
     # @param backlog [Integer] the worker's current reactor backlog
     # @return [void]
@@ -76,7 +80,7 @@ module Raptor
     # @rbs (Integer backlog) -> void
     def self.update_load: (Integer backlog) -> void
 
-    # Publishes an accept-side backlog estimate. This uses a separate value
+    # Publishes an accept-side load estimate. This uses a separate value
     # buffer because the server and load reporter call into the map from
     # different threads.
     #
@@ -95,5 +99,13 @@ module Raptor
     #
     # @rbs (Integer worker_index) -> void
     def self.mark_unavailable: (Integer worker_index) -> void
+
+    # Returns the number of connections waiting in this worker's accept
+    # queues, which the reactor backlog cannot see.
+    #
+    # @return [Integer]
+    #
+    # @rbs () -> Integer
+    def self.accept_queue_length: () -> Integer
   end
 end

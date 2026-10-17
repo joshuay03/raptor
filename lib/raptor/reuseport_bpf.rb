@@ -22,11 +22,13 @@ module Raptor
   module ReuseportBPF
     LIBBPF_LOADED = !!defined?(LibBPFRuby)
     BPF_OBJECT_PATH = File.expand_path("../../ext/raptor_bpf/reuseport_select.bpf.o", __dir__)
+    TCP_INFO_UNACKED_OFFSET = 24
 
     # @rbs self.@object: untyped
     # @rbs self.@program_fd: Integer
     # @rbs self.@socks_fd: Integer
     # @rbs self.@loads_fd: Integer?
+    # @rbs self.@worker_listeners: Array[TCPServer]
     # @rbs self.@load_key: String
     # @rbs self.@load_value: String
     # @rbs self.@accepted_load_value: String
@@ -73,7 +75,7 @@ module Raptor
     #
     # @rbs (Array[String] bind_uris, Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
     def self.create_worker_listeners(bind_uris, worker_index, socket_backlog)
-      bind_uris.filter_map do |bind_uri|
+      @worker_listeners = bind_uris.filter_map do |bind_uri|
         uri = URI(bind_uri)
         next unless uri.scheme == "tcp"
 
@@ -110,21 +112,22 @@ module Raptor
       @accepted_load_value = String.new("\x00\x00\x00\x00", encoding: Encoding::ASCII_8BIT)
     end
 
-    # Publishes this worker's current backlog to the BPF map.
+    # Publishes this worker's load to the BPF map.
     #
     # @param backlog [Integer] the worker's current reactor backlog
     # @return [void]
     #
     # @rbs (Integer backlog) -> void
     def self.update_load(backlog)
-      @load_value.setbyte(0, backlog & 0xff)
-      @load_value.setbyte(1, (backlog >> 8) & 0xff)
-      @load_value.setbyte(2, (backlog >> 16) & 0xff)
-      @load_value.setbyte(3, (backlog >> 24) & 0xff)
+      load = backlog + accept_queue_length
+      @load_value.setbyte(0, load & 0xff)
+      @load_value.setbyte(1, (load >> 8) & 0xff)
+      @load_value.setbyte(2, (load >> 16) & 0xff)
+      @load_value.setbyte(3, (load >> 24) & 0xff)
       LibBPFRuby.map_update(@loads_fd, @load_key, @load_value)
     end
 
-    # Publishes an accept-side backlog estimate. This uses a separate value
+    # Publishes an accept-side load estimate. This uses a separate value
     # buffer because the server and load reporter call into the map from
     # different threads.
     #
@@ -133,10 +136,11 @@ module Raptor
     #
     # @rbs (Integer backlog) -> void
     def self.update_accepted_load(backlog)
-      @accepted_load_value.setbyte(0, backlog & 0xff)
-      @accepted_load_value.setbyte(1, (backlog >> 8) & 0xff)
-      @accepted_load_value.setbyte(2, (backlog >> 16) & 0xff)
-      @accepted_load_value.setbyte(3, (backlog >> 24) & 0xff)
+      load = backlog + accept_queue_length
+      @accepted_load_value.setbyte(0, load & 0xff)
+      @accepted_load_value.setbyte(1, (load >> 8) & 0xff)
+      @accepted_load_value.setbyte(2, (load >> 16) & 0xff)
+      @accepted_load_value.setbyte(3, (load >> 24) & 0xff)
       LibBPFRuby.map_update(@loads_fd, @load_key, @accepted_load_value)
     end
 
@@ -153,5 +157,16 @@ module Raptor
 
       LibBPFRuby.map_update(@loads_fd, [worker_index + 1].pack("L"), [0xffffffff].pack("L"))
     end
+
+    # Returns the number of connections waiting in this worker's accept
+    # queues, which the reactor backlog cannot see.
+    #
+    # @return [Integer]
+    #
+    # @rbs () -> Integer
+    def self.accept_queue_length
+      @worker_listeners.sum { |listener| listener.getsockopt(Socket::IPPROTO_TCP, Socket::TCP_INFO).data.unpack1("L", offset: TCP_INFO_UNACKED_OFFSET) }
+    end
+    private_class_method :accept_queue_length
   end
 end

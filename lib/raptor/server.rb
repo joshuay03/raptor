@@ -119,12 +119,12 @@ module Raptor
 
     private
 
-    # Starts a background thread that publishes this worker's reactor
-    # backlog to the BPF map for load-aware dispatch.
+    # Starts a background thread that publishes this worker's load to the
+    # BPF map for load-aware dispatch.
     #
-    # @return [void]
+    # @return [Thread] the load reporter
     #
-    # @rbs () -> void
+    # @rbs () -> Thread
     def spawn_load_reporter
       Thread.new do
         Thread.current.name = "Load Reporter"
