@@ -92,6 +92,15 @@ module Raptor
       assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
     end
 
+    def test_process_frames_rejects_oversized_frame_from_its_header
+      frame_header = [Http2::MAX_FRAME_SIZE + 1].pack("N").byteslice(1, 3) + [DATA_FRAME_TYPE, 0, 1].pack("CCN")
+
+      result = process_frames_with(frame_header)
+
+      assert result[:close_connection]
+      assert_equal Http2::ERROR_FRAME_SIZE_ERROR, goaway_error_code(result)
+    end
+
     def test_process_frames_rejects_undecodable_header_block
       parser = Http2Parser.new
       headers = parser.build_frame(:headers, Http2::FLAG_END_STREAM | Http2::FLAG_END_HEADERS, 1, "\x80")

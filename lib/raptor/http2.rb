@@ -485,6 +485,12 @@ module Raptor
       end
 
       loop do
+        # Reject oversized frames before waiting for their payload.
+        if buffer.bytesize >= 3 && (buffer.getbyte(0) << 16 | buffer.getbyte(1) << 8 | buffer.getbyte(2)) > MAX_FRAME_SIZE
+          goaway_error = ERROR_FRAME_SIZE_ERROR
+          break
+        end
+
         parsed = parser.parse_frame(buffer)
         break unless parsed
 
