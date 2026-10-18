@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Replace config file binds with `--bind` addresses instead of adding to them
 - Stop BPF dispatch from routing connections to workers that stopped accepting
 - Restart workers forked by the seed when they exit
 - Keep draining HTTP/2 connections when another attaches during shutdown

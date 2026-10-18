@@ -259,6 +259,8 @@ module Raptor
     #
     # @rbs () -> OptionParser
     def create_parser
+      cli_binds = []
+
       OptionParser.new do |opts|
         opts.banner = "Usage: raptor [options] [rackup file]"
 
@@ -267,11 +269,8 @@ module Raptor
         end
 
         opts.on("-b", "--bind URI", String, "Bind address (default: tcp://0.0.0.0:9292)") do |bind|
-          if @options[:binds].equal?(DEFAULT_OPTIONS[:binds])
-            @options[:binds] = [bind]
-          else
-            @options[:binds] << bind
-          end
+          cli_binds << bind
+          @options[:binds] = cli_binds
         end
 
         opts.on("--socket-backlog NUM", Integer, "Socket listen backlog (default: 1024)") do |num|

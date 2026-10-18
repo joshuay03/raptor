@@ -124,6 +124,14 @@ module Raptor
       assert_equal ["tcp://0.0.0.0:3000"], options(cli)[:binds]
     end
 
+    def test_bind_replaces_config_file_binds
+      with_config_file({ binds: ["tcp://127.0.0.1:4242"] }) do |path|
+        cli = CLI.new(["-c", path, "-b", "tcp://0.0.0.0:3000"])
+
+        assert_equal ["tcp://0.0.0.0:3000"], options(cli)[:binds]
+      end
+    end
+
     def test_bind_accumulates_on_subsequent_uses
       cli = CLI.new(["-b", "tcp://0.0.0.0:3000", "-b", "tcp://0.0.0.0:3001"])
 
