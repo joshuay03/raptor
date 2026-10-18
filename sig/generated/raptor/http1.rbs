@@ -246,11 +246,10 @@ module Raptor
     # @param env [Hash] the Rack environment being built
     # @param parser [HttpParser] the parser holding the finished parse state
     # @param nread [Integer] the byte offset where the body begins in `buffer`
-    # @param decode_chunked [Boolean] whether to decode chunked bodies inline; when false chunked bodies signal `:incomplete`
     # @return [String, nil, Symbol]
     #
-    # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
-    def extract_body: (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
+    # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread) -> (String | Symbol)?
+    def extract_body: (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread) -> (String | Symbol)?
 
     # Returns true when the request expects a 100 Continue response per
     # RFC 9110 section 10.1.1.

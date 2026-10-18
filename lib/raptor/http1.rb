@@ -299,7 +299,7 @@ module Raptor
         return
       end
 
-      body = extract_body(buffer, env, parser, nread, decode_chunked: true)
+      body = extract_body(buffer, env, parser, nread)
       case body
       when :incomplete
         fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
@@ -413,7 +413,7 @@ module Raptor
           return
         end
 
-        body = extract_body(buffer, env, parser, nread, decode_chunked: false)
+        body = extract_body(buffer, env, parser, nread)
         case body
         when :incomplete
           fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
@@ -510,11 +510,10 @@ module Raptor
     # @param env [Hash] the Rack environment being built
     # @param parser [HttpParser] the parser holding the finished parse state
     # @param nread [Integer] the byte offset where the body begins in `buffer`
-    # @param decode_chunked [Boolean] whether to decode chunked bodies inline; when false chunked bodies signal `:incomplete`
     # @return [String, nil, Symbol]
     #
-    # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
-    def extract_body(buffer, env, parser, nread, decode_chunked:)
+    # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread) -> (String | Symbol)?
+    def extract_body(buffer, env, parser, nread)
       return :malformed if Http1.invalid_host?(env) || Http1.request_smuggling?(env)
       return unless parser.has_body?
       return :too_large if @max_body_size && parser.content_length > @max_body_size
@@ -522,8 +521,6 @@ module Raptor
       body = buffer.byteslice(nread..-1) || ""
 
       if parser.chunked?
-        return :incomplete unless decode_chunked
-
         body, chunked_state = HttpParser.decode_chunked(body, @max_body_size)
         case chunked_state
         when :complete

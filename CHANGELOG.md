@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Process chunked requests on kept-alive HTTP/1.1 connections without waiting for more data
 - Validate request framing on kept-alive HTTP/1.1 connections
 - Reject `Content-Length` values that overflow 64 bits
 - Resume idle HTTP/1.1 keep-alive connections on application threads
