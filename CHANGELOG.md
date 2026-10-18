@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Raise `Http2ParserError` for malformed HPACK Huffman data
+
 ## [0.22.3] - 2026-10-04
 
 - Keep workers accepting connections when clients reset during accept

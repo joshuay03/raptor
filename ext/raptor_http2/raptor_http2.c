@@ -305,10 +305,7 @@ static int hpack_decode_string(const uint8_t *buf, size_t len, size_t *pos, VALU
     uint8_t *decoded = ALLOCA_N(uint8_t, decoded_cap);
     size_t decoded_len;
 
-    if (hpack_decode_huffman(buf + *pos, (size_t)str_len, decoded, decoded_cap, &decoded_len) < 0) {
-      rb_raise(rb_eRuntimeError, "HPACK Huffman decode error");
-      return -1;
-    }
+    if (hpack_decode_huffman(buf + *pos, (size_t)str_len, decoded, decoded_cap, &decoded_len) < 0) return -1;
 
     *out_str = rb_str_new((const char *)decoded, decoded_len);
   } else {

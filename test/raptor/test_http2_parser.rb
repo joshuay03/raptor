@@ -26,6 +26,15 @@ module Raptor
       assert_empty headers
     end
 
+    def test_parse_headers_rejects_malformed_huffman_string
+      parser = Http2Parser.new
+      overlong_padding_name = "\x00\x81\xff\x01a".b
+
+      assert_raises(Http2ParserError) do
+        parser.parse_headers(overlong_padding_name, [])
+      end
+    end
+
     def test_encode_response_headers_prepends_status_pseudo_header
       parser = Http2Parser.new
       encoded = parser.encode_response_headers(200, { "content-type" => "text/plain" })
