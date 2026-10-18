@@ -372,15 +372,15 @@
       <pre class="lines">
 
 
-806
-807
-808</pre>
+834
+835
+836</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 806</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 834</span>
 
 <span class='id identifier rubyid_static'>static</span> <span class='const'>VALUE</span> <span class='id identifier rubyid_h2_parser_connection_preface'>h2_parser_connection_preface</span><span class='lparen'>(</span><span class='const'>VALUE</span> <span class='kw'>self</span><span class='rparen'>)</span> <span class='lbrace'>{</span>
-  <span class='kw'>return</span> <span class='id identifier rubyid_rb_str_new_lit'>rb_str_new_lit</span><span class='lparen'>(</span><span class='const'>HTTP2_CONNECTION_PREFACE</span><span class='rparen'>)</span><span class='semicolon'>;</span>
+  <span class='kw'>return</span> <span class='id identifier rubyid_rb_str_new_lit'>rb_str_new_lit</span><span class='lparen'>(</span><span class='const'>CONNECTION_PREFACE</span><span class='rparen'>)</span><span class='semicolon'>;</span>
 <span class='rbrace'>}</span></pre>
     </td>
   </tr>
@@ -408,28 +408,6 @@
       <pre class="lines">
 
 
-667
-668
-669
-670
-671
-672
-673
-674
-675
-676
-677
-678
-679
-680
-681
-682
-683
-684
-685
-686
-687
-688
 689
 690
 691
@@ -444,25 +422,47 @@
 700
 701
 702
-703</pre>
+703
+704
+705
+706
+707
+708
+709
+710
+711
+712
+713
+714
+715
+716
+717
+718
+719
+720
+721
+722
+723
+724
+725</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 667</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 689</span>
 
 static VALUE h2_parser_build_frame(VALUE self, VALUE type, VALUE flags, VALUE stream_id, VALUE payload) {
   uint8_t frame_type;
   ID type_id = SYM2ID(type);
 
-  if (type_id == rb_intern(&quot;data&quot;))               frame_type = FRAME_DATA;
-  else if (type_id == rb_intern(&quot;headers&quot;))       frame_type = FRAME_HEADERS;
-  else if (type_id == rb_intern(&quot;priority&quot;))      frame_type = FRAME_PRIORITY;
-  else if (type_id == rb_intern(&quot;rst_stream&quot;))    frame_type = FRAME_RST_STREAM;
-  else if (type_id == rb_intern(&quot;settings&quot;))      frame_type = FRAME_SETTINGS;
-  else if (type_id == rb_intern(&quot;push_promise&quot;))  frame_type = FRAME_PUSH_PROMISE;
-  else if (type_id == rb_intern(&quot;ping&quot;))          frame_type = FRAME_PING;
-  else if (type_id == rb_intern(&quot;goaway&quot;))        frame_type = FRAME_GOAWAY;
-  else if (type_id == rb_intern(&quot;window_update&quot;)) frame_type = FRAME_WINDOW_UPDATE;
-  else if (type_id == rb_intern(&quot;continuation&quot;))  frame_type = FRAME_CONTINUATION;
+  if (type_id == id_data)               frame_type = FRAME_DATA;
+  else if (type_id == id_headers)       frame_type = FRAME_HEADERS;
+  else if (type_id == id_priority)      frame_type = FRAME_PRIORITY;
+  else if (type_id == id_rst_stream)    frame_type = FRAME_RST_STREAM;
+  else if (type_id == id_settings)      frame_type = FRAME_SETTINGS;
+  else if (type_id == id_push_promise)  frame_type = FRAME_PUSH_PROMISE;
+  else if (type_id == id_ping)          frame_type = FRAME_PING;
+  else if (type_id == id_goaway)        frame_type = FRAME_GOAWAY;
+  else if (type_id == id_window_update) frame_type = FRAME_WINDOW_UPDATE;
+  else if (type_id == id_continuation)  frame_type = FRAME_CONTINUATION;
   else rb_raise(rb_eArgError, &quot;unknown frame type&quot;);
 
   uint8_t frame_flags = (uint8_t)NUM2UINT(flags);
@@ -471,7 +471,7 @@ static VALUE h2_parser_build_frame(VALUE self, VALUE type, VALUE flags, VALUE st
   const char *payload_ptr = NIL_P(payload) ? &quot;&quot; : RSTRING_PTR(payload);
   size_t payload_len = NIL_P(payload) ? 0 : RSTRING_LEN(payload);
 
-  uint8_t header[HTTP2_FRAME_HEADER_SIZE];
+  uint8_t header[FRAME_HEADER_SIZE];
   header[0] = (payload_len &gt;&gt; 16) &amp; 0xff;
   header[1] = (payload_len &gt;&gt; 8) &amp; 0xff;
   header[2] = payload_len &amp; 0xff;
@@ -482,7 +482,7 @@ static VALUE h2_parser_build_frame(VALUE self, VALUE type, VALUE flags, VALUE st
   header[7] = (sid &gt;&gt; 8) &amp; 0xff;
   header[8] = sid &amp; 0xff;
 
-  VALUE result = rb_str_new((const char *)header, HTTP2_FRAME_HEADER_SIZE);
+  VALUE result = rb_str_new((const char *)header, FRAME_HEADER_SIZE);
   rb_str_cat(result, payload_ptr, payload_len);
   return result;
 }</pre>
@@ -506,16 +506,16 @@ static VALUE h2_parser_build_frame(VALUE self, VALUE type, VALUE flags, VALUE st
       <pre class="lines">
 
 
-785
-786
-787
-788
-789
-790
-791</pre>
+813
+814
+815
+816
+817
+818
+819</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 785</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 813</span>
 
 static VALUE h2_parser_build_settings(VALUE self, VALUE settings) {
   Check_Type(settings, T_HASH);
@@ -544,13 +544,13 @@ static VALUE h2_parser_build_settings(VALUE self, VALUE settings) {
       <pre class="lines">
 
 
-726
-727
-728
-729</pre>
+748
+749
+750
+751</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 726</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 748</span>
 
 static VALUE h2_parser_encode_headers(VALUE self, VALUE headers) {
   Check_Type(headers, T_ARRAY);
@@ -576,18 +576,18 @@ static VALUE h2_parser_encode_headers(VALUE self, VALUE headers) {
       <pre class="lines">
 
 
-731
-732
-733
-734
-735
-736
-737
-738
-739</pre>
+753
+754
+755
+756
+757
+758
+759
+760
+761</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 731</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 753</span>
 
 static VALUE h2_parser_encode_response_headers(VALUE self, VALUE status, VALUE headers) {
   Check_Type(headers, T_HASH);
@@ -618,17 +618,17 @@ static VALUE h2_parser_encode_response_headers(VALUE self, VALUE status, VALUE h
       <pre class="lines">
 
 
-741
-742
-743
-744
-745
-746
-747
-748</pre>
+763
+764
+765
+766
+767
+768
+769
+770</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 741</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 763</span>
 
 static VALUE h2_parser_encode_response_trailers(VALUE self, VALUE trailers) {
   Check_Type(trailers, T_HASH);
@@ -658,32 +658,32 @@ static VALUE h2_parser_encode_response_trailers(VALUE self, VALUE trailers) {
       <pre class="lines">
 
 
-643
-644
-645
-646
-647
-648
-649
-650
-651
-652
-653
-654
-655
-656
-657
-658
-659
-660
-661
-662
-663
-664
-665</pre>
+665
+666
+667
+668
+669
+670
+671
+672
+673
+674
+675
+676
+677
+678
+679
+680
+681
+682
+683
+684
+685
+686
+687</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 643</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 665</span>
 
 static VALUE h2_parser_parse_frame(VALUE self, VALUE buffer) {
   Check_Type(buffer, T_STRING);
@@ -691,20 +691,20 @@ static VALUE h2_parser_parse_frame(VALUE self, VALUE buffer) {
   const uint8_t *buf = (const uint8_t *)RSTRING_PTR(buffer);
   size_t len = RSTRING_LEN(buffer);
 
-  if (len &lt; HTTP2_FRAME_HEADER_SIZE) return Qnil;
+  if (len &lt; FRAME_HEADER_SIZE) return Qnil;
 
   frame_header fh;
   parse_frame_header(buf, &amp;fh);
 
-  size_t total = HTTP2_FRAME_HEADER_SIZE + fh.length;
+  size_t total = FRAME_HEADER_SIZE + fh.length;
   if (len &lt; total) return Qnil;
 
   VALUE frame = rb_hash_new();
-  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;type&quot;)),      frame_type_sym(fh.type));
-  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;length&quot;)),    UINT2NUM(fh.length));
-  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;flags&quot;)),     UINT2NUM(fh.flags));
-  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;stream_id&quot;)), UINT2NUM(fh.stream_id));
-  rb_hash_aset(frame, ID2SYM(rb_intern(&quot;payload&quot;)),   rb_str_new((const char *)(buf + HTTP2_FRAME_HEADER_SIZE), fh.length));
+  rb_hash_aset(frame, ID2SYM(id_type),      frame_type_sym(fh.type));
+  rb_hash_aset(frame, ID2SYM(id_length),    UINT2NUM(fh.length));
+  rb_hash_aset(frame, ID2SYM(id_flags),     UINT2NUM(fh.flags));
+  rb_hash_aset(frame, ID2SYM(id_stream_id), UINT2NUM(fh.stream_id));
+  rb_hash_aset(frame, ID2SYM(id_payload),   rb_str_new((const char *)(buf + FRAME_HEADER_SIZE), fh.length));
 
   return rb_ary_new_from_args(2, frame, SIZET2NUM(total));
 }</pre>
@@ -728,29 +728,29 @@ static VALUE h2_parser_parse_frame(VALUE self, VALUE buffer) {
       <pre class="lines">
 
 
-705
-706
-707
-708
-709
-710
-711
-712
-713
-714
-715
-716
-717
-718
-719
-720
-721
-722
-723
-724</pre>
+727
+728
+729
+730
+731
+732
+733
+734
+735
+736
+737
+738
+739
+740
+741
+742
+743
+744
+745
+746</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 705</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 727</span>
 
 static VALUE h2_parser_parse_headers(VALUE self, VALUE header_block, VALUE dyn_table) {
   raptor_h2_parser *parser;
@@ -792,28 +792,6 @@ static VALUE h2_parser_parse_headers(VALUE self, VALUE header_block, VALUE dyn_t
       <pre class="lines">
 
 
-750
-751
-752
-753
-754
-755
-756
-757
-758
-759
-760
-761
-762
-763
-764
-765
-766
-767
-768
-769
-770
-771
 772
 773
 774
@@ -825,10 +803,38 @@ static VALUE h2_parser_parse_headers(VALUE self, VALUE header_block, VALUE dyn_t
 780
 781
 782
-783</pre>
+783
+784
+785
+786
+787
+788
+789
+790
+791
+792
+793
+794
+795
+796
+797
+798
+799
+800
+801
+802
+803
+804
+805
+806
+807
+808
+809
+810
+811</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 750</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 772</span>
 
 static VALUE h2_parser_parse_settings(VALUE self, VALUE payload) {
   Check_Type(payload, T_STRING);
@@ -848,17 +854,23 @@ static VALUE h2_parser_parse_settings(VALUE self, VALUE payload) {
 
     switch (id) {
       case SETTINGS_HEADER_TABLE_SIZE:
-        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;header_table_size&quot;)), UINT2NUM(val));       break;
+        rb_hash_aset(settings, ID2SYM(id_header_table_size), UINT2NUM(val));
+        break;
       case SETTINGS_ENABLE_PUSH:
-        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;enable_push&quot;)), UINT2NUM(val));              break;
+        rb_hash_aset(settings, ID2SYM(id_enable_push), UINT2NUM(val));
+        break;
       case SETTINGS_MAX_CONCURRENT_STREAMS:
-        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;max_concurrent_streams&quot;)), UINT2NUM(val));   break;
+        rb_hash_aset(settings, ID2SYM(id_max_concurrent_streams), UINT2NUM(val));
+        break;
       case SETTINGS_INITIAL_WINDOW_SIZE:
-        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;initial_window_size&quot;)), UINT2NUM(val));      break;
+        rb_hash_aset(settings, ID2SYM(id_initial_window_size), UINT2NUM(val));
+        break;
       case SETTINGS_MAX_FRAME_SIZE:
-        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;max_frame_size&quot;)), UINT2NUM(val));           break;
+        rb_hash_aset(settings, ID2SYM(id_max_frame_size), UINT2NUM(val));
+        break;
       case SETTINGS_MAX_HEADER_LIST_SIZE:
-        rb_hash_aset(settings, ID2SYM(rb_intern(&quot;max_header_list_size&quot;)), UINT2NUM(val));     break;
+        rb_hash_aset(settings, ID2SYM(id_max_header_list_size), UINT2NUM(val));
+        break;
     }
   }
 
@@ -884,21 +896,21 @@ static VALUE h2_parser_parse_settings(VALUE self, VALUE payload) {
       <pre class="lines">
 
 
-793
-794
-795
-796
-797
-798
-799
-800
-801
-802
-803
-804</pre>
+821
+822
+823
+824
+825
+826
+827
+828
+829
+830
+831
+832</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 793</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 821</span>
 
 static VALUE h2_parser_parse_window_update(VALUE self, VALUE payload) {
   Check_Type(payload, T_STRING);
@@ -922,7 +934,7 @@ static VALUE h2_parser_parse_window_update(VALUE self, VALUE payload) {
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 11:43:27 2026 by
+  Generated on Sun Oct 18 11:45:11 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

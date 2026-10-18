@@ -611,7 +611,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns true when the request has been fully parsed.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns whether the request has been fully parsed.</p></div></span>
   
 </li>
 
@@ -853,7 +853,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns the flow controller associated with a given connection, if one was supplied when the connection was added.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns the HTTP/2 flow controller registered by <span class='object_link'><a href="#attach_http2-instance_method" title="Raptor::Reactor#attach_http2 (method)">#attach_http2</a></span> for a connection.</p></div></span>
   
 </li>
 
@@ -1009,7 +1009,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Creates a new Reactor instance.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Creates a new Reactor.</p></div></span>
   
 </li>
 
@@ -1493,7 +1493,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Handles socket wakeup by deregistering and queuing for processing.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Deregisters a readable socket and resumes its idle keep-alive connection or queues its bytes for parsing.</p></div></span>
   
 </li>
 
@@ -1559,7 +1559,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns the writer object associated with a given connection, if one was supplied when the connection was added.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns the HTTP/2 frame writer registered by <span class='object_link'><a href="#attach_http2-instance_method" title="Raptor::Reactor#attach_http2 (method)">#attach_http2</a></span> for a connection.</p></div></span>
   
 </li>
 
@@ -1582,7 +1582,7 @@ to the caller-provided handlers.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Creates a new Reactor instance.</p>
+    <p>Creates a new Reactor.</p>
 
   </div>
 </div>
@@ -1827,7 +1827,6 @@ to the caller-provided handlers.</p>
       <pre class="lines">
 
 
-221
 222
 223
 224
@@ -1858,10 +1857,11 @@ to the caller-provided handlers.</p>
 249
 250
 251
-252</pre>
+252
+253</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 221</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 222</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_http1'>http1</span><span class='comma'>,</span> <span class='id identifier rubyid_http1_ractor_pool'>http1_ractor_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_http2_ractor_pool'>http2_ractor_pool</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_pool'>thread_pool</span><span class='comma'>,</span> <span class='label'>connection_options:</span><span class='comma'>,</span> <span class='label'>http1_options:</span><span class='comma'>,</span> <span class='label'>http2_options:</span><span class='rparen'>)</span>
   <span class='ivar'>@http1</span> <span class='op'>=</span> <span class='id identifier rubyid_http1'>http1</span>
@@ -1963,15 +1963,15 @@ to the caller-provided handlers.</p>
       <pre class="lines">
 
 
+600
+601
+602
 603
 604
-605
-606
-607
-608</pre>
+605</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 603</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 600</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_acknowledge_http2_ping'>acknowledge_http2_ping</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_payloads'>payloads</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_keepalive'>keepalive</span> <span class='op'>=</span> <span class='ivar'>@id_to_http2_keepalive</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -2057,29 +2057,21 @@ to the caller-provided handlers.</p>
       <pre class="lines">
 
 
-310
 311
 312
 313
 314
 315
 316
-317
-318
-319
-320</pre>
+317</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 310</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 311</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_add'>add</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='id identifier rubyid_state'>state</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:socket</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_writer'>writer</span> <span class='op'>=</span> <span class='id identifier rubyid_state'>state</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:writer</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_flow_control'>flow_control</span> <span class='op'>=</span> <span class='id identifier rubyid_state'>state</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='symbol'>:flow_control</span><span class='rparen'>)</span>
   <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_socket'>socket</span>
   <span class='ivar'>@socket_to_state</span><span class='lbracket'>[</span><span class='id identifier rubyid_socket'>socket</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_state'>state</span>
-  <span class='ivar'>@id_to_writer</span><span class='lbracket'>[</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_writer'>writer</span> <span class='kw'>if</span> <span class='id identifier rubyid_writer'>writer</span>
-  <span class='ivar'>@id_to_flow_control</span><span class='lbracket'>[</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_flow_control'>flow_control</span> <span class='kw'>if</span> <span class='id identifier rubyid_flow_control'>flow_control</span>
 
   <span class='id identifier rubyid_read_and_queue_for_parse'>read_and_queue_for_parse</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
@@ -2202,6 +2194,9 @@ to the caller-provided handlers.</p>
       <pre class="lines">
 
 
+422
+423
+424
 425
 426
 427
@@ -2211,13 +2206,10 @@ to the caller-provided handlers.</p>
 431
 432
 433
-434
-435
-436
-437</pre>
+434</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 425</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 422</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_attach_http1_body'>attach_http1_body</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_state'>state</span><span class='comma'>,</span> <span class='id identifier rubyid_finished'>finished</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_attached'>attached</span> <span class='op'>=</span> <span class='const'>AtomicBoolean</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='kw'>false</span><span class='rparen'>)</span>
@@ -2335,6 +2327,9 @@ to the caller-provided handlers.</p>
       <pre class="lines">
 
 
+754
+755
+756
 757
 758
 759
@@ -2349,13 +2344,10 @@ to the caller-provided handlers.</p>
 768
 769
 770
-771
-772
-773
-774</pre>
+771</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 757</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 754</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_attach_http1_detached_body'>attach_http1_detached_body</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_state'>state</span><span class='comma'>,</span> <span class='id identifier rubyid_finished'>finished</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Reactor/Http1IO.html" title="Raptor::Reactor::Http1IO (class)">Http1IO</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Reactor/Http1IO.html#initialize-instance_method" title="Raptor::Reactor::Http1IO#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
@@ -2584,6 +2576,9 @@ controller in the reactor's per-connection maps.</p>
       <pre class="lines">
 
 
+580
+581
+582
 583
 584
 585
@@ -2592,13 +2587,10 @@ controller in the reactor's per-connection maps.</p>
 588
 589
 590
-591
-592
-593
-594</pre>
+591</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 583</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 580</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_attach_http2'>attach_http2</span><span class='lparen'>(</span><span class='label'>id:</span><span class='comma'>,</span> <span class='label'>socket:</span><span class='comma'>,</span> <span class='label'>state:</span><span class='comma'>,</span> <span class='label'>writer:</span><span class='comma'>,</span> <span class='label'>flow_control:</span><span class='comma'>,</span> <span class='label'>ping_frame:</span><span class='comma'>,</span> <span class='label'>ping_payload:</span><span class='rparen'>)</span>
   <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_socket'>socket</span>
@@ -2717,6 +2709,9 @@ controller in the reactor's per-connection maps.</p>
       <pre class="lines">
 
 
+504
+505
+506
 507
 508
 509
@@ -2726,13 +2721,10 @@ controller in the reactor's per-connection maps.</p>
 513
 514
 515
-516
-517
-518
-519</pre>
+516</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 507</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 504</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_attach_http2_body'>attach_http2_body</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_finished'>finished</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_attached'>attached</span> <span class='op'>=</span> <span class='const'>AtomicBoolean</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='kw'>false</span><span class='rparen'>)</span>
@@ -2836,6 +2828,9 @@ controller in the reactor's per-connection maps.</p>
       <pre class="lines">
 
 
+875
+876
+877
 878
 879
 880
@@ -2850,13 +2845,10 @@ controller in the reactor's per-connection maps.</p>
 889
 890
 891
-892
-893
-894
-895</pre>
+892</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 878</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 875</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_attach_http2_detached_body'>attach_http2_detached_body</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='comma'>,</span> <span class='id identifier rubyid_finished'>finished</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='ivar'>@id_to_io</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -2922,12 +2914,12 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
-654
-655
-656</pre>
+651
+652
+653</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 654</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 651</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_backlog'>backlog</span>
   <span class='ivar'>@thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_queue_size'>queue_size</span> <span class='op'>+</span> <span class='ivar'>@thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_active_count'>active_count</span>
@@ -2961,6 +2953,9 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+1015
+1016
+1017
 1018
 1019
 1020
@@ -2968,13 +2963,10 @@ or awaiting processing.</p>
 1022
 1023
 1024
-1025
-1026
-1027
-1028</pre>
+1025</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1018</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1015</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_cancel_detached_bodies'>cancel_detached_bodies</span>
   <span class='ivar'>@id_to_io</span><span class='period'>.</span><span class='id identifier rubyid_to_a'>to_a</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='op'>|</span>
@@ -3048,15 +3040,15 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+538
+539
+540
 541
 542
-543
-544
-545
-546</pre>
+543</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 541</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 538</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_cancel_http2_body'>cancel_http2_body</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@detached_count</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
@@ -3111,6 +3103,8 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+1458
+1459
 1460
 1461
 1462
@@ -3135,12 +3129,10 @@ or awaiting processing.</p>
 1481
 1482
 1483
-1484
-1485
-1486</pre>
+1484</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1460</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1458</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_cleanup'>cleanup</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_state'>state</span> <span class='op'>=</span> <span class='ivar'>@socket_to_state</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
@@ -3216,14 +3208,14 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+1200
+1201
+1202
 1203
-1204
-1205
-1206
-1207</pre>
+1204</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1203</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1200</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_clear_write_timeout'>clear_write_timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='id identifier rubyid_io'>io</span><span class='op'>&amp;.</span><span class='id identifier rubyid_timeout'>timeout</span>
@@ -3277,19 +3269,19 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+1047
+1048
+1049
 1050
 1051
 1052
 1053
 1054
 1055
-1056
-1057
-1058
-1059</pre>
+1056</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1050</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1047</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close_after_writes'>close_after_writes</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='ivar'>@id_to_io</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -3348,13 +3340,13 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
-632
-633
-634
-635</pre>
+629
+630
+631
+632</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 632</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 629</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close_connection'>close_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='ivar'>@io_queue</span> <span class='op'>&lt;&lt;</span> <span class='lbracket'>[</span><span class='symbol'>:close</span><span class='comma'>,</span> <span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -3376,7 +3368,7 @@ or awaiting processing.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Returns true when the request has been fully parsed.</p>
+    <p>Returns whether the request has been fully parsed.</p>
 
   </div>
 </div>
@@ -3410,9 +3402,6 @@ or awaiting processing.</p>
       
       
       
-        &mdash;
-        <div class='inline'><p>true if the request is complete</p></div>
-      
     </li>
   
 </ul>
@@ -3423,12 +3412,12 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
-1494
-1495
-1496</pre>
+1492
+1493
+1494</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1494</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1492</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_complete?'>complete?</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:complete</span><span class='rbracket'>]</span>
@@ -3494,16 +3483,16 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+1213
+1214
+1215
 1216
 1217
 1218
-1219
-1220
-1221
-1222</pre>
+1219</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1216</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1213</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_deregister'>deregister</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_io'>io</span><span class='op'>&amp;.</span><span class='id identifier rubyid_monitor'>monitor</span> <span class='op'>||</span> <span class='ivar'>@selector</span><span class='period'>.</span><span class='id identifier rubyid_registered?'>registered?</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
@@ -3541,17 +3530,17 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+1032
+1033
+1034
 1035
 1036
 1037
 1038
-1039
-1040
-1041
-1042</pre>
+1039</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1035</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1032</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_detached_body_removed'>detached_body_removed</span>
   <span class='id identifier rubyid_remaining'>remaining</span> <span class='op'>=</span> <span class='kw'>nil</span>
@@ -3639,18 +3628,18 @@ that arrived after graceful draining began.</p>
       <pre class="lines">
 
 
+444
+445
+446
 447
 448
 449
 450
 451
-452
-453
-454
-455</pre>
+452</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 447</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 444</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_dispatch_http2_stream'>dispatch_http2_stream</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='lparen'>(</span><span class='id identifier rubyid_last_stream'>last_stream</span> <span class='op'>=</span> <span class='ivar'>@id_to_http2_drain_stream</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
@@ -3709,6 +3698,9 @@ the worker drain period.</p>
       <pre class="lines">
 
 
+552
+553
+554
 555
 556
 557
@@ -3719,13 +3711,10 @@ the worker drain period.</p>
 562
 563
 564
-565
-566
-567
-568</pre>
+565</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 555</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 552</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_drain_detached_bodies'>drain_detached_bodies</span><span class='lparen'>(</span><span class='id identifier rubyid_timeout'>timeout</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_barrier'>barrier</span> <span class='op'>=</span> <span class='const'>AtomicBoolean</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='kw'>false</span><span class='rparen'>)</span>
@@ -3821,18 +3810,18 @@ connection may dispatch while existing application work drains.</p>
       <pre class="lines">
 
 
+463
+464
+465
 466
 467
 468
 469
 470
-471
-472
-473
-474</pre>
+471</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 466</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 463</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_drain_http2'>drain_http2</span>
   <span class='ivar'>@id_to_flow_control</span><span class='period'>.</span><span class='id identifier rubyid_each_key'>each_key</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_id'>id</span><span class='op'>|</span>
@@ -3872,6 +3861,9 @@ connection may dispatch while existing application work drains.</p>
       <pre class="lines">
 
 
+692
+693
+694
 695
 696
 697
@@ -3919,13 +3911,10 @@ connection may dispatch while existing application work drains.</p>
 739
 740
 741
-742
-743
-744
-745</pre>
+742</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 695</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 692</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_drain_io_queue'>drain_io_queue</span>
   <span class='id identifier rubyid_connections'>connections</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
@@ -4025,6 +4014,9 @@ connection may dispatch while existing application work drains.</p>
       <pre class="lines">
 
 
+673
+674
+675
 676
 677
 678
@@ -4034,13 +4026,10 @@ connection may dispatch while existing application work drains.</p>
 682
 683
 684
-685
-686
-687
-688</pre>
+685</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 676</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 673</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_expire_timeouts'>expire_timeouts</span><span class='lparen'>(</span><span class='id identifier rubyid_now'>now</span><span class='rparen'>)</span>
   <span class='kw'>while</span> <span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='ivar'>@timeouts</span><span class='period'>.</span><span class='id identifier rubyid_min'>min</span><span class='rparen'>)</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_timeout'>timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_now'>now</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
@@ -4116,6 +4105,9 @@ connection may dispatch while existing application work drains.</p>
       <pre class="lines">
 
 
+813
+814
+815
 816
 817
 818
@@ -4146,13 +4138,10 @@ connection may dispatch while existing application work drains.</p>
 843
 844
 845
-846
-847
-848
-849</pre>
+846</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 816</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 813</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_finish_http1_detached_body'>finish_http1_detached_body</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -4263,6 +4252,9 @@ connection may dispatch while existing application work drains.</p>
       <pre class="lines">
 
 
+978
+979
+980
 981
 982
 983
@@ -4272,13 +4264,10 @@ connection may dispatch while existing application work drains.</p>
 987
 988
 989
-990
-991
-992
-993</pre>
+990</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 981</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 978</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_finish_http2_detached_body'>finish_http2_detached_body</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_body'>body</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_parser'>parser</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2Parser.html" title="Raptor::Http2Parser (class)">Http2Parser</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
@@ -4343,9 +4332,6 @@ connection may dispatch while existing application work drains.</p>
       
       
       
-        &mdash;
-        <div class='inline'><p>true if first data has been received</p></div>
-      
     </li>
   
 </ul>
@@ -4356,12 +4342,12 @@ connection may dispatch while existing application work drains.</p>
       <pre class="lines">
 
 
-1504
-1505
-1506</pre>
+1502
+1503
+1504</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1504</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1502</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_first_data_received?'>first_data_received?</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_complete?'>complete?</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='period'>.</span><span class='id identifier rubyid_dig'>dig</span><span class='lparen'>(</span><span class='symbol'>:parse_data</span><span class='comma'>,</span> <span class='symbol'>:parse_count</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='int'>0</span><span class='rparen'>)</span> <span class='op'>&gt;=</span> <span class='int'>1</span>
@@ -4382,8 +4368,8 @@ connection may dispatch while existing application work drains.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Returns the flow controller associated with a given connection, if
-one was supplied when the connection was added.</p>
+    <p>Returns the HTTP/2 flow controller registered by <span class='object_link'><a href="#attach_http2-instance_method" title="Raptor::Reactor#attach_http2 (method)">#attach_http2</a></span> for a
+connection.</p>
 
   </div>
 </div>
@@ -4430,12 +4416,12 @@ one was supplied when the connection was added.</p>
       <pre class="lines">
 
 
-411
-412
-413</pre>
+408
+409
+410</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 411</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 408</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_flow_control_for'>flow_control_for</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='ivar'>@id_to_flow_control</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -4487,6 +4473,9 @@ one was supplied when the connection was added.</p>
       <pre class="lines">
 
 
+779
+780
+781
 782
 783
 784
@@ -4509,13 +4498,10 @@ one was supplied when the connection was added.</p>
 801
 802
 803
-804
-805
-806
-807</pre>
+804</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 782</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 779</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_flush_http1_detached_body'>flush_http1_detached_body</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='ivar'>@id_to_io</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -4590,6 +4576,9 @@ one was supplied when the connection was added.</p>
       <pre class="lines">
 
 
+928
+929
+930
 931
 932
 933
@@ -4627,13 +4616,10 @@ one was supplied when the connection was added.</p>
 965
 966
 967
-968
-969
-970
-971</pre>
+968</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 931</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 928</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_flush_http2_detached_bodies'>flush_http2_detached_bodies</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='ivar'>@id_to_io</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -4719,7 +4705,7 @@ one was supplied when the connection was added.</p>
         <span class='name'>io</span>
       
       
-        <span class='type'>(<tt><span class='object_link'><a href="Reactor/ConnectionIO.html" title="Raptor::Reactor::ConnectionIO (class)">ConnectionIO</a></span></tt>)</span>
+        <span class='type'>(<tt><span class='object_link'><a href="Reactor/ConnectionIO.html" title="Raptor::Reactor::ConnectionIO (class)">ConnectionIO</a></span></tt>, <tt>nil</tt>)</span>
       
       
       
@@ -4737,6 +4723,9 @@ one was supplied when the connection was added.</p>
       <pre class="lines">
 
 
+1093
+1094
+1095
 1096
 1097
 1098
@@ -4775,13 +4764,10 @@ one was supplied when the connection was added.</p>
 1131
 1132
 1133
-1134
-1135
-1136
-1137</pre>
+1134</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1096</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1093</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_flush_output'>flush_output</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -4886,6 +4872,9 @@ one was supplied when the connection was added.</p>
       <pre class="lines">
 
 
+1348
+1349
+1350
 1351
 1352
 1353
@@ -4906,13 +4895,10 @@ one was supplied when the connection was added.</p>
 1368
 1369
 1370
-1371
-1372
-1373
-1374</pre>
+1371</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1351</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1348</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle_http1_detached_monitor'>handle_http1_detached_monitor</span><span class='lparen'>(</span><span class='id identifier rubyid_monitor'>monitor</span><span class='comma'>,</span> <span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='id identifier rubyid_monitor'>monitor</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -4986,6 +4972,9 @@ threads to take ownership of HTTP/2 sockets.</p>
       <pre class="lines">
 
 
+1304
+1305
+1306
 1307
 1308
 1309
@@ -5018,13 +5007,10 @@ threads to take ownership of HTTP/2 sockets.</p>
 1336
 1337
 1338
-1339
-1340
-1341
-1342</pre>
+1339</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1307</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1304</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle_monitor'>handle_monitor</span><span class='lparen'>(</span><span class='id identifier rubyid_monitor'>monitor</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='id identifier rubyid_monitor'>monitor</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -5124,6 +5110,9 @@ probe before closing the connection when its acknowledgement is late.</p>
       <pre class="lines">
 
 
+1279
+1280
+1281
 1282
 1283
 1284
@@ -5137,13 +5126,10 @@ probe before closing the connection when its acknowledgement is late.</p>
 1292
 1293
 1294
-1295
-1296
-1297
-1298</pre>
+1295</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1282</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1279</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle_timeout'>handle_timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span><span class='comma'>,</span> <span class='id identifier rubyid_now'>now</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_state'>state</span> <span class='op'>=</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_client_data'>client_data</span>
@@ -5223,16 +5209,16 @@ probe before closing the connection when its acknowledgement is late.</p>
       <pre class="lines">
 
 
+901
+902
+903
 904
 905
 906
-907
-908
-909
-910</pre>
+907</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 904</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 901</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_mark_http2_detached_body_ready'>mark_http2_detached_body_ready</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='ivar'>@id_to_io</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -5367,6 +5353,9 @@ under the persistent-data timeout.</p>
       <pre class="lines">
 
 
+363
+364
+365
 366
 367
 368
@@ -5379,13 +5368,10 @@ under the persistent-data timeout.</p>
 375
 376
 377
-378
-379
-380
-381</pre>
+378</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 366</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 363</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_persist'>persist</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_request_count'>request_count</span><span class='comma'>,</span> <span class='label'>remote_addr:</span><span class='comma'>,</span> <span class='label'>url_scheme:</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_state'>state</span> <span class='op'>=</span> <span class='lbrace'>{</span>
@@ -5432,7 +5418,7 @@ under the persistent-data timeout.</p>
         <span class='name'>io</span>
       
       
-        <span class='type'>(<tt><span class='object_link'><a href="Reactor/ConnectionIO.html" title="Raptor::Reactor::ConnectionIO (class)">ConnectionIO</a></span></tt>)</span>
+        <span class='type'>(<tt><span class='object_link'><a href="Reactor/ConnectionIO.html" title="Raptor::Reactor::ConnectionIO (class)">ConnectionIO</a></span></tt>, <tt>nil</tt>)</span>
       
       
       
@@ -5464,18 +5450,18 @@ under the persistent-data timeout.</p>
       <pre class="lines">
 
 
+1076
+1077
+1078
 1079
 1080
 1081
 1082
 1083
-1084
-1085
-1086
-1087</pre>
+1084</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1079</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1076</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_queue_output'>queue_output</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='id identifier rubyid_data'>data</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_io'>io</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_closing'>closing</span>
@@ -5548,6 +5534,8 @@ returns it to the selector.</p>
       <pre class="lines">
 
 
+1428
+1429
 1430
 1431
 1432
@@ -5568,12 +5556,10 @@ returns it to the selector.</p>
 1447
 1448
 1449
-1450
-1451
-1452</pre>
+1450</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1430</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1428</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_read_and_queue_for_parse'>read_and_queue_for_parse</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='kw'>begin</span>
@@ -5645,6 +5631,9 @@ returns it to the selector.</p>
       <pre class="lines">
 
 
+1227
+1228
+1229
 1230
 1231
 1232
@@ -5670,13 +5659,10 @@ returns it to the selector.</p>
 1252
 1253
 1254
-1255
-1256
-1257
-1258</pre>
+1255</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1230</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1227</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_register'>register</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_state'>state</span> <span class='op'>=</span> <span class='ivar'>@socket_to_state</span><span class='lbracket'>[</span><span class='id identifier rubyid_socket'>socket</span><span class='rbracket'>]</span>
@@ -5772,14 +5758,14 @@ open so the worker can write the response.</p>
       <pre class="lines">
 
 
+346
+347
+348
 349
-350
-351
-352
-353</pre>
+350</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 349</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 346</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove'>remove</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='ivar'>@id_to_socket</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_tap'>tap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_socket'>socket</span><span class='op'>|</span>
@@ -5833,13 +5819,13 @@ open so the worker can write the response.</p>
       <pre class="lines">
 
 
-1067
-1068
-1069
-1070</pre>
+1064
+1065
+1066
+1067</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1067</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1064</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_connection'>remove_connection</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -5906,19 +5892,19 @@ open so the worker can write the response.</p>
       <pre class="lines">
 
 
+855
+856
+857
 858
 859
 860
 861
 862
 863
-864
-865
-866
-867</pre>
+864</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 858</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 855</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_http1_detached_body'>remove_http1_detached_body</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_reason'>reason</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='ivar'>@id_to_io</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -6005,18 +5991,18 @@ open so the worker can write the response.</p>
       <pre class="lines">
 
 
+1000
+1001
+1002
 1003
 1004
 1005
 1006
 1007
-1008
-1009
-1010
-1011</pre>
+1008</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1003</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1000</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_http2_detached_body'>remove_http2_detached_body</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_reason'>reason</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='ivar'>@id_to_io</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -6074,15 +6060,15 @@ open so the worker can write the response.</p>
       <pre class="lines">
 
 
+524
+525
+526
 527
 528
-529
-530
-531
-532</pre>
+529</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 527</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 524</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_resume_http2_bodies'>resume_http2_bodies</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@detached_count</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
@@ -6137,15 +6123,15 @@ open so the worker can write the response.</p>
       <pre class="lines">
 
 
+915
+916
+917
 918
 919
-920
-921
-922
-923</pre>
+920</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 918</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 915</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_resume_http2_detached_bodies'>resume_http2_detached_bodies</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span> <span class='op'>=</span> <span class='ivar'>@id_to_io</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -6216,6 +6202,8 @@ round trip.</p>
       <pre class="lines">
 
 
+1402
+1403
 1404
 1405
 1406
@@ -6230,12 +6218,10 @@ round trip.</p>
 1415
 1416
 1417
-1418
-1419
-1420</pre>
+1418</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1404</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1402</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_resume_keepalive'>resume_keepalive</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_remove'>remove</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
@@ -6300,7 +6286,6 @@ shutdown work and pending writes are drained.</p>
       <pre class="lines">
 
 
-260
 261
 262
 263
@@ -6340,10 +6325,11 @@ shutdown work and pending writes are drained.</p>
 297
 298
 299
-300</pre>
+300
+301</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 260</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 261</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
   <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span>
@@ -6416,13 +6402,13 @@ event loop drains pending work and exits.</p>
       <pre class="lines">
 
 
-643
-644
-645
-646</pre>
+640
+641
+642
+643</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 643</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 640</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='ivar'>@queue</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span>
@@ -6491,12 +6477,12 @@ event loop drains pending work and exits.</p>
       <pre class="lines">
 
 
-389
-390
-391</pre>
+386
+387
+388</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 389</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 386</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_socket_for'>socket_for</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -6543,13 +6529,13 @@ event loop drains pending work and exits.</p>
       <pre class="lines">
 
 
-665
-666
-667
-668</pre>
+662
+663
+664
+665</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 665</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 662</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stopped?'>stopped?</span>
   <span class='ivar'>@queue</span><span class='period'>.</span><span class='id identifier rubyid_closed?'>closed?</span> <span class='op'>&amp;&amp;</span> <span class='ivar'>@queue</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>&amp;&amp;</span> <span class='ivar'>@io_queue</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>&amp;&amp;</span>
@@ -6616,15 +6602,15 @@ event loop drains pending work and exits.</p>
       <pre class="lines">
 
 
+1264
+1265
+1266
 1267
 1268
-1269
-1270
-1271
-1272</pre>
+1269</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1267</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1264</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_track_timeout'>track_timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='comma'>,</span> <span class='id identifier rubyid_timeout_at'>timeout_at</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Reactor/TimeoutClient.html" title="Raptor::Reactor::TimeoutClient (class)">TimeoutClient</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="#initialize-instance_method" title="Raptor::Reactor#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
@@ -6693,16 +6679,16 @@ event loop drains pending work and exits.</p>
       <pre class="lines">
 
 
+1186
+1187
+1188
 1189
 1190
 1191
-1192
-1193
-1194
-1195</pre>
+1192</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1189</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1186</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_track_write_timeout'>track_write_timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_clear_write_timeout'>clear_write_timeout</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
@@ -6772,6 +6758,9 @@ event loop drains pending work and exits.</p>
       <pre class="lines">
 
 
+1157
+1158
+1159
 1160
 1161
 1162
@@ -6789,13 +6778,10 @@ event loop drains pending work and exits.</p>
 1174
 1175
 1176
-1177
-1178
-1179
-1180</pre>
+1177</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1160</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1157</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_update_monitor'>update_monitor</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -6886,19 +6872,19 @@ it for further I/O.</p>
       <pre class="lines">
 
 
+327
+328
+329
 330
 331
 332
 333
 334
 335
-336
-337
-338
-339</pre>
+336</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 330</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 327</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_update_state'>update_state</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rbracket'>]</span>
@@ -6985,14 +6971,14 @@ it for further I/O.</p>
       <pre class="lines">
 
 
+1144
+1145
+1146
 1147
-1148
-1149
-1150
-1151</pre>
+1148</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1147</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1144</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_wait_for_write'>wait_for_write</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='id identifier rubyid_readiness'>readiness</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_io'>io</span><span class='period'>.</span><span class='id identifier rubyid_wait'>wait</span> <span class='op'>=</span> <span class='id identifier rubyid_readiness'>readiness</span>
@@ -7015,7 +7001,8 @@ it for further I/O.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Handles socket wakeup by deregistering and queuing for processing.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Deregisters a readable socket and resumes its idle keep-alive
+connection or queues its bytes for parsing.</p>
 
   </div>
 </div>
@@ -7046,6 +7033,8 @@ it for further I/O.</p>
       <pre class="lines">
 
 
+1380
+1381
 1382
 1383
 1384
@@ -7055,12 +7044,10 @@ it for further I/O.</p>
 1388
 1389
 1390
-1391
-1392
-1393</pre>
+1391</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1382</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1380</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_wakeup!'>wakeup!</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
   <span class='ivar'>@selector</span><span class='period'>.</span><span class='id identifier rubyid_deregister'>deregister</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
@@ -7121,18 +7108,18 @@ it for further I/O.</p>
       <pre class="lines">
 
 
+613
+614
+615
 616
 617
 618
 619
 620
-621
-622
-623
-624</pre>
+621</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 616</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 613</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_watch'>watch</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='ivar'>@id_to_socket</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -7205,6 +7192,9 @@ write to the socket or wait for it to become writable.</p>
       <pre class="lines">
 
 
+481
+482
+483
 484
 485
 486
@@ -7214,13 +7204,10 @@ write to the socket or wait for it to become writable.</p>
 490
 491
 492
-493
-494
-495
-496</pre>
+493</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 484</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 481</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_http2_frames'>write_http2_frames</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='comma'>,</span> <span class='id identifier rubyid_frames'>frames</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='id identifier rubyid_frames'>frames</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
@@ -7251,8 +7238,8 @@ write to the socket or wait for it to become writable.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Returns the writer object associated with a given connection, if one
-was supplied when the connection was added.</p>
+    <p>Returns the HTTP/2 frame writer registered by <span class='object_link'><a href="#attach_http2-instance_method" title="Raptor::Reactor#attach_http2 (method)">#attach_http2</a></span> for a
+connection.</p>
 
   </div>
 </div>
@@ -7299,12 +7286,12 @@ was supplied when the connection was added.</p>
       <pre class="lines">
 
 
-400
-401
-402</pre>
+397
+398
+399</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 400</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 397</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_writer_for'>writer_for</span><span class='lparen'>(</span><span class='id identifier rubyid_id'>id</span><span class='rparen'>)</span>
   <span class='ivar'>@id_to_writer</span><span class='lbracket'>[</span><span class='id identifier rubyid_id'>id</span><span class='rbracket'>]</span>
@@ -7319,7 +7306,7 @@ was supplied when the connection was added.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 11:43:27 2026 by
+  Generated on Sun Oct 18 11:45:11 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

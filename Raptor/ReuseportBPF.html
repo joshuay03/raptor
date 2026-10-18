@@ -271,7 +271,7 @@ left to the binder's shared listeners.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Marks a worker's slot as unavailable by parking its load at the sentinel maximum so the BPF program's least-loaded pick skips it.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Marks a worker's slot as unavailable by parking its load at the sentinel maximum so the BPF program's two-choice sampling prefers the other candidate.</p></div></span>
   
 </li>
 
@@ -594,7 +594,8 @@ Skips non-tcp bind URIs.</p>
 </h3><div class="docstring">
   <div class="discussion">
     <p class="note returns_void">This method returns an undefined value.</p><p>Marks a worker's slot as unavailable by parking its load at the
-sentinel maximum so the BPF program's least-loaded pick skips it.</p>
+sentinel maximum so the BPF program's two-choice sampling prefers the
+other candidate.</p>
 
   </div>
 </div>
@@ -625,14 +626,14 @@ sentinel maximum so the BPF program's least-loaded pick skips it.</p>
       <pre class="lines">
 
 
-155
 156
 157
 158
-159</pre>
+159
+160</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 155</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 156</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_mark_unavailable'>mark_unavailable</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@loads_fd</span>
@@ -927,7 +928,7 @@ different threads.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 11:43:26 2026 by
+  Generated on Sun Oct 18 11:45:10 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

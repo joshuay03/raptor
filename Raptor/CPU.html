@@ -170,19 +170,19 @@
       <pre class="lines">
 
 
-72
-73
-74
 75
 76
 77
 78
 79
 80
-81</pre>
+81
+82
+83
+84</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 72</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 75</span>
 
 static VALUE cpu_count(VALUE self) {
 #ifdef __linux__
@@ -247,7 +247,10 @@ static VALUE cpu_count(VALUE self) {
 67
 68
 69
-70</pre>
+70
+71
+72
+73</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 46</span>
@@ -263,7 +266,10 @@ static VALUE cpu_pin(VALUE self, VALUE cpu) {
   int seen = 0;
   for (int candidate = 0; candidate &lt; CPU_SETSIZE; candidate++) {
     if (!CPU_ISSET(candidate, &amp;current)) continue;
-    if (seen == worker_index) { cpu_id = candidate; break; }
+    if (seen == worker_index) {
+      cpu_id = candidate;
+      break;
+    }
     seen++;
   }
   if (cpu_id &lt; 0) return Qfalse;
@@ -287,7 +293,7 @@ static VALUE cpu_pin(VALUE self, VALUE cpu) {
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 11:43:26 2026 by
+  Generated on Sun Oct 18 11:45:10 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

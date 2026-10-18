@@ -247,7 +247,7 @@ booted            uint8     1 byte
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Allocates the shared mmap region for <code>num_workers</code> slots.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Creates a new Stats and allocates the shared mmap region for <code>num_workers</code> slots.</p></div></span>
   
 </li>
 
@@ -336,7 +336,8 @@ booted            uint8     1 byte
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Allocates the shared mmap region for <code>num_workers</code> slots.</p>
+    <p>Creates a new Stats and allocates the shared mmap region for
+<code>num_workers</code> slots.</p>
 
   </div>
 </div>
@@ -367,13 +368,13 @@ booted            uint8     1 byte
       <pre class="lines">
 
 
-36
 37
 38
-39</pre>
+39
+40</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 36</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 37</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_num_workers'>num_workers</span><span class='rparen'>)</span>
   <span class='ivar'>@num_workers</span> <span class='op'>=</span> <span class='id identifier rubyid_num_workers'>num_workers</span>
@@ -431,12 +432,12 @@ booted            uint8     1 byte
       <pre class="lines">
 
 
-66
 67
-68</pre>
+68
+69</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 66</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 67</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_all'>all</span>
   <span class='lparen'>(</span><span class='int'>0</span><span class='op'>...</span><span class='ivar'>@num_workers</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_index'>index</span><span class='op'>|</span> <span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
@@ -475,7 +476,7 @@ booted            uint8     1 byte
       
       
         &mdash;
-        <div class='inline'><p>slot offset to read from</p></div>
+        <div class='inline'><p>slot index to read from</p></div>
       
     </li>
   
@@ -504,7 +505,6 @@ booted            uint8     1 byte
       <pre class="lines">
 
 
-87
 88
 89
 90
@@ -519,10 +519,11 @@ booted            uint8     1 byte
 99
 100
 101
-102</pre>
+102
+103</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 87</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 88</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_slot'>slot</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='ivar'>@mmap</span><span class='lbracket'>[</span><span class='id identifier rubyid_slot'>slot</span> <span class='op'>*</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='rbracket'>]</span>
@@ -569,12 +570,12 @@ booted            uint8     1 byte
       <pre class="lines">
 
 
-75
 76
-77</pre>
+77
+78</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 75</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 76</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_unmap'>unmap</span>
   <span class='ivar'>@mmap</span><span class='period'>.</span><span class='id identifier rubyid_unmap'>unmap</span>
@@ -851,13 +852,13 @@ booted            uint8     1 byte
       <pre class="lines">
 
 
-56
 57
 58
-59</pre>
+59
+60</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 56</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 57</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='label'>pid:</span><span class='comma'>,</span> <span class='label'>phase:</span><span class='comma'>,</span> <span class='label'>requests:</span><span class='comma'>,</span> <span class='label'>backlog:</span><span class='comma'>,</span> <span class='label'>busy_threads:</span><span class='comma'>,</span> <span class='label'>thread_capacity:</span><span class='comma'>,</span> <span class='label'>started_at:</span><span class='comma'>,</span> <span class='label'>last_checkin:</span><span class='comma'>,</span> <span class='label'>booted:</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='id identifier rubyid_phase'>phase</span><span class='comma'>,</span> <span class='id identifier rubyid_requests'>requests</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span><span class='comma'>,</span> <span class='id identifier rubyid_busy_threads'>busy_threads</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_capacity'>thread_capacity</span><span class='comma'>,</span> <span class='id identifier rubyid_started_at'>started_at</span><span class='comma'>,</span> <span class='id identifier rubyid_last_checkin'>last_checkin</span><span class='comma'>,</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>?</span> <span class='int'>1</span> <span class='op'>:</span> <span class='int'>0</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#SLOT_FORMAT-constant" title="Raptor::Stats::SLOT_FORMAT (constant)">SLOT_FORMAT</a></span></span><span class='rparen'>)</span>
@@ -873,7 +874,7 @@ booted            uint8     1 byte
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 11:43:26 2026 by
+  Generated on Sun Oct 18 11:45:11 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

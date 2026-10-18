@@ -473,7 +473,7 @@ settings.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns the path from a <code>-c</code>/<code>--config</code> flag in <code>argv</code>, recognising all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--config PATH</code>, <code>--config=PATH</code>).</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns the path from a <code>-c</code>/<code>--config</code> flag in <code>argv</code>, recognizing all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>, <code>--config PATH</code>, <code>--config=PATH</code>).</p></div></span>
   
 </li>
 
@@ -497,7 +497,7 @@ settings.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Creates a new CLI instance from <code>argv</code>.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Creates a new CLI from <code>argv</code>.</p></div></span>
   
 </li>
 
@@ -564,9 +564,8 @@ settings.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Creates a new CLI instance from <code>argv</code>. A rackup file may be given
-as the first positional argument; every other value is parsed as a
-flag.</p>
+    <p>Creates a new CLI from <code>argv</code>. A rackup file may be given as the
+first positional argument; every other value is parsed as a flag.</p>
 
   </div>
 </div>
@@ -602,6 +601,18 @@ flag.</p>
       
         &mdash;
         <div class='inline'><p>if invalid options are provided</p></div>
+      
+    </li>
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>ArgumentError</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>if the config file or max threads value is invalid</p></div>
       
     </li>
   
@@ -1389,7 +1400,7 @@ options are parsed afterwards and take precedence.</p>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:connection</span><span class='rbracket'>]</span><span class='lbracket'>[</span><span class='symbol'>:body_spool_threshold</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_bytes'>bytes</span>
     <span class='kw'>end</span>
 
-    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--http1-ractors NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of HTTP/1.1 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..3)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
+    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--http1-ractors NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of HTTP/1.1 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..</span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="Cluster.html" title="Raptor::Cluster (class)">Cluster</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Cluster.html#HTTP1_RACTOR_COUNT_CAP-constant" title="Raptor::Cluster::HTTP1_RACTOR_COUNT_CAP (constant)">HTTP1_RACTOR_COUNT_CAP</a></span></span><span class='embexpr_end'>}</span><span class='tstring_content'>)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:http1</span><span class='rbracket'>]</span><span class='lbracket'>[</span><span class='symbol'>:ractors</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
@@ -1401,7 +1412,7 @@ options are parsed afterwards and take precedence.</p>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:http1</span><span class='rbracket'>]</span><span class='lbracket'>[</span><span class='symbol'>:max_keepalive_requests</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
-    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--http2-ractors NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of HTTP/2 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..2)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
+    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--http2-ractors NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of HTTP/2 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..</span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="Cluster.html" title="Raptor::Cluster (class)">Cluster</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Cluster.html#HTTP2_RACTOR_COUNT_CAP-constant" title="Raptor::Cluster::HTTP2_RACTOR_COUNT_CAP (constant)">HTTP2_RACTOR_COUNT_CAP</a></span></span><span class='embexpr_end'>}</span><span class='tstring_content'>)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:http2</span><span class='rbracket'>]</span><span class='lbracket'>[</span><span class='symbol'>:ractors</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
@@ -1433,7 +1444,7 @@ options are parsed afterwards and take precedence.</p>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:worker_shutdown_timeout</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_timeout'>timeout</span>
     <span class='kw'>end</span>
 
-    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--refork-after NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Refork workers from a warmed source after any worker crosses NUM requests; 0 disables (default: 1000)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
+    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--refork-after NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Refork workers from a warmed source after any worker crosses NUM requests; 0 disables (default: 1000 on Linux, off elsewhere)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:refork_after</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
@@ -1488,7 +1499,7 @@ options are parsed afterwards and take precedence.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Returns the path from a <code>-c</code>/<code>--config</code> flag in <code>argv</code>, recognising
+    <p>Returns the path from a <code>-c</code>/<code>--config</code> flag in <code>argv</code>, recognizing
 all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 <code>--config PATH</code>, <code>--config=PATH</code>).</p>
 
@@ -1679,7 +1690,7 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 11:43:26 2026 by
+  Generated on Sun Oct 18 11:45:10 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
