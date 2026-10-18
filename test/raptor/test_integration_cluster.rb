@@ -364,6 +364,34 @@ module Raptor
       File.delete(stats_path) rescue nil
     end
 
+    def test_master_replaces_crashed_seed_forked_worker
+      skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Subreaper.enable
+
+      stats_path = "/tmp/raptor_test_refork_crash_#{Process.pid}.json"
+      File.delete(stats_path) rescue nil
+      @options[:refork_after] = 1
+      @options[:stats_file] = stats_path
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      original_pid = wait_for_booted_worker_pid(stats_path)
+      Net::HTTP.get_response(URI("http://127.0.0.1:#{server_port}/"))
+      seed_forked_pid = wait_for_booted_worker_pid(stats_path, except: original_pid)
+
+      Process.kill("KILL", seed_forked_pid)
+
+      wait_for_booted_worker_pid(stats_path, except: [original_pid, seed_forked_pid])
+      response = Net::HTTP.get_response(URI("http://127.0.0.1:#{server_port}/"))
+
+      assert_equal 200, response.code.to_i
+      assert_equal "Hello, World!", response.body
+    ensure
+      stop_cluster(cluster_pid)
+      File.delete(stats_path) rescue nil
+    end
+
     def test_worker_drain_timeout_force_kills_hanging_app_threads
       @options[:rackup] = fixture_path("slow_path.ru")
       @options[:worker_drain_timeout] = 1
@@ -633,7 +661,7 @@ module Raptor
         next unless File.exist?(stats_path)
 
         data = JSON.parse(File.read(stats_path), symbolize_names: true) rescue nil
-        worker = data&.dig(:workers)&.find { |entry| entry[:booted] && entry[:pid] != except }
+        worker = data&.dig(:workers)&.find { |entry| entry[:booted] && !Array(except).include?(entry[:pid]) }
         worker&.fetch(:pid)
       end
     end

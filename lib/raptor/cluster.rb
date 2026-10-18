@@ -973,11 +973,6 @@ module Raptor
       trap("TERM") { seed_shutdown = true }
       trap("URG", "IGNORE")
 
-      child_pids = []
-      trap("CHLD") do
-        child_pids.reject! { |pid| Process.wait(pid, Process::WNOHANG) rescue true }
-      end
-
       @resp_w.write([0].pack("L"))
 
       until seed_shutdown
@@ -987,9 +982,15 @@ module Raptor
         break unless bytes.is_a?(String) && bytes.bytesize == 8
 
         slot_index, child_phase = bytes.unpack("LL")
-        pid = fork { run_worker(slot_index, child_phase) }
-        child_pids << pid
-        @resp_w.write([pid].pack("L")) rescue nil
+        # Forks through a short-lived intermediate process so the worker
+        # reparents to the subreaper master, which supervises and reaps it
+        # like a worker it forked itself.
+        intermediate_pid = fork do
+          pid = fork { run_worker(slot_index, child_phase) }
+          @resp_w.write([pid].pack("L")) rescue nil
+          exit!
+        end
+        Process.wait(intermediate_pid)
       end
     rescue Errno::EPIPE, IOError
     end

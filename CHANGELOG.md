@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Restart workers forked by the seed when they exit
 - Keep draining HTTP/2 connections when another attaches during shutdown
 - Close HTTP/1.1 connections on the reactor thread when a detached body fails to open
 - Apply HTTP/2 initial window changes to responses waiting for flow control
