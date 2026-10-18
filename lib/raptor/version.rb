@@ -2,5 +2,5 @@
 # frozen_string_literal: true
 
 module Raptor
-  VERSION = "0.22.3"
+  VERSION = "0.23.0"
 end

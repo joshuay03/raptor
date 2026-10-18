@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-18
+
 - Route connections through BPF dispatch on every TCP bind
 - Reject non-integer `RAPTOR_WORKERS` and `RAPTOR_THREADS` in the Rackup handler
 - Replace config file binds with `--bind` addresses instead of adding to them

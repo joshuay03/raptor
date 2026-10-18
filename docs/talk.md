@@ -1155,17 +1155,17 @@ Linux moves processes between cores whenever it likes, and each move lands a wor
 
 Full results and the setup are in the [README](../README.md#micro-benchmarks). **I/O** requests mostly wait on fake database calls, and **CPU** requests mostly run Ruby.
 
-- <big>**I/O-heavy HTTP/1.1 with 3 threads per worker**: roughly 1.8 to 2.1 times Puma's throughput</big>
+- <big>**I/O-heavy HTTP/1.1 with 3 threads per worker**: roughly 2.3 times Puma's throughput</big>
   - Raptor polls for accept capacity under saturation. That trades CPU time for throughput and latency; the same thread count doesn't mean the same CPU use.
   - Existing keep-alive traffic can also delay new connections at saturation; throughput and p95 don't capture every client's wait.
 - <big>**I/O-heavy HTTP/1.1 with scaling threads**: approximately tied with Puma</big>
   - Puma adds a thread whenever work is waiting. Raptor only adds one when the busy threads are blocked, to avoid adding threads CPU-heavy apps can't use.
 - <big>**HTTP/2**: direct multiplexing, compared with Falcon</big>
   - Puma doesn't implement HTTP/2. Raptor and Falcon do; their numbers move around a lot between runs, so check the spread as well as the medians.
-- <big>**I/O with server-sent events and 3 threads per worker**: 8.3 times Puma's throughput, with Puma also reporting timeouts</big>
+- <big>**I/O with server-sent events and 3 threads per worker**: 9.5 times Puma's throughput, with Puma also reporting timeouts</big>
   - A detached body hands the stream to the reactor, so the app thread is free again. On Puma, every open stream holds a thread until it closes.
 
-Puma wins three of the four CPU-heavy HTTP/1.1 comparisons; Raptor leads slightly with scaling threads and keep-alive. These are micro benchmarks though, so benchmark your own application before choosing a server.
+Raptor wins on throughput in three of the four CPU-heavy HTTP/1.1 comparisons; Puma leads slightly with fixed threads and keep-alive. Puma still has lower p95 on fresh connections, while Raptor has lower p95 with keep-alive. These are micro benchmarks though, so benchmark your own application before choosing a server.
 
 <br>
 <br>
