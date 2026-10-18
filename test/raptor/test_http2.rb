@@ -512,6 +512,22 @@ module Raptor
       assert_equal 40, blocked.value
     end
 
+    def test_flow_control_acquire_applies_initial_window_changed_while_waiting
+      flow_control = Http2::FlowControl.new
+      drain_windows(flow_control, stream_id: 1)
+
+      blocked = Thread.new { flow_control.acquire(3, 100) }
+      sleep 0.05
+      flow_control.set_initial_stream_window(0)
+      flow_control.add_connection_window(100)
+      sleep 0.05
+      assert_predicate blocked, :alive?
+
+      flow_control.add_stream_window(3, 40)
+
+      assert_equal 40, blocked.value
+    end
+
     def test_flow_control_acquire_raises_when_stream_closes
       flow_control = Http2::FlowControl.new
       drain_windows(flow_control, stream_id: 1)

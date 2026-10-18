@@ -146,11 +146,11 @@ module Raptor
       #
       # @rbs (Integer stream_id, Integer max_bytes) -> Integer
       def acquire(stream_id, max_bytes)
-        initial = @initial_stream_window.value
         capped = [max_bytes, MAX_FRAME_SIZE].min
 
         @available.wait do
           check(stream_id)
+          initial = @initial_stream_window.value
           stream_window = @stream_windows.value[stream_id] || initial
           capped_full = [capped, stream_window].min
           granted = capped_full.positive? ? reserve_connection(capped_full) : 0
