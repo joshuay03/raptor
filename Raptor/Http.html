@@ -332,7 +332,7 @@ writing, and Common Log Format access-log formatting.</p>
 
 </div>
         </dt>
-        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Raptor/</span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../Raptor.html#VERSION-constant" title="Raptor::VERSION (constant)">VERSION</a></span></span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span></pre></dd>
+        <dd><pre class="code"><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Raptor/</span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="../Raptor.html#VERSION-constant" title="Raptor::VERSION (constant)">VERSION</a></span></span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span></pre></dd>
       
     </dl>
   
@@ -532,12 +532,12 @@ registration order, rescuing any that raise.</p>
         <span class='name'>status</span>
       
       
-        <span class='type'>(<tt>Integer</tt>, <tt>nil</tt>)</span>
+        <span class='type'>(<tt>Object</tt>, <tt>nil</tt>)</span>
       
       
       
         &mdash;
-        <div class='inline'><p>the response status code</p></div>
+        <div class='inline'><p>the status returned by the app, if any</p></div>
       
     </li>
   
@@ -578,16 +578,16 @@ registration order, rescuing any that raise.</p>
       <pre class="lines">
 
 
-130
-131
 132
 133
 134
 135
-136</pre>
+136
+137
+138</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 130</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 132</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_call_response_finished'>call_response_finished</span><span class='lparen'>(</span><span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_headers'>headers</span><span class='comma'>,</span> <span class='id identifier rubyid_error'>error</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_env'>env</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_env'>env</span><span class='lbracket'>[</span><span class='const'>Rack</span><span class='op'>::</span><span class='const'>RACK_RESPONSE_FINISHED</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Array</span><span class='rparen'>)</span>
@@ -741,18 +741,18 @@ the state hash's buffered bytes.</p>
       <pre class="lines">
 
 
-114
-115
 116
 117
-118</pre>
+118
+119
+120</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 114</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 116</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_parser_worker'>parser_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_env_template'>env_template</span><span class='comma'>,</span> <span class='id identifier rubyid_max_body_size'>max_body_size</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_proc'>proc</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_data'>data</span><span class='op'>|</span>
-    <span class='const'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_parse'><span class='object_link'><a href="Http1.html#parse-class_method" title="Raptor::Http1.parse (method)">parse</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_data'>data</span><span class='comma'>,</span> <span class='id identifier rubyid_env_template'>env_template</span><span class='comma'>,</span> <span class='id identifier rubyid_max_body_size'>max_body_size</span><span class='rparen'>)</span>
+    <span class='const'><span class='object_link'><a href="Http1.html" title="Raptor::Http1 (class)">Http1</a></span></span><span class='period'>.</span><span class='id identifier rubyid_parse'><span class='object_link'><a href="Http1.html#parse-class_method" title="Raptor::Http1.parse (method)">parse</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_data'>data</span><span class='comma'>,</span> <span class='id identifier rubyid_env_template'>env_template</span><span class='comma'>,</span> <span class='id identifier rubyid_max_body_size'>max_body_size</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -876,7 +876,8 @@ the state hash's buffered bytes.</p>
 61
 62
 63
-64</pre>
+64
+65</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 50</span>
@@ -890,6 +891,7 @@ the state hash's buffered bytes.</p>
       <span class='id identifier rubyid_bytes'>bytes</span> <span class='op'>+=</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_write_nonblock'>write_nonblock</span><span class='lparen'>(</span><span class='id identifier rubyid_bytes'>bytes</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span> <span class='op'>?</span> <span class='id identifier rubyid_string'>string</span> <span class='op'>:</span> <span class='id identifier rubyid_string'>string</span><span class='period'>.</span><span class='id identifier rubyid_byteslice'>byteslice</span><span class='lparen'>(</span><span class='id identifier rubyid_bytes'>bytes</span><span class='op'>..</span><span class='op'>-</span><span class='int'>1</span><span class='rparen'>)</span><span class='rparen'>)</span>
     <span class='kw'>rescue</span> <span class='const'>IO</span><span class='op'>::</span><span class='const'>WaitWritable</span>
       <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="Http/WriteError.html" title="Raptor::Http::WriteError (class)">WriteError</a></span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_wait_writable'>wait_writable</span><span class='lparen'>(</span><span class='id identifier rubyid_timeout'>timeout</span><span class='rparen'>)</span>
+
       <span class='kw'>retry</span>
     <span class='kw'>rescue</span> <span class='const'>IOError</span>
       <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="Http/WriteError.html" title="Raptor::Http::WriteError (class)">WriteError</a></span></span>
@@ -1004,7 +1006,6 @@ falling back to per-string writes on partial results. Bounded by
       <pre class="lines">
 
 
-77
 78
 79
 80
@@ -1031,19 +1032,22 @@ falling back to per-string writes on partial results. Bounded by
 101
 102
 103
-104</pre>
+104
+105
+106</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 77</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 78</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_socket_writev'>socket_writev</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_strings'>strings</span><span class='comma'>,</span> <span class='label'>timeout:</span> <span class='const'><span class='object_link'><a href="#WRITE_TIMEOUT-constant" title="Raptor::Http::WRITE_TIMEOUT (constant)">WRITE_TIMEOUT</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_total'>total</span> <span class='op'>=</span> <span class='id identifier rubyid_strings'>strings</span><span class='period'>.</span><span class='id identifier rubyid_sum'>sum</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:bytesize</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='id identifier rubyid_total'>total</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
 
   <span class='kw'>begin</span>
-    <span class='id identifier rubyid_written'>written</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="VectorIO.html" title="Raptor::VectorIO (module)">VectorIO</a></span></span><span class='period'>.</span><span class='id identifier rubyid_writev_nonblock'><span class='object_link'><a href="VectorIO.html#writev_nonblock-class_method" title="Raptor::VectorIO.writev_nonblock (method)">writev_nonblock</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_strings'>strings</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_written'>written</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="VectorIO.html" title="Raptor::VectorIO (module)">VectorIO</a></span></span><span class='period'>.</span><span class='id identifier rubyid_writev_nonblock'><span class='object_link'><a href="VectorIO.html#writev_nonblock-class_method" title="Raptor::VectorIO.writev_nonblock (method)">writev_nonblock</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_strings'>strings</span><span class='rparen'>)</span>
   <span class='kw'>rescue</span> <span class='const'>IO</span><span class='op'>::</span><span class='const'>WaitWritable</span>
     <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="Http/WriteError.html" title="Raptor::Http::WriteError (class)">WriteError</a></span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_wait_writable'>wait_writable</span><span class='lparen'>(</span><span class='id identifier rubyid_timeout'>timeout</span><span class='rparen'>)</span>
+
     <span class='kw'>retry</span>
   <span class='kw'>rescue</span> <span class='const'>IOError</span>
     <span class='id identifier rubyid_raise'>raise</span> <span class='const'><span class='object_link'><a href="Http/WriteError.html" title="Raptor::Http::WriteError (class)">WriteError</a></span></span>
@@ -1168,18 +1172,18 @@ ignored.</p>
       <pre class="lines">
 
 
-149
-150
 151
 152
 153
 154
 155
 156
-157</pre>
+157
+158
+159</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 149</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http.rb', line 151</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_write_access_log'>write_access_log</span><span class='lparen'>(</span><span class='id identifier rubyid_io'>io</span><span class='comma'>,</span> <span class='id identifier rubyid_env'>env</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='comma'>,</span> <span class='id identifier rubyid_size'>size</span><span class='comma'>,</span> <span class='id identifier rubyid_remote_addr'>remote_addr</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_timestamp'>timestamp</span> <span class='op'>=</span> <span class='const'>Time</span><span class='period'>.</span><span class='id identifier rubyid_now'>now</span><span class='period'>.</span><span class='id identifier rubyid_strftime'>strftime</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>%d/%b/%Y:%H:%M:%S %z</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -1200,7 +1204,7 @@ ignored.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:18 2026 by
+  Generated on Sun Oct 18 04:51:49 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

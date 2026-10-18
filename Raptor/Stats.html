@@ -508,7 +508,18 @@ booted            uint8     1 byte
 88
 89
 90
-91</pre>
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/stats.rb', line 87</span>
@@ -516,7 +527,18 @@ booted            uint8     1 byte
 <span class='kw'>def</span> <span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_slot'>slot</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='ivar'>@mmap</span><span class='lbracket'>[</span><span class='id identifier rubyid_slot'>slot</span> <span class='op'>*</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='comma'>,</span> <span class='const'><span class='object_link'><a href="#SLOT_SIZE-constant" title="Raptor::Stats::SLOT_SIZE (constant)">SLOT_SIZE</a></span></span><span class='rbracket'>]</span>
   <span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='id identifier rubyid_phase'>phase</span><span class='comma'>,</span> <span class='id identifier rubyid_requests'>requests</span><span class='comma'>,</span> <span class='id identifier rubyid_backlog'>backlog</span><span class='comma'>,</span> <span class='id identifier rubyid_busy_threads'>busy_threads</span><span class='comma'>,</span> <span class='id identifier rubyid_thread_capacity'>thread_capacity</span><span class='comma'>,</span> <span class='id identifier rubyid_started_at'>started_at</span><span class='comma'>,</span> <span class='id identifier rubyid_last_checkin'>last_checkin</span><span class='comma'>,</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>=</span> <span class='id identifier rubyid_data'>data</span><span class='period'>.</span><span class='id identifier rubyid_unpack'>unpack</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#SLOT_FORMAT-constant" title="Raptor::Stats::SLOT_FORMAT (constant)">SLOT_FORMAT</a></span></span><span class='rparen'>)</span>
-  <span class='lbrace'>{</span> <span class='label'>pid:</span><span class='comma'>,</span> <span class='label'>index:</span><span class='comma'>,</span> <span class='label'>phase:</span><span class='comma'>,</span> <span class='label'>requests:</span><span class='comma'>,</span> <span class='label'>backlog:</span><span class='comma'>,</span> <span class='label'>busy_threads:</span><span class='comma'>,</span> <span class='label'>thread_capacity:</span><span class='comma'>,</span> <span class='label'>started_at:</span><span class='comma'>,</span> <span class='label'>last_checkin:</span><span class='comma'>,</span> <span class='label'>booted:</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>==</span> <span class='int'>1</span> <span class='rbrace'>}</span>
+  <span class='lbrace'>{</span>
+    <span class='label'>pid:</span> <span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span>
+    <span class='label'>index:</span> <span class='id identifier rubyid_index'>index</span><span class='comma'>,</span>
+    <span class='label'>phase:</span> <span class='id identifier rubyid_phase'>phase</span><span class='comma'>,</span>
+    <span class='label'>requests:</span> <span class='id identifier rubyid_requests'>requests</span><span class='comma'>,</span>
+    <span class='label'>backlog:</span> <span class='id identifier rubyid_backlog'>backlog</span><span class='comma'>,</span>
+    <span class='label'>busy_threads:</span> <span class='id identifier rubyid_busy_threads'>busy_threads</span><span class='comma'>,</span>
+    <span class='label'>thread_capacity:</span> <span class='id identifier rubyid_thread_capacity'>thread_capacity</span><span class='comma'>,</span>
+    <span class='label'>started_at:</span> <span class='id identifier rubyid_started_at'>started_at</span><span class='comma'>,</span>
+    <span class='label'>last_checkin:</span> <span class='id identifier rubyid_last_checkin'>last_checkin</span><span class='comma'>,</span>
+    <span class='label'>booted:</span> <span class='id identifier rubyid_booted'>booted</span> <span class='op'>==</span> <span class='int'>1</span>
+  <span class='rbrace'>}</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -851,7 +873,7 @@ booted            uint8     1 byte
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:19 2026 by
+  Generated on Sun Oct 18 04:51:50 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

@@ -140,7 +140,7 @@
   
 
   
-    <span class="summary_desc"><div class='inline'></div></span>
+    <span class="summary_desc"><div class='inline'><p>worker indexes map onto the CPUs the process is actually allowed to use.</p></div></span>
   
 </li>
 
@@ -170,6 +170,8 @@
       <pre class="lines">
 
 
+72
+73
 74
 75
 76
@@ -177,16 +179,12 @@
 78
 79
 80
-81
-82
-83
-84</pre>
+81</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 74</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 72</span>
 
-static VALUE raptor_native_cpu_count(VALUE self) {
-  (void)self;
+static VALUE cpu_count(VALUE self) {
 #ifdef __linux__
   cpu_set_t set;
   CPU_ZERO(&amp;set);
@@ -210,7 +208,16 @@ static VALUE raptor_native_cpu_count(VALUE self) {
   
 
   
-</h3><table class="source_code">
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>worker indexes map onto the CPUs the process is actually allowed to use.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
   <tr>
     <td>
       <pre class="lines">
@@ -240,15 +247,12 @@ static VALUE raptor_native_cpu_count(VALUE self) {
 67
 68
 69
-70
-71
-72</pre>
+70</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 46</span>
 
-static VALUE raptor_native_pin_to_cpu(VALUE self, VALUE cpu) {
-  (void)self;
+static VALUE cpu_pin(VALUE self, VALUE cpu) {
 #ifdef __linux__
   int worker_index = NUM2INT(cpu);
   cpu_set_t current;
@@ -270,7 +274,6 @@ static VALUE raptor_native_pin_to_cpu(VALUE self, VALUE cpu) {
   if (sched_setaffinity(0, sizeof(set), &amp;set) &lt; 0) rb_sys_fail(&quot;sched_setaffinity&quot;);
   return Qtrue;
 #else
-  (void)cpu;
   return Qfalse;
 #endif
 }</pre>
@@ -284,7 +287,7 @@ static VALUE raptor_native_pin_to_cpu(VALUE self, VALUE cpu) {
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:18 2026 by
+  Generated on Sun Oct 18 04:51:49 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

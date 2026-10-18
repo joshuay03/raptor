@@ -544,6 +544,22 @@ has returned.</p>
   
 </ul>
 
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>ArgumentError</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>if <code>max_buffer_size</code> is not positive</p></div>
+      
+    </li>
+  
+</ul>
 
 </div><table class="source_code">
   <tr>
@@ -551,7 +567,6 @@ has returned.</p>
       <pre class="lines">
 
 
-71
 72
 73
 74
@@ -562,10 +577,11 @@ has returned.</p>
 79
 80
 81
-82</pre>
+82
+83</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 71</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 72</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='label'>max_buffer_size:</span> <span class='const'><span class='object_link'><a href="#DEFAULT_MAX_BUFFER_SIZE-constant" title="Raptor::DetachedBody::DEFAULT_MAX_BUFFER_SIZE (constant)">DEFAULT_MAX_BUFFER_SIZE</a></span></span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>max_buffer_size must be positive</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_max_buffer_size'>max_buffer_size</span><span class='period'>.</span><span class='id identifier rubyid_positive?'>positive?</span>
@@ -691,10 +707,6 @@ has returned.</p>
       <pre class="lines">
 
 
-195
-196
-197
-198
 199
 200
 201
@@ -708,10 +720,14 @@ has returned.</p>
 209
 210
 211
-212</pre>
+212
+213
+214
+215
+216</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 195</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 199</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_attach'>attach</span><span class='lparen'>(</span><span class='id identifier rubyid_budgets'>budgets</span><span class='comma'>,</span> <span class='id identifier rubyid_wake'>wake</span><span class='comma'>,</span> <span class='id identifier rubyid_dispatch'>dispatch</span><span class='comma'>,</span> <span class='id identifier rubyid_finished'>finished</span><span class='rparen'>)</span>
   <span class='ivar'>@wake</span> <span class='op'>=</span> <span class='id identifier rubyid_wake'>wake</span>
@@ -793,10 +809,6 @@ has returned.</p>
       <pre class="lines">
 
 
-159
-160
-161
-162
 163
 164
 165
@@ -809,14 +821,18 @@ has returned.</p>
 172
 173
 174
-175</pre>
+175
+176
+177
+178
+179</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 159</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 163</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close'>close</span><span class='lparen'>(</span><span class='label'>trailers:</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_trailers'>trailers</span> <span class='op'>=</span> <span class='id identifier rubyid_trailers'>trailers</span><span class='period'>.</span><span class='id identifier rubyid_to_h'>to_h</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_name'>name</span><span class='comma'>,</span> <span class='id identifier rubyid_value'>value</span><span class='op'>|</span>
-    <span class='id identifier rubyid_value'>value</span> <span class='op'>=</span> <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Array</span><span class='rparen'>)</span> <span class='op'>?</span> <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='id identifier rubyid__1'>_1</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span> <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span> <span class='op'>:</span> <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
+    <span class='id identifier rubyid_value'>value</span> <span class='op'>=</span> <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>Array</span><span class='rparen'>)</span> <span class='op'>?</span> <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_item'>item</span><span class='op'>|</span> <span class='id identifier rubyid_item'>item</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span> <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span> <span class='op'>:</span> <span class='id identifier rubyid_value'>value</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
     <span class='lbracket'>[</span><span class='id identifier rubyid_name'>name</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span><span class='comma'>,</span> <span class='id identifier rubyid_value'>value</span><span class='rbracket'>]</span>
   <span class='kw'>end</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span>
   <span class='id identifier rubyid_wake'>wake</span> <span class='op'>=</span> <span class='kw'>false</span>
@@ -873,12 +889,12 @@ has returned.</p>
       <pre class="lines">
 
 
-182
-183
-184</pre>
+186
+187
+188</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 182</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 186</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_closed?'>closed?</span>
   <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='lbracket'>[</span><span class='symbol'>:closed</span><span class='rbracket'>]</span>
@@ -930,10 +946,6 @@ has returned.</p>
       <pre class="lines">
 
 
-280
-281
-282
-283
 284
 285
 286
@@ -954,10 +966,14 @@ has returned.</p>
 301
 302
 303
-304</pre>
+304
+305
+306
+307
+308</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 280</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 284</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_finish'>finish</span><span class='lparen'>(</span><span class='id identifier rubyid_reason'>reason</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_callback'>callback</span> <span class='op'>=</span> <span class='kw'>false</span>
@@ -1027,13 +1043,13 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-230
-231
-232
-233</pre>
+234
+235
+236
+237</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 230</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 234</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_next_size'>next_size</span>
   <span class='id identifier rubyid_state'>state</span> <span class='op'>=</span> <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span>
@@ -1071,6 +1087,9 @@ while waiting for more data.</p>
       
       
       
+        
+        <div class='inline'><p>once the response stream closes</p></div>
+      
     </li>
   
 </ul>
@@ -1088,19 +1107,6 @@ while waiting for more data.</p>
       
         &mdash;
         <div class='inline'><p>why the stream closed</p></div>
-      
-    </li>
-  
-</ul>
-<p class="tag_title">Yield Returns:</p>
-<ul class="yieldreturn">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>void</tt>)</span>
-      
-      
       
     </li>
   
@@ -1125,13 +1131,13 @@ while waiting for more data.</p>
       <pre class="lines">
 
 
-102
-103
-104
-105</pre>
+105
+106
+107
+108</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 102</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 105</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_close'>on_close</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='ivar'>@on_close</span> <span class='op'>=</span> <span class='id identifier rubyid_block'>block</span>
@@ -1170,6 +1176,9 @@ accepts the response stream.</p>
       
       
       
+        
+        <div class='inline'><p>once the response stream opens</p></div>
+      
     </li>
   
 </ul>
@@ -1187,19 +1196,6 @@ accepts the response stream.</p>
       
         &mdash;
         <div class='inline'><p>the opened response stream</p></div>
-      
-    </li>
-  
-</ul>
-<p class="tag_title">Yield Returns:</p>
-<ul class="yieldreturn">
-  
-    <li>
-      
-      
-        <span class='type'>(<tt>void</tt>)</span>
-      
-      
       
     </li>
   
@@ -1224,13 +1220,13 @@ accepts the response stream.</p>
       <pre class="lines">
 
 
-91
-92
 93
-94</pre>
+94
+95
+96</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 91</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 93</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_on_open'>on_open</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='ivar'>@on_open</span> <span class='op'>=</span> <span class='id identifier rubyid_block'>block</span>
@@ -1265,13 +1261,13 @@ accepts the response stream.</p>
       <pre class="lines">
 
 
-219
-220
-221
-222</pre>
+223
+224
+225
+226</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 219</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 223</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_open'>open</span>
   <span class='ivar'>@on_open</span><span class='op'>&amp;.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='kw'>self</span><span class='rparen'>)</span>
@@ -1324,12 +1320,12 @@ accepts the response stream.</p>
       <pre class="lines">
 
 
-332
-333
-334</pre>
+336
+337
+338</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 332</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 336</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_release'>release</span><span class='lparen'>(</span><span class='id identifier rubyid_bytes'>bytes</span><span class='rparen'>)</span>
   <span class='ivar'>@budgets</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_budget'>budget</span><span class='op'>|</span> <span class='id identifier rubyid_budget'>budget</span><span class='period'>.</span><span class='id identifier rubyid_release'>release</span><span class='lparen'>(</span><span class='id identifier rubyid_bytes'>bytes</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
@@ -1397,20 +1393,20 @@ accepts the response stream.</p>
       <pre class="lines">
 
 
-314
-315
-316
-317
 318
 319
 320
 321
 322
 323
-324</pre>
+324
+325
+326
+327
+328</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 314</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 318</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reserve'>reserve</span><span class='lparen'>(</span><span class='id identifier rubyid_bytes'>bytes</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_reserved'>reserved</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
@@ -1486,10 +1482,6 @@ accepts the response stream.</p>
       <pre class="lines">
 
 
-241
-242
-243
-244
 245
 246
 247
@@ -1508,10 +1500,14 @@ accepts the response stream.</p>
 260
 261
 262
-263</pre>
+263
+264
+265
+266
+267</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 241</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 245</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shift'>shift</span><span class='lparen'>(</span><span class='id identifier rubyid_max_bytes'>max_bytes</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_chunk'>chunk</span> <span class='op'>=</span> <span class='kw'>nil</span>
@@ -1581,12 +1577,12 @@ accepts the response stream.</p>
       <pre class="lines">
 
 
-270
-271
-272</pre>
+274
+275
+276</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 270</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 274</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_trailers'>trailers</span>
   <span class='ivar'>@state</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span><span class='lbracket'>[</span><span class='symbol'>:trailers</span><span class='rbracket'>]</span>
@@ -1647,6 +1643,22 @@ accepts the response stream.</p>
     </li>
   
 </ul>
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>TypeError</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>if the chunk is not a String</p></div>
+      
+    </li>
+  
+</ul>
 
 </div><table class="source_code">
   <tr>
@@ -1654,10 +1666,6 @@ accepts the response stream.</p>
       <pre class="lines">
 
 
-113
-114
-115
-116
 117
 118
 119
@@ -1692,10 +1700,14 @@ accepts the response stream.</p>
 148
 149
 150
-151</pre>
+151
+152
+153
+154
+155</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 113</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/detached_body.rb', line 117</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_try_write'>try_write</span><span class='lparen'>(</span><span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>TypeError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>body must yield String values</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_chunk'>chunk</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>String</span><span class='rparen'>)</span>
@@ -1746,7 +1758,7 @@ accepts the response stream.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:19 2026 by
+  Generated on Sun Oct 18 04:51:51 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

@@ -241,18 +241,18 @@ settings.</p>
     <span class='label'>write_timeout:</span> <span class='int'>5</span><span class='comma'>,</span>
     <span class='label'>max_body_size:</span> <span class='kw'>nil</span><span class='comma'>,</span>
     <span class='label'>body_spool_threshold:</span> <span class='int'>1024</span> <span class='op'>*</span> <span class='int'>1024</span>
-  <span class='rbrace'>}</span><span class='comma'>,</span>
+  <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span><span class='comma'>,</span>
   <span class='label'>http1:</span> <span class='lbrace'>{</span>
     <span class='label'>ractors:</span> <span class='kw'>nil</span><span class='comma'>,</span>
     <span class='label'>persistent_data_timeout:</span> <span class='int'>65</span><span class='comma'>,</span>
     <span class='label'>max_keepalive_requests:</span> <span class='int'>1000</span>
-  <span class='rbrace'>}</span><span class='comma'>,</span>
+  <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span><span class='comma'>,</span>
   <span class='label'>http2:</span> <span class='lbrace'>{</span>
     <span class='label'>ractors:</span> <span class='kw'>nil</span><span class='comma'>,</span>
     <span class='label'>max_concurrent_streams:</span> <span class='int'>100</span><span class='comma'>,</span>
     <span class='label'>keepalive_interval:</span> <span class='int'>10</span><span class='comma'>,</span>
     <span class='label'>keepalive_timeout:</span> <span class='int'>5</span>
-  <span class='rbrace'>}</span><span class='comma'>,</span>
+  <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span><span class='comma'>,</span>
   <span class='label'>worker_boot_timeout:</span> <span class='int'>60</span><span class='comma'>,</span>
   <span class='label'>worker_timeout:</span> <span class='int'>60</span><span class='comma'>,</span>
   <span class='label'>worker_drain_timeout:</span> <span class='int'>25</span><span class='comma'>,</span>
@@ -267,7 +267,7 @@ settings.</p>
   <span class='label'>pid_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
   <span class='label'>stdout_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
   <span class='label'>stderr_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
-  <span class='label'>access_log_file:</span> <span class='kw'>nil</span><span class='comma'>,</span>
+  <span class='label'>access_log_file:</span> <span class='kw'>nil</span>
 <span class='rbrace'>}</span><span class='period'>.</span><span class='id identifier rubyid_freeze'>freeze</span></pre></dd>
       
         <dt id="DEFAULT_CONFIG_PATHS-constant" class="">DEFAULT_CONFIG_PATHS =
@@ -613,7 +613,6 @@ flag.</p>
       <pre class="lines">
 
 
-147
 148
 149
 150
@@ -634,10 +633,11 @@ flag.</p>
 165
 166
 167
-168</pre>
+168
+169</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 147</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 148</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_argv'>argv</span><span class='rparen'>)</span>
   <span class='ivar'>@options</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="#DEFAULT_OPTIONS-constant" title="Raptor::CLI::DEFAULT_OPTIONS (constant)">DEFAULT_OPTIONS</a></span></span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
@@ -734,12 +734,12 @@ against <code>root</code>, or nil if none exist.</p>
       <pre class="lines">
 
 
-105
 106
-107</pre>
+107
+108</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 105</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 106</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_default_config_path'>default_config_path</span><span class='lparen'>(</span><span class='id identifier rubyid_root'><span class='object_link'><a href="../top-level-namespace.html" title="Top Level Namespace (root)">root</a></span></span> <span class='op'>=</span> <span class='const'>Dir</span><span class='period'>.</span><span class='id identifier rubyid_pwd'>pwd</span><span class='rparen'>)</span>
   <span class='const'><span class='object_link'><a href="#DEFAULT_CONFIG_PATHS-constant" title="Raptor::CLI::DEFAULT_CONFIG_PATHS (constant)">DEFAULT_CONFIG_PATHS</a></span></span><span class='period'>.</span><span class='id identifier rubyid_find'>find</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_path'>path</span><span class='op'>|</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='id identifier rubyid_root'><span class='object_link'><a href="../top-level-namespace.html" title="Top Level Namespace (root)">root</a></span></span><span class='comma'>,</span> <span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
@@ -825,15 +825,15 @@ same as in a regular script.</p>
       <pre class="lines">
 
 
-91
 92
 93
 94
 95
-96</pre>
+96
+97</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 91</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 92</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_load_config_file'>load_config_file</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_config'>config</span> <span class='op'>=</span> <span class='id identifier rubyid_eval'>eval</span><span class='lparen'>(</span><span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span><span class='comma'>,</span> <span class='const'>TOPLEVEL_BINDING</span><span class='comma'>,</span> <span class='id identifier rubyid_path'>path</span><span class='comma'>,</span> <span class='int'>1</span><span class='rparen'>)</span>
@@ -946,7 +946,6 @@ same as in a regular script.</p>
       <pre class="lines">
 
 
-118
 119
 120
 121
@@ -960,10 +959,11 @@ same as in a regular script.</p>
 129
 130
 131
-132</pre>
+132
+133</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 118</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 119</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_parse_max_threads'>parse_max_threads</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='comma'>,</span> <span class='label'>threads:</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>ArgumentError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>max_threads cannot be nil</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>unless</span> <span class='id identifier rubyid_value'>value</span>
@@ -1033,7 +1033,6 @@ same as in a regular script.</p>
       <pre class="lines">
 
 
-230
 231
 232
 233
@@ -1044,10 +1043,11 @@ same as in a regular script.</p>
 238
 239
 240
-241</pre>
+241
+242</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 230</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 231</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_apply_config_file'>apply_config_file</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_path'>path</span>
@@ -1091,14 +1091,14 @@ options are parsed afterwards and take precedence.</p>
       <pre class="lines">
 
 
-249
 250
 251
 252
-253</pre>
+253
+254</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 249</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 250</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_apply_environment'>apply_environment</span>
   <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:workers</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Integer</span><span class='lparen'>(</span><span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>RAPTOR_WORKERS</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='int'>10</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>RAPTOR_WORKERS</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
@@ -1150,7 +1150,6 @@ options are parsed afterwards and take precedence.</p>
       <pre class="lines">
 
 
-260
 261
 262
 263
@@ -1308,10 +1307,11 @@ options are parsed afterwards and take precedence.</p>
 415
 416
 417
-418</pre>
+418
+419</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 260</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 261</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_parser'>create_parser</span>
   <span class='const'>OptionParser</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_opts'>opts</span><span class='op'>|</span>
@@ -1467,7 +1467,7 @@ options are parsed afterwards and take precedence.</p>
     <span class='kw'>end</span>
 
     <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-v</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--version</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Show version</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span>
-      <span class='id identifier rubyid_puts'>puts</span> <span class='const'><span class='object_link'><a href="../Raptor.html" title="Raptor (module)">Raptor</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../Raptor.html#VERSION-constant" title="Raptor::VERSION (constant)">VERSION</a></span></span>
+      <span class='id identifier rubyid_puts'>puts</span> <span class='const'><span class='object_link'><a href="../Raptor.html#VERSION-constant" title="Raptor::VERSION (constant)">VERSION</a></span></span>
       <span class='id identifier rubyid_exit'>exit</span>
     <span class='kw'>end</span>
   <span class='kw'>end</span>
@@ -1537,7 +1537,6 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
       <pre class="lines">
 
 
-214
 215
 216
 217
@@ -1545,10 +1544,11 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 219
 220
 221
-222</pre>
+222
+223</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 214</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 215</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_extract_config_path'>extract_config_path</span><span class='lparen'>(</span><span class='id identifier rubyid_argv'>argv</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_arg'>arg</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='op'>|</span>
@@ -1588,12 +1588,12 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
       <pre class="lines">
 
 
-175
 176
-177</pre>
+177
+178</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 175</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 176</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
   <span class='ivar'>@command</span> <span class='op'>==</span> <span class='symbol'>:stats</span> <span class='op'>?</span> <span class='id identifier rubyid_run_stats'>run_stats</span> <span class='op'>:</span> <span class='const'><span class='object_link'><a href="Cluster.html" title="Raptor::Cluster (class)">Cluster</a></span></span><span class='period'>.</span><span class='id identifier rubyid_run'><span class='object_link'><a href="Cluster.html#run-class_method" title="Raptor::Cluster.run (method)">run</a></span></span><span class='lparen'>(</span><span class='ivar'>@options</span><span class='rparen'>)</span>
@@ -1627,7 +1627,6 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
       <pre class="lines">
 
 
-186
 187
 188
 189
@@ -1645,10 +1644,11 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 201
 202
 203
-204</pre>
+204
+205</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 186</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 187</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run_stats'>run_stats</span>
   <span class='id identifier rubyid_stats_file'>stats_file</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:stats_file</span><span class='rbracket'>]</span>
@@ -1679,7 +1679,7 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:18 2026 by
+  Generated on Sun Oct 18 04:51:49 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

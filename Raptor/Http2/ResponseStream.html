@@ -333,7 +333,7 @@
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Streaming responses are write-only.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Rejects reads; streaming responses are write-only.</p></div></span>
   
 </li>
 
@@ -424,7 +424,7 @@
       
       
         &mdash;
-        <div class='inline'><p>outbound flow controller</p></div>
+        <div class='inline'><p>per-connection outbound flow controller</p></div>
       
     </li>
   
@@ -465,19 +465,19 @@
       <pre class="lines">
 
 
-315
-316
-317
-318
-319
-320
-321
-322
-323
-324</pre>
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 315</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 339</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_writer'>writer</span><span class='comma'>,</span> <span class='id identifier rubyid_flow_control'>flow_control</span><span class='comma'>,</span> <span class='id identifier rubyid_stream_id'>stream_id</span><span class='comma'>,</span> <span class='id identifier rubyid_trailers'>trailers</span><span class='rparen'>)</span>
   <span class='ivar'>@socket</span> <span class='op'>=</span> <span class='id identifier rubyid_socket'>socket</span>
@@ -538,12 +538,12 @@
       <pre class="lines">
 
 
-303
-304
-305</pre>
+327
+328
+329</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 303</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 327</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_bytes_written'>bytes_written</span>
   <span class='ivar'>@bytes_written</span>
@@ -615,13 +615,13 @@
       <pre class="lines">
 
 
-363
-364
-365
-366</pre>
+389
+390
+391
+392</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 363</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 389</span>
 
 <span class='kw'>def</span> <span class='op'>&lt;&lt;</span><span class='lparen'>(</span><span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span>
@@ -656,22 +656,22 @@
       <pre class="lines">
 
 
-382
-383
-384
-385
-386
-387
-388
-389
-390
-391
-392
-393
-394</pre>
+408
+409
+410
+411
+412
+413
+414
+415
+416
+417
+418
+419
+420</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 382</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 408</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close'>close</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@closed</span>
@@ -731,6 +731,9 @@
       
       
       
+        &mdash;
+        <div class='inline'><p>always</p></div>
+      
     </li>
   
 </ul>
@@ -741,12 +744,12 @@
       <pre class="lines">
 
 
-401
-402
-403</pre>
+427
+428
+429</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 401</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 427</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close_read'>close_read</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>closing non-duplex IO for reading</span><span class='tstring_end'>&quot;</span></span>
@@ -780,12 +783,12 @@
       <pre class="lines">
 
 
-410
-411
-412</pre>
+436
+437
+438</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 410</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 436</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_close_write'>close_write</span>
   <span class='id identifier rubyid_close'>close</span>
@@ -832,12 +835,12 @@
       <pre class="lines">
 
 
-419
-420
-421</pre>
+445
+446
+447</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 419</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 445</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_closed?'>closed?</span>
   <span class='ivar'>@closed</span>
@@ -884,12 +887,12 @@
       <pre class="lines">
 
 
-373
-374
-375</pre>
+399
+400
+401</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 373</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 399</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_flush'>flush</span>
   <span class='kw'>self</span>
@@ -910,7 +913,7 @@
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Streaming responses are write-only.</p>
+    <p>Rejects reads; streaming responses are write-only.</p>
 
   </div>
 </div>
@@ -954,6 +957,9 @@
       
       
       
+        &mdash;
+        <div class='inline'><p>always</p></div>
+      
     </li>
   
 </ul>
@@ -964,12 +970,12 @@
       <pre class="lines">
 
 
-331
-332
-333</pre>
+355
+356
+357</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 331</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 355</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_read'>read</span><span class='lparen'>(</span><span class='op'>*</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>not opened for reading</span><span class='tstring_end'>&quot;</span></span>
@@ -1030,6 +1036,34 @@
     </li>
   
 </ul>
+<p class="tag_title">Raises:</p>
+<ul class="raise">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>IOError</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>if the stream has already closed</p></div>
+      
+    </li>
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>TypeError</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>if the chunk is not a String</p></div>
+      
+    </li>
+  
+</ul>
 
 </div><table class="source_code">
   <tr>
@@ -1037,24 +1071,24 @@
       <pre class="lines">
 
 
-341
-342
-343
-344
-345
-346
-347
-348
-349
-350
-351
-352
-353
-354
-355</pre>
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+378
+379
+380
+381</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 341</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/http2.rb', line 367</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='id identifier rubyid_chunk'>chunk</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_raise'>raise</span> <span class='const'>IOError</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>closed stream</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='ivar'>@closed</span>
@@ -1081,7 +1115,7 @@
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:19 2026 by
+  Generated on Sun Oct 18 04:51:50 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

@@ -613,7 +613,7 @@ file descriptors when provided (systemd socket activation, hot restart).</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns the port of the first TCP or SSL listener, or 0 when none is configured.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns the port of the first TCP, SSL, or cleartext HTTP/2 listener, or 0 when none is configured.</p></div></span>
   
 </li>
 
@@ -1049,12 +1049,12 @@ HTTP/1.1 ALPN negotiation.</p>
         <span class='name'>ssl_params</span>
       
       
-        <span class='type'>(<tt>Hash&lt;String, String&gt;</tt>)</span>
+        <span class='type'>(<tt>Hash{String =&gt; String}</tt>)</span>
       
       
       
         &mdash;
-        <div class='inline'><p>SSL options (&quot;cert&quot; and &quot;key&quot; paths)</p></div>
+        <div class='inline'><p>SSL options (<code>cert</code> and <code>key</code> file paths)</p></div>
       
     </li>
   
@@ -1214,7 +1214,7 @@ survive <code>Kernel.exec</code>.</p>
         <span class='name'>uri</span>
       
       
-        <span class='type'>(<tt>URI</tt>)</span>
+        <span class='type'>(<tt>URI::Generic</tt>)</span>
       
       
       
@@ -1350,7 +1350,7 @@ survive <code>Kernel.exec</code>.</p>
         <span class='name'>ssl_params</span>
       
       
-        <span class='type'>(<tt>Hash&lt;String, String&gt;</tt>)</span>
+        <span class='type'>(<tt>Hash{String =&gt; String}</tt>)</span>
       
       
       
@@ -1956,7 +1956,7 @@ descriptors.</p>
         <span class='name'>uri</span>
       
       
-        <span class='type'>(<tt>URI</tt>)</span>
+        <span class='type'>(<tt>URI::Generic</tt>)</span>
       
       
       
@@ -2069,8 +2069,8 @@ descriptors.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Returns the port of the first TCP or SSL listener, or 0 when none
-is configured.</p>
+    <p>Returns the port of the first TCP, SSL, or cleartext HTTP/2 listener,
+or 0 when none is configured.</p>
 
   </div>
 </div>
@@ -2126,7 +2126,7 @@ is configured.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:19 2026 by
+  Generated on Sun Oct 18 04:51:50 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

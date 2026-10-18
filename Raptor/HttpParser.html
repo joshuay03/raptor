@@ -256,28 +256,6 @@
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#body-instance_method" title="#body (instance method)">#<strong>body</strong>  &#x21d2; Object </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  
-  
-
-  
-    <span class="summary_desc"><div class='inline'></div></span>
-  
-</li>
-
-      
-        <li class="public ">
-  <span class="summary_signature">
-    
       <a href="#chunked%3F-instance_method" title="#chunked? (instance method)">#<strong>chunked?</strong>  &#x21d2; Boolean </a>
     
 
@@ -388,28 +366,6 @@
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#nread-instance_method" title="#nread (instance method)">#<strong>nread</strong>  &#x21d2; Object </a>
-    
-
-    
-  </span>
-  
-  
-  
-  
-  
-  
-  
-
-  
-    <span class="summary_desc"><div class='inline'></div></span>
-  
-</li>
-
-      
-        <li class="public ">
-  <span class="summary_signature">
-    
       <a href="#reset-instance_method" title="#reset (instance method)">#<strong>reset</strong>  &#x21d2; Object </a>
     
 
@@ -454,27 +410,25 @@
       <pre class="lines">
 
 
-1493
-1494
-1495
-1496
-1497
-1498
-1499
-1500
-1501
-1502
-1503
-1504
-1505
-1506
-1507</pre>
+1463
+1464
+1465
+1466
+1467
+1468
+1469
+1470
+1471
+1472
+1473
+1474
+1475
+1476</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1493</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1463</span>
 
 static VALUE parser_chunked_encode(VALUE self, VALUE buffer, VALUE chunk) {
-  (void)self;
   Check_Type(buffer, T_STRING);
   Check_Type(chunk, T_STRING);
   long chunk_len = RSTRING_LEN(chunk);
@@ -508,6 +462,43 @@ static VALUE parser_chunked_encode(VALUE self, VALUE buffer, VALUE chunk) {
       <pre class="lines">
 
 
+1297
+1298
+1299
+1300
+1301
+1302
+1303
+1304
+1305
+1306
+1307
+1308
+1309
+1310
+1311
+1312
+1313
+1314
+1315
+1316
+1317
+1318
+1319
+1320
+1321
+1322
+1323
+1324
+1325
+1326
+1327
+1328
+1329
+1330
+1331
+1332
+1333
 1334
 1335
 1336
@@ -541,51 +532,12 @@ static VALUE parser_chunked_encode(VALUE self, VALUE buffer, VALUE chunk) {
 1364
 1365
 1366
-1367
-1368
-1369
-1370
-1371
-1372
-1373
-1374
-1375
-1376
-1377
-1378
-1379
-1380
-1381
-1382
-1383
-1384
-1385
-1386
-1387
-1388
-1389
-1390
-1391
-1392
-1393
-1394
-1395
-1396
-1397
-1398
-1399
-1400
-1401
-1402
-1403
-1404
-1405</pre>
+1367</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1334</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1297</span>
 
 static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
-  (void)self;
   VALUE buffer, max_size;
   rb_scan_args(argc, argv, &quot;11&quot;, &amp;buffer, &amp;max_size);
   Check_Type(buffer, T_STRING);
@@ -676,19 +628,17 @@ static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
       <pre class="lines">
 
 
-1485
-1486
-1487
-1488
-1489
-1490
-1491</pre>
+1456
+1457
+1458
+1459
+1460
+1461</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1485</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1456</span>
 
 static VALUE parser_format_headers(VALUE self, VALUE buffer, VALUE headers) {
-  (void)self;
   Check_Type(buffer, T_STRING);
   Check_Type(headers, T_HASH);
   rb_hash_foreach(headers, format_header_iter, buffer);
@@ -736,17 +686,15 @@ static VALUE parser_format_headers(VALUE self, VALUE buffer, VALUE headers) {
       <pre class="lines">
 
 
-1422
-1423
-1424
-1425
-1426</pre>
+1396
+1397
+1398
+1399</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1422</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1396</span>
 
 static VALUE parser_illegal_header_key_p(VALUE self, VALUE key) {
-  (void)self;
   Check_Type(key, T_STRING);
   return contains_illegal_byte(illegal_header_key_bitmap, RSTRING_PTR(key), (size_t)RSTRING_LEN(key)) ? Qtrue : Qfalse;
 }</pre>
@@ -792,17 +740,15 @@ static VALUE parser_illegal_header_key_p(VALUE self, VALUE key) {
       <pre class="lines">
 
 
-1428
-1429
-1430
-1431
-1432</pre>
+1401
+1402
+1403
+1404</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1428</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1401</span>
 
 static VALUE parser_illegal_header_value_p(VALUE self, VALUE value) {
-  (void)self;
   Check_Type(value, T_STRING);
   return contains_illegal_byte(illegal_header_value_bitmap, RSTRING_PTR(value), (size_t)RSTRING_LEN(value)) ? Qtrue : Qfalse;
 }</pre>
@@ -818,41 +764,7 @@ static VALUE parser_illegal_header_value_p(VALUE self, VALUE value) {
 
     
       <div class="method_details first">
-  <h3 class="signature first" id="body-instance_method">
-  
-    #<strong>body</strong>  &#x21d2; <tt>Object</tt> 
-  
-
-  
-
-  
-</h3><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-1319
-1320
-1321
-1322
-1323</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1319</span>
-
-static VALUE parser_body(VALUE self) {
-  raptor_parser *parser;
-  TypedData_Get_Struct(self, raptor_parser, &amp;parser_type, parser);
-  return parser-&gt;body;
-}</pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-      <div class="method_details ">
-  <h3 class="signature " id="chunked?-instance_method">
+  <h3 class="signature first" id="chunked?-instance_method">
   
     #<strong>chunked?</strong>  &#x21d2; <tt>Boolean</tt> 
   
@@ -888,19 +800,19 @@ static VALUE parser_body(VALUE self) {
       <pre class="lines">
 
 
-1294
-1295
-1296
-1297
-1298</pre>
+1269
+1270
+1271
+1272
+1273</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1294</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1269</span>
 
 static VALUE parser_chunked_p(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &amp;parser_type, parser);
-  return raptor_parser_is_chunked(parser) ? Qtrue : Qfalse;
+  return (parser-&gt;flags &amp; FLAG_CHUNKED) ? Qtrue : Qfalse;
 }</pre>
     </td>
   </tr>
@@ -922,19 +834,19 @@ static VALUE parser_chunked_p(VALUE self) {
       <pre class="lines">
 
 
-1300
-1301
-1302
-1303
-1304</pre>
+1275
+1276
+1277
+1278
+1279</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1300</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1275</span>
 
 static VALUE parser_content_length(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &amp;parser_type, parser);
-  return SIZET2NUM(raptor_parser_content_length(parser));
+  return SIZET2NUM((size_t)parser-&gt;content_len);
 }</pre>
     </td>
   </tr>
@@ -956,27 +868,27 @@ static VALUE parser_content_length(VALUE self) {
       <pre class="lines">
 
 
-1263
-1264
-1265
-1266
-1267
-1268
-1269
-1270
-1271
-1272
-1273
-1274
-1275
-1276
-1277
-1278
-1279
-1280</pre>
+1238
+1239
+1240
+1241
+1242
+1243
+1244
+1245
+1246
+1247
+1248
+1249
+1250
+1251
+1252
+1253
+1254
+1255</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1263</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1238</span>
 
 static VALUE parser_execute(VALUE self, VALUE req_hash, VALUE buffer, VALUE start) {
   raptor_parser *parser;
@@ -1038,19 +950,19 @@ static VALUE parser_execute(VALUE self, VALUE req_hash, VALUE buffer, VALUE star
       <pre class="lines">
 
 
-1282
-1283
-1284
-1285
-1286</pre>
+1257
+1258
+1259
+1260
+1261</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1282</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1257</span>
 
 static VALUE parser_finished_p(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &amp;parser_type, parser);
-  return raptor_parser_finished(parser) ? Qtrue : Qfalse;
+  return (parser-&gt;flags &amp; FLAG_FINISHED) ? Qtrue : Qfalse;
 }</pre>
     </td>
   </tr>
@@ -1094,53 +1006,19 @@ static VALUE parser_finished_p(VALUE self) {
       <pre class="lines">
 
 
-1288
-1289
-1290
-1291
-1292</pre>
+1263
+1264
+1265
+1266
+1267</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1288</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1263</span>
 
 static VALUE parser_has_body_p(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &amp;parser_type, parser);
-  return raptor_parser_has_body(parser) ? Qtrue : Qfalse;
-}</pre>
-    </td>
-  </tr>
-</table>
-</div>
-    
-      <div class="method_details ">
-  <h3 class="signature " id="nread-instance_method">
-  
-    #<strong>nread</strong>  &#x21d2; <tt>Object</tt> 
-  
-
-  
-
-  
-</h3><table class="source_code">
-  <tr>
-    <td>
-      <pre class="lines">
-
-
-1306
-1307
-1308
-1309
-1310</pre>
-    </td>
-    <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1306</span>
-
-static VALUE parser_nread(VALUE self) {
-  raptor_parser *parser;
-  TypedData_Get_Struct(self, raptor_parser, &amp;parser_type, parser);
-  return SIZET2NUM(parser-&gt;nread);
+  return (parser-&gt;flags &amp; FLAG_HAS_BODY) ? Qtrue : Qfalse;
 }</pre>
     </td>
   </tr>
@@ -1162,15 +1040,15 @@ static VALUE parser_nread(VALUE self) {
       <pre class="lines">
 
 
-1312
-1313
-1314
-1315
-1316
-1317</pre>
+1281
+1282
+1283
+1284
+1285
+1286</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1312</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http/raptor_http.c', line 1281</span>
 
 static VALUE parser_reset(VALUE self) {
   raptor_parser *parser;
@@ -1188,7 +1066,7 @@ static VALUE parser_reset(VALUE self) {
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:19 2026 by
+  Generated on Sun Oct 18 04:51:52 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

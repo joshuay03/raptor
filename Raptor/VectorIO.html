@@ -148,6 +148,7 @@
       <pre class="lines">
 
 
+18
 19
 20
 21
@@ -171,22 +172,19 @@
 39
 40
 41
-42
-43
-44</pre>
+42</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 19</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 18</span>
 
-static VALUE raptor_native_writev_nonblock(VALUE self, VALUE io, VALUE strings) {
-  (void)self;
+static VALUE vector_io_writev_nonblock(VALUE self, VALUE io, VALUE strings) {
   Check_Type(strings, T_ARRAY);
   long len = RARRAY_LEN(strings);
   if (len == 0) return LONG2NUM(0);
   if (len &gt; IOV_MAX) len = IOV_MAX;
 
   int fd = rb_io_descriptor(io);
-  struct iovec *iov = alloca(len * sizeof(struct iovec));
+  struct iovec *iov = ALLOCA_N(struct iovec, len);
 
   for (long i = 0; i &lt; len; i++) {
     VALUE str = RARRAY_AREF(strings, i);
@@ -214,7 +212,7 @@ static VALUE raptor_native_writev_nonblock(VALUE self, VALUE io, VALUE strings) 
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:26:18 2026 by
+  Generated on Sun Oct 18 04:51:49 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
