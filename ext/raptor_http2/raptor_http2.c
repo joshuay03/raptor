@@ -305,13 +305,15 @@ static int hpack_decode_string(const uint8_t *buf, size_t len, size_t *pos, VALU
   if (*pos + str_len > len) return -1;
 
   if (huffman) {
-    size_t decoded_cap = str_len * 2 + 256;
-    uint8_t *decoded = ALLOCA_N(uint8_t, decoded_cap);
+    // The shortest Huffman code is five bits, bounding the decoded length.
+    size_t decoded_cap = str_len * 8 / 5;
+    VALUE decoded = rb_str_new(NULL, (long)decoded_cap);
     size_t decoded_len;
 
-    if (hpack_decode_huffman(buf + *pos, (size_t)str_len, decoded, decoded_cap, &decoded_len) < 0) return -1;
+    if (hpack_decode_huffman(buf + *pos, (size_t)str_len, (uint8_t *)RSTRING_PTR(decoded), decoded_cap, &decoded_len) < 0) return -1;
 
-    *out_str = rb_str_new((const char *)decoded, decoded_len);
+    rb_str_set_len(decoded, (long)decoded_len);
+    *out_str = decoded;
   } else {
     *out_str = rb_str_new((const char *)(buf + *pos), (long)str_len);
   }
@@ -351,6 +353,13 @@ static size_t hpack_huffman_encode(const uint8_t *src, size_t src_len, uint8_t *
   }
 
   return pos;
+}
+
+// Encodes into the Ruby buffer to avoid stack allocations sized by header values.
+static void hpack_append_huffman(VALUE buf, const uint8_t *src, size_t src_len, size_t huff_len) {
+  long offset = RSTRING_LEN(buf);
+  rb_str_resize(buf, offset + (long)huff_len);
+  hpack_huffman_encode(src, src_len, (uint8_t *)RSTRING_PTR(buf) + offset);
 }
 
 static int hpack_table_lookup(VALUE dyn_table, long index, VALUE *name, VALUE *value) {
@@ -528,9 +537,7 @@ static VALUE hpack_encode_header_block(VALUE headers) {
       if (huff_len < name_len) {
         int_len = hpack_encode_int(int_buf, huff_len, 7, 0x80);
         rb_str_cat(buf, (const char *)int_buf, int_len);
-        uint8_t *huff_buf = ALLOCA_N(uint8_t, huff_len);
-        hpack_huffman_encode(name_ptr, name_len, huff_buf);
-        rb_str_cat(buf, (const char *)huff_buf, huff_len);
+        hpack_append_huffman(buf, name_ptr, name_len, huff_len);
       } else {
         int_len = hpack_encode_int(int_buf, name_len, 7, 0x00);
         rb_str_cat(buf, (const char *)int_buf, int_len);
@@ -542,9 +549,7 @@ static VALUE hpack_encode_header_block(VALUE headers) {
     if (huff_len < value_len) {
       int_len = hpack_encode_int(int_buf, huff_len, 7, 0x80);
       rb_str_cat(buf, (const char *)int_buf, int_len);
-      uint8_t *huff_buf = ALLOCA_N(uint8_t, huff_len);
-      hpack_huffman_encode(value_ptr, value_len, huff_buf);
-      rb_str_cat(buf, (const char *)huff_buf, huff_len);
+      hpack_append_huffman(buf, value_ptr, value_len, huff_len);
     } else {
       int_len = hpack_encode_int(int_buf, value_len, 7, 0x00);
       rb_str_cat(buf, (const char *)int_buf, int_len);
