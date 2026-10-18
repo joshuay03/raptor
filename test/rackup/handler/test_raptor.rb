@@ -101,6 +101,11 @@ module Rackup
         assert_equal 12, opts[:max_threads]
       end
 
+      def test_rejects_non_integer_environment_variables
+        assert_raises(ArgumentError) { options_from_subprocess({ "RAPTOR_THREADS" => "four" }) }
+        assert_raises(ArgumentError) { options_from_subprocess({ "RAPTOR_WORKERS" => "2x" }) }
+      end
+
       def test_handler_options_override_environment_variables
         opts = options_from_subprocess(
           { "RAPTOR_WORKERS" => "2", "RAPTOR_THREADS" => "4", "RAPTOR_MAX_THREADS" => "12" },
@@ -206,8 +211,11 @@ module Rackup
         pid = fork do
           reader.close
           ENV.update(environment)
-          result = build(options)
-          result.delete(:app)
+          result = begin
+            build(options).tap { |cluster_options| cluster_options.delete(:app) }
+          rescue => error
+            error
+          end
           Marshal.dump(result, writer)
           writer.close
           exit!(0)
@@ -215,6 +223,8 @@ module Rackup
         writer.close
         result = Marshal.load(reader)
         Process.wait(pid)
+        raise result if result.is_a?(Exception)
+
         result
       ensure
         reader&.close

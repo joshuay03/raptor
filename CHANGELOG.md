@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Reject non-integer `RAPTOR_WORKERS` and `RAPTOR_THREADS` in the Rackup handler
 - Replace config file binds with `--bind` addresses instead of adding to them
 - Stop BPF dispatch from routing connections to workers that stopped accepting
 - Restart workers forked by the seed when they exit

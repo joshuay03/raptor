@@ -70,7 +70,9 @@ module Rackup
         cli_defaults = ::Raptor::CLI::DEFAULT_OPTIONS
         config_path = options[:Config] || ::Raptor::CLI.default_config_path
         config = config_path ? ::Raptor::CLI.load_config_file(config_path) : {}
-        threads = (options[:Threads] || ENV["RAPTOR_THREADS"] || config[:threads] || cli_defaults[:threads]).to_i
+        environment_workers = Integer(ENV["RAPTOR_WORKERS"], 10) if ENV["RAPTOR_WORKERS"]
+        environment_threads = Integer(ENV["RAPTOR_THREADS"], 10) if ENV["RAPTOR_THREADS"]
+        threads = (options[:Threads] || environment_threads || config[:threads] || cli_defaults[:threads]).to_i
         max_threads = options[:MaxThreads] || ENV["RAPTOR_MAX_THREADS"] || config.fetch(:max_threads, cli_defaults[:max_threads])
 
         result = {
@@ -81,7 +83,7 @@ module Rackup
           end,
           socket_backlog: (config[:socket_backlog] || cli_defaults[:socket_backlog]).to_i,
           drain_accept_queue: config.fetch(:drain_accept_queue, cli_defaults[:drain_accept_queue]),
-          workers: (options[:Workers] || ENV["RAPTOR_WORKERS"] || config[:workers] || cli_defaults[:workers]).to_i,
+          workers: (options[:Workers] || environment_workers || config[:workers] || cli_defaults[:workers]).to_i,
           threads: threads,
           max_threads: ::Raptor::CLI.parse_max_threads(max_threads, threads: threads),
           cpu_affinity: config.fetch(:cpu_affinity, cli_defaults[:cpu_affinity]),
