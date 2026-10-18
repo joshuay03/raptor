@@ -92,6 +92,26 @@ module Raptor
       assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
     end
 
+    def test_process_frames_rejects_undecodable_header_block
+      parser = Http2Parser.new
+      headers = parser.build_frame(:headers, Http2::FLAG_END_STREAM | Http2::FLAG_END_HEADERS, 1, "\x80")
+
+      result = process_frames_with(headers)
+
+      assert result[:close_connection]
+      assert_equal Http2::ERROR_COMPRESSION_ERROR, goaway_error_code(result)
+    end
+
+    def test_process_frames_rejects_settings_with_partial_entry
+      parser = Http2Parser.new
+      settings = parser.build_frame(:settings, 0, 0, "\x00\x04\x00\x00\xff")
+
+      result = process_frames_with(settings)
+
+      assert result[:close_connection]
+      assert_equal Http2::ERROR_FRAME_SIZE_ERROR, goaway_error_code(result)
+    end
+
     def test_process_frames_resets_stream_with_missing_pseudo_header
       parser = Http2Parser.new
       encoded = parser.encode_headers([[":method", "GET"], [":scheme", "https"], [":authority", "x"]])

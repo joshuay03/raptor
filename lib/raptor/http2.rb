@@ -30,7 +30,9 @@ module Raptor
     ERROR_NO_ERROR = 0x0
     ERROR_PROTOCOL_ERROR = 0x1
     ERROR_INTERNAL_ERROR = 0x2
+    ERROR_FRAME_SIZE_ERROR = 0x6
     ERROR_REFUSED_STREAM = 0x7
+    ERROR_COMPRESSION_ERROR = 0x9
 
     DEFAULT_WINDOW_SIZE = 65_535
     MAX_FRAME_SIZE = 16_384
@@ -605,6 +607,14 @@ module Raptor
           completed_requests.reject! { |request| request[:stream_id] == stream_id }
           cancelled_streams << stream_id
         end
+      rescue Http2ParserError
+        # A failed header decode can desynchronize HPACK state for the whole connection.
+        goaway_error = if frame[:type] == :headers || frame[:type] == :continuation
+          ERROR_COMPRESSION_ERROR
+        else
+          ERROR_FRAME_SIZE_ERROR
+        end
+        break
       end
 
       if goaway_error

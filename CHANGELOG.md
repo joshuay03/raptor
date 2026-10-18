@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Send GOAWAY when an HTTP/2 frame fails to decode
 - Keep pipelined HTTP/1.1 requests out of the previous request's body
 - Process chunked requests on kept-alive HTTP/1.1 connections without waiting for more data
 - Validate request framing on kept-alive HTTP/1.1 connections
