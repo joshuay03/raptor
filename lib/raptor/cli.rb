@@ -7,6 +7,7 @@ require "optparse"
 require "concurrent/utility/processor_counter"
 
 require_relative "cluster"
+require_relative "version"
 
 module Raptor
   # Command-line interface for the Raptor web server.
@@ -48,18 +49,18 @@ module Raptor
         write_timeout: 5,
         max_body_size: nil,
         body_spool_threshold: 1024 * 1024
-      },
+      }.freeze,
       http1: {
         ractors: nil,
         persistent_data_timeout: 65,
         max_keepalive_requests: 1000
-      },
+      }.freeze,
       http2: {
         ractors: nil,
         max_concurrent_streams: 100,
         keepalive_interval: 10,
         keepalive_timeout: 5
-      },
+      }.freeze,
       worker_boot_timeout: 60,
       worker_timeout: 60,
       worker_drain_timeout: 25,
@@ -74,7 +75,7 @@ module Raptor
       pid_file: nil,
       stdout_file: nil,
       stderr_file: nil,
-      access_log_file: nil,
+      access_log_file: nil
     }.freeze
 
     DEFAULT_CONFIG_PATHS = ["raptor.rb", "config/raptor.rb"].freeze
@@ -131,17 +132,17 @@ module Raptor
       max_threads
     end
 
-    # @rbs @command: Symbol
     # @rbs @options: Hash[Symbol, untyped]
+    # @rbs @command: Symbol
     # @rbs @parser: OptionParser
 
-    # Creates a new CLI instance from `argv`. A rackup file may be given
-    # as the first positional argument; every other value is parsed as a
-    # flag.
+    # Creates a new CLI from `argv`. A rackup file may be given as the
+    # first positional argument; every other value is parsed as a flag.
     #
     # @param argv [Array<String>] command-line arguments to parse
     # @return [void]
     # @raise [OptionParser::ParseError] if invalid options are provided
+    # @raise [ArgumentError] if the config file or max threads value is invalid
     #
     # @rbs (Array[String] argv) -> void
     def initialize(argv)
@@ -203,7 +204,7 @@ module Raptor
       end
     end
 
-    # Returns the path from a `-c`/`--config` flag in `argv`, recognising
+    # Returns the path from a `-c`/`--config` flag in `argv`, recognizing
     # all four OptionParser-accepted forms (`-c PATH`, `-cPATH`,
     # `--config PATH`, `--config=PATH`).
     #
@@ -333,7 +334,7 @@ module Raptor
           @options[:connection][:body_spool_threshold] = bytes
         end
 
-        opts.on("--http1-ractors NUM", Integer, "Number of HTTP/1.1 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..3)") do |num|
+        opts.on("--http1-ractors NUM", Integer, "Number of HTTP/1.1 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..#{Cluster::HTTP1_RACTOR_COUNT_CAP})") do |num|
           @options[:http1][:ractors] = num
         end
 
@@ -345,7 +346,7 @@ module Raptor
           @options[:http1][:max_keepalive_requests] = num
         end
 
-        opts.on("--http2-ractors NUM", Integer, "Number of HTTP/2 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..2)") do |num|
+        opts.on("--http2-ractors NUM", Integer, "Number of HTTP/2 pipeline ractors per worker (default: `round(cores / workers)`, clamped to 1..#{Cluster::HTTP2_RACTOR_COUNT_CAP})") do |num|
           @options[:http2][:ractors] = num
         end
 
@@ -377,7 +378,7 @@ module Raptor
           @options[:worker_shutdown_timeout] = timeout
         end
 
-        opts.on("--refork-after NUM", Integer, "Refork workers from a warmed source after any worker crosses NUM requests; 0 disables (default: 1000)") do |num|
+        opts.on("--refork-after NUM", Integer, "Refork workers from a warmed source after any worker crosses NUM requests; 0 disables (default: 1000 on Linux, off elsewhere)") do |num|
           @options[:refork_after] = num
         end
 
@@ -411,7 +412,7 @@ module Raptor
         end
 
         opts.on("-v", "--version", "Show version") do
-          puts Raptor::VERSION
+          puts VERSION
           exit
         end
       end

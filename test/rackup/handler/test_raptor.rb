@@ -198,7 +198,7 @@ module Rackup
       private
 
       def build(options = {})
-        Rackup::Handler::Raptor.send(:build_cluster_options, ->(_) { [200, {}, []] }, options)
+        Rackup::Handler::Raptor.send(:build_cluster_options, ->(_env) { [200, {}, []] }, options)
       end
 
       def options_from_subprocess(environment, options = {})
@@ -231,7 +231,7 @@ module Rackup
         file.close
         yield file.path
       ensure
-        file.unlink if file
+        file&.unlink
       end
     end
   end

@@ -57,6 +57,7 @@ module Raptor
     #
     # @param max_buffer_size [Integer] maximum body bytes waiting to be written
     # @return [void]
+    # @raise [ArgumentError] if `max_buffer_size` is not positive
     #
     # @rbs (?max_buffer_size: Integer) -> void
     def initialize: (?max_buffer_size: Integer) -> void
@@ -64,6 +65,7 @@ module Raptor
     # Registers a callback that runs on the request thread once the server
     # accepts the response stream.
     #
+    # @yield once the response stream opens
     # @yieldparam stream [DetachedBody] the opened response stream
     # @return [DetachedBody]
     #
@@ -72,6 +74,7 @@ module Raptor
 
     # Registers a callback for when the response stream closes.
     #
+    # @yield once the response stream closes
     # @yieldparam reason [Symbol] why the stream closed
     # @return [DetachedBody]
     #
@@ -82,11 +85,12 @@ module Raptor
     #
     # @param chunk [String] response body bytes
     # @return [Symbol] `:accepted`, `:full`, or `:closed`
+    # @raise [TypeError] if the chunk is not a String
     #
     # @rbs (String chunk) -> Symbol
     def try_write: (String chunk) -> Symbol
 
-    # Finishes the body after all accepted bytes have been written.
+    # Marks the body complete; the stream finishes once buffered bytes are written.
     #
     # @param trailers [Hash] trailing response headers
     # @return [void]

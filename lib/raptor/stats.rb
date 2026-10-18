@@ -27,7 +27,8 @@ module Raptor
     # @rbs @num_workers: Integer
     # @rbs @mmap: untyped
 
-    # Allocates the shared mmap region for `num_workers` slots.
+    # Creates a new Stats and allocates the shared mmap region for
+    # `num_workers` slots.
     #
     # @param num_workers [Integer] number of worker slots to allocate
     # @return [void]
@@ -80,14 +81,25 @@ module Raptor
 
     # Reads stats for a worker slot from shared memory.
     #
-    # @param slot [Integer] slot offset to read from
+    # @param slot [Integer] slot index to read from
     # @return [Hash] stat hash with :pid, :index, :phase, :requests, :backlog, :busy_threads, :thread_capacity, :started_at, :last_checkin, and :booted
     #
     # @rbs (Integer slot) -> Hash[Symbol, untyped]
     def read(slot)
       data = @mmap[slot * SLOT_SIZE, SLOT_SIZE]
       pid, index, phase, requests, backlog, busy_threads, thread_capacity, started_at, last_checkin, booted = data.unpack(SLOT_FORMAT)
-      { pid:, index:, phase:, requests:, backlog:, busy_threads:, thread_capacity:, started_at:, last_checkin:, booted: booted == 1 }
+      {
+        pid: pid,
+        index: index,
+        phase: phase,
+        requests: requests,
+        backlog: backlog,
+        busy_threads: busy_threads,
+        thread_capacity: thread_capacity,
+        started_at: started_at,
+        last_checkin: last_checkin,
+        booted: booted == 1
+      }
     end
   end
 end

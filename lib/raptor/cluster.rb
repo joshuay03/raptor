@@ -9,16 +9,18 @@ require "concurrent/utility/processor_counter"
 require "rack/builder"
 require "ractor-pool"
 
-require_relative "log"
 require_relative "binder"
 require_relative "control_server"
-require_relative "reactor"
-require_relative "server"
-require_relative "reuseport_bpf"
 require_relative "http1"
 require_relative "http2"
+require_relative "log"
+require_relative "raptor_native"
+require_relative "reactor"
+require_relative "reuseport_bpf"
+require_relative "server"
 require_relative "stats"
 require_relative "systemd"
+require_relative "version"
 
 module Raptor
   # Forks and supervises worker processes. Handles graceful shutdown on
@@ -100,7 +102,7 @@ module Raptor
     # @rbs @access_log_io: IO?
     # @rbs @launch_command: String?
     # @rbs @launch_argv: Array[String]?
-    # @rbs @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    # @rbs @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
     # @rbs @binder: Binder
     # @rbs @server_port: Integer
     # @rbs @app: untyped
@@ -115,7 +117,7 @@ module Raptor
     # @rbs @hot_restart_requested: bool
     # @rbs @refork_thresholds: Array[Integer]
     # @rbs @refork_requested: bool
-    # @rbs @refork_threshold_idx: Integer
+    # @rbs @refork_threshold_index: Integer
     # @rbs @seed_pid: Integer?
     # @rbs @seed_ready: bool
     # @rbs @seed_vacated_index: Integer?
@@ -200,7 +202,7 @@ module Raptor
 
       Dir.chdir(options[:chdir]) if options[:chdir]
 
-      inherited_fds = if raw = ENV.delete(INHERITED_FDS_ENV)
+      inherited_fds = if (raw = ENV.delete(INHERITED_FDS_ENV))
         JSON.parse(raw)
       elsif (systemd_fds = Systemd.listen_fds).any?
         Systemd.clear_listen_env
@@ -225,7 +227,7 @@ module Raptor
 
       @refork_thresholds = normalize_refork_thresholds(options[:refork_after])
       @refork_requested = false
-      @refork_threshold_idx = 0
+      @refork_threshold_index = 0
       @seed_pid = nil
       @seed_ready = false
       @seed_vacated_index = nil
@@ -310,9 +312,11 @@ module Raptor
       @stats.all
     end
 
-    # Returns cluster statistics for the control server.
-    # For an adaptive pool, `max_threads` is the number of threads currently
-    # running so utilization reflects the capacity available at that moment.
+    private
+
+    # Returns cluster statistics for the control server. For an adaptive
+    # pool, `max_threads` is the number of threads currently running so
+    # utilization reflects the capacity available at that moment.
     #
     # @return [Hash] cluster statistics
     #
@@ -354,11 +358,9 @@ module Raptor
       }
     end
 
-    private
-
-    # @rbs (Float timestamp) -> String
-    def timestamp(timestamp)
-      Time.at(timestamp).utc.iso8601(6)
+    # @rbs (Numeric time) -> String
+    def timestamp(time)
+      Time.at(time).utc.iso8601(6)
     end
 
     # Returns the inherited-FDs hash for a systemd socket-activation handoff,
@@ -449,7 +451,7 @@ module Raptor
     def pid_alive?(pid)
       Process.kill(0, pid)
       true
-    rescue Errno::ESRCH, Errno::ECHILD
+    rescue Errno::ESRCH
       false
     rescue Errno::EPERM
       true
@@ -513,14 +515,14 @@ module Raptor
       return unless candidate
 
       candidate_index, candidate_requests = candidate
-      threshold = @refork_thresholds[@refork_threshold_idx]
+      threshold = @refork_thresholds[@refork_threshold_index]
 
       if @refork_requested
         @refork_requested = false
       elsif !threshold || candidate_requests < threshold
         return
       else
-        @refork_threshold_idx += 1
+        @refork_threshold_index += 1
       end
 
       promote_worker_to_seed(candidate_index)
@@ -800,7 +802,7 @@ module Raptor
       trap("USR2", "IGNORE")
       trap("URG") { promote_to_seed = true } if @fork_r
 
-      Raptor::CPU.pin(index) if @cpu_affinity && Raptor::CPU.count >= @worker_count
+      CPU.pin(index) if @cpu_affinity && CPU.count >= @worker_count
 
       started_at = Process.clock_gettime(Process::CLOCK_REALTIME)
       request_count = 0
@@ -813,7 +815,7 @@ module Raptor
         backlog: 0,
         busy_threads: 0,
         thread_capacity: @thread_count,
-        started_at:,
+        started_at: started_at,
         last_checkin: started_at,
         booted: false
       )
@@ -891,7 +893,6 @@ module Raptor
       end
 
       server = Server.new(
-        @binder,
         reactor,
         thread_pool,
         http1,
@@ -919,7 +920,7 @@ module Raptor
             backlog: reactor.backlog,
             busy_threads: thread_pool.active_count,
             thread_capacity: thread_pool.size,
-            started_at:,
+            started_at: started_at,
             last_checkin: Process.clock_gettime(Process::CLOCK_REALTIME),
             booted: true
           )
@@ -974,7 +975,7 @@ module Raptor
 
       child_pids = []
       trap("CHLD") do
-        child_pids.reject! { Process.wait(_1, Process::WNOHANG) rescue true }
+        child_pids.reject! { |pid| Process.wait(pid, Process::WNOHANG) rescue true }
       end
 
       @resp_w.write([0].pack("L"))
@@ -1002,16 +1003,16 @@ module Raptor
     #
     # @rbs (AtomicThreadPool thread_pool) -> void
     def drain_thread_pool(thread_pool)
-      drain = Thread.new do
+      drain_thread = Thread.new do
         Thread.current.name = "Thread Pool Drain"
 
         thread_pool.shutdown
       end
-      return if drain.join(@worker_drain_timeout)
+      return if drain_thread.join(@worker_drain_timeout)
 
       Log.warn "Force-killing in-flight app threads after #{@worker_drain_timeout}s drain timeout"
       thread_pool.instance_variable_get(:@threads).each(&:kill)
-      drain.join
+      drain_thread.join
     end
 
     # Returns a human-readable description of how a process exited.
@@ -1036,8 +1037,6 @@ module Raptor
     #
     # @rbs () -> void
     def shutdown
-      return if @shutdown
-
       @shutdown = true
     end
 

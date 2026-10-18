@@ -34,6 +34,8 @@ module Raptor
 
     INTERNAL_SERVER_ERROR_RESPONSE: ::String
 
+    CHUNKED_TERMINATOR: ::String
+
     CONNECTION_CLOSE: ::String
 
     CONNECTION_KEEPALIVE: ::String
@@ -42,13 +44,17 @@ module Raptor
 
     TRANSFER_ENCODING_CHUNKED: ::String
 
-    CHUNKED_TERMINATOR: ::String
-
     HTTP_CONNECTION: ::String
 
     HTTP_EXPECT: ::String
 
     HTTP_TRANSFER_ENCODING: ::String
+
+    HTTP_X_FORWARDED_PROTO: ::String
+
+    HTTP_X_FORWARDED_SCHEME: ::String
+
+    HTTP_X_FORWARDED_SSL: ::String
 
     RACK_HEADER_PREFIX: ::String
 
@@ -110,8 +116,6 @@ module Raptor
 
     @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
 
-    @server_port: Integer
-
     @server_port_string: String
 
     @write_timeout: Integer
@@ -128,7 +132,7 @@ module Raptor
 
     @clean_fiber_locals: bool
 
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
 
     @running: AtomicBoolean
 
@@ -150,38 +154,15 @@ module Raptor
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?) -> void
 
-    # Instance-level wrapper around {Http.parser_worker} that binds this
-    # handler's env template and body-size limit into the worker proc.
+    # Returns a Ractor-safe proc that parses HTTP/1.x requests.
     #
     # @return [Proc]
     #
     # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
     def parser_worker: () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
-
-    # Instance-level wrapper around {Http.socket_write} that applies the
-    # configured `write_timeout`.
-    #
-    # @param socket [TCPSocket] the socket to write to
-    # @param string [String] the data to write
-    # @return [void]
-    # @raise [Http::WriteError] if the socket is not writable within the timeout or raises IOError
-    #
-    # @rbs (TCPSocket socket, String string) -> void
-    def socket_write: (TCPSocket socket, String string) -> void
-
-    # Instance-level wrapper around {Http.socket_writev} that applies the
-    # configured `write_timeout`.
-    #
-    # @param socket [TCPSocket] the socket to write to
-    # @param strings [Array<String>] the buffers to write in order
-    # @return [void]
-    # @raise [Http::WriteError] if the socket is not writable within the timeout or raises IOError
-    #
-    # @rbs (TCPSocket socket, Array[String] strings) -> void
-    def socket_writev: (TCPSocket socket, Array[String] strings) -> void
 
     # Signals eager keep-alive loops to stop processing further requests on
     # their connections. In-flight requests complete normally.
@@ -196,10 +177,10 @@ module Raptor
     # when complete. Falls back to the reactor when more data is needed.
     #
     # @param socket [TCPSocket] the freshly accepted client socket
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param reactor [Reactor] the reactor for fallback registration
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
-    # @param remote_addr [String] client IP address
+    # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @return [void]
     #
@@ -221,21 +202,21 @@ module Raptor
 
     # Reads pending bytes off `socket` into the thread-local read buffer,
     # draining any additional SSL-buffered bytes so `pending` is empty on
-    # return. Raises `IO::WaitReadable`, `EOFError`, or `IOError` like the
-    # underlying `read_nonblock` does.
+    # return.
     #
     # @param socket [TCPSocket] the socket to read from
     # @return [String] the thread-local buffer, freshly populated
+    # @raise [IO::WaitReadable] if no bytes are ready to read
+    # @raise [EOFError, IOError, SystemCallError] if the connection is closed or fails
     #
     # @rbs (TCPSocket socket) -> String
     def read_into_thread_buffer: (TCPSocket socket) -> String
 
-    # Runs a fresh HTTP/1.x parse against `buffer`, returning
-    # `[env, parse_data, nread, parser]`. Raises `HttpParserError` on
-    # malformed input.
+    # Runs a fresh HTTP/1.x parse against `buffer`.
     #
     # @param buffer [String] the raw request bytes
-    # @return [Array(Hash, Hash, Integer, HttpParser)]
+    # @return [Array(Hash, Hash, Integer, HttpParser)] the env, parse data, bytes read, and parser
+    # @raise [HttpParserError] if the request is malformed
     #
     # @rbs (String buffer) -> [Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser]
     def parse_next_request: (String buffer) -> [ Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser ]
@@ -255,8 +236,8 @@ module Raptor
     # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
     def extract_body: (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
 
-    # Returns true if the request expects a 100 Continue response per
-    # RFC 7231 section 5.1.1.
+    # Returns true when the request expects a 100 Continue response per
+    # RFC 9110 section 10.1.1.
     #
     # @param env [Hash] the parsed Rack environment (possibly incomplete)
     # @return [Boolean]
@@ -279,32 +260,32 @@ module Raptor
     # if keep-alive, eagerly reading subsequent requests inline.
     #
     # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param env [Hash] partial env hash from the HTTP parser
     # @param parse_data [Hash] metadata from the parsing pass
     # @param body [String, nil] decoded request body
     # @param reactor [Reactor] the reactor managing the client connection
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param request_count [Integer] number of requests handled on this connection
-    # @param remote_addr [String] client IP address
+    # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @return [void]
     #
     # @rbs (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
     def process_client: (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
 
-    # Processes a single request. Builds the Rack env, calls the app,
-    # writes the response, and returns whether the connection stays open
-    # for another request.
+    # Processes a single request, isolating fiber and thread locals as
+    # configured, and returns whether the connection stays open for another
+    # request.
     #
     # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param env [Hash] partial env hash from the HTTP parser
     # @param parse_data [Hash] metadata from the parsing pass
     # @param body [String, nil] decoded request body
     # @param reactor [Reactor] the reactor managing the client connection
     # @param request_count [Integer] number of requests handled on this connection
-    # @param remote_addr [String] client IP address
+    # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @return [Boolean] true if the connection should be kept alive
     #
@@ -314,13 +295,13 @@ module Raptor
     # Calls the Rack app and writes its response for one request.
     #
     # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param env [Hash] partial env hash from the HTTP parser
     # @param parse_data [Hash] metadata from the parsing pass
     # @param body [String, nil] decoded request body
     # @param reactor [Reactor] the reactor managing the client connection
     # @param request_count [Integer] number of requests handled on this connection
-    # @param remote_addr [String] client IP address
+    # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @return [Boolean] true if the connection should be kept alive
     #
@@ -334,27 +315,25 @@ module Raptor
     #
     # @param socket [TCPSocket] the client socket
     # @param rack_env [Hash, nil] the Rack environment, if it was built
-    # @param status [Integer, nil] the status returned by the app, if any
+    # @param status [Object, nil] the status returned by the app, if any
     # @param headers [Hash, nil] the headers returned by the app, if any
     # @param error [Exception] the exception raised
     # @param response_started [Boolean] whether any response bytes have been written
     # @param hijacked [Boolean] whether the app took over the socket
     # @return [void]
     #
-    # @rbs (TCPSocket socket, Hash[String, untyped]? rack_env, Integer? status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
-    def handle_app_error: (TCPSocket socket, Hash[String, untyped]? rack_env, Integer? status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
+    # @rbs (TCPSocket socket, Hash[String, untyped]? rack_env, untyped status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
+    def handle_app_error: (TCPSocket socket, Hash[String, untyped]? rack_env, untyped status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
 
-    # Reads and processes subsequent requests inline on a kept-alive
-    # connection. Returns the connection to the reactor when no data is ready
-    # or a request is incomplete, and queues complete requests behind work
-    # that is already waiting.
+    # Processes kept-alive requests on application threads, yielding to queued
+    # work and returning idle or incomplete connections to the reactor.
     #
     # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param reactor [Reactor] the reactor for fallback registration
-    # @param thread_pool [AtomicThreadPool] thread pool for deprioritization
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param request_count [Integer] number of requests handled on this connection
-    # @param remote_addr [String] client IP address
+    # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @return [void]
     #
@@ -365,19 +344,19 @@ module Raptor
     # an incomplete request is received on the fast path.
     #
     # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param buffer [String] the partial request data already read
     # @param env [Hash] partial env hash from the HTTP parser
     # @param parse_data [Hash] metadata from the parsing pass
     # @param reactor [Reactor] the reactor to re-register with
     # @param request_count [Integer] number of requests handled on this connection
-    # @param remote_addr [String] client IP address
+    # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @param persisted [Boolean] whether the connection has already completed at least one request
     # @return [void]
     #
-    # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
-    def fallback_to_reactor: (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, persisted: bool) -> void
+    # @rbs (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, ?persisted: bool) -> void
+    def fallback_to_reactor: (TCPSocket socket, Integer id, String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, Reactor reactor, Integer request_count, String remote_addr, String url_scheme, ?persisted: bool) -> void
 
     # Writes a 413 response and closes the socket.
     #
@@ -401,7 +380,7 @@ module Raptor
     # @param parse_data [Hash] metadata from the parsing pass, including content_length
     # @param body [String, nil] decoded request body, or nil if no body
     # @param socket [TCPSocket] the client socket, used for hijack support
-    # @param remote_addr [String] client IP address
+    # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @return [Hash] fully populated Rack environment hash
     #
@@ -481,10 +460,10 @@ module Raptor
     # @raise [TypeError] if status is not an Integer
     # @raise [ArgumentError] if status is less than 100
     #
-    # @rbs (Integer status) -> void
-    def validate_status: (Integer status) -> void
+    # @rbs (untyped status) -> void
+    def validate_status: (untyped status) -> void
 
-    # Returns a normalised copy of the response headers with lowercased
+    # Returns a normalized copy of the response headers with lowercased
     # keys and illegal/`rack.*`/`status` entries dropped.
     #
     # @param headers [Hash] raw headers from the Rack application
@@ -515,8 +494,8 @@ module Raptor
     # @rbs (String http_version, Integer status) -> String
     def build_status_line: (String http_version, Integer status) -> String
 
-    # Writes the response headers, uncorks the socket, and hands the raw
-    # socket to the hijack callback.
+    # Writes the response headers and hands the raw socket to the hijack
+    # callback.
     #
     # @param socket [TCPSocket] the client socket
     # @param response [String] the status line accumulated so far
@@ -550,6 +529,7 @@ module Raptor
     # @param body [Object] the response body
     # @param http_version [String] "HTTP/1.1" or "HTTP/1.0"
     # @return [void]
+    # @raise [TypeError] if the body responds to none of `each`, `to_ary`, or `to_path`
     #
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
     def write_full_response: (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
@@ -622,8 +602,27 @@ module Raptor
     # @rbs (TCPSocket socket, String response, untyped body, bool use_chunked) -> void
     def write_enumerable_body: (TCPSocket socket, String response, untyped body, bool use_chunked) -> void
 
-    # Instance-level wrapper around {Http.write_access_log} that routes to
-    # the configured `@access_log_io`.
+    # Writes response bytes within the configured write timeout.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param string [String] the data to write
+    # @return [void]
+    # @raise [Http::WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, String string) -> void
+    def socket_write: (TCPSocket socket, String string) -> void
+
+    # Writes response buffers in order within the configured write timeout.
+    #
+    # @param socket [TCPSocket] the socket to write to
+    # @param strings [Array<String>] the buffers to write in order
+    # @return [void]
+    # @raise [Http::WriteError] if the socket is not writable within the timeout or raises IOError
+    #
+    # @rbs (TCPSocket socket, Array[String] strings) -> void
+    def socket_writev: (TCPSocket socket, Array[String] strings) -> void
+
+    # Writes a completed request to the access log.
     #
     # @param env [Hash] the Rack environment
     # @param status [Integer] the response status code

@@ -5,24 +5,24 @@ require "test_helper"
 require "raptor/http1"
 
 module Raptor
-  class TestHttp1Parser < TestCase
+  class TestHttpParser < TestCase
     parallelize_me!
 
-    def test_decode_chunked_single_chunk_complete
+    def test_decode_chunked_decodes_single_chunk
       decoded, state = HttpParser.decode_chunked("5\r\nhello\r\n0\r\n\r\n")
 
       assert_equal "hello", decoded
       assert_equal :complete, state
     end
 
-    def test_decode_chunked_multi_chunk_complete
+    def test_decode_chunked_decodes_multiple_chunks
       decoded, state = HttpParser.decode_chunked("5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n")
 
       assert_equal "hello world", decoded
       assert_equal :complete, state
     end
 
-    def test_decode_chunked_hex_size_upper_and_lower_case
+    def test_decode_chunked_accepts_mixed_case_hex_size
       decoded, state = HttpParser.decode_chunked("Ff\r\n#{"x" * 255}\r\n0\r\n\r\n")
 
       assert_equal "x" * 255, decoded
@@ -43,72 +43,72 @@ module Raptor
       assert_equal :complete, state
     end
 
-    def test_decode_chunked_incomplete_missing_terminator
-      decoded, state = HttpParser.decode_chunked("5\r\nhello\r\n")
-
-      assert_equal "hello", decoded
-      assert_equal :incomplete, state
-    end
-
-    def test_decode_chunked_incomplete_size_line
-      decoded, state = HttpParser.decode_chunked("5")
-
-      assert_equal "", decoded
-      assert_equal :incomplete, state
-    end
-
-    def test_decode_chunked_incomplete_trailer_section
-      decoded, state = HttpParser.decode_chunked("5\r\nhello\r\n0\r\nX-Trailer: value\r\n")
-
-      assert_equal "hello", decoded
-      assert_equal :incomplete, state
-    end
-
-    def test_decode_chunked_malformed_non_hex_size
-      _decoded, state = HttpParser.decode_chunked("z\r\nhello\r\n0\r\n\r\n")
-
-      assert_equal :malformed, state
-    end
-
-    def test_decode_chunked_malformed_empty_size_line
-      _decoded, state = HttpParser.decode_chunked("\r\nhello\r\n0\r\n\r\n")
-
-      assert_equal :malformed, state
-    end
-
-    def test_decode_chunked_too_large_when_max_exceeded
-      _decoded, state = HttpParser.decode_chunked("a\r\n0123456789\r\n0\r\n\r\n", 5)
-
-      assert_equal :too_large, state
-    end
-
-    def test_decode_chunked_within_max_size
+    def test_decode_chunked_accepts_body_within_max_size
       decoded, state = HttpParser.decode_chunked("5\r\nhello\r\n0\r\n\r\n", 5)
 
       assert_equal "hello", decoded
       assert_equal :complete, state
     end
 
-    def test_decode_chunked_malformed_when_overhead_exceeds_limit
-      bloated_extension = "A" * (HttpParser::MAX_CHUNK_OVERHEAD + 1)
-      _decoded, state = HttpParser.decode_chunked("1;#{bloated_extension}\r\nX\r\n0\r\n\r\n")
+    def test_decode_chunked_treats_nil_max_size_as_unlimited
+      body = "x" * 10_000
+      decoded, state = HttpParser.decode_chunked("#{body.bytesize.to_s(16)}\r\n#{body}\r\n0\r\n\r\n", nil)
 
-      assert_equal :malformed, state
+      assert_equal body, decoded
+      assert_equal :complete, state
     end
 
-    def test_decode_chunked_empty_buffer_incomplete
+    def test_decode_chunked_returns_incomplete_for_empty_buffer
       decoded, state = HttpParser.decode_chunked("")
 
       assert_equal "", decoded
       assert_equal :incomplete, state
     end
 
-    def test_decode_chunked_nil_max_size_treated_as_unlimited
-      body = "x" * 10_000
-      decoded, state = HttpParser.decode_chunked("#{body.bytesize.to_s(16)}\r\n#{body}\r\n0\r\n\r\n", nil)
+    def test_decode_chunked_returns_incomplete_for_partial_size_line
+      decoded, state = HttpParser.decode_chunked("5")
 
-      assert_equal body, decoded
-      assert_equal :complete, state
+      assert_equal "", decoded
+      assert_equal :incomplete, state
+    end
+
+    def test_decode_chunked_returns_incomplete_without_terminating_chunk
+      decoded, state = HttpParser.decode_chunked("5\r\nhello\r\n")
+
+      assert_equal "hello", decoded
+      assert_equal :incomplete, state
+    end
+
+    def test_decode_chunked_returns_incomplete_for_unterminated_trailers
+      decoded, state = HttpParser.decode_chunked("5\r\nhello\r\n0\r\nX-Trailer: value\r\n")
+
+      assert_equal "hello", decoded
+      assert_equal :incomplete, state
+    end
+
+    def test_decode_chunked_returns_malformed_for_non_hex_size
+      _decoded, state = HttpParser.decode_chunked("z\r\nhello\r\n0\r\n\r\n")
+
+      assert_equal :malformed, state
+    end
+
+    def test_decode_chunked_returns_malformed_for_empty_size_line
+      _decoded, state = HttpParser.decode_chunked("\r\nhello\r\n0\r\n\r\n")
+
+      assert_equal :malformed, state
+    end
+
+    def test_decode_chunked_returns_malformed_for_excessive_chunk_overhead
+      bloated_extension = "A" * (HttpParser::MAX_CHUNK_OVERHEAD + 1)
+      _decoded, state = HttpParser.decode_chunked("1;#{bloated_extension}\r\nX\r\n0\r\n\r\n")
+
+      assert_equal :malformed, state
+    end
+
+    def test_decode_chunked_returns_too_large_above_max_size
+      _decoded, state = HttpParser.decode_chunked("a\r\n0123456789\r\n0\r\n\r\n", 5)
+
+      assert_equal :too_large, state
     end
 
     def test_illegal_header_key_rejects_delimiters_and_control_bytes

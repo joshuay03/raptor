@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 run proc { |env|
-  if env["PATH_INFO"] == "/set"
+  if env[Rack::PATH_INFO] == "/set"
     Thread.current[:fiber_local] = "fiber"
     Thread.current.thread_variable_set(:thread_local, "thread")
     Fiber[:storage] = "storage"

@@ -1,6 +1,7 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
+require "openssl"
 require "socket"
 require "uri"
 
@@ -56,17 +57,17 @@ module Raptor
     # Returns the array of bind URIs.
     #
     # @return [Array<String>]
-    attr_reader :bind_uris
+    attr_reader :bind_uris #: Array[String]
 
     # Returns the kernel `listen()` queue depth for TCP/SSL listeners.
     #
     # @return [Integer]
-    attr_reader :socket_backlog
+    attr_reader :socket_backlog #: Integer
 
     # Returns the array of listening sockets.
     #
     # @return [Array<TCPServer, UNIXServer, SslListener, H2cListener>]
-    attr_reader :listeners
+    attr_reader :listeners #: Array[TCPServer | UNIXServer | SslListener | H2cListener]
 
     # Creates a new Binder and binds each URI. `localhost` expands to both
     # IPv4 and IPv6 loopback; when `inherited_fds` supplies file descriptors
@@ -113,8 +114,8 @@ module Raptor
       end
     end
 
-    # Returns the port of the first TCP or SSL listener, or 0 when none
-    # is configured.
+    # Returns the port of the first TCP, SSL, or cleartext HTTP/2 listener,
+    # or 0 when none is configured.
     #
     # @return [Integer]
     #
@@ -185,7 +186,7 @@ module Raptor
 
     # Creates fresh listeners for the given URI.
     #
-    # @param uri [URI] the parsed bind URI
+    # @param uri [URI::Generic] the parsed bind URI
     # @return [Array<TCPServer, UNIXServer, SslListener, H2cListener>]
     # @raise [UnknownBindSchemeError] if the URI scheme is not supported
     #
@@ -208,7 +209,7 @@ module Raptor
     # Reconstructs listeners for the given URI from inherited file
     # descriptors.
     #
-    # @param uri [URI] the parsed bind URI the FDs were bound to
+    # @param uri [URI::Generic] the parsed bind URI the FDs were bound to
     # @param filenos [Array<Integer>] file descriptors to wrap
     # @return [Array<TCPServer, UNIXServer, SslListener, H2cListener>]
     # @raise [UnknownBindSchemeError] if the URI scheme is not supported
@@ -240,7 +241,7 @@ module Raptor
     # @rbs (String? host, Integer? port) -> Array[TCPServer]
     def create_tcp_listeners(host, port)
       if host == "localhost"
-        return loopback_addresses.map { |address| create_tcp_listeners(address, port) }.flatten
+        return loopback_addresses.flat_map { |address| create_tcp_listeners(address, port) }
       end
 
       host = host[1..-2] if host&.start_with?("[")
@@ -299,7 +300,7 @@ module Raptor
     #
     # @param host [String, nil] hostname or IP address to bind to
     # @param port [Integer, nil] port number to bind to
-    # @param ssl_params [Hash<String, String>] SSL options (`cert` and `key` file paths)
+    # @param ssl_params [Hash{String => String}] SSL options (`cert` and `key` file paths)
     # @return [Array<SslListener>] array containing the created SSL listener(s)
     #
     # @rbs (String? host, Integer? port, Hash[String, String] ssl_params) -> Array[SslListener]
@@ -312,13 +313,11 @@ module Raptor
     # Builds a frozen `OpenSSL::SSL::SSLContext` configured for HTTP/2 and
     # HTTP/1.1 ALPN negotiation.
     #
-    # @param ssl_params [Hash<String, String>] SSL options ("cert" and "key" paths)
+    # @param ssl_params [Hash{String => String}] SSL options (`cert` and `key` file paths)
     # @return [OpenSSL::SSL::SSLContext]
     #
     # @rbs (Hash[String, String] ssl_params) -> OpenSSL::SSL::SSLContext
     def build_ssl_context(ssl_params)
-      require "openssl"
-
       OpenSSL::SSL::SSLContext.new.tap do |ssl_context|
         ssl_context.cert = OpenSSL::X509::Certificate.new(File.read(ssl_params["cert"]))
         ssl_context.key = OpenSSL::PKey.read(File.read(ssl_params["key"]))

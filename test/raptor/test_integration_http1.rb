@@ -16,58 +16,15 @@ module Raptor
       end
     end
 
-    def test_detached_response
-      with_server("detached_body.ru") do |uri|
-        response = raw_request(
-          uri,
-          "GET / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Connection: close\r\n\r\n"
-        )
+    def test_unix_socket_binding
+      socket_path = "/tmp/raptor_test_unix_#{Process.pid}.sock"
+      File.delete(socket_path) rescue nil
 
-        assert_match(/transfer-encoding: chunked/i, response)
-        assert_includes response, "5\r\nfirst\r\n7\r\n second\r\n"
-        assert_includes response, "0\r\nx-stream-status: complete\r\n\r\n"
-      end
-    end
+      with_unix_server(socket_path) do
+        response = raw_unix_request(socket_path, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
 
-    def test_detached_response_for_http10
-      with_server("detached_body.ru") do |uri|
-        response = raw_request(uri, "GET / HTTP/1.0\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
-
-        assert_match(/\AHTTP\/1\.0 200/, response)
-        refute_match(/transfer-encoding/i, response)
-        assert response.end_with?("\r\n\r\nfirst second")
-      end
-    end
-
-    def test_detached_responses_on_persistent_connection
-      with_server("detached_body.ru") do |uri|
-        socket = TCPSocket.new(uri.host, uri.port)
-        socket.write("GET /first HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
-        response = +""
-        Timeout.timeout(5) do
-          response << socket.readpartial(1024) until response.include?("\r\n\r\n")
-        end
-        socket.write("GET /second HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
-        response << Timeout.timeout(5) { socket.read }
-
-        assert_equal 2, response.scan(/HTTP\/1\.1 200/).size
-        assert_equal 2, response.scan("5\r\nfirst\r\n7\r\n second\r\n").size
-      ensure
-        socket&.close
-      end
-    end
-
-    def test_head_request_returns_no_body
-      with_server("head_request.ru") do |uri|
-        response = Net::HTTP.start(uri.host, uri.port) do |http|
-          http.head(uri.path)
-        end
-
-        assert_equal 200, response.code.to_i
-        assert_equal "text/plain", response["content-type"]
-        assert_empty response.body.to_s
+        assert_match(/200 OK/, response)
+        assert_match(/Hello, World!/, response)
       end
     end
 
@@ -135,6 +92,125 @@ module Raptor
 
         assert_equal 200, response.code.to_i
         assert_equal "", response.body
+      end
+    end
+
+    def test_rack_version_present
+      with_server("rack_version.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        refute_empty response.body
+        assert_match(/\d/, response.body)
+      end
+    end
+
+    def test_server_software_present
+      with_server("server_software.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal "Raptor/#{Raptor::VERSION}", response.body
+      end
+    end
+
+    def test_http_version_present
+      with_server("http_version.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal "HTTP/1.1", response.body
+      end
+    end
+
+    def test_server_name_and_port_present
+      with_server("server_name_port.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_match(/\S+:\d+/, response.body)
+      end
+    end
+
+    def test_remote_addr_present
+      with_server("remote_addr.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal "127.0.0.1", response.body
+      end
+    end
+
+    def test_rack_is_hijack_present
+      with_server("rack_is_hijack.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+      end
+    end
+
+    def test_http_headers_prefixed
+      with_server("http_headers.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["User-Agent"] = "TestAgent/1.0"
+          http.request(request)
+        end
+
+        assert_equal 200, response.code.to_i
+        assert_equal "TestAgent/1.0", response.body
+      end
+    end
+
+    def test_x_forwarded_proto_promotes_to_https
+      with_server("forwarded_proto.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["X-Forwarded-Proto"] = "https"
+          request["Host"] = "example.com"
+          http.request(request)
+        end
+
+        assert_equal "https|443", response.body
+      end
+    end
+
+    def test_x_forwarded_scheme_promotes_to_https
+      with_server("forwarded_proto.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["X-Forwarded-Scheme"] = "https"
+          request["Host"] = "example.com"
+          http.request(request)
+        end
+
+        assert_equal "https|443", response.body
+      end
+    end
+
+    def test_x_forwarded_ssl_promotes_to_https
+      with_server("forwarded_proto.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["X-Forwarded-Ssl"] = "on"
+          request["Host"] = "example.com"
+          http.request(request)
+        end
+
+        assert_equal "https|443", response.body
+      end
+    end
+
+    def test_x_forwarded_proto_takes_first_value_from_proxy_chain
+      with_server("forwarded_proto.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["X-Forwarded-Proto"] = "https, http"
+          request["Host"] = "example.com"
+          http.request(request)
+        end
+
+        assert_equal "https|443", response.body
       end
     end
 
@@ -254,6 +330,28 @@ module Raptor
       end
     end
 
+    def test_max_body_size_returns_413
+      @options[:connection] = @options[:connection].merge(max_body_size: 5)
+
+      with_server("rack_input.ru") do |uri|
+        response = Net::HTTP.post(uri, "this body is well over five bytes")
+
+        assert_equal 413, response.code.to_i
+      end
+    end
+
+    def test_head_request_returns_no_body
+      with_server("head_request.ru") do |uri|
+        response = Net::HTTP.start(uri.host, uri.port) do |http|
+          http.head(uri.path)
+        end
+
+        assert_equal 200, response.code.to_i
+        assert_equal "text/plain", response["content-type"]
+        assert_empty response.body.to_s
+      end
+    end
+
     def test_array_body_with_multiple_chunks
       with_server("array_body.ru") do |uri|
         response = Net::HTTP.get_response(uri)
@@ -287,6 +385,49 @@ module Raptor
       end
     ensure
       file&.unlink
+    end
+
+    def test_detached_response
+      with_server("detached_body.ru") do |uri|
+        response = raw_request(
+          uri,
+          "GET / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Connection: close\r\n\r\n"
+        )
+
+        assert_match(/transfer-encoding: chunked/i, response)
+        assert_includes response, "5\r\nfirst\r\n7\r\n second\r\n"
+        assert_includes response, "0\r\nx-stream-status: complete\r\n\r\n"
+      end
+    end
+
+    def test_detached_response_for_http10
+      with_server("detached_body.ru") do |uri|
+        response = raw_request(uri, "GET / HTTP/1.0\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
+
+        assert_match(%r{\AHTTP/1\.0 200}, response)
+        refute_match(/transfer-encoding/i, response)
+        assert_match(/\r\n\r\nfirst second\z/, response)
+      end
+    end
+
+    def test_detached_responses_on_persistent_connection
+      with_server("detached_body.ru") do |uri|
+        socket = TCPSocket.new(uri.host, uri.port)
+        socket.write("GET /first HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
+        response = +""
+        Timeout.timeout(5) do
+          response << socket.readpartial(1024) until response.include?("\r\n\r\n")
+        end
+        socket.write("GET /second HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
+        response << Timeout.timeout(5) { socket.read }
+
+        assert_equal 2, response.scan(%r{HTTP/1\.1 200}).size
+        assert_equal 2, response.scan("5\r\nfirst\r\n7\r\n second\r\n").size
+      ensure
+        socket&.close
+      end
     end
 
     def test_status_204_has_no_content_type
@@ -327,131 +468,12 @@ module Raptor
       end
     end
 
-    def test_rack_version_present
-      with_server("rack_version.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
-
-        assert_equal 200, response.code.to_i
-        refute_empty response.body
-        assert_match(/\d/, response.body)
-      end
-    end
-
-    def test_server_software_present
-      with_server("server_software.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
-
-        assert_equal 200, response.code.to_i
-        assert_equal "Raptor/#{Raptor::VERSION}", response.body
-      end
-    end
-
-    def test_http_version_present
-      with_server("http_version.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
-
-        assert_equal 200, response.code.to_i
-        assert_equal "HTTP/1.1", response.body
-      end
-    end
-
-    def test_server_name_and_port
-      with_server("server_name_port.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
-
-        assert_equal 200, response.code.to_i
-        assert_match(/\S+:\d+/, response.body)
-      end
-    end
-
-    def test_remote_addr_in_rack_env
-      with_server("remote_addr.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
-
-        assert_equal 200, response.code.to_i
-        assert_equal "127.0.0.1", response.body
-      end
-    end
-
-    def test_rack_is_hijack_present_in_env
-      with_server("rack_is_hijack.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
-
-        assert_equal 200, response.code.to_i
-      end
-    end
-
-    def test_x_forwarded_proto_promotes_to_https
-      with_server("forwarded_proto.ru") do |uri|
-        response = Net::HTTP.start(uri.host, uri.port) do |http|
-          request = Net::HTTP::Get.new(uri)
-          request["X-Forwarded-Proto"] = "https"
-          request["Host"] = "example.com"
-          http.request(request)
-        end
-
-        assert_equal "https|443", response.body
-      end
-    end
-
-    def test_x_forwarded_scheme_promotes_to_https
-      with_server("forwarded_proto.ru") do |uri|
-        response = Net::HTTP.start(uri.host, uri.port) do |http|
-          request = Net::HTTP::Get.new(uri)
-          request["X-Forwarded-Scheme"] = "https"
-          request["Host"] = "example.com"
-          http.request(request)
-        end
-
-        assert_equal "https|443", response.body
-      end
-    end
-
-    def test_x_forwarded_ssl_promotes_to_https
-      with_server("forwarded_proto.ru") do |uri|
-        response = Net::HTTP.start(uri.host, uri.port) do |http|
-          request = Net::HTTP::Get.new(uri)
-          request["X-Forwarded-Ssl"] = "on"
-          request["Host"] = "example.com"
-          http.request(request)
-        end
-
-        assert_equal "https|443", response.body
-      end
-    end
-
-    def test_x_forwarded_proto_takes_first_value_from_proxy_chain
-      with_server("forwarded_proto.ru") do |uri|
-        response = Net::HTTP.start(uri.host, uri.port) do |http|
-          request = Net::HTTP::Get.new(uri)
-          request["X-Forwarded-Proto"] = "https, http"
-          request["Host"] = "example.com"
-          http.request(request)
-        end
-
-        assert_equal "https|443", response.body
-      end
-    end
-
-    def test_http_headers_prefixed
-      with_server("http_headers.ru") do |uri|
-        response = Net::HTTP.start(uri.host, uri.port) do |http|
-          request = Net::HTTP::Get.new(uri)
-          request["User-Agent"] = "TestAgent/1.0"
-          http.request(request)
-        end
-
-        assert_equal 200, response.code.to_i
-        assert_equal "TestAgent/1.0", response.body
-      end
-    end
-
     def test_multiple_header_values
       with_server("multiple_headers.ru") do |uri|
         response = Net::HTTP.get_response(uri)
+        cookies = response.get_fields("set-cookie")
 
         assert_equal 200, response.code.to_i
-        cookies = response.get_fields("set-cookie")
         assert_equal 2, cookies.length
         assert_includes cookies, "cookie1=value1"
         assert_includes cookies, "cookie2=value2"
@@ -461,9 +483,9 @@ module Raptor
     def test_newline_joined_header_values
       with_server("newline_joined_headers.ru") do |uri|
         response = Net::HTTP.get_response(uri)
+        cookies = response.get_fields("set-cookie")
 
         assert_equal 200, response.code.to_i
-        cookies = response.get_fields("set-cookie")
         assert_equal 2, cookies.length
         assert_includes cookies, "cookie1=value1"
         assert_includes cookies, "cookie2=value2"
@@ -477,6 +499,24 @@ module Raptor
         assert_equal 200, response.code.to_i
         assert_nil response["rack.custom"]
         assert_nil response["status"]
+      end
+    end
+
+    def test_partial_hijack_response
+      with_server("hijack.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal "hijacked body", response.body
+      end
+    end
+
+    def test_full_hijack_response
+      with_server("full_hijack.ru") do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal "hijacked full!", response.body
       end
     end
 
@@ -561,12 +601,7 @@ module Raptor
       with_server("error_500.ru") do |uri|
         Net::HTTP.get_response(uri)
 
-        Timeout.timeout(5) do
-          loop do
-            break if File.exist?(log_path) && File.size(log_path) > 0
-            sleep 0.1
-          end
-        end
+        wait_until { File.size?(log_path) }
 
         assert_equal "/:RuntimeError", File.read(log_path)
       end
@@ -607,19 +642,9 @@ module Raptor
       end
     end
 
-    def test_max_body_size_returns_413
-      @options[:connection] = @options[:connection].merge(max_body_size: 5)
-
-      with_server("rack_input.ru") do |uri|
-        response = Net::HTTP.post(uri, "this body is well over five bytes")
-
-        assert_equal 413, response.code.to_i
-      end
-    end
-
     def test_too_long_uri_returns_400
       with_server do |uri|
-        long_path = "/" + "a" * (13 * 1024)
+        long_path = "/#{"a" * (13 * 1024)}"
         response = raw_request(uri, "GET #{long_path} HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\nConnection: close\r\n\r\n")
 
         assert_match(/400 Bad Request/, response)
@@ -631,9 +656,9 @@ module Raptor
     def test_too_long_uri_on_keepalive_returns_400
       with_server do |uri|
         socket = TCPSocket.new(uri.host, uri.port)
-        long_path = "/" + "a" * (13 * 1024)
+        long_path = "/#{"a" * (13 * 1024)}"
         socket.write("GET / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
-        first_response = String.new
+        first_response = +""
         Timeout.timeout(5) do
           first_response << socket.readpartial(1024) until first_response.include?("Hello, World!")
         end
@@ -839,39 +864,9 @@ module Raptor
       end
     end
 
-    def test_unix_socket_binding
-      socket_path = "/tmp/raptor_test_#{Process.pid}.sock"
-      File.delete(socket_path) rescue nil
-
-      with_unix_server(socket_path) do
-        response = raw_unix_request(socket_path, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
-
-        assert_match(/200 OK/, response)
-        assert_match(/Hello, World!/, response)
-      end
-    end
-
-    def test_partial_hijack_response
-      with_server("hijack.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
-
-        assert_equal 200, response.code.to_i
-        assert_equal "hijacked body", response.body
-      end
-    end
-
-    def test_full_hijack_response
-      with_server("full_hijack.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
-
-        assert_equal 200, response.code.to_i
-        assert_equal "hijacked full!", response.body
-      end
-    end
-
     private
 
-    def with_unix_server(socket_path, fixture: "hello_world.ru")
+    def with_unix_server(socket_path, fixture = "hello_world.ru")
       @options.merge!(
         binds: ["unix://#{socket_path}"],
         rackup: fixture_path(fixture)
@@ -892,10 +887,7 @@ module Raptor
 
       yield
     ensure
-      if cluster_pid
-        Process.kill("TERM", cluster_pid) rescue nil
-        Process.wait(cluster_pid) rescue nil
-      end
+      stop_cluster(cluster_pid)
       File.delete(socket_path) rescue nil
     end
   end

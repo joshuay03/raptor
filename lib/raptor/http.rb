@@ -20,7 +20,7 @@ module Raptor
     REMOTE_ADDR = "REMOTE_ADDR"
     REQUEST_URI = "REQUEST_URI"
     SERVER_SOFTWARE = "SERVER_SOFTWARE"
-    SERVER_SOFTWARE_VALUE = "Raptor/#{Raptor::VERSION}".freeze
+    SERVER_SOFTWARE_VALUE = "Raptor/#{VERSION}".freeze
 
     class WriteError < StandardError
       # @rbs () -> String
@@ -56,6 +56,7 @@ module Raptor
           bytes += socket.write_nonblock(bytes.zero? ? string : string.byteslice(bytes..-1))
         rescue IO::WaitWritable
           raise WriteError unless socket.wait_writable(timeout)
+
           retry
         rescue IOError
           raise WriteError
@@ -79,9 +80,10 @@ module Raptor
       return if total.zero?
 
       begin
-        written = Raptor::VectorIO.writev_nonblock(socket, strings)
+        written = VectorIO.writev_nonblock(socket, strings)
       rescue IO::WaitWritable
         raise WriteError unless socket.wait_writable(timeout)
+
         retry
       rescue IOError
         raise WriteError
@@ -113,7 +115,7 @@ module Raptor
     # @rbs (Hash[String, untyped] env_template, Integer? max_body_size) -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
     def self.parser_worker(env_template, max_body_size)
       proc do |data|
-        Raptor::Http1.parse(data, env_template, max_body_size)
+        Http1.parse(data, env_template, max_body_size)
       end
     end
 
@@ -121,12 +123,12 @@ module Raptor
     # registration order, rescuing any that raise.
     #
     # @param env [Hash, nil] the Rack environment
-    # @param status [Integer, nil] the response status code
+    # @param status [Object, nil] the status returned by the app, if any
     # @param headers [Hash, nil] the response headers
     # @param error [Exception, nil] any error raised during processing, or nil on success
     # @return [void]
     #
-    # @rbs (Hash[String, untyped]? env, Integer? status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
+    # @rbs (Hash[String, untyped]? env, untyped status, Hash[String, String | Array[String]]? headers, Exception? error) -> void
     def self.call_response_finished(env, status, headers, error)
       return unless env && env[Rack::RACK_RESPONSE_FINISHED].is_a?(Array)
 

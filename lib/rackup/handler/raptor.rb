@@ -1,8 +1,6 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
-require "concurrent/utility/processor_counter"
-
 module Rackup
   module Handler
     # Rack handler for booting Raptor through Rackup, `rails server`, or any
@@ -18,7 +16,8 @@ module Rackup
       #
       # @param app [#call] the Rack application to serve
       # @param options [Hash] handler options provided by Rackup or the host
-      # @yield [cluster] the cluster instance, before it starts running
+      # @yield before the cluster starts running
+      # @yieldparam cluster [::Raptor::Cluster] the cluster instance
       # @return [void]
       #
       # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, **untyped options) { (::Raptor::Cluster) -> void } -> void
@@ -62,7 +61,7 @@ module Rackup
       def self.build_cluster_options(app, options)
         defaults = DEFAULT_OPTIONS.dup
 
-        if user_supplied_options = options.delete(:user_supplied_options)
+        if (user_supplied_options = options.delete(:user_supplied_options))
           (options.keys - user_supplied_options).each do |key|
             defaults[key] = options.delete(key)
           end
@@ -81,13 +80,13 @@ module Rackup
             config[:binds] || ["tcp://#{defaults[:Host]}:#{defaults[:Port]}"]
           end,
           socket_backlog: (config[:socket_backlog] || cli_defaults[:socket_backlog]).to_i,
-          drain_accept_queue: config.key?(:drain_accept_queue) ? config[:drain_accept_queue] : cli_defaults[:drain_accept_queue],
-          workers: (options[:Workers] || ENV["RAPTOR_WORKERS"] || config[:workers] || Concurrent.available_processor_count).to_i,
+          drain_accept_queue: config.fetch(:drain_accept_queue, cli_defaults[:drain_accept_queue]),
+          workers: (options[:Workers] || ENV["RAPTOR_WORKERS"] || config[:workers] || cli_defaults[:workers]).to_i,
           threads: threads,
           max_threads: ::Raptor::CLI.parse_max_threads(max_threads, threads: threads),
-          cpu_affinity: config.key?(:cpu_affinity) ? config[:cpu_affinity] : cli_defaults[:cpu_affinity],
-          clean_thread_locals: config.key?(:clean_thread_locals) ? config[:clean_thread_locals] : cli_defaults[:clean_thread_locals],
-          clean_fiber_locals: config.key?(:clean_fiber_locals) ? config[:clean_fiber_locals] : cli_defaults[:clean_fiber_locals],
+          cpu_affinity: config.fetch(:cpu_affinity, cli_defaults[:cpu_affinity]),
+          clean_thread_locals: config.fetch(:clean_thread_locals, cli_defaults[:clean_thread_locals]),
+          clean_fiber_locals: config.fetch(:clean_fiber_locals, cli_defaults[:clean_fiber_locals]),
           app: app
         }
         result[:rackup] = config[:rackup] if config.key?(:rackup)
@@ -105,7 +104,7 @@ module Rackup
         result[:before_worker_boot] = config.fetch(:before_worker_boot, cli_defaults[:before_worker_boot])
         result[:before_worker_shutdown] = config.fetch(:before_worker_shutdown, cli_defaults[:before_worker_shutdown])
         result[:before_refork] = config.fetch(:before_refork, cli_defaults[:before_refork])
-        result[:stats_file] = config.key?(:stats_file) ? config[:stats_file] : cli_defaults[:stats_file]
+        result[:stats_file] = config.fetch(:stats_file, cli_defaults[:stats_file])
         result[:control_url] = config[:control_url] if config.key?(:control_url)
         result[:pid_file] = config[:pid_file] if config.key?(:pid_file)
         result[:stdout_file] = config[:stdout_file] if config.key?(:stdout_file)

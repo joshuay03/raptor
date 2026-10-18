@@ -6,15 +6,24 @@
 #include "ruby.h"
 #include "ruby/encoding.h"
 #include <assert.h>
-#include <string.h>
 #include <ctype.h>
+#include <stdint.h>
+#include <string.h>
 
 #define MAX_HEADER_LENGTH (112 * 1024)
 #define MAX_URI_LENGTH (12 * 1024)
 #define MAX_FIELD_NAME 256
 #define MAX_FIELD_VALUE (80 * 1024)
 
-typedef struct raptor_parser {
+// Upper bound on chunk-size lines, extensions and CRLFs a chunked body may
+// carry beyond its payload before it is rejected as malformed.
+#define MAX_CHUNK_OVERHEAD (16 * 1024)
+
+#define FLAG_CHUNKED  0x1
+#define FLAG_HAS_BODY 0x2
+#define FLAG_FINISHED 0x4
+
+typedef struct {
   int cs;
   size_t mark;
   size_t field_start;
@@ -25,7 +34,7 @@ typedef struct raptor_parser {
   off_t content_len;
   unsigned int flags;
   VALUE request;
-  VALUE body;
+  // Scratch space for the env key: "HTTP_" prefix + field name + NUL.
   char buf[MAX_FIELD_NAME + 6];
 } raptor_parser;
 
@@ -33,33 +42,29 @@ typedef struct raptor_parser {
 #define LEN(AT, P) ((P) - buffer - parser->AT)
 #define PTR_TO(F) (buffer + parser->F)
 
-#define FLAG_CHUNKED 0x1
-#define FLAG_HAS_BODY 0x2
-#define FLAG_FINISHED 0x4
-
-#define MAX_CHUNK_OVERHEAD (16 * 1024)
-
 static VALUE eHttpParserError;
 static VALUE global_request_method;
 static VALUE global_request_uri;
 static VALUE global_query_string;
 static VALUE global_server_protocol;
-static VALUE global_request_path;
+static VALUE global_path_info;
 static VALUE global_fragment;
 static ID id_complete;
 static ID id_incomplete;
 static ID id_malformed;
 static ID id_too_large;
 
-struct common_field {
+typedef struct {
   const char *name;
   size_t len;
   VALUE interned;
-};
+} common_field;
 
 #define FIELD(name) { name, sizeof(name) - 1, Qnil }
 
-static struct common_field common_fields[] = {
+// Env keys for frequently seen headers, interned once at load time so parsing
+// these headers does not need to look up the fstring table.
+static common_field common_fields[] = {
   FIELD("HTTP_HOST"),
   FIELD("HTTP_USER_AGENT"),
   FIELD("HTTP_CONNECTION"),
@@ -111,7 +116,7 @@ static struct common_field common_fields[] = {
 
 #define NUM_COMMON_FIELDS (sizeof(common_fields) / sizeof(common_fields[0]))
 
-static VALUE raptor_http_intern_field(const char *buf, size_t len) {
+static VALUE intern_field(const char *buf, size_t len) {
   for (size_t i = 0; i < NUM_COMMON_FIELDS; i++) {
     if (common_fields[i].len == len && memcmp(common_fields[i].name, buf, len) == 0) {
       return common_fields[i].interned;
@@ -143,10 +148,8 @@ static int contains_chunked(const char *value, long len) {
 }
 
 static const int raptor_parser_start = 1;
-static const int raptor_parser_first_final = 46;
-static const int raptor_parser_error = 0;
 
-size_t raptor_parser_execute(raptor_parser *parser, const char *buffer, size_t len) {
+static size_t raptor_parser_execute(raptor_parser *parser, const char *buffer, size_t len) {
   const char *p, *pe;
   int cs = parser->cs;
 
@@ -257,7 +260,7 @@ tr33:
 tr37:
 	{
     VALUE path = rb_str_new(PTR_TO(mark), LEN(mark,p));
-    rb_hash_aset(parser->request, global_request_path, path);
+    rb_hash_aset(parser->request, global_path_info, path);
   }
 	{
     if (LEN(mark, p) > MAX_URI_LENGTH)
@@ -397,7 +400,7 @@ tr26:
       parser->buf[key_len] = '\0';
     }
 
-    VALUE key = raptor_http_intern_field(parser->buf, key_len);
+    VALUE key = intern_field(parser->buf, key_len);
     VALUE value = rb_str_new(PTR_TO(mark), value_len);
 
     char *value_ptr = RSTRING_PTR(value);
@@ -421,7 +424,7 @@ tr26:
 
     VALUE existing = rb_hash_aref(parser->request, key);
     if (!NIL_P(existing)) {
-      rb_str_cat2(existing, ", ");
+      rb_str_cat(existing, ", ", 2);
       rb_str_append(existing, value);
     } else {
       rb_hash_aset(parser->request, key, value);
@@ -457,7 +460,7 @@ tr29:
       parser->buf[key_len] = '\0';
     }
 
-    VALUE key = raptor_http_intern_field(parser->buf, key_len);
+    VALUE key = intern_field(parser->buf, key_len);
     VALUE value = rb_str_new(PTR_TO(mark), value_len);
 
     char *value_ptr = RSTRING_PTR(value);
@@ -481,7 +484,7 @@ tr29:
 
     VALUE existing = rb_hash_aref(parser->request, key);
     if (!NIL_P(existing)) {
-      rb_str_cat2(existing, ", ");
+      rb_str_cat(existing, ", ", 2);
       rb_str_append(existing, value);
     } else {
       rb_hash_aset(parser->request, key, value);
@@ -629,7 +632,7 @@ tr9:
 tr38:
 	{
     VALUE path = rb_str_new(PTR_TO(mark), LEN(mark,p));
-    rb_hash_aset(parser->request, global_request_path, path);
+    rb_hash_aset(parser->request, global_path_info, path);
   }
 	{
     if (LEN(mark, p) > MAX_URI_LENGTH)
@@ -761,7 +764,7 @@ case 24:
 tr39:
 	{
     VALUE path = rb_str_new(PTR_TO(mark), LEN(mark,p));
-    rb_hash_aset(parser->request, global_request_path, path);
+    rb_hash_aset(parser->request, global_path_info, path);
   }
 	goto st25;
 st25:
@@ -1193,31 +1196,7 @@ done:
   return parser->nread;
 }
 
-int raptor_parser_finished(raptor_parser *parser) {
-  return (parser->flags & FLAG_FINISHED) != 0;
-}
-
-int raptor_parser_has_body(raptor_parser *parser) {
-  return (parser->flags & FLAG_HAS_BODY) != 0;
-}
-
-size_t raptor_parser_content_length(raptor_parser *parser) {
-  return parser->content_len;
-}
-
-int raptor_parser_is_chunked(raptor_parser *parser) {
-  return (parser->flags & FLAG_CHUNKED) != 0;
-}
-
-int raptor_parser_has_error(raptor_parser *parser) {
-  return parser->cs == raptor_parser_error;
-}
-
-int raptor_parser_is_finished(raptor_parser *parser) {
-  return parser->cs >= raptor_parser_first_final;
-}
-
-void raptor_parser_init(raptor_parser *parser) {
+static void raptor_parser_init(raptor_parser *parser) {
   parser->cs = raptor_parser_start;
   parser->mark = 0;
   parser->field_start = 0;
@@ -1228,19 +1207,11 @@ void raptor_parser_init(raptor_parser *parser) {
   parser->content_len = 0;
   parser->flags = 0;
   parser->request = Qnil;
-  parser->body = Qnil;
 }
-
-static VALUE cHttpParser;
 
 static void parser_mark(void *ptr) {
   raptor_parser *parser = ptr;
   rb_gc_mark(parser->request);
-  rb_gc_mark(parser->body);
-}
-
-static void parser_free(void *ptr) {
-  xfree(ptr);
 }
 
 static size_t parser_memsize(const void *ptr) {
@@ -1248,9 +1219,13 @@ static size_t parser_memsize(const void *ptr) {
 }
 
 static const rb_data_type_t parser_type = {
-  "raptor_http_parser",
-  { parser_mark, parser_free, parser_memsize },
-  0, 0, RUBY_TYPED_FREE_IMMEDIATELY
+  .wrap_struct_name = "raptor_http_parser",
+  .function = {
+    .dmark = parser_mark,
+    .dfree = RUBY_TYPED_DEFAULT_FREE,
+    .dsize = parser_memsize,
+  },
+  .flags = RUBY_TYPED_FREE_IMMEDIATELY,
 };
 
 static VALUE parser_alloc(VALUE klass) {
@@ -1282,31 +1257,25 @@ static VALUE parser_execute(VALUE self, VALUE req_hash, VALUE buffer, VALUE star
 static VALUE parser_finished_p(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
-  return raptor_parser_finished(parser) ? Qtrue : Qfalse;
+  return (parser->flags & FLAG_FINISHED) ? Qtrue : Qfalse;
 }
 
 static VALUE parser_has_body_p(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
-  return raptor_parser_has_body(parser) ? Qtrue : Qfalse;
+  return (parser->flags & FLAG_HAS_BODY) ? Qtrue : Qfalse;
 }
 
 static VALUE parser_chunked_p(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
-  return raptor_parser_is_chunked(parser) ? Qtrue : Qfalse;
+  return (parser->flags & FLAG_CHUNKED) ? Qtrue : Qfalse;
 }
 
 static VALUE parser_content_length(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
-  return SIZET2NUM(raptor_parser_content_length(parser));
-}
-
-static VALUE parser_nread(VALUE self) {
-  raptor_parser *parser;
-  TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
-  return SIZET2NUM(parser->nread);
+  return SIZET2NUM((size_t)parser->content_len);
 }
 
 static VALUE parser_reset(VALUE self) {
@@ -1314,12 +1283,6 @@ static VALUE parser_reset(VALUE self) {
   TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
   raptor_parser_init(parser);
   return Qnil;
-}
-
-static VALUE parser_body(VALUE self) {
-  raptor_parser *parser;
-  TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
-  return parser->body;
 }
 
 static const char *find_crlf(const char *buf, size_t len) {
@@ -1332,7 +1295,6 @@ static const char *find_crlf(const char *buf, size_t len) {
 }
 
 static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
-  (void)self;
   VALUE buffer, max_size;
   rb_scan_args(argc, argv, "11", &buffer, &max_size);
   Check_Type(buffer, T_STRING);
@@ -1404,11 +1366,23 @@ static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
   return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
 }
 
+// One bit per byte value. Header names reject C0 controls, space, DEL and
+// separators; header values reject C0 controls other than horizontal tab.
 static uint8_t illegal_header_key_bitmap[32];
 static uint8_t illegal_header_value_bitmap[32];
 
 static void bitmap_set(uint8_t *bitmap, unsigned char byte) {
   bitmap[byte >> 3] |= (uint8_t)(1u << (byte & 7));
+}
+
+static void init_illegal_header_bitmaps(void) {
+  for (int byte = 0x00; byte <= 0x20; byte++) bitmap_set(illegal_header_key_bitmap, (unsigned char)byte);
+  const char *key_specials = "()<>@,;:\\\"/[]?={}";
+  for (const char *p = key_specials; *p; p++) bitmap_set(illegal_header_key_bitmap, (unsigned char)*p);
+  bitmap_set(illegal_header_key_bitmap, 0x7F);
+
+  for (int byte = 0x00; byte <= 0x08; byte++) bitmap_set(illegal_header_value_bitmap, (unsigned char)byte);
+  for (int byte = 0x0A; byte <= 0x1F; byte++) bitmap_set(illegal_header_value_bitmap, (unsigned char)byte);
 }
 
 static int contains_illegal_byte(const uint8_t *bitmap, const char *str, size_t len) {
@@ -1420,13 +1394,11 @@ static int contains_illegal_byte(const uint8_t *bitmap, const char *str, size_t 
 }
 
 static VALUE parser_illegal_header_key_p(VALUE self, VALUE key) {
-  (void)self;
   Check_Type(key, T_STRING);
   return contains_illegal_byte(illegal_header_key_bitmap, RSTRING_PTR(key), (size_t)RSTRING_LEN(key)) ? Qtrue : Qfalse;
 }
 
 static VALUE parser_illegal_header_value_p(VALUE self, VALUE value) {
-  (void)self;
   Check_Type(value, T_STRING);
   return contains_illegal_byte(illegal_header_value_bitmap, RSTRING_PTR(value), (size_t)RSTRING_LEN(value)) ? Qtrue : Qfalse;
 }
@@ -1442,7 +1414,7 @@ static void emit_header_line(VALUE buffer, const char *name, long name_len,
 }
 
 static void emit_header(VALUE buffer, const char *name, long name_len, VALUE value) {
-  VALUE str = RB_TYPE_P(value, T_STRING) ? value : rb_funcall(value, rb_intern("to_s"), 0);
+  VALUE str = rb_obj_as_string(value);
   const char *ptr = RSTRING_PTR(str);
   long len = RSTRING_LEN(str);
   if (len == 0) return;
@@ -1459,13 +1431,10 @@ static void emit_header(VALUE buffer, const char *name, long name_len, VALUE val
       line_start = i + 1;
     }
   }
-  if (line_start < len) {
-    emit_header_line(buffer, name, name_len, ptr + line_start, len - line_start);
-  }
+  if (line_start < len) emit_header_line(buffer, name, name_len, ptr + line_start, len - line_start);
 }
 
-static int format_header_iter(VALUE key, VALUE value, VALUE data) {
-  VALUE buffer = (VALUE)data;
+static int format_header_iter(VALUE key, VALUE value, VALUE buffer) {
   if (!RB_TYPE_P(key, T_STRING)) return ST_CONTINUE;
   const char *name = RSTRING_PTR(key);
   long name_len = RSTRING_LEN(key);
@@ -1483,7 +1452,6 @@ static int format_header_iter(VALUE key, VALUE value, VALUE data) {
 }
 
 static VALUE parser_format_headers(VALUE self, VALUE buffer, VALUE headers) {
-  (void)self;
   Check_Type(buffer, T_STRING);
   Check_Type(headers, T_HASH);
   rb_hash_foreach(headers, format_header_iter, buffer);
@@ -1491,7 +1459,6 @@ static VALUE parser_format_headers(VALUE self, VALUE buffer, VALUE headers) {
 }
 
 static VALUE parser_chunked_encode(VALUE self, VALUE buffer, VALUE chunk) {
-  (void)self;
   Check_Type(buffer, T_STRING);
   Check_Type(chunk, T_STRING);
   long chunk_len = RSTRING_LEN(chunk);
@@ -1506,36 +1473,27 @@ static VALUE parser_chunked_encode(VALUE self, VALUE buffer, VALUE chunk) {
   return buffer;
 }
 
-static void init_illegal_header_bitmaps(void) {
-  for (int byte = 0x00; byte <= 0x20; byte++) bitmap_set(illegal_header_key_bitmap, (unsigned char)byte);
-  const char *key_specials = "()<>@,;:\\\"/[]?={}";
-  for (const char *p = key_specials; *p; p++) bitmap_set(illegal_header_key_bitmap, (unsigned char)*p);
-  bitmap_set(illegal_header_key_bitmap, 0x7F);
-
-  for (int byte = 0x00; byte <= 0x08; byte++) bitmap_set(illegal_header_value_bitmap, (unsigned char)byte);
-  for (int byte = 0x0A; byte <= 0x1F; byte++) bitmap_set(illegal_header_value_bitmap, (unsigned char)byte);
-}
-
 RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   rb_ext_ractor_safe(true);
-
-  VALUE mRaptor = rb_define_module("Raptor");
-  cHttpParser = rb_define_class_under(mRaptor, "HttpParser", rb_cObject);
-  eHttpParserError = rb_define_class_under(mRaptor, "HttpParserError", rb_eStandardError);
 
   rb_global_variable(&global_request_method);
   rb_global_variable(&global_request_uri);
   rb_global_variable(&global_query_string);
   rb_global_variable(&global_server_protocol);
-  rb_global_variable(&global_request_path);
+  rb_global_variable(&global_path_info);
   rb_global_variable(&global_fragment);
 
-  global_request_method = rb_str_new2("REQUEST_METHOD");
-  global_request_uri = rb_str_new2("REQUEST_URI");
-  global_query_string = rb_str_new2("QUERY_STRING");
-  global_server_protocol = rb_str_new2("SERVER_PROTOCOL");
-  global_request_path = rb_str_new2("PATH_INFO");
-  global_fragment = rb_str_new2("FRAGMENT");
+  global_request_method = rb_str_new_lit("REQUEST_METHOD");
+  global_request_uri = rb_str_new_lit("REQUEST_URI");
+  global_query_string = rb_str_new_lit("QUERY_STRING");
+  global_server_protocol = rb_str_new_lit("SERVER_PROTOCOL");
+  global_path_info = rb_str_new_lit("PATH_INFO");
+  global_fragment = rb_str_new_lit("FRAGMENT");
+
+  for (size_t i = 0; i < NUM_COMMON_FIELDS; i++) {
+    rb_global_variable(&common_fields[i].interned);
+    common_fields[i].interned = rb_enc_interned_str(common_fields[i].name, common_fields[i].len, rb_utf8_encoding());
+  }
 
   id_complete = rb_intern("complete");
   id_incomplete = rb_intern("incomplete");
@@ -1544,10 +1502,11 @@ RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
 
   init_illegal_header_bitmaps();
 
-  for (size_t i = 0; i < NUM_COMMON_FIELDS; i++) {
-    common_fields[i].interned = rb_enc_interned_str(common_fields[i].name, common_fields[i].len, rb_utf8_encoding());
-    rb_global_variable(&common_fields[i].interned);
-  }
+  VALUE mRaptor = rb_define_module("Raptor");
+  VALUE cHttpParser = rb_define_class_under(mRaptor, "HttpParser", rb_cObject);
+  eHttpParserError = rb_define_class_under(mRaptor, "HttpParserError", rb_eStandardError);
+
+  rb_define_const(cHttpParser, "MAX_CHUNK_OVERHEAD", INT2FIX(MAX_CHUNK_OVERHEAD));
 
   rb_define_alloc_func(cHttpParser, parser_alloc);
   rb_define_method(cHttpParser, "execute", parser_execute, 3);
@@ -1555,13 +1514,11 @@ RUBY_FUNC_EXPORTED void Init_raptor_http(void) {
   rb_define_method(cHttpParser, "has_body?", parser_has_body_p, 0);
   rb_define_method(cHttpParser, "chunked?", parser_chunked_p, 0);
   rb_define_method(cHttpParser, "content_length", parser_content_length, 0);
-  rb_define_method(cHttpParser, "nread", parser_nread, 0);
   rb_define_method(cHttpParser, "reset", parser_reset, 0);
-  rb_define_method(cHttpParser, "body", parser_body, 0);
+
   rb_define_singleton_method(cHttpParser, "decode_chunked", parser_decode_chunked, -1);
   rb_define_singleton_method(cHttpParser, "illegal_header_key?", parser_illegal_header_key_p, 1);
   rb_define_singleton_method(cHttpParser, "illegal_header_value?", parser_illegal_header_value_p, 1);
   rb_define_singleton_method(cHttpParser, "format_headers", parser_format_headers, 2);
   rb_define_singleton_method(cHttpParser, "chunked_encode", parser_chunked_encode, 2);
-  rb_define_const(cHttpParser, "MAX_CHUNK_OVERHEAD", INT2FIX(MAX_CHUNK_OVERHEAD));
 }

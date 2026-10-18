@@ -7,7 +7,7 @@ CPU_SEQUENCES = Random.new(0).then { |rng|
 }.freeze
 
 run proc { |env|
-  env["rack.input"].read
+  env[Rack::RACK_INPUT].read
   items = []
   CPU_SEQUENCES.sample.each do |chunk|
     chunk[:count].times do |index|

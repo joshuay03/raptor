@@ -2,6 +2,8 @@
 
 require "test_helper"
 
+require "raptor/control_server"
+
 module Raptor
   class TestControlServer < TestCase
     parallelize_me!
@@ -46,10 +48,8 @@ module Raptor
       server.start
       client = UNIXSocket.new(socket_path)
 
-      Timeout.timeout(1) do
-        Thread.pass until server.instance_variable_get(:@client).value
-        server.shutdown
-      end
+      wait_until(timeout: 1) { server.instance_variable_get(:@client).value }
+      Timeout.timeout(1) { server.shutdown }
 
       assert_equal "", client.read
     ensure

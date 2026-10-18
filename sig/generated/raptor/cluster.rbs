@@ -62,7 +62,7 @@ module Raptor
 
     @launch_argv: Array[String]?
 
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
+    @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
 
     @binder: Binder
 
@@ -104,7 +104,7 @@ module Raptor
 
     @seed_pid: Integer?
 
-    @refork_threshold_idx: Integer
+    @refork_threshold_index: Integer
 
     @refork_requested: bool
 
@@ -210,19 +210,19 @@ module Raptor
     # @rbs () -> Array[Hash[Symbol, untyped]]
     def stats: () -> Array[Hash[Symbol, untyped]]
 
-    # Returns cluster statistics for the control server.
-    # For an adaptive pool, `max_threads` is the number of threads currently
-    # running so utilization reflects the capacity available at that moment.
+    private
+
+    # Returns cluster statistics for the control server. For an adaptive
+    # pool, `max_threads` is the number of threads currently running so
+    # utilization reflects the capacity available at that moment.
     #
     # @return [Hash] cluster statistics
     #
     # @rbs () -> Hash[Symbol, untyped]
     def stats_hash: () -> Hash[Symbol, untyped]
 
-    private
-
-    # @rbs (Float timestamp) -> String
-    def timestamp: (Float timestamp) -> String
+    # @rbs (Numeric time) -> String
+    def timestamp: (Numeric time) -> String
 
     # Returns the inherited-FDs hash for a systemd socket-activation handoff,
     # pairing each bind URI with the FD systemd passed at the same index.

@@ -11,18 +11,15 @@ module Raptor
     parallelize_me!
 
     def setup
+      super
       generate_test_certs
-
-      @options = CLI::DEFAULT_OPTIONS.merge(
-        binds: ["ssl://127.0.0.1:0?cert=#{@cert_path}&key=#{@key_path}"],
-        workers: 1,
-        rackup: fixture_path("hello_world.ru")
-      )
+      @options[:binds] = ["ssl://127.0.0.1:0?cert=#{@cert_path}&key=#{@key_path}"]
     end
 
     def teardown
       @cert_file&.unlink
       @key_file&.unlink
+      super
     end
 
     def test_basic_http2_get_request
@@ -47,84 +44,6 @@ module Raptor
       end
     end
 
-    def test_http2_request_method
-      with_http2_server("request_method.ru") do |port|
-        responses = http2_request(port, "POST", "/", body: "data")
-
-        assert_equal 1, responses.size
-        assert_equal "200", responses[0][:status]
-        assert_equal "POST", responses[0][:body]
-      end
-    end
-
-    def test_http2_path_info
-      with_http2_server("path_info.ru") do |port|
-        responses = http2_get(port, "/foo/bar")
-
-        assert_equal 1, responses.size
-        assert_equal "200", responses[0][:status]
-        assert_equal "/foo/bar", responses[0][:body]
-      end
-    end
-
-    def test_http2_query_string
-      with_http2_server("query_string.ru") do |port|
-        responses = http2_get(port, "/?foo=bar&baz=qux")
-
-        assert_equal 1, responses.size
-        assert_equal "200", responses[0][:status]
-        assert_equal "foo=bar&baz=qux", responses[0][:body]
-      end
-    end
-
-    def test_http2_response_headers
-      with_http2_server do |port|
-        responses = http2_get(port, "/")
-
-        assert_equal "text/plain", responses[0][:headers]["content-type"]
-      end
-    end
-
-    def test_http2_http_version_present
-      with_http2_server("http_version.ru") do |port|
-        responses = http2_get(port, "/")
-
-        assert_equal "200", responses[0][:status]
-        assert_equal "HTTP/2", responses[0][:body]
-      end
-    end
-
-    def test_http2_post_with_body
-      with_http2_server("rack_input.ru") do |port|
-        responses = http2_request(port, "POST", "/", body: "request body content")
-
-        assert_equal "200", responses[0][:status]
-        assert_equal "request body content", responses[0][:body]
-      end
-    end
-
-    def test_http2_concurrent_streams
-      with_http2_server do |port|
-        responses = http2_concurrent_gets(port, ["/", "/", "/"])
-
-        assert_equal 3, responses.size
-        responses.each do |response|
-          assert_equal "200", response[:status]
-          assert_equal "Hello, World!", response[:body]
-        end
-      end
-    end
-
-    def test_http2_detached_body
-      with_http2_server("detached_body.ru") do |port|
-        responses = http2_get(port, "/")
-
-        assert_equal "200", responses[0][:status]
-        assert_equal "first second", responses[0][:body]
-        assert_equal "complete", responses[0][:headers]["x-stream-status"]
-      end
-    end
-
     def test_slow_ssl_handshake_does_not_block_other_connections
       with_http2_server do |port|
         slow_client = TCPSocket.new("127.0.0.1", port)
@@ -135,6 +54,88 @@ module Raptor
         assert_equal "200", responses[0][:status]
       ensure
         slow_client&.close
+      end
+    end
+
+    def test_request_method
+      with_http2_server("request_method.ru") do |port|
+        responses = http2_request(port, "POST", "/", body: "data")
+
+        assert_equal 1, responses.size
+        assert_equal "200", responses[0][:status]
+        assert_equal "POST", responses[0][:body]
+      end
+    end
+
+    def test_path_info
+      with_http2_server("path_info.ru") do |port|
+        responses = http2_get(port, "/foo/bar")
+
+        assert_equal 1, responses.size
+        assert_equal "200", responses[0][:status]
+        assert_equal "/foo/bar", responses[0][:body]
+      end
+    end
+
+    def test_query_string
+      with_http2_server("query_string.ru") do |port|
+        responses = http2_get(port, "/?foo=bar&baz=qux")
+
+        assert_equal 1, responses.size
+        assert_equal "200", responses[0][:status]
+        assert_equal "foo=bar&baz=qux", responses[0][:body]
+      end
+    end
+
+    def test_http_version_present
+      with_http2_server("http_version.ru") do |port|
+        responses = http2_get(port, "/")
+
+        assert_equal 1, responses.size
+        assert_equal "200", responses[0][:status]
+        assert_equal "HTTP/2", responses[0][:body]
+      end
+    end
+
+    def test_rack_input_with_post_body
+      with_http2_server("rack_input.ru") do |port|
+        responses = http2_request(port, "POST", "/", body: "request body content")
+
+        assert_equal 1, responses.size
+        assert_equal "200", responses[0][:status]
+        assert_equal "request body content", responses[0][:body]
+      end
+    end
+
+    def test_response_headers
+      with_http2_server do |port|
+        responses = http2_get(port, "/")
+
+        assert_equal 1, responses.size
+        assert_equal "text/plain", responses[0][:headers]["content-type"]
+      end
+    end
+
+    def test_detached_response
+      with_http2_server("detached_body.ru") do |port|
+        responses = http2_get(port, "/")
+
+        assert_equal 1, responses.size
+        assert_equal "200", responses[0][:status]
+        assert_equal "first second", responses[0][:body]
+        assert_equal "complete", responses[0][:headers]["x-stream-status"]
+      end
+    end
+
+    def test_concurrent_streams
+      with_http2_server do |port|
+        responses = http2_concurrent_gets(port, ["/", "/", "/"])
+
+        assert_equal 3, responses.size
+        responses.each do |response|
+          assert_equal "200", response[:status]
+          assert_equal "Hello, World!", response[:body]
+        end
       end
     end
 
@@ -164,9 +165,7 @@ module Raptor
     end
 
     def with_http2_server(fixture = nil)
-      if fixture
-        @options[:rackup] = fixture_path(fixture)
-      end
+      @options[:rackup] = fixture_path(fixture) if fixture
 
       cluster = without_output { Cluster.new(@options) }
       server_port = cluster.instance_variable_get(:@server_port)
@@ -182,40 +181,35 @@ module Raptor
 
       yield server_port
     ensure
-      if cluster_pid
-        Process.kill("TERM", cluster_pid) rescue nil
-        Process.wait(cluster_pid) rescue nil
-      end
+      stop_cluster(cluster_pid)
     end
 
     def wait_for_ssl_server(port)
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
+      Timeout.timeout(10) do
+        loop do
+          tcp_socket = TCPSocket.new("127.0.0.1", port)
+          ssl_context = OpenSSL::SSL::SSLContext.new
+          ssl_context.verify_mode = OpenSSL::SSL::VERIFY_NONE
+          ssl_socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
+          ssl_socket.sync_close = true
 
-      loop do
-        raise Timeout::Error, "server did not become ready" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-
-        tcp = TCPSocket.new("127.0.0.1", port)
-        ctx = OpenSSL::SSL::SSLContext.new
-        ctx.verify_mode = OpenSSL::SSL::VERIFY_NONE
-        ssl = OpenSSL::SSL::SSLSocket.new(tcp, ctx)
-        ssl.sync_close = true
-
-        begin
-          ssl.connect_nonblock
-        rescue IO::WaitReadable, IO::WaitWritable
-          if IO.select([ssl], [ssl], nil, 1)
-            retry
-          else
-            ssl.close rescue nil
-            sleep 0.1
-            next
+          begin
+            ssl_socket.connect_nonblock
+          rescue IO::WaitReadable, IO::WaitWritable
+            if IO.select([ssl_socket], [ssl_socket], nil, 1)
+              retry
+            else
+              ssl_socket.close rescue nil
+              sleep 0.1
+              next
+            end
           end
-        end
 
-        ssl.close
-        break
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET, OpenSSL::SSL::SSLError
-        sleep 0.1
+          ssl_socket.close
+          break
+        rescue Errno::ECONNREFUSED, Errno::ECONNRESET, OpenSSL::SSL::SSLError
+          sleep 0.1
+        end
       end
     end
 
@@ -282,10 +276,10 @@ module Raptor
     def http2_concurrent_gets(port, paths)
       responses = []
 
-      ssl_socket = connect_http2(port)
+      socket = connect_http2(port)
       conn = HTTP2::Client.new
 
-      conn.on(:frame) { |bytes| ssl_socket.write(bytes) }
+      conn.on(:frame) { |bytes| socket.write(bytes) }
 
       paths.each do |path|
         stream = conn.new_stream
@@ -312,11 +306,11 @@ module Raptor
         }, end_stream: true)
       end
 
-      read_http2_responses(ssl_socket, conn)
+      read_http2_responses(socket, conn)
 
       responses
     ensure
-      ssl_socket&.close rescue nil
+      socket&.close rescue nil
     end
 
     def connect_http2(port, ssl: true)

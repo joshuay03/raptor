@@ -1,12 +1,11 @@
 #include "ruby.h"
-#include <string.h>
 #include <stdint.h>
+#include <string.h>
 
-#define HTTP2_FRAME_HEADER_SIZE 9
-#define HTTP2_DEFAULT_HEADER_TABLE_SIZE 4096
-#define HTTP2_ENTRY_OVERHEAD 32
-#define HTTP2_CONNECTION_PREFACE "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
-#define HTTP2_CONNECTION_PREFACE_LEN 24
+#define FRAME_HEADER_SIZE 9
+#define DEFAULT_HEADER_TABLE_SIZE 4096
+#define ENTRY_OVERHEAD 32
+#define CONNECTION_PREFACE "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
 #define FRAME_DATA          0x0
 #define FRAME_HEADERS       0x1
@@ -19,12 +18,6 @@
 #define FRAME_WINDOW_UPDATE 0x8
 #define FRAME_CONTINUATION  0x9
 
-#define FLAG_END_STREAM  0x1
-#define FLAG_END_HEADERS 0x4
-#define FLAG_PADDED      0x8
-#define FLAG_PRIORITY    0x20
-#define FLAG_ACK         0x1
-
 #define SETTINGS_HEADER_TABLE_SIZE      0x1
 #define SETTINGS_ENABLE_PUSH            0x2
 #define SETTINGS_MAX_CONCURRENT_STREAMS 0x3
@@ -32,21 +25,41 @@
 #define SETTINGS_MAX_FRAME_SIZE         0x5
 #define SETTINGS_MAX_HEADER_LIST_SIZE   0x6
 
-#define STATIC_TABLE_SIZE 61
-
 #define HUFFMAN_ACCEPTED   1
 #define HUFFMAN_SYM        (1 << 1)
 #define HUFFMAN_FAIL_STATE 0x100
 
-static VALUE cHttp2Parser;
 static VALUE eHttp2ParserError;
+static ID id_type;
+static ID id_length;
+static ID id_flags;
+static ID id_stream_id;
+static ID id_payload;
+static ID id_data;
+static ID id_headers;
+static ID id_priority;
+static ID id_rst_stream;
+static ID id_settings;
+static ID id_push_promise;
+static ID id_ping;
+static ID id_goaway;
+static ID id_window_update;
+static ID id_continuation;
+static ID id_unknown;
+static ID id_header_table_size;
+static ID id_enable_push;
+static ID id_max_concurrent_streams;
+static ID id_initial_window_size;
+static ID id_max_frame_size;
+static ID id_max_header_list_size;
 
 typedef struct {
   const char *name;
   const char *value;
 } hpack_static_entry;
 
-static const hpack_static_entry STATIC_TABLE[] = {
+// RFC 7541 Appendix A. HPACK indexes are 1-based, so slot 0 is a placeholder.
+static const hpack_static_entry static_table[] = {
   {NULL, NULL},
   {":authority", ""},
   {":method", "GET"},
@@ -111,12 +124,15 @@ static const hpack_static_entry STATIC_TABLE[] = {
   {"www-authenticate", ""}
 };
 
+#define STATIC_TABLE_SIZE ((long)(sizeof(static_table) / sizeof(static_table[0])) - 1)
+
 typedef struct {
   uint32_t code;
   uint8_t  bits;
 } huffman_entry;
 
-static const huffman_entry HUFFMAN_TABLE[257] = {
+// RFC 7541 Appendix B: one code per byte value plus EOS.
+static const huffman_entry huffman_table[257] = {
   {0x1ff8,     13}, {0x7fffd8,   23}, {0xfffffe2,  28}, {0xfffffe3,  28},
   {0xfffffe4,  28}, {0xfffffe5,  28}, {0xfffffe6,  28}, {0xfffffe7,  28},
   {0xfffffe8,  28}, {0xffffea,   24}, {0x3ffffffc, 30}, {0xfffffe9,  28},
@@ -306,7 +322,7 @@ static int hpack_decode_string(const uint8_t *buf, size_t len, size_t *pos, VALU
 static size_t hpack_huffman_encode_len(const uint8_t *src, size_t src_len) {
   size_t bits = 0;
   for (size_t i = 0; i < src_len; i++)
-    bits += HUFFMAN_TABLE[src[i]].bits;
+    bits += huffman_table[src[i]].bits;
   return (bits + 7) / 8;
 }
 
@@ -316,8 +332,8 @@ static size_t hpack_huffman_encode(const uint8_t *src, size_t src_len, uint8_t *
   int remaining = 0;
 
   for (size_t i = 0; i < src_len; i++) {
-    uint32_t code = HUFFMAN_TABLE[src[i]].code;
-    uint8_t  bits = HUFFMAN_TABLE[src[i]].bits;
+    uint32_t code = huffman_table[src[i]].code;
+    uint8_t  bits = huffman_table[src[i]].bits;
 
     current = (current << bits) | code;
     remaining += bits;
@@ -336,26 +352,26 @@ static size_t hpack_huffman_encode(const uint8_t *src, size_t src_len, uint8_t *
   return pos;
 }
 
-static VALUE dynamic_table_lookup(VALUE dyn_table, long index, VALUE *name, VALUE *value) {
-  if (index < 1) return Qfalse;
+static int hpack_table_lookup(VALUE dyn_table, long index, VALUE *name, VALUE *value) {
+  if (index < 1) return -1;
 
   if (index <= STATIC_TABLE_SIZE) {
-    *name  = rb_str_new_cstr(STATIC_TABLE[index].name);
-    *value = rb_str_new_cstr(STATIC_TABLE[index].value);
-    return Qtrue;
+    *name  = rb_str_new_cstr(static_table[index].name);
+    *value = rb_str_new_cstr(static_table[index].value);
+    return 0;
   }
 
   long dyn_index = index - STATIC_TABLE_SIZE - 1;
-  if (dyn_index >= RARRAY_LEN(dyn_table)) return Qfalse;
+  if (dyn_index >= RARRAY_LEN(dyn_table)) return -1;
 
   VALUE entry = rb_ary_entry(dyn_table, dyn_index);
   *name  = rb_ary_entry(entry, 0);
   *value = rb_ary_entry(entry, 1);
-  return Qtrue;
+  return 0;
 }
 
-static VALUE dynamic_table_add(VALUE dyn_table, VALUE name, VALUE value, long max_size) {
-  long entry_size = RSTRING_LEN(name) + RSTRING_LEN(value) + HTTP2_ENTRY_OVERHEAD;
+static VALUE hpack_dynamic_table_add(VALUE dyn_table, VALUE name, VALUE value, long max_size) {
+  long entry_size = RSTRING_LEN(name) + RSTRING_LEN(value) + ENTRY_OVERHEAD;
 
   VALUE new_table = rb_ary_new();
   VALUE new_entry = rb_ary_new_from_args(2, rb_str_freeze(rb_str_dup(name)), rb_str_freeze(rb_str_dup(value)));
@@ -366,7 +382,7 @@ static VALUE dynamic_table_add(VALUE dyn_table, VALUE name, VALUE value, long ma
     VALUE existing = rb_ary_entry(dyn_table, i);
     VALUE ename = rb_ary_entry(existing, 0);
     VALUE evalue = rb_ary_entry(existing, 1);
-    long esize = RSTRING_LEN(ename) + RSTRING_LEN(evalue) + HTTP2_ENTRY_OVERHEAD;
+    long esize = RSTRING_LEN(ename) + RSTRING_LEN(evalue) + ENTRY_OVERHEAD;
 
     if (current_size + esize > max_size) break;
 
@@ -377,7 +393,7 @@ static VALUE dynamic_table_add(VALUE dyn_table, VALUE name, VALUE value, long ma
   return new_table;
 }
 
-static VALUE dynamic_table_evict(VALUE dyn_table, long max_size) {
+static VALUE hpack_dynamic_table_evict(VALUE dyn_table, long max_size) {
   long current_size = 0;
   long keep = 0;
 
@@ -385,7 +401,7 @@ static VALUE dynamic_table_evict(VALUE dyn_table, long max_size) {
     VALUE entry = rb_ary_entry(dyn_table, i);
     VALUE name = rb_ary_entry(entry, 0);
     VALUE value = rb_ary_entry(entry, 1);
-    long esize = RSTRING_LEN(name) + RSTRING_LEN(value) + HTTP2_ENTRY_OVERHEAD;
+    long esize = RSTRING_LEN(name) + RSTRING_LEN(value) + ENTRY_OVERHEAD;
 
     if (current_size + esize > max_size) break;
 
@@ -410,42 +426,42 @@ static int hpack_decode_header_block(const uint8_t *buf, size_t len,
     uint8_t byte = buf[pos];
 
     if (byte & 0x80) {
-      /* indexed (RFC 7541 6.1) */
+      // Indexed header field (RFC 7541 6.1).
       uint64_t index;
       if (hpack_decode_int(buf, len, &pos, 7, &index) < 0) return -1;
       if (index == 0) return -1;
 
       VALUE name, value;
-      if (!RTEST(dynamic_table_lookup(*dyn_table, (long)index, &name, &value))) return -1;
+      if (hpack_table_lookup(*dyn_table, (long)index, &name, &value) < 0) return -1;
 
       rb_ary_push(headers_out, rb_ary_new_from_args(2, name, value));
 
     } else if ((byte & 0xc0) == 0x40) {
-      /* literal with incremental indexing (RFC 7541 6.2.1) */
+      // Literal header field with incremental indexing (RFC 7541 6.2.1).
       uint64_t index;
       if (hpack_decode_int(buf, len, &pos, 6, &index) < 0) return -1;
 
       VALUE name, value;
       if (index > 0) {
         VALUE dummy;
-        if (!RTEST(dynamic_table_lookup(*dyn_table, (long)index, &name, &dummy))) return -1;
+        if (hpack_table_lookup(*dyn_table, (long)index, &name, &dummy) < 0) return -1;
       } else {
         if (hpack_decode_string(buf, len, &pos, &name) < 0) return -1;
       }
       if (hpack_decode_string(buf, len, &pos, &value) < 0) return -1;
 
       rb_ary_push(headers_out, rb_ary_new_from_args(2, name, value));
-      *dyn_table = dynamic_table_add(*dyn_table, name, value, *max_table_size);
+      *dyn_table = hpack_dynamic_table_add(*dyn_table, name, value, *max_table_size);
 
     } else if ((byte & 0xf0) == 0x00 || (byte & 0xf0) == 0x10) {
-      /* literal without indexing / never indexed (RFC 7541 6.2.2, 6.2.3) */
+      // Literal header field without indexing or never indexed (RFC 7541 6.2.2, 6.2.3).
       uint64_t index;
       if (hpack_decode_int(buf, len, &pos, 4, &index) < 0) return -1;
 
       VALUE name, value;
       if (index > 0) {
         VALUE dummy;
-        if (!RTEST(dynamic_table_lookup(*dyn_table, (long)index, &name, &dummy))) return -1;
+        if (hpack_table_lookup(*dyn_table, (long)index, &name, &dummy) < 0) return -1;
       } else {
         if (hpack_decode_string(buf, len, &pos, &name) < 0) return -1;
       }
@@ -454,12 +470,12 @@ static int hpack_decode_header_block(const uint8_t *buf, size_t len,
       rb_ary_push(headers_out, rb_ary_new_from_args(2, name, value));
 
     } else if ((byte & 0xe0) == 0x20) {
-      /* dynamic table size update (RFC 7541 6.3) */
+      // Dynamic table size update (RFC 7541 6.3).
       uint64_t new_size;
       if (hpack_decode_int(buf, len, &pos, 5, &new_size) < 0) return -1;
-      if (new_size > HTTP2_DEFAULT_HEADER_TABLE_SIZE) return -1;
+      if (new_size > DEFAULT_HEADER_TABLE_SIZE) return -1;
       *max_table_size = (long)new_size;
-      *dyn_table = dynamic_table_evict(*dyn_table, *max_table_size);
+      *dyn_table = hpack_dynamic_table_evict(*dyn_table, *max_table_size);
 
     } else {
       return -1;
@@ -487,8 +503,8 @@ static VALUE hpack_encode_header_block(VALUE headers) {
 
     int found_index = 0;
     for (int idx = 1; idx <= STATIC_TABLE_SIZE; idx++) {
-      if (strlen(STATIC_TABLE[idx].name) == name_len &&
-          memcmp(STATIC_TABLE[idx].name, name_ptr, name_len) == 0) {
+      if (strlen(static_table[idx].name) == name_len &&
+          memcmp(static_table[idx].name, name_ptr, name_len) == 0) {
         found_index = idx;
         break;
       }
@@ -496,35 +512,35 @@ static VALUE hpack_encode_header_block(VALUE headers) {
 
     if (found_index > 0) {
       int_len = hpack_encode_int(int_buf, found_index, 4, 0x00);
-      rb_str_buf_cat(buf, (const char *)int_buf, int_len);
+      rb_str_cat(buf, (const char *)int_buf, int_len);
     } else {
-      rb_str_buf_cat(buf, "\x00", 1);
+      rb_str_cat(buf, "\x00", 1);
 
       size_t huff_len = hpack_huffman_encode_len(name_ptr, name_len);
       if (huff_len < name_len) {
         int_len = hpack_encode_int(int_buf, huff_len, 7, 0x80);
-        rb_str_buf_cat(buf, (const char *)int_buf, int_len);
+        rb_str_cat(buf, (const char *)int_buf, int_len);
         uint8_t *huff_buf = ALLOCA_N(uint8_t, huff_len);
         hpack_huffman_encode(name_ptr, name_len, huff_buf);
-        rb_str_buf_cat(buf, (const char *)huff_buf, huff_len);
+        rb_str_cat(buf, (const char *)huff_buf, huff_len);
       } else {
         int_len = hpack_encode_int(int_buf, name_len, 7, 0x00);
-        rb_str_buf_cat(buf, (const char *)int_buf, int_len);
-        rb_str_buf_cat(buf, (const char *)name_ptr, name_len);
+        rb_str_cat(buf, (const char *)int_buf, int_len);
+        rb_str_cat(buf, (const char *)name_ptr, name_len);
       }
     }
 
     size_t huff_len = hpack_huffman_encode_len(value_ptr, value_len);
     if (huff_len < value_len) {
       int_len = hpack_encode_int(int_buf, huff_len, 7, 0x80);
-      rb_str_buf_cat(buf, (const char *)int_buf, int_len);
+      rb_str_cat(buf, (const char *)int_buf, int_len);
       uint8_t *huff_buf = ALLOCA_N(uint8_t, huff_len);
       hpack_huffman_encode(value_ptr, value_len, huff_buf);
-      rb_str_buf_cat(buf, (const char *)huff_buf, huff_len);
+      rb_str_cat(buf, (const char *)huff_buf, huff_len);
     } else {
       int_len = hpack_encode_int(int_buf, value_len, 7, 0x00);
-      rb_str_buf_cat(buf, (const char *)int_buf, int_len);
-      rb_str_buf_cat(buf, (const char *)value_ptr, value_len);
+      rb_str_cat(buf, (const char *)int_buf, int_len);
+      rb_str_cat(buf, (const char *)value_ptr, value_len);
     }
   }
 
@@ -541,38 +557,174 @@ static void parse_frame_header(const uint8_t *buf, frame_header *fh) {
 
 static VALUE frame_type_sym(uint8_t type) {
   switch (type) {
-    case FRAME_DATA:          return ID2SYM(rb_intern("data"));
-    case FRAME_HEADERS:       return ID2SYM(rb_intern("headers"));
-    case FRAME_PRIORITY:      return ID2SYM(rb_intern("priority"));
-    case FRAME_RST_STREAM:    return ID2SYM(rb_intern("rst_stream"));
-    case FRAME_SETTINGS:      return ID2SYM(rb_intern("settings"));
-    case FRAME_PUSH_PROMISE:  return ID2SYM(rb_intern("push_promise"));
-    case FRAME_PING:          return ID2SYM(rb_intern("ping"));
-    case FRAME_GOAWAY:        return ID2SYM(rb_intern("goaway"));
-    case FRAME_WINDOW_UPDATE: return ID2SYM(rb_intern("window_update"));
-    case FRAME_CONTINUATION:  return ID2SYM(rb_intern("continuation"));
-    default:                  return ID2SYM(rb_intern("unknown"));
+    case FRAME_DATA:          return ID2SYM(id_data);
+    case FRAME_HEADERS:       return ID2SYM(id_headers);
+    case FRAME_PRIORITY:      return ID2SYM(id_priority);
+    case FRAME_RST_STREAM:    return ID2SYM(id_rst_stream);
+    case FRAME_SETTINGS:      return ID2SYM(id_settings);
+    case FRAME_PUSH_PROMISE:  return ID2SYM(id_push_promise);
+    case FRAME_PING:          return ID2SYM(id_ping);
+    case FRAME_GOAWAY:        return ID2SYM(id_goaway);
+    case FRAME_WINDOW_UPDATE: return ID2SYM(id_window_update);
+    case FRAME_CONTINUATION:  return ID2SYM(id_continuation);
+    default:                  return ID2SYM(id_unknown);
   }
 }
 
-static void h2_parser_mark(void *ptr) { (void)ptr; }
-static void h2_parser_free(void *ptr) { xfree(ptr); }
-static size_t h2_parser_memsize(const void *ptr) { return sizeof(raptor_h2_parser); }
+static const char *const hop_by_hop_headers[] = {
+  "connection", "transfer-encoding", "keep-alive", "upgrade", "proxy-connection"
+};
+
+#define NUM_HOP_BY_HOP_HEADERS (sizeof(hop_by_hop_headers) / sizeof(hop_by_hop_headers[0]))
+
+static int is_hop_by_hop(const char *name, long name_len) {
+  for (size_t i = 0; i < NUM_HOP_BY_HOP_HEADERS; i++) {
+    size_t hbh_len = strlen(hop_by_hop_headers[i]);
+    if ((long)hbh_len == name_len && memcmp(name, hop_by_hop_headers[i], hbh_len) == 0) return 1;
+  }
+  return 0;
+}
+
+static VALUE ascii_lowercase_str(VALUE str) {
+  long len = RSTRING_LEN(str);
+  VALUE lower = rb_str_new(RSTRING_PTR(str), len);
+  char *ptr = RSTRING_PTR(lower);
+  for (long i = 0; i < len; i++) {
+    if (ptr[i] >= 'A' && ptr[i] <= 'Z') ptr[i] = (char)(ptr[i] | 0x20);
+  }
+  return lower;
+}
+
+static int response_headers_iter(VALUE key, VALUE value, VALUE pairs) {
+  if (!RB_TYPE_P(key, T_STRING)) return ST_CONTINUE;
+
+  VALUE lowered = ascii_lowercase_str(key);
+  const char *lname = RSTRING_PTR(lowered);
+  long lname_len = RSTRING_LEN(lowered);
+
+  if (lname_len > 0 && lname[0] == ':') return ST_CONTINUE;
+  if (lname_len >= 5 && memcmp(lname, "rack.", 5) == 0) return ST_CONTINUE;
+  if (is_hop_by_hop(lname, lname_len)) return ST_CONTINUE;
+
+  if (RB_TYPE_P(value, T_ARRAY)) {
+    long entries = RARRAY_LEN(value);
+    for (long i = 0; i < entries; i++) {
+      VALUE entry = RARRAY_AREF(value, i);
+      rb_ary_push(pairs, rb_ary_new_from_args(2, lowered, rb_obj_as_string(entry)));
+    }
+  } else {
+    rb_ary_push(pairs, rb_ary_new_from_args(2, lowered, rb_obj_as_string(value)));
+  }
+  return ST_CONTINUE;
+}
+
+static int build_settings_iter(VALUE key, VALUE val, VALUE buf) {
+  ID key_id = SYM2ID(key);
+
+  uint16_t id;
+  if (key_id == id_header_table_size)           id = SETTINGS_HEADER_TABLE_SIZE;
+  else if (key_id == id_enable_push)            id = SETTINGS_ENABLE_PUSH;
+  else if (key_id == id_max_concurrent_streams) id = SETTINGS_MAX_CONCURRENT_STREAMS;
+  else if (key_id == id_initial_window_size)    id = SETTINGS_INITIAL_WINDOW_SIZE;
+  else if (key_id == id_max_frame_size)         id = SETTINGS_MAX_FRAME_SIZE;
+  else if (key_id == id_max_header_list_size)   id = SETTINGS_MAX_HEADER_LIST_SIZE;
+  else return ST_CONTINUE;
+
+  uint32_t v = NUM2UINT(val);
+  uint8_t entry[6];
+  entry[0] = (id >> 8) & 0xff;
+  entry[1] = id & 0xff;
+  entry[2] = (v >> 24) & 0xff;
+  entry[3] = (v >> 16) & 0xff;
+  entry[4] = (v >> 8) & 0xff;
+  entry[5] = v & 0xff;
+  rb_str_cat(buf, (const char *)entry, sizeof(entry));
+  return ST_CONTINUE;
+}
+
+static size_t h2_parser_memsize(const void *ptr) {
+  return sizeof(raptor_h2_parser);
+}
 
 static const rb_data_type_t h2_parser_type = {
-  "raptor_http2_parser",
-  {h2_parser_mark, h2_parser_free, h2_parser_memsize},
-  0, 0, RUBY_TYPED_FREE_IMMEDIATELY
+  .wrap_struct_name = "raptor_http2_parser",
+  .function = {
+    .dfree = RUBY_TYPED_DEFAULT_FREE,
+    .dsize = h2_parser_memsize,
+  },
+  .flags = RUBY_TYPED_FREE_IMMEDIATELY,
 };
 
 static VALUE h2_parser_alloc(VALUE klass) {
   raptor_h2_parser *parser;
   VALUE obj = TypedData_Make_Struct(klass, raptor_h2_parser, &h2_parser_type, parser);
-  parser->max_table_size = HTTP2_DEFAULT_HEADER_TABLE_SIZE;
+  parser->max_table_size = DEFAULT_HEADER_TABLE_SIZE;
   return obj;
 }
 
-static VALUE h2_parse_headers(VALUE self, VALUE header_block, VALUE dyn_table) {
+static VALUE h2_parser_parse_frame(VALUE self, VALUE buffer) {
+  Check_Type(buffer, T_STRING);
+
+  const uint8_t *buf = (const uint8_t *)RSTRING_PTR(buffer);
+  size_t len = RSTRING_LEN(buffer);
+
+  if (len < FRAME_HEADER_SIZE) return Qnil;
+
+  frame_header fh;
+  parse_frame_header(buf, &fh);
+
+  size_t total = FRAME_HEADER_SIZE + fh.length;
+  if (len < total) return Qnil;
+
+  VALUE frame = rb_hash_new();
+  rb_hash_aset(frame, ID2SYM(id_type),      frame_type_sym(fh.type));
+  rb_hash_aset(frame, ID2SYM(id_length),    UINT2NUM(fh.length));
+  rb_hash_aset(frame, ID2SYM(id_flags),     UINT2NUM(fh.flags));
+  rb_hash_aset(frame, ID2SYM(id_stream_id), UINT2NUM(fh.stream_id));
+  rb_hash_aset(frame, ID2SYM(id_payload),   rb_str_new((const char *)(buf + FRAME_HEADER_SIZE), fh.length));
+
+  return rb_ary_new_from_args(2, frame, SIZET2NUM(total));
+}
+
+static VALUE h2_parser_build_frame(VALUE self, VALUE type, VALUE flags, VALUE stream_id, VALUE payload) {
+  uint8_t frame_type;
+  ID type_id = SYM2ID(type);
+
+  if (type_id == id_data)               frame_type = FRAME_DATA;
+  else if (type_id == id_headers)       frame_type = FRAME_HEADERS;
+  else if (type_id == id_priority)      frame_type = FRAME_PRIORITY;
+  else if (type_id == id_rst_stream)    frame_type = FRAME_RST_STREAM;
+  else if (type_id == id_settings)      frame_type = FRAME_SETTINGS;
+  else if (type_id == id_push_promise)  frame_type = FRAME_PUSH_PROMISE;
+  else if (type_id == id_ping)          frame_type = FRAME_PING;
+  else if (type_id == id_goaway)        frame_type = FRAME_GOAWAY;
+  else if (type_id == id_window_update) frame_type = FRAME_WINDOW_UPDATE;
+  else if (type_id == id_continuation)  frame_type = FRAME_CONTINUATION;
+  else rb_raise(rb_eArgError, "unknown frame type");
+
+  uint8_t frame_flags = (uint8_t)NUM2UINT(flags);
+  uint32_t sid = NUM2UINT(stream_id);
+
+  const char *payload_ptr = NIL_P(payload) ? "" : RSTRING_PTR(payload);
+  size_t payload_len = NIL_P(payload) ? 0 : RSTRING_LEN(payload);
+
+  uint8_t header[FRAME_HEADER_SIZE];
+  header[0] = (payload_len >> 16) & 0xff;
+  header[1] = (payload_len >> 8) & 0xff;
+  header[2] = payload_len & 0xff;
+  header[3] = frame_type;
+  header[4] = frame_flags;
+  header[5] = (sid >> 24) & 0x7f;
+  header[6] = (sid >> 16) & 0xff;
+  header[7] = (sid >> 8) & 0xff;
+  header[8] = sid & 0xff;
+
+  VALUE result = rb_str_new((const char *)header, FRAME_HEADER_SIZE);
+  rb_str_cat(result, payload_ptr, payload_len);
+  return result;
+}
+
+static VALUE h2_parser_parse_headers(VALUE self, VALUE header_block, VALUE dyn_table) {
   raptor_h2_parser *parser;
   TypedData_Get_Struct(self, raptor_h2_parser, &h2_parser_type, parser);
 
@@ -593,63 +745,12 @@ static VALUE h2_parse_headers(VALUE self, VALUE header_block, VALUE dyn_table) {
   return rb_ary_new_from_args(2, headers, table);
 }
 
-static VALUE h2_encode_headers(VALUE self, VALUE headers) {
-  (void)self;
+static VALUE h2_parser_encode_headers(VALUE self, VALUE headers) {
   Check_Type(headers, T_ARRAY);
   return hpack_encode_header_block(headers);
 }
 
-static const char *const HOP_BY_HOP_HEADERS[] = {
-  "connection", "transfer-encoding", "keep-alive", "upgrade", "proxy-connection"
-};
-#define NUM_HOP_BY_HOP_HEADERS 5
-
-static int is_hop_by_hop(const char *name, long name_len) {
-  for (size_t i = 0; i < NUM_HOP_BY_HOP_HEADERS; i++) {
-    size_t hbh_len = strlen(HOP_BY_HOP_HEADERS[i]);
-    if ((long)hbh_len == name_len && memcmp(name, HOP_BY_HOP_HEADERS[i], hbh_len) == 0) return 1;
-  }
-  return 0;
-}
-
-static VALUE ascii_lowercase_str(VALUE str) {
-  long len = RSTRING_LEN(str);
-  VALUE lower = rb_str_new(RSTRING_PTR(str), len);
-  char *ptr = RSTRING_PTR(lower);
-  for (long i = 0; i < len; i++) {
-    if (ptr[i] >= 'A' && ptr[i] <= 'Z') ptr[i] = (char)(ptr[i] | 0x20);
-  }
-  return lower;
-}
-
-static int response_headers_iter(VALUE key, VALUE value, VALUE data) {
-  VALUE pairs = data;
-  if (!RB_TYPE_P(key, T_STRING)) return ST_CONTINUE;
-
-  VALUE lowered = ascii_lowercase_str(key);
-  const char *lname = RSTRING_PTR(lowered);
-  long lname_len = RSTRING_LEN(lowered);
-
-  if (lname_len > 0 && lname[0] == ':') return ST_CONTINUE;
-  if (lname_len >= 5 && memcmp(lname, "rack.", 5) == 0) return ST_CONTINUE;
-  if (is_hop_by_hop(lname, lname_len)) return ST_CONTINUE;
-
-  if (RB_TYPE_P(value, T_ARRAY)) {
-    long entries = RARRAY_LEN(value);
-    for (long i = 0; i < entries; i++) {
-      VALUE entry = RARRAY_AREF(value, i);
-      VALUE str = RB_TYPE_P(entry, T_STRING) ? entry : rb_obj_as_string(entry);
-      rb_ary_push(pairs, rb_ary_new_from_args(2, lowered, str));
-    }
-  } else {
-    VALUE str = RB_TYPE_P(value, T_STRING) ? value : rb_obj_as_string(value);
-    rb_ary_push(pairs, rb_ary_new_from_args(2, lowered, str));
-  }
-  return ST_CONTINUE;
-}
-
-static VALUE h2_encode_response_headers(VALUE self, VALUE status, VALUE headers) {
-  (void)self;
+static VALUE h2_parser_encode_response_headers(VALUE self, VALUE status, VALUE headers) {
   Check_Type(headers, T_HASH);
 
   VALUE pairs = rb_ary_new();
@@ -659,8 +760,7 @@ static VALUE h2_encode_response_headers(VALUE self, VALUE status, VALUE headers)
   return hpack_encode_header_block(pairs);
 }
 
-static VALUE h2_encode_response_trailers(VALUE self, VALUE trailers) {
-  (void)self;
+static VALUE h2_parser_encode_response_trailers(VALUE self, VALUE trailers) {
   Check_Type(trailers, T_HASH);
 
   VALUE pairs = rb_ary_new();
@@ -669,78 +769,7 @@ static VALUE h2_encode_response_trailers(VALUE self, VALUE trailers) {
   return hpack_encode_header_block(pairs);
 }
 
-static VALUE h2_parse_frame(VALUE self, VALUE buffer) {
-  (void)self;
-  Check_Type(buffer, T_STRING);
-
-  const uint8_t *buf = (const uint8_t *)RSTRING_PTR(buffer);
-  size_t len = RSTRING_LEN(buffer);
-
-  if (len < HTTP2_FRAME_HEADER_SIZE) return Qnil;
-
-  frame_header fh;
-  parse_frame_header(buf, &fh);
-
-  size_t total = HTTP2_FRAME_HEADER_SIZE + fh.length;
-  if (len < total) return Qnil;
-
-  VALUE frame = rb_hash_new();
-  rb_hash_aset(frame, ID2SYM(rb_intern("type")),      frame_type_sym(fh.type));
-  rb_hash_aset(frame, ID2SYM(rb_intern("length")),     UINT2NUM(fh.length));
-  rb_hash_aset(frame, ID2SYM(rb_intern("flags")),      UINT2NUM(fh.flags));
-  rb_hash_aset(frame, ID2SYM(rb_intern("stream_id")),  UINT2NUM(fh.stream_id));
-  rb_hash_aset(frame, ID2SYM(rb_intern("payload")),    rb_str_new((const char *)(buf + HTTP2_FRAME_HEADER_SIZE), fh.length));
-
-  return rb_ary_new_from_args(2, frame, SIZET2NUM(total));
-}
-
-static VALUE h2_build_frame(VALUE self, VALUE type, VALUE flags, VALUE stream_id, VALUE payload) {
-  (void)self;
-
-  uint8_t frame_type;
-  ID type_id = SYM2ID(type);
-
-  if (type_id == rb_intern("data"))               frame_type = FRAME_DATA;
-  else if (type_id == rb_intern("headers"))        frame_type = FRAME_HEADERS;
-  else if (type_id == rb_intern("priority"))       frame_type = FRAME_PRIORITY;
-  else if (type_id == rb_intern("rst_stream"))     frame_type = FRAME_RST_STREAM;
-  else if (type_id == rb_intern("settings"))       frame_type = FRAME_SETTINGS;
-  else if (type_id == rb_intern("push_promise"))   frame_type = FRAME_PUSH_PROMISE;
-  else if (type_id == rb_intern("ping"))           frame_type = FRAME_PING;
-  else if (type_id == rb_intern("goaway"))         frame_type = FRAME_GOAWAY;
-  else if (type_id == rb_intern("window_update"))  frame_type = FRAME_WINDOW_UPDATE;
-  else if (type_id == rb_intern("continuation"))   frame_type = FRAME_CONTINUATION;
-  else rb_raise(rb_eArgError, "unknown frame type");
-
-  uint8_t frame_flags = (uint8_t)NUM2UINT(flags);
-  uint32_t sid = NUM2UINT(stream_id);
-
-  const char *payload_ptr = NIL_P(payload) ? "" : RSTRING_PTR(payload);
-  size_t payload_len = NIL_P(payload) ? 0 : RSTRING_LEN(payload);
-
-  uint8_t header[HTTP2_FRAME_HEADER_SIZE];
-  header[0] = (payload_len >> 16) & 0xff;
-  header[1] = (payload_len >> 8) & 0xff;
-  header[2] = payload_len & 0xff;
-  header[3] = frame_type;
-  header[4] = frame_flags;
-  header[5] = (sid >> 24) & 0x7f;
-  header[6] = (sid >> 16) & 0xff;
-  header[7] = (sid >> 8) & 0xff;
-  header[8] = sid & 0xff;
-
-  VALUE result = rb_str_new((const char *)header, HTTP2_FRAME_HEADER_SIZE);
-  rb_str_buf_cat(result, payload_ptr, payload_len);
-  return result;
-}
-
-static VALUE h2_connection_preface(VALUE self) {
-  (void)self;
-  return rb_str_new(HTTP2_CONNECTION_PREFACE, HTTP2_CONNECTION_PREFACE_LEN);
-}
-
-static VALUE h2_parse_settings(VALUE self, VALUE payload) {
-  (void)self;
+static VALUE h2_parser_parse_settings(VALUE self, VALUE payload) {
   Check_Type(payload, T_STRING);
 
   const uint8_t *buf = (const uint8_t *)RSTRING_PTR(payload);
@@ -758,60 +787,38 @@ static VALUE h2_parse_settings(VALUE self, VALUE payload) {
 
     switch (id) {
       case SETTINGS_HEADER_TABLE_SIZE:
-        rb_hash_aset(settings, ID2SYM(rb_intern("header_table_size")), UINT2NUM(val));       break;
+        rb_hash_aset(settings, ID2SYM(id_header_table_size), UINT2NUM(val));
+        break;
       case SETTINGS_ENABLE_PUSH:
-        rb_hash_aset(settings, ID2SYM(rb_intern("enable_push")), UINT2NUM(val));              break;
+        rb_hash_aset(settings, ID2SYM(id_enable_push), UINT2NUM(val));
+        break;
       case SETTINGS_MAX_CONCURRENT_STREAMS:
-        rb_hash_aset(settings, ID2SYM(rb_intern("max_concurrent_streams")), UINT2NUM(val));   break;
+        rb_hash_aset(settings, ID2SYM(id_max_concurrent_streams), UINT2NUM(val));
+        break;
       case SETTINGS_INITIAL_WINDOW_SIZE:
-        rb_hash_aset(settings, ID2SYM(rb_intern("initial_window_size")), UINT2NUM(val));      break;
+        rb_hash_aset(settings, ID2SYM(id_initial_window_size), UINT2NUM(val));
+        break;
       case SETTINGS_MAX_FRAME_SIZE:
-        rb_hash_aset(settings, ID2SYM(rb_intern("max_frame_size")), UINT2NUM(val));           break;
+        rb_hash_aset(settings, ID2SYM(id_max_frame_size), UINT2NUM(val));
+        break;
       case SETTINGS_MAX_HEADER_LIST_SIZE:
-        rb_hash_aset(settings, ID2SYM(rb_intern("max_header_list_size")), UINT2NUM(val));     break;
+        rb_hash_aset(settings, ID2SYM(id_max_header_list_size), UINT2NUM(val));
+        break;
     }
   }
 
   return settings;
 }
 
-static VALUE h2_build_settings(VALUE self, VALUE settings) {
-  (void)self;
+static VALUE h2_parser_build_settings(VALUE self, VALUE settings) {
   Check_Type(settings, T_HASH);
 
   VALUE buf = rb_str_buf_new(36);
-  VALUE keys = rb_funcall(settings, rb_intern("keys"), 0);
-
-  for (long i = 0; i < RARRAY_LEN(keys); i++) {
-    VALUE key = rb_ary_entry(keys, i);
-    VALUE val = rb_hash_aref(settings, key);
-    ID key_id = SYM2ID(key);
-
-    uint16_t id;
-    if (key_id == rb_intern("header_table_size"))           id = SETTINGS_HEADER_TABLE_SIZE;
-    else if (key_id == rb_intern("enable_push"))            id = SETTINGS_ENABLE_PUSH;
-    else if (key_id == rb_intern("max_concurrent_streams")) id = SETTINGS_MAX_CONCURRENT_STREAMS;
-    else if (key_id == rb_intern("initial_window_size"))    id = SETTINGS_INITIAL_WINDOW_SIZE;
-    else if (key_id == rb_intern("max_frame_size"))         id = SETTINGS_MAX_FRAME_SIZE;
-    else if (key_id == rb_intern("max_header_list_size"))   id = SETTINGS_MAX_HEADER_LIST_SIZE;
-    else continue;
-
-    uint32_t v = NUM2UINT(val);
-    uint8_t entry[6];
-    entry[0] = (id >> 8) & 0xff;
-    entry[1] = id & 0xff;
-    entry[2] = (v >> 24) & 0xff;
-    entry[3] = (v >> 16) & 0xff;
-    entry[4] = (v >> 8) & 0xff;
-    entry[5] = v & 0xff;
-    rb_str_buf_cat(buf, (const char *)entry, 6);
-  }
-
+  rb_hash_foreach(settings, build_settings_iter, buf);
   return buf;
 }
 
-static VALUE h2_parse_window_update(VALUE self, VALUE payload) {
-  (void)self;
+static VALUE h2_parser_parse_window_update(VALUE self, VALUE payload) {
   Check_Type(payload, T_STRING);
 
   if (RSTRING_LEN(payload) != 4)
@@ -824,22 +831,50 @@ static VALUE h2_parse_window_update(VALUE self, VALUE payload) {
   return UINT2NUM(increment);
 }
 
+static VALUE h2_parser_connection_preface(VALUE self) {
+  return rb_str_new_lit(CONNECTION_PREFACE);
+}
+
 RUBY_FUNC_EXPORTED void Init_raptor_http2(void) {
   rb_ext_ractor_safe(true);
 
   VALUE mRaptor = rb_define_module("Raptor");
-  cHttp2Parser = rb_define_class_under(mRaptor, "Http2Parser", rb_cObject);
+  VALUE cHttp2Parser = rb_define_class_under(mRaptor, "Http2Parser", rb_cObject);
   eHttp2ParserError = rb_define_class_under(mRaptor, "Http2ParserError", rb_eStandardError);
 
+  id_type = rb_intern("type");
+  id_length = rb_intern("length");
+  id_flags = rb_intern("flags");
+  id_stream_id = rb_intern("stream_id");
+  id_payload = rb_intern("payload");
+  id_data = rb_intern("data");
+  id_headers = rb_intern("headers");
+  id_priority = rb_intern("priority");
+  id_rst_stream = rb_intern("rst_stream");
+  id_settings = rb_intern("settings");
+  id_push_promise = rb_intern("push_promise");
+  id_ping = rb_intern("ping");
+  id_goaway = rb_intern("goaway");
+  id_window_update = rb_intern("window_update");
+  id_continuation = rb_intern("continuation");
+  id_unknown = rb_intern("unknown");
+  id_header_table_size = rb_intern("header_table_size");
+  id_enable_push = rb_intern("enable_push");
+  id_max_concurrent_streams = rb_intern("max_concurrent_streams");
+  id_initial_window_size = rb_intern("initial_window_size");
+  id_max_frame_size = rb_intern("max_frame_size");
+  id_max_header_list_size = rb_intern("max_header_list_size");
+
   rb_define_alloc_func(cHttp2Parser, h2_parser_alloc);
-  rb_define_method(cHttp2Parser, "parse_frame", h2_parse_frame, 1);
-  rb_define_method(cHttp2Parser, "parse_headers", h2_parse_headers, 2);
-  rb_define_method(cHttp2Parser, "encode_headers", h2_encode_headers, 1);
-  rb_define_method(cHttp2Parser, "encode_response_headers", h2_encode_response_headers, 2);
-  rb_define_method(cHttp2Parser, "encode_response_trailers", h2_encode_response_trailers, 1);
-  rb_define_method(cHttp2Parser, "parse_settings", h2_parse_settings, 1);
-  rb_define_method(cHttp2Parser, "build_settings", h2_build_settings, 1);
-  rb_define_method(cHttp2Parser, "build_frame", h2_build_frame, 4);
-  rb_define_method(cHttp2Parser, "parse_window_update", h2_parse_window_update, 1);
-  rb_define_singleton_method(cHttp2Parser, "connection_preface", h2_connection_preface, 0);
+  rb_define_method(cHttp2Parser, "parse_frame", h2_parser_parse_frame, 1);
+  rb_define_method(cHttp2Parser, "build_frame", h2_parser_build_frame, 4);
+  rb_define_method(cHttp2Parser, "parse_headers", h2_parser_parse_headers, 2);
+  rb_define_method(cHttp2Parser, "encode_headers", h2_parser_encode_headers, 1);
+  rb_define_method(cHttp2Parser, "encode_response_headers", h2_parser_encode_response_headers, 2);
+  rb_define_method(cHttp2Parser, "encode_response_trailers", h2_parser_encode_response_trailers, 1);
+  rb_define_method(cHttp2Parser, "parse_settings", h2_parser_parse_settings, 1);
+  rb_define_method(cHttp2Parser, "build_settings", h2_parser_build_settings, 1);
+  rb_define_method(cHttp2Parser, "parse_window_update", h2_parser_parse_window_update, 1);
+
+  rb_define_singleton_method(cHttp2Parser, "connection_preface", h2_parser_connection_preface, 0);
 }

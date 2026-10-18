@@ -8,7 +8,7 @@ module Raptor
   class TestDetachedBody < TestCase
     parallelize_me!
 
-    def test_bounded_writes
+    def test_try_write_reports_full_until_buffer_is_drained
       body = DetachedBody.new(max_buffer_size: 5)
 
       assert_equal :accepted, body.try_write("hello")
@@ -19,7 +19,7 @@ module Raptor
       assert_equal "!", body.shift(3)
     end
 
-    def test_stream_lifecycle
+    def test_close_snapshots_trailers_and_finish_closes_stream_once
       opened = nil
       closed = []
       wakes = 0
@@ -51,7 +51,7 @@ module Raptor
       assert_equal :closed, body.try_write("later")
     end
 
-    def test_shared_buffer_limits
+    def test_try_write_reports_full_when_shared_budget_is_exhausted
       budget = DetachedBody::Budget.new(5)
       first = DetachedBody.new
       second = DetachedBody.new

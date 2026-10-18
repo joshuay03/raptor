@@ -2,6 +2,8 @@
 
 require "test_helper"
 
+require "raptor"
+
 module Raptor
   class TestRaptor < TestCase
     parallelize_me!

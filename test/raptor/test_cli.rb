@@ -4,6 +4,8 @@ require "test_helper"
 
 require "tmpdir"
 
+require "raptor/cli"
+
 module Raptor
   class TestCLI < TestCase
     parallelize_me!
@@ -158,6 +160,35 @@ module Raptor
       assert_equal 2, options(cli)[:workers]
     end
 
+    def test_threads_short_flag
+      cli = CLI.new(["-t", "8"])
+
+      assert_equal 8, options(cli)[:threads]
+    end
+
+    def test_threads_long_flag
+      cli = CLI.new(["--threads", "8"])
+
+      assert_equal 8, options(cli)[:threads]
+    end
+
+    def test_max_threads
+      cli = CLI.new(["--max-threads", "16"])
+
+      assert_equal 16, options(cli)[:max_threads]
+    end
+
+    def test_max_threads_unlimited
+      cli = CLI.new(["--max-threads", "unlimited"])
+
+      assert_equal Float::INFINITY, options(cli)[:max_threads]
+    end
+
+    def test_max_threads_cannot_be_less_than_threads
+      assert_raises(ArgumentError) { CLI.new(["--threads", "3", "--max-threads", "2"]) }
+      assert_raises(ArgumentError) { CLI.new(["--max-threads", "2", "--threads", "3"]) }
+    end
+
     def test_worker_and_thread_environment_variables
       opts = options_from_subprocess(
         { "RAPTOR_WORKERS" => "2", "RAPTOR_THREADS" => "4", "RAPTOR_MAX_THREADS" => "12" }
@@ -179,53 +210,19 @@ module Raptor
       assert_equal 15, opts[:max_threads]
     end
 
-    def test_http1_ractors_long_flag
-      cli = CLI.new(["--http1-ractors", "4"])
+    def test_cpu_affinity_enabled
+      cli = CLI.new(["--cpu-affinity"])
 
-      assert_equal 4, options(cli)[:http1][:ractors]
+      assert_equal true, options(cli)[:cpu_affinity]
     end
 
-    def test_http2_ractors_long_flag
-      cli = CLI.new(["--http2-ractors", "4"])
+    def test_cpu_affinity_disabled
+      cli = CLI.new(["--no-cpu-affinity"])
 
-      assert_equal 4, options(cli)[:http2][:ractors]
+      assert_equal false, options(cli)[:cpu_affinity]
     end
 
-    def test_threads_short_flag
-      cli = CLI.new(["-t", "8"])
-
-      assert_equal 8, options(cli)[:threads]
-    end
-
-    def test_threads_long_flag
-      cli = CLI.new(["--threads", "8"])
-
-      assert_equal 8, options(cli)[:threads]
-    end
-
-    def test_max_threads
-      cli = CLI.new(["--max-threads", "16"])
-
-      assert_equal 16, options(cli)[:max_threads]
-    end
-
-    def test_unlimited_max_threads
-      cli = CLI.new(["--max-threads", "unlimited"])
-
-      assert_equal Float::INFINITY, options(cli)[:max_threads]
-    end
-
-    def test_max_threads_cannot_be_less_than_threads
-      assert_raises(ArgumentError) { CLI.new(["--threads", "3", "--max-threads", "2"]) }
-      assert_raises(ArgumentError) { CLI.new(["--max-threads", "2", "--threads", "3"]) }
-    end
-
-    def test_cpu_affinity
-      assert_equal true, options(CLI.new(["--cpu-affinity"]))[:cpu_affinity]
-      assert_equal false, options(CLI.new(["--no-cpu-affinity"]))[:cpu_affinity]
-    end
-
-    def test_local_cleaning
+    def test_clean_thread_and_fiber_locals_disabled
       cli = CLI.new(["--no-clean-thread-locals", "--no-clean-fiber-locals"])
 
       assert_equal false, options(cli)[:clean_thread_locals]
@@ -256,12 +253,6 @@ module Raptor
       assert_equal "production", options(cli)[:environment]
     end
 
-    def test_control_url
-      cli = CLI.new(["--control-url", "unix:///tmp/raptor-control.sock"])
-
-      assert_equal "unix:///tmp/raptor-control.sock", options(cli)[:control_url]
-    end
-
     def test_first_data_timeout
       cli = CLI.new(["--first-data-timeout", "60"])
 
@@ -283,13 +274,19 @@ module Raptor
     def test_max_body_size
       cli = CLI.new(["--max-body-size", "1048576"])
 
-      assert_equal 1048576, options(cli)[:connection][:max_body_size]
+      assert_equal 1024 * 1024, options(cli)[:connection][:max_body_size]
     end
 
     def test_body_spool_threshold
       cli = CLI.new(["--body-spool-threshold", "4096"])
 
       assert_equal 4096, options(cli)[:connection][:body_spool_threshold]
+    end
+
+    def test_http1_ractors
+      cli = CLI.new(["--http1-ractors", "4"])
+
+      assert_equal 4, options(cli)[:http1][:ractors]
     end
 
     def test_http1_persistent_data_timeout
@@ -302,6 +299,12 @@ module Raptor
       cli = CLI.new(["--http1-max-keepalive-requests", "50"])
 
       assert_equal 50, options(cli)[:http1][:max_keepalive_requests]
+    end
+
+    def test_http2_ractors
+      cli = CLI.new(["--http2-ractors", "4"])
+
+      assert_equal 4, options(cli)[:http2][:ractors]
     end
 
     def test_http2_max_concurrent_streams
@@ -332,6 +335,12 @@ module Raptor
       cli = CLI.new(["--stats-file", "/tmp/custom.json"])
 
       assert_equal "/tmp/custom.json", options(cli)[:stats_file]
+    end
+
+    def test_control_url
+      cli = CLI.new(["--control-url", "unix:///tmp/raptor-control.sock"])
+
+      assert_equal "unix:///tmp/raptor-control.sock", options(cli)[:control_url]
     end
 
     def test_pid_file
@@ -429,7 +438,7 @@ module Raptor
       file.close
       yield file.path
     ensure
-      file.unlink if file
+      file&.unlink
     end
   end
 end

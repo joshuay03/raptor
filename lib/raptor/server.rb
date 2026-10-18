@@ -1,17 +1,18 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
+require "openssl"
 require "socket"
 
 require "atomic-ruby/atomic_boolean"
 
+require_relative "binder"
+require_relative "log"
 require_relative "reuseport_bpf"
 
 module Raptor
-  # Accepts client connections on TCP, Unix, and SSL listeners and
-  # dispatches them into the request pipeline. Yields between accepts
-  # when the thread pool queue exceeds the pool size so overloaded
-  # workers stay responsive to in-flight requests.
+  # Accepts client connections on TCP, Unix, SSL, and cleartext HTTP/2
+  # listeners and dispatches them into the request pipeline.
   #
   class Server
     HTTP_SCHEME = "http"
@@ -25,39 +26,37 @@ module Raptor
     BACKPRESSURE_THRESHOLD_MULTIPLIER = 1.2
     MIN_BACKPRESSURE_THRESHOLD = 8
 
-    # @rbs @binder: Binder
-    # @rbs @listeners: Array[TCPServer | UNIXServer | Binder::SslListener]
     # @rbs @reactor: Reactor
     # @rbs @thread_pool: AtomicThreadPool
     # @rbs @http1: Http1
     # @rbs @http2: Http2
     # @rbs @first_data_timeout: Integer
+    # @rbs @listeners: Array[TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener]
     # @rbs @drain_accept_queue: bool
     # @rbs @bpf_active: bool
     # @rbs @running: AtomicBoolean
 
-    # Creates a new Server instance.
+    # Creates a new Server.
     #
-    # @param binder [Binder] the binder managing listening sockets
     # @param reactor [Reactor] the reactor for handling client connections
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @param http1 [Http1] the HTTP/1.1 handler
-    # @param http2 [Http2] the HTTP/2 handler (provides the initial SETTINGS frame)
+    # @param http2 [Http2] the HTTP/2 handler
     # @param connection_options [Hash] per-connection timeout configuration, used to bound TLS handshakes
-    # @param listeners [Array] the per-worker listeners this server accepts on
+    # @option connection_options [Integer] :first_data_timeout timeout for completing the TLS handshake
+    # @param listeners [Array<TCPServer, UNIXServer, Binder::SslListener, Binder::H2cListener>] the per-worker listeners this server accepts on
     # @param drain_accept_queue [Boolean] whether to drain the kernel accept queue on shutdown
-    # @param worker_index [Integer, nil] the slot index for BPF load reporting
+    # @param worker_index [Integer, nil] this worker's BPF slot index, or nil when BPF dispatch is inactive
     # @return [void]
     #
-    # @rbs (Binder binder, Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], listeners: Array[untyped], ?drain_accept_queue: bool, ?worker_index: Integer?) -> void
-    def initialize(binder, reactor, thread_pool, http1, http2, connection_options:, listeners:, drain_accept_queue: false, worker_index: nil)
-      @binder = binder
-      @listeners = listeners
+    # @rbs (Reactor reactor, AtomicThreadPool thread_pool, Http1 http1, Http2 http2, connection_options: Hash[Symbol, untyped], listeners: Array[TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener], ?drain_accept_queue: bool, ?worker_index: Integer?) -> void
+    def initialize(reactor, thread_pool, http1, http2, connection_options:, listeners:, drain_accept_queue: false, worker_index: nil)
       @reactor = reactor
       @thread_pool = thread_pool
       @http1 = http1
       @http2 = http2
       @first_data_timeout = connection_options[:first_data_timeout]
+      @listeners = listeners
       @drain_accept_queue = drain_accept_queue
       @bpf_active = !!worker_index
       @running = AtomicBoolean.new(true)
@@ -78,7 +77,7 @@ module Raptor
 
         while @running.true?
           begin
-            ready_servers, _, _ = IO.select(@listeners, nil, nil, 1)
+            ready_servers, = IO.select(@listeners, nil, nil, 1)
           rescue IOError, Errno::EBADF
             break
           end
@@ -154,12 +153,12 @@ module Raptor
 
     # Accepts a connection from the given listener, immediately publishes
     # the pending work to the BPF map, and dispatches the socket into the
-    # HTTP/1.1 or SSL/HTTP-2 pipeline.
+    # SSL, cleartext HTTP/2, or HTTP/1.1 pipeline.
     #
-    # @param listener [TCPServer, UNIXServer, Binder::SslListener] the ready listener
+    # @param listener [TCPServer, UNIXServer, Binder::SslListener, Binder::H2cListener] the ready listener
     # @return [Boolean] true if a connection was accepted, false if the listener had nothing to dispatch
     #
-    # @rbs (TCPServer | UNIXServer | Binder::SslListener listener) -> bool
+    # @rbs (TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener listener) -> bool
     def accept_connection(listener)
       tcp_client = begin
         listener.is_a?(Binder::SslListener) ? listener.tcp_server.accept_nonblock : listener.accept_nonblock
@@ -212,7 +211,7 @@ module Raptor
     #
     # @param listener [Binder::SslListener] the SSL listener that accepted the connection
     # @param tcp_client [TCPSocket] the accepted TCP socket
-    # @param remote_addr [String] the client's IP address
+    # @param remote_addr [String] the client IP address
     # @return [void]
     #
     # @rbs (Binder::SslListener listener, TCPSocket tcp_client, String remote_addr) -> void

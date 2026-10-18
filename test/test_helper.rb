@@ -40,6 +40,17 @@ module Raptor
         end
       end
     end
+
+    def wait_until(timeout: 5)
+      Timeout.timeout(timeout) do
+        loop do
+          result = yield
+          break result if result
+
+          sleep 0.05
+        end
+      end
+    end
   end
 
   class IntegrationTestCase < TestCase
@@ -85,11 +96,15 @@ module Raptor
       uri = URI("http://127.0.0.1:#{server_port}/")
       yield uri
     ensure
-      if cluster_pid
-        Process.kill("TERM", cluster_pid) rescue nil
-        Process.wait(cluster_pid) rescue nil
-      end
+      stop_cluster(cluster_pid)
       rackup_file&.unlink
+    end
+
+    def stop_cluster(cluster_pid)
+      return unless cluster_pid
+
+      Process.kill("TERM", cluster_pid) rescue nil
+      Process.wait(cluster_pid) rescue nil
     end
 
     def wait_for_server(port)

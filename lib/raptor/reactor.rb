@@ -1,20 +1,21 @@
 # rbs_inline: enabled
 # frozen_string_literal: true
 
-require "nio"
 require "openssl"
-require "red-black-tree"
 require "timeout"
 
 require "atomic-ruby/atom"
 require "atomic-ruby/atomic_boolean"
 require "atomic-ruby/atomic_condition_variable"
 require "atomic-ruby/atomic_queue"
+require "nio"
+require "red-black-tree"
 
 require_relative "detached_body"
 require_relative "http1"
 require_relative "http2"
 require_relative "log"
+require_relative "raptor_http2"
 
 module Raptor
   # Multiplexes client connections, manages connection deadlines, feeds
@@ -22,12 +23,18 @@ module Raptor
   # to the caller-provided handlers.
   #
   class Reactor
+    CHUNK_SIZE = 64 * 1024
+    DETACHED_CONNECTION_BUFFER_SIZE = 1024 * 1024
+    DETACHED_WRITE_BATCH = 8
+    DETACHED_WORKER_BUFFER_SIZE = 16 * 1024 * 1024
+
+    TIMEOUT_RESPONSE = "HTTP/1.1 408 Request Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+
     # A client connection node ordered by absolute expiry time so the
     # soonest-to-expire is always at the tree's minimum.
     #
     class TimeoutClient < RedBlackTree::Node
-      # @rbs attr_accessor timeout_at: Float
-      attr_accessor :timeout_at
+      attr_accessor :timeout_at #: Float
 
       # Returns the client connection state.
       #
@@ -46,7 +53,7 @@ module Raptor
       #
       # @rbs (Float now) -> Float
       def timeout(now)
-        [timeout_at - now, 0].max
+        [timeout_at - now, 0.0].max
       end
 
       # Orders nodes by `timeout_at` so the tree minimum is the next
@@ -64,26 +71,13 @@ module Raptor
     # Tracks reactor-owned output state for a connection.
     #
     class ConnectionIO
-      # @rbs attr_accessor offset: Integer
-      attr_accessor :offset
-
-      # @rbs attr_accessor wait: Symbol?
-      attr_accessor :wait
-
-      # @rbs attr_accessor reading: bool
-      attr_accessor :reading
-
-      # @rbs attr_accessor closing: bool
-      attr_accessor :closing
-
-      # @rbs attr_accessor monitor: NIO::Monitor?
-      attr_accessor :monitor
-
-      # @rbs attr_accessor timeout: TimeoutClient?
-      attr_accessor :timeout
-
-      # @rbs attr_reader output: Array[String]
-      attr_reader :output
+      attr_accessor :offset #: Integer
+      attr_accessor :wait #: Symbol?
+      attr_accessor :reading #: bool
+      attr_accessor :closing #: bool
+      attr_accessor :monitor #: NIO::Monitor?
+      attr_accessor :timeout #: TimeoutClient?
+      attr_reader :output #: Array[String]
 
       # Creates empty connection I/O state for reactor-owned writes.
       #
@@ -113,20 +107,11 @@ module Raptor
     # Tracks reactor-owned I/O state for an HTTP/1.x detached response.
     #
     class Http1IO < ConnectionIO
-      # @rbs attr_accessor body: DetachedBody?
-      attr_accessor :body
-
-      # @rbs attr_accessor finishing: bool
-      attr_accessor :finishing
-
-      # @rbs attr_reader budget: DetachedBody::Budget
-      attr_reader :budget
-
-      # @rbs attr_reader input: String
-      attr_reader :input
-
-      # @rbs attr_reader state: Hash[Symbol, untyped]
-      attr_reader :state
+      attr_accessor :body #: DetachedBody?
+      attr_accessor :finishing #: bool
+      attr_reader :budget #: DetachedBody::Budget
+      attr_reader :input #: String
+      attr_reader :state #: Hash[Symbol, untyped]
 
       # Creates I/O state for an HTTP/1.x detached response.
       #
@@ -158,17 +143,10 @@ module Raptor
     # Tracks reactor-owned I/O state for an HTTP/2 connection.
     #
     class Http2IO < ConnectionIO
-      # @rbs attr_reader detached: Hash[Integer, DetachedBody]
-      attr_reader :detached
-
-      # @rbs attr_reader ready: Array[Integer]
-      attr_reader :ready
-
-      # @rbs attr_reader ready_streams: Hash[Integer, bool]
-      attr_reader :ready_streams
-
-      # @rbs attr_reader budget: DetachedBody::Budget
-      attr_reader :budget
+      attr_reader :detached #: Hash[Integer, DetachedBody]
+      attr_reader :ready #: Array[Integer]
+      attr_reader :ready_streams #: Hash[Integer, bool]
+      attr_reader :budget #: DetachedBody::Budget
 
       # Creates empty I/O state for an HTTP/2 connection and its detached streams.
       #
@@ -193,19 +171,13 @@ module Raptor
       end
     end
 
-    CHUNK_SIZE = 64 * 1024
-    DETACHED_CONNECTION_BUFFER_SIZE = 1024 * 1024
-    DETACHED_WRITE_BATCH = 8
-    DETACHED_WORKER_BUFFER_SIZE = 16 * 1024 * 1024
-    TIMEOUT_RESPONSE = "HTTP/1.1 408 Request Timeout\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-
-    # @rbs @thread_pool: untyped
-    # @rbs @http1_ractor_pool: untyped
-    # @rbs @http2_ractor_pool: untyped
+    # @rbs @http1_ractor_pool: RactorPool
+    # @rbs @http2_ractor_pool: RactorPool?
+    # @rbs @thread_pool: AtomicThreadPool
     # @rbs @first_data_timeout: Integer
     # @rbs @chunk_data_timeout: Integer
-    # @rbs @persistent_data_timeout: Integer
     # @rbs @write_timeout: Integer
+    # @rbs @persistent_data_timeout: Integer
     # @rbs @http2_keepalive_interval: Integer
     # @rbs @http2_keepalive_timeout: Integer
     # @rbs @selector: NIO::Selector
@@ -216,8 +188,8 @@ module Raptor
     # @rbs @id_to_socket: Hash[Integer, TCPSocket]
     # @rbs @socket_to_state: Hash[TCPSocket, Hash[Symbol, untyped]]
     # @rbs @id_to_timeout: Hash[Integer, TimeoutClient]
-    # @rbs @id_to_writer: Hash[Integer, untyped]
-    # @rbs @id_to_flow_control: Hash[Integer, untyped]
+    # @rbs @id_to_writer: Hash[Integer, Http2::Writer]
+    # @rbs @id_to_flow_control: Hash[Integer, Http2::FlowControl]
     # @rbs @id_to_http2_last_stream: Hash[Integer, Integer]
     # @rbs @id_to_http2_drain_stream: Hash[Integer, Integer]
     # @rbs @id_to_http2_keepalive: Hash[Integer, Hash[Symbol, untyped]]
@@ -227,7 +199,7 @@ module Raptor
     # @rbs @detached_drained: AtomicConditionVariable
     # @rbs @thread: Thread?
 
-    # Creates a new Reactor instance.
+    # Creates a new Reactor.
     #
     # @param http1_ractor_pool [RactorPool] ractor pool for HTTP/1.x parsing
     # @param http2_ractor_pool [RactorPool, nil] ractor pool for HTTP/2 parsing, or nil when no listener supports HTTP/2
@@ -243,7 +215,7 @@ module Raptor
     # @option http2_options [Integer] :keepalive_timeout time to await a PING acknowledgement
     # @return [void]
     #
-    # @rbs (untyped http1_ractor_pool, untyped http2_ractor_pool, untyped thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
+    # @rbs (RactorPool http1_ractor_pool, RactorPool? http2_ractor_pool, AtomicThreadPool thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
     def initialize(http1_ractor_pool, http2_ractor_pool, thread_pool, connection_options:, http1_options:, http2_options:)
       @http1_ractor_pool = http1_ractor_pool
       @http2_ractor_pool = http2_ractor_pool
@@ -328,19 +300,14 @@ module Raptor
     #
     # @param state [Hash] client connection state including socket and ID
     # @option state [TCPSocket] :socket the client socket
-    # @option state [Integer] :id unique identifier for the client
+    # @option state [Integer] :id unique connection identifier
     # @return [void]
     #
     # @rbs (Hash[Symbol, untyped] state) -> void
     def add(state)
-      socket = state[:socket]
-      state.delete(:socket)
-      writer = state.delete(:writer)
-      flow_control = state.delete(:flow_control)
+      socket = state.delete(:socket)
       @id_to_socket[state[:id]] = socket
       @socket_to_state[socket] = state
-      @id_to_writer[state[:id]] = writer if writer
-      @id_to_flow_control[state[:id]] = flow_control if flow_control
 
       read_and_queue_for_parse(socket, state)
     end
@@ -349,7 +316,7 @@ module Raptor
     # it for further I/O.
     #
     # @param state [Hash] updated client connection state
-    # @option state [Integer] :id client identifier
+    # @option state [Integer] :id unique connection identifier
     # @return [void]
     #
     # @rbs (Hash[Symbol, untyped] state) -> void
@@ -368,7 +335,7 @@ module Raptor
     # has been handed off to the thread pool. The socket itself is kept
     # open so the worker can write the response.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @return [TCPSocket, nil] the socket associated with `id`, if any
     #
     # @rbs (Integer id) -> TCPSocket?
@@ -382,9 +349,9 @@ module Raptor
     # under the persistent-data timeout.
     #
     # @param socket [TCPSocket] the kept-alive client socket
-    # @param id [Integer] the unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param request_count [Integer] number of requests handled on this connection
-    # @param remote_addr [String] the client's remote IP address
+    # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @return [void]
     #
@@ -406,9 +373,9 @@ module Raptor
       socket.close
     end
 
-    # Returns the socket for a given client identifier without removing it.
+    # Returns the socket for a given connection identifier without removing it.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @return [TCPSocket, nil] the socket, if found
     #
     # @rbs (Integer id) -> TCPSocket?
@@ -416,24 +383,24 @@ module Raptor
       @id_to_socket[id]
     end
 
-    # Returns the writer object associated with a given connection, if one
-    # was supplied when the connection was added.
+    # Returns the HTTP/2 frame writer registered by {attach_http2} for a
+    # connection.
     #
-    # @param id [Integer] unique client identifier
-    # @return [Object, nil] the writer, if found
+    # @param id [Integer] unique connection identifier
+    # @return [Http2::Writer, nil] the writer, if found
     #
-    # @rbs (Integer id) -> untyped?
+    # @rbs (Integer id) -> Http2::Writer?
     def writer_for(id)
       @id_to_writer[id]
     end
 
-    # Returns the flow controller associated with a given connection, if
-    # one was supplied when the connection was added.
+    # Returns the HTTP/2 flow controller registered by {attach_http2} for a
+    # connection.
     #
-    # @param id [Integer] unique client identifier
-    # @return [Object, nil] the flow controller, if found
+    # @param id [Integer] unique connection identifier
+    # @return [Http2::FlowControl, nil] the flow controller, if found
     #
-    # @rbs (Integer id) -> untyped?
+    # @rbs (Integer id) -> Http2::FlowControl?
     def flow_control_for(id)
       @id_to_flow_control[id]
     end
@@ -441,7 +408,7 @@ module Raptor
     # Attaches a detached response body to an HTTP/1.x connection.
     #
     # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param body [DetachedBody] the response body
     # @param state [Hash] connection state restored once the response finishes
     # @param finished [Proc] called with the close reason
@@ -466,7 +433,7 @@ module Raptor
     # that arrived after graceful draining began.
     #
     # @param id [Integer] unique connection identifier
-    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @return [Boolean] whether the stream may be dispatched
     #
     # @rbs (Integer id, Integer stream_id) -> bool
@@ -483,7 +450,8 @@ module Raptor
     # Sends GOAWAY on every HTTP/2 connection and fixes the last stream each
     # connection may dispatch while existing application work drains.
     #
-    # @yieldparam stream_id [Integer] last dispatched stream identifier
+    # @yield for each HTTP/2 connection
+    # @yieldparam stream_id [Integer] the last dispatched HTTP/2 stream identifier
     # @yieldreturn [String] serialized GOAWAY frame
     # @return [void]
     #
@@ -523,7 +491,7 @@ module Raptor
     # Attaches a detached response body to an HTTP/2 stream.
     #
     # @param id [Integer] unique connection identifier
-    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param body [DetachedBody] the response body
     # @param finished [Proc] called with the close reason
     # @return [Boolean] whether the body was attached
@@ -559,7 +527,7 @@ module Raptor
     # Cancels a detached response stream.
     #
     # @param id [Integer] unique connection identifier
-    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @return [void]
     #
     # @rbs (Integer id, Integer stream_id) -> void
@@ -595,16 +563,16 @@ module Raptor
     # Stores an HTTP/2 connection's socket, state, writer, and flow
     # controller in the reactor's per-connection maps.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param socket [TCPSocket] the connection socket
     # @param state [Hash] initial connection state
-    # @param writer [Http2::Writer] per-connection frame writer
+    # @param writer [Http2::Writer] frame writer for the connection
     # @param flow_control [Http2::FlowControl] per-connection outbound flow controller
     # @param ping_frame [String] serialized PING frame for keepalive probes
     # @param ping_payload [String] payload expected in the corresponding acknowledgement
     # @return [void]
     #
-    # @rbs (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: untyped, flow_control: untyped, ping_frame: String, ping_payload: String) -> void
+    # @rbs (id: Integer, socket: TCPSocket, state: Hash[Symbol, untyped], writer: Http2::Writer, flow_control: Http2::FlowControl, ping_frame: String, ping_payload: String) -> void
     def attach_http2(id:, socket:, state:, writer:, flow_control:, ping_frame:, ping_payload:)
       @id_to_socket[id] = socket
       @socket_to_state[socket] = state
@@ -634,7 +602,7 @@ module Raptor
 
     # Registers an attached socket for future reactor-driven reads.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @return [void]
     #
     # @rbs (Integer id) -> void
@@ -648,27 +616,9 @@ module Raptor
       socket.close
     end
 
-    # Updates connection state for an HTTP/2 connection and re-registers
-    # the socket for further reads.
-    #
-    # @param state [Hash] updated connection state from the ractor pool
-    # @return [void]
-    #
-    # @rbs (Hash[Symbol, untyped] state) -> void
-    def update_http2_state(state)
-      socket = @id_to_socket[state[:id]]
-      return unless socket
-
-      @socket_to_state[socket] = state
-      @queue << socket
-      @selector.wakeup
-    rescue ClosedQueueError
-      socket.close
-    end
-
     # Closes a connection after writing any frames already queued for it.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @return [void]
     #
     # @rbs (Integer id) -> void
@@ -741,8 +691,7 @@ module Raptor
         type, id, value, body, attached, finished, state = operation
         case type
         when :write
-          data = value
-          queue_output(@id_to_io[id], data)
+          queue_output(@id_to_io[id], value)
           connections[id] = true
         when :close
           close_after_writes(id)
@@ -791,7 +740,7 @@ module Raptor
     # Adds a detached body to an HTTP/1.x connection.
     #
     # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param body [DetachedBody] the response body
     # @param state [Hash] connection state restored once the response finishes
     # @param finished [Proc] called with the close reason
@@ -819,7 +768,7 @@ module Raptor
 
     # Writes buffered HTTP/1.x body chunks without blocking.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @return [void]
     #
     # @rbs (Integer id) -> void
@@ -852,7 +801,7 @@ module Raptor
 
     # Finishes an HTTP/1.x detached response and either reuses or closes its connection.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param io [Http1IO] connection I/O state
     # @return [void]
     #
@@ -894,7 +843,7 @@ module Raptor
 
     # Cancels an HTTP/1.x detached response and closes its connection.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @param reason [Symbol] why the response closed
     # @return [void]
     #
@@ -913,7 +862,7 @@ module Raptor
     # Adds a detached body to an HTTP/2 stream.
     #
     # @param id [Integer] unique connection identifier
-    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param body [DetachedBody] the response body
     # @param finished [Proc] called with the close reason
     # @return [void]
@@ -941,7 +890,7 @@ module Raptor
     # Marks an HTTP/2 detached stream eligible for fair scheduling.
     #
     # @param id [Integer] unique connection identifier
-    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @return [void]
     #
     # @rbs (Integer id, Integer stream_id) -> void
@@ -1017,7 +966,7 @@ module Raptor
     # Finishes an HTTP/2 detached stream with DATA or trailing HEADERS.
     #
     # @param id [Integer] unique connection identifier
-    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param body [DetachedBody] the response body
     # @return [void]
     #
@@ -1039,7 +988,7 @@ module Raptor
     # Removes an HTTP/2 detached stream and schedules its close callback.
     #
     # @param id [Integer] unique connection identifier
-    # @param stream_id [Integer] HTTP/2 stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param reason [Symbol] why the stream closed
     # @return [void]
     #
@@ -1087,7 +1036,7 @@ module Raptor
 
     # Closes a connection once its queued frames are written.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @return [void]
     #
     # @rbs (Integer id) -> void
@@ -1104,7 +1053,7 @@ module Raptor
 
     # Immediately closes a connection and drops its reactor state.
     #
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @return [void]
     #
     # @rbs (Integer id) -> void
@@ -1113,9 +1062,9 @@ module Raptor
       cleanup(socket) if socket
     end
 
-    # Adds bytes to one connection and writes as much as the socket accepts.
+    # Appends bytes to one connection's pending output.
     #
-    # @param io [ConnectionIO] connection I/O state
+    # @param io [ConnectionIO, nil] connection I/O state
     # @param data [String] serialized response bytes
     # @return [void]
     #
@@ -1133,7 +1082,7 @@ module Raptor
     # Drains one connection's queued response bytes without blocking.
     #
     # @param id [Integer] unique connection identifier
-    # @param io [ConnectionIO] connection I/O state
+    # @param io [ConnectionIO, nil] connection I/O state
     # @return [void]
     #
     # @rbs (Integer id, ConnectionIO? io) -> void
@@ -1372,6 +1321,7 @@ module Raptor
         flush_output(id, io)
         return unless @id_to_socket.key?(id)
         return if io.wait == :read
+
         flush_http2_detached_bodies(id) unless io.detached.empty?
       end
 
@@ -1379,15 +1329,15 @@ module Raptor
 
       io.reading = false
       update_monitor(id, io)
-      to_client = @id_to_timeout.delete(id)
-      @timeouts.delete!(to_client) if to_client
+      client = @id_to_timeout.delete(id)
+      @timeouts.delete!(client) if client
       read_and_queue_for_parse(socket, state)
     end
 
     # Handles readiness for an HTTP/1.x detached response.
     #
     # @param monitor [NIO::Monitor] ready selector monitor
-    # @param id [Integer] unique client identifier
+    # @param id [Integer] unique connection identifier
     # @return [void]
     #
     # @rbs (NIO::Monitor monitor, Integer id) -> void
@@ -1425,8 +1375,8 @@ module Raptor
     def wakeup!(socket)
       @selector.deregister(socket)
       state = @socket_to_state[socket]
-      to_client = @id_to_timeout.delete(state[:id])
-      @timeouts.delete!(to_client) if to_client
+      client = @id_to_timeout.delete(state[:id])
+      @timeouts.delete!(client) if client
       read_and_queue_for_parse(socket, state)
     end
 
@@ -1435,9 +1385,9 @@ module Raptor
     #
     # @param socket [TCPSocket] the socket to read from and queue
     # @param state [Hash] current connection state
-    # @return [Hash, nil] updated state, if successful
+    # @return [void]
     #
-    # @rbs (TCPSocket socket, Hash[Symbol, untyped] state) -> Hash[Symbol, untyped]?
+    # @rbs (TCPSocket socket, Hash[Symbol, untyped] state) -> void
     def read_and_queue_for_parse(socket, state)
       data = begin
         socket.read_nonblock(CHUNK_SIZE)
@@ -1496,20 +1446,20 @@ module Raptor
       socket.close rescue nil
     end
 
-    # Returns true when the request has been fully parsed.
+    # Returns whether the request has been fully parsed.
     #
     # @param state [Hash] connection state
-    # @return [Boolean] true if the request is complete
+    # @return [Boolean]
     #
     # @rbs (Hash[Symbol, untyped] state) -> bool
     def complete?(state)
       state[:complete]
     end
 
-    # Checks if any data has been received for this connection.
+    # Returns whether any data has been received for this connection.
     #
     # @param state [Hash] connection state
-    # @return [Boolean] true if first data has been received
+    # @return [Boolean]
     #
     # @rbs (Hash[Symbol, untyped] state) -> bool
     def first_data_received?(state)

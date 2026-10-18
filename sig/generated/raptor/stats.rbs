@@ -25,7 +25,8 @@ module Raptor
 
     @mmap: untyped
 
-    # Allocates the shared mmap region for `num_workers` slots.
+    # Creates a new Stats and allocates the shared mmap region for
+    # `num_workers` slots.
     #
     # @param num_workers [Integer] number of worker slots to allocate
     # @return [void]
@@ -68,7 +69,7 @@ module Raptor
 
     # Reads stats for a worker slot from shared memory.
     #
-    # @param slot [Integer] slot offset to read from
+    # @param slot [Integer] slot index to read from
     # @return [Hash] stat hash with :pid, :index, :phase, :requests, :backlog, :busy_threads, :thread_capacity, :started_at, :last_checkin, and :booted
     #
     # @rbs (Integer slot) -> Hash[Symbol, untyped]

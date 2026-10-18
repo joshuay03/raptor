@@ -66,6 +66,7 @@ module Raptor
     #
     # @param max_buffer_size [Integer] maximum body bytes waiting to be written
     # @return [void]
+    # @raise [ArgumentError] if `max_buffer_size` is not positive
     #
     # @rbs (?max_buffer_size: Integer) -> void
     def initialize(max_buffer_size: DEFAULT_MAX_BUFFER_SIZE)
@@ -84,6 +85,7 @@ module Raptor
     # Registers a callback that runs on the request thread once the server
     # accepts the response stream.
     #
+    # @yield once the response stream opens
     # @yieldparam stream [DetachedBody] the opened response stream
     # @return [DetachedBody]
     #
@@ -95,6 +97,7 @@ module Raptor
 
     # Registers a callback for when the response stream closes.
     #
+    # @yield once the response stream closes
     # @yieldparam reason [Symbol] why the stream closed
     # @return [DetachedBody]
     #
@@ -108,6 +111,7 @@ module Raptor
     #
     # @param chunk [String] response body bytes
     # @return [Symbol] `:accepted`, `:full`, or `:closed`
+    # @raise [TypeError] if the chunk is not a String
     #
     # @rbs (String chunk) -> Symbol
     def try_write(chunk)
@@ -150,7 +154,7 @@ module Raptor
       result
     end
 
-    # Finishes the body after all accepted bytes have been written.
+    # Marks the body complete; the stream finishes once buffered bytes are written.
     #
     # @param trailers [Hash] trailing response headers
     # @return [void]
@@ -158,7 +162,7 @@ module Raptor
     # @rbs (?trailers: Hash[String, String | Array[String]]) -> void
     def close(trailers: {})
       trailers = trailers.to_h do |name, value|
-        value = value.is_a?(Array) ? value.map { _1.dup.freeze }.freeze : value.dup.freeze
+        value = value.is_a?(Array) ? value.map { |item| item.dup.freeze }.freeze : value.dup.freeze
         [name.dup.freeze, value]
       end.freeze
       wake = false

@@ -3,7 +3,42 @@
 module Raptor
   # Handles HTTP/2 request processing and Rack application integration.
   class Http2
+    EAGER_READ_BUFFER_SIZE: untyped
+
+    EAGER_MAX_ROUNDS: ::Integer
+
+    FLAG_END_STREAM: ::Integer
+
+    FLAG_ACK: ::Integer
+
+    FLAG_END_HEADERS: ::Integer
+
+    FLAG_PRIORITY: ::Integer
+
+    ERROR_NO_ERROR: ::Integer
+
+    ERROR_PROTOCOL_ERROR: ::Integer
+
+    ERROR_INTERNAL_ERROR: ::Integer
+
+    ERROR_REFUSED_STREAM: ::Integer
+
+    DEFAULT_WINDOW_SIZE: ::Integer
+
+    MAX_FRAME_SIZE: ::Integer
+
     RESPONSE_TRAILERS: ::String
+
+    SERVER_PROTOCOL: ::String
+
+    REQUEST_PSEUDO_HEADERS: untyped
+
+    REQUIRED_REQUEST_PSEUDO_HEADERS: untyped
+
+    class StreamClosedError < StandardError
+      # @rbs () -> String
+      def message: () -> String
+    end
 
     # Queues concurrent frame writes while the reactor remains the sole
     # owner of the connection socket.
@@ -34,12 +69,12 @@ module Raptor
       # Queues frames for the reactor to write. Before attachment, writes
       # directly so the writer remains usable during connection setup.
       #
-      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+      # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
       # @param frames [Array<String>, nil] frame bytes to write in order
       # @return [void]
       #
-      # @rbs (OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
-      def write_frames: (OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
+      # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
+      def write_frames: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Array[String]? frames) -> void
 
       # Attaches a response body that outlives its application thread.
       #
@@ -50,11 +85,6 @@ module Raptor
       #
       # @rbs (Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
       def attach_body: (Integer stream_id, DetachedBody body, ^(Symbol) -> void finished) -> bool
-    end
-
-    class StreamClosedError < StandardError
-      # @rbs () -> String
-      def message: () -> String
     end
 
     # Coordinates outbound flow control and stream cancellation without
@@ -79,11 +109,12 @@ module Raptor
 
       # Reserves outbound capacity on the given stream, waiting until at
       # least one byte is available on both the connection and stream
-      # windows. Raises when the stream or connection closes.
+      # windows.
       #
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @param max_bytes [Integer] the largest size the caller would like to send
       # @return [Integer] the number of bytes the caller may now send
+      # @raise [StreamClosedError] if the stream or connection has closed
       #
       # @rbs (Integer stream_id, Integer max_bytes) -> Integer
       def acquire: (Integer stream_id, Integer max_bytes) -> Integer
@@ -93,6 +124,7 @@ module Raptor
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @param max_bytes [Integer] the largest size the caller would like to send
       # @return [Integer] available bytes, or 0 when flow control is exhausted
+      # @raise [StreamClosedError] if the stream or connection has closed
       #
       # @rbs (Integer stream_id, Integer max_bytes) -> Integer
       def try_acquire: (Integer stream_id, Integer max_bytes) -> Integer
@@ -115,7 +147,7 @@ module Raptor
       def add_stream_window: (Integer stream_id, Integer increment) -> void
 
       # Updates the peer's `SETTINGS_INITIAL_WINDOW_SIZE`. Shifts every
-      # existing stream window by the delta as required by RFC 7540 section 6.9.2.
+      # existing stream window by the delta as required by RFC 9113 section 6.9.2.
       #
       # @param new_size [Integer] the peer's new initial window size
       # @return [void]
@@ -157,12 +189,10 @@ module Raptor
 
       private
 
-      # Reserves up to `capped` bytes from the connection window,
-      # returning the number of bytes granted (0 when the window is
-      # exhausted).
+      # Reserves up to `capped` bytes from the connection window.
       #
       # @param capped [Integer] the largest reservation the caller will accept
-      # @return [Integer]
+      # @return [Integer] bytes granted, or 0 when the window is exhausted
       #
       # @rbs (Integer capped) -> Integer
       def reserve_connection: (Integer capped) -> Integer
@@ -184,7 +214,7 @@ module Raptor
 
       @writer: Writer
 
-      @socket: OpenSSL::SSL::SSLSocket
+      @socket: TCPSocket | OpenSSL::SSL::SSLSocket
 
       # Returns the number of response body bytes written to the stream.
       #
@@ -193,19 +223,19 @@ module Raptor
 
       # Creates a response stream for a Rack streaming body.
       #
-      # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+      # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
       # @param writer [Writer] frame writer for the connection
-      # @param flow_control [FlowControl] outbound flow controller
+      # @param flow_control [FlowControl] per-connection outbound flow controller
       # @param stream_id [Integer] the HTTP/2 stream identifier
       # @param trailers [Hash] trailing response headers populated by the Rack application
       # @return [void]
       #
-      # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] trailers) -> void
-      def initialize: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] trailers) -> void
+      # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] trailers) -> void
+      def initialize: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] trailers) -> void
 
-      # Streaming responses are write-only.
+      # Rejects reads; streaming responses are write-only.
       #
-      # @raise [IOError]
+      # @raise [IOError] always
       #
       # @rbs (*untyped) -> bot
       def read: (*untyped) -> bot
@@ -214,6 +244,9 @@ module Raptor
       #
       # @param chunk [String] response body bytes
       # @return [Integer] number of bytes written
+      # @raise [IOError] if the stream has already closed
+      # @raise [TypeError] if the chunk is not a String
+      # @raise [StreamClosedError] if the stream or connection has closed
       #
       # @rbs (String chunk) -> Integer
       def write: (String chunk) -> Integer
@@ -226,7 +259,8 @@ module Raptor
       # @rbs (String chunk) -> ResponseStream
       def <<: (String chunk) -> ResponseStream
 
-      # Flushes the stream. Frame writes are already immediate.
+      # Flushes the stream. Frames are already handed to the writer as they
+      # are produced.
       #
       # @return [ResponseStream]
       #
@@ -236,13 +270,14 @@ module Raptor
       # Finishes the stream.
       #
       # @return [void]
+      # @raise [StreamClosedError] if the stream or connection has closed
       #
       # @rbs () -> void
       def close: () -> void
 
       # Closes the unsupported read side of the stream.
       #
-      # @raise [IOError]
+      # @raise [IOError] always
       #
       # @rbs () -> bot
       def close_read: () -> bot
@@ -262,113 +297,6 @@ module Raptor
       def closed?: () -> bool
     end
 
-    EAGER_READ_BUFFER_SIZE: untyped
-
-    EAGER_MAX_ROUNDS: ::Integer
-
-    FLAG_END_STREAM: ::Integer
-
-    FLAG_END_HEADERS: ::Integer
-
-    FLAG_ACK: ::Integer
-
-    FLAG_PRIORITY: ::Integer
-
-    ERROR_NO_ERROR: ::Integer
-
-    ERROR_PROTOCOL_ERROR: ::Integer
-
-    ERROR_INTERNAL_ERROR: ::Integer
-
-    ERROR_REFUSED_STREAM: ::Integer
-
-    DEFAULT_WINDOW_SIZE: ::Integer
-
-    MAX_FRAME_SIZE: ::Integer
-
-    SERVER_PROTOCOL: ::String
-
-    REQUEST_PSEUDO_HEADERS: untyped
-
-    REQUIRED_REQUEST_PSEUDO_HEADERS: untyped
-
-    # Returns true when a decoded header block violates the HTTP/2 pseudo-header
-    # rules from RFC 9113 section 8.3: an unknown pseudo-header, a duplicate
-    # pseudo-header, a pseudo-header appearing after any regular header, or a
-    # required pseudo-header (`:method`, `:scheme`, `:path`) missing on
-    # non-`CONNECT` requests.
-    #
-    # @param headers [Array<Array(String, String)>] decoded header pairs
-    # @return [Boolean]
-    #
-    # @rbs (Array[[String, String]] headers) -> bool
-    def self.invalid_pseudo_headers?: (Array[[ String, String ]] headers) -> bool
-
-    @running: AtomicBoolean
-
-    @initial_settings_frame: String
-
-    @on_error: ^(Hash[String, untyped]?, Exception) -> void | nil
-
-    @clean_fiber_locals: bool
-
-    @clean_thread_locals: bool
-
-    @access_log_io: IO?
-
-    @write_timeout: Integer
-
-    @server_port: Integer
-
-    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
-
-    # Returns the initial server SETTINGS frame to send on every new
-    # HTTP/2 connection.
-    #
-    # @return [String]
-    attr_reader initial_settings_frame: untyped
-
-    # Creates a new Http2 handler.
-    #
-    # @param app [#call] the Rack application to dispatch requests to
-    # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
-    # @param connection_options [Hash] per-connection settings shared across protocols
-    # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
-    # @param http2_options [Hash] HTTP/2-specific settings
-    # @option http2_options [Integer] :max_concurrent_streams maximum HTTP/2 concurrent streams per connection
-    # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
-    # @param clean_thread_locals [Boolean] whether to clear application thread locals after each request
-    # @param clean_fiber_locals [Boolean] whether to process each request in a fresh Fiber
-    # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
-    # @return [void]
-    #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: ^(Hash[String, untyped]?, Exception) -> void | nil) -> void
-
-    # Creates a per-connection {Writer} configured with the handler's write timeout.
-    #
-    # @return [Writer] a new per-connection frame writer
-    #
-    # @rbs () -> Writer
-    def create_writer: () -> Writer
-
-    # Stops new stream dispatch and asks clients to finish streams already
-    # handed to the application.
-    #
-    # @param reactor [Reactor] the reactor managing HTTP/2 connections
-    # @return [void]
-    #
-    # @rbs (Reactor reactor) -> void
-    def shutdown: (Reactor reactor) -> void
-
-    # Returns a Ractor-safe proc that parses HTTP/2 frames from the
-    # state hash's buffered bytes.
-    #
-    # @return [Proc]
-    #
-    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
-    def parser_worker: () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
-
     # Advances HTTP/2 frame parsing from the connection buffer, returning
     # updated connection state along with any outgoing protocol frames and
     # completed stream requests.
@@ -379,6 +307,14 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
     def self.process_frames: (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
 
+    # Returns whether request pseudo-headers violate RFC 9113 section 8.3.
+    #
+    # @param headers [Array<Array(String, String)>] decoded header pairs
+    # @return [Boolean]
+    #
+    # @rbs (Array[[String, String]] headers) -> bool
+    def self.invalid_pseudo_headers?: (Array[[ String, String ]] headers) -> bool
+
     # Applies one complete request header block to its stream, resetting
     # malformed initial headers or trailers and completing valid trailers.
     #
@@ -386,7 +322,7 @@ module Raptor
     # @param completed_requests [Array<Hash>] accumulator of completed stream requests
     # @param outgoing_frames [Array<String>] accumulator of protocol response frames
     # @param parser [Http2Parser] frame parser and encoder
-    # @param stream_id [Integer] the stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param decoded_headers [Array<Array(String, String)>] decoded header pairs
     # @param end_stream [Boolean] whether the source frame had END_STREAM set
     # @param trailers [Boolean] whether this is a trailing header block
@@ -400,7 +336,7 @@ module Raptor
     #
     # @param streams [Hash] current open-stream map
     # @param completed_requests [Array<Hash>] accumulator of completed stream requests
-    # @param stream_id [Integer] the stream identifier
+    # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param decoded_headers [Array<Array(String, String)>] decoded header pairs
     # @param end_stream [Boolean] whether the source frame had END_STREAM set
     # @return [Array(Hash, Array<Hash>)] updated streams and completed_requests
@@ -430,42 +366,101 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[Integer, Integer]] window_updates, Array[String] ping_acknowledgements, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
     def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[ Integer, Integer ]] window_updates, Array[String] ping_acknowledgements, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
 
+    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
+
+    @server_port_string: String
+
+    @write_timeout: Integer
+
+    @access_log_io: IO?
+
+    @clean_thread_locals: bool
+
+    @clean_fiber_locals: bool
+
+    @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
+
+    @running: AtomicBoolean
+
+    @initial_settings_frame: String
+
+    # Creates a new Http2 handler.
+    #
+    # @param app [#call] the Rack application to dispatch requests to
+    # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
+    # @param connection_options [Hash] per-connection settings shared across protocols
+    # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
+    # @param http2_options [Hash] HTTP/2-specific settings
+    # @option http2_options [Integer] :max_concurrent_streams maximum HTTP/2 concurrent streams per connection
+    # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
+    # @param clean_thread_locals [Boolean] whether to clear application thread locals after each request
+    # @param clean_fiber_locals [Boolean] whether to process each request in a fresh Fiber
+    # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
+    # @return [void]
+    #
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?) -> void
+
+    # Returns a Ractor-safe proc that parses HTTP/2 frames from the
+    # state hash's buffered bytes.
+    #
+    # @return [Proc]
+    #
+    # @rbs () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+    def parser_worker: () -> ^(Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
+    # Stops new stream dispatch and asks clients to finish streams already
+    # handed to the application.
+    #
+    # @param reactor [Reactor] the reactor managing HTTP/2 connections
+    # @return [void]
+    #
+    # @rbs (Reactor reactor) -> void
+    def shutdown: (Reactor reactor) -> void
+
     # Sends the server SETTINGS frame on a freshly negotiated HTTP/2
     # connection, then eagerly reads and parses the first client frame
     # batch, dispatching completed streams directly to the thread pool.
     # Falls back to the reactor when no initial data is ready.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param id [Integer] unique client identifier
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
+    # @param id [Integer] unique connection identifier
     # @param reactor [Reactor] the reactor managing the connection
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
-    # @param remote_addr [String] client IP address
-    # @param url_scheme [String] "https"
+    # @param remote_addr [String] the client IP address
+    # @param url_scheme [String] "http" or "https"
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
-    def eager_accept: (OpenSSL::SSL::SSLSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
+    def eager_accept: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, String remote_addr, String url_scheme) -> void
 
     # Handles a parsed HTTP/2 result. Writes outgoing frames, dispatches
     # completed stream requests to the thread pool, and eagerly consumes
     # further buffered frame batches before returning control to the
     # reactor.
     #
-    # @param result [Hash] the parsed result produced by {process_frames}
+    # @param parsed_request [Hash] the parsed result produced by {.process_frames}
     # @param reactor [Reactor] the reactor managing the connection
-    # @param thread_pool [AtomicThreadPool] thread pool for Rack app dispatch
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
     # @return [void]
     #
-    # @rbs (Hash[Symbol, untyped] result, Reactor reactor, AtomicThreadPool thread_pool) -> void
-    def handle_parsed_request: (Hash[Symbol, untyped] result, Reactor reactor, AtomicThreadPool thread_pool) -> void
+    # @rbs (Hash[Symbol, untyped] parsed_request, Reactor reactor, AtomicThreadPool thread_pool) -> void
+    def handle_parsed_request: (Hash[Symbol, untyped] parsed_request, Reactor reactor, AtomicThreadPool thread_pool) -> void
 
     private
 
-    # Applies inbound flow-control updates from a parsed result to the
-    # connection's `FlowControl`.
+    # Creates a per-connection {Writer} configured with the handler's write timeout.
     #
-    # @param flow_control [FlowControl] the per-connection flow controller
-    # @param result [Hash] the parsed result from `process_frames`
+    # @return [Writer] a new per-connection frame writer
+    #
+    # @rbs () -> Writer
+    def create_writer: () -> Writer
+
+    # Applies inbound flow-control updates from a parsed result to the
+    # connection's {FlowControl}.
+    #
+    # @param flow_control [FlowControl] per-connection outbound flow controller
+    # @param result [Hash] the parsed result from {.process_frames}
     # @return [void]
     #
     # @rbs (FlowControl flow_control, Hash[Symbol, untyped] result) -> void
@@ -474,17 +469,17 @@ module Raptor
     # Reads the next frame batch from `socket` if it has already arrived,
     # without waiting on the shared collector thread.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
     # @return [String, nil] the bytes read, or nil if nothing was available
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket) -> String?
-    def eager_read_next_batch: (OpenSSL::SSL::SSLSocket socket) -> String?
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket) -> String?
+    def eager_read_next_batch: (TCPSocket | OpenSSL::SSL::SSLSocket socket) -> String?
 
     # Dispatches a completed stream request to the Rack app and writes
     # the response back as HTTP/2 frames.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param writer [Writer] lock-free frame writer for the connection
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
     # @param flow_control [FlowControl] per-connection outbound flow controller
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param headers [Array<Array(String, String)>] request headers
@@ -492,13 +487,13 @@ module Raptor
     # @param remote_addr [String] the client IP address
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
-    def dispatch_stream_request: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[ String, String ]] headers, String body, remote_addr: String) -> void
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
+    def dispatch_stream_request: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[ String, String ]] headers, String body, remote_addr: String) -> void
 
     # Calls the Rack app and writes its response for one stream.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param writer [Writer] lock-free frame writer for the connection
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
     # @param flow_control [FlowControl] per-connection outbound flow controller
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param headers [Array<Array(String, String)>] request headers
@@ -506,13 +501,13 @@ module Raptor
     # @param remote_addr [String] the client IP address
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
-    def perform_stream_request: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[ String, String ]] headers, String body, remote_addr: String) -> void
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[String, String]] headers, String body, remote_addr: String) -> void
+    def perform_stream_request: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Array[[ String, String ]] headers, String body, remote_addr: String) -> void
 
     # Starts a detached HTTP/2 response after writing its response headers.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param writer [Writer] lock-free frame writer for the connection
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
     # @param flow_control [FlowControl] per-connection outbound flow controller
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param status [Integer] HTTP status code
@@ -522,14 +517,14 @@ module Raptor
     # @yield once the response headers are queued
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> void
-    def write_http2_detached_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> void
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> void
+    def write_detached_response: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, DetachedBody body, ^(Symbol) -> void finished) { () -> void } -> void
 
     # Writes a Rack response as HTTP/2 frames to the socket, partitioning
     # DATA frames through `flow_control` to fit within the peer's windows.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param writer [Writer] lock-free frame writer for the connection
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
     # @param flow_control [FlowControl] per-connection outbound flow controller
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param status [Integer] HTTP status code
@@ -537,46 +532,68 @@ module Raptor
     # @param body [Object] response body responding to each
     # @param trailers [Hash] trailing response headers populated by the Rack application
     # @param request_method [String] request method used to suppress HEAD response bodies
+    # @yield once the response headers are queued
     # @return [String] the response body size in bytes
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, trailers: Hash[String, String | Array[String]], request_method: String) ?{ () -> void } -> String
-    def write_http2_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, trailers: Hash[String, String | Array[String]], request_method: String) ?{ () -> void } -> String
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, trailers: Hash[String, String | Array[String]], request_method: String) ?{ () -> void } -> String
+    def write_response: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Integer status, Hash[String, String | Array[String]] headers, untyped body, trailers: Hash[String, String | Array[String]], request_method: String) ?{ () -> void } -> String
 
     # Sends an HTTP 103 Early Hints response.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
     # @param writer [Writer] frame writer for the connection
     # @param flow_control [FlowControl] per-connection outbound flow controller
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param hints [Hash] response headers to send as early hints
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
-    def send_early_hints: (OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
+    def send_early_hints: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, Hash[String, String | Array[String]] hints) -> void
 
     # Resets one HTTP/2 stream with the given error code.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
     # @param writer [Writer] frame writer for the connection
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @param error_code [Integer] the HTTP/2 error code
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer error_code) -> void
-    def write_http2_reset_stream: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer error_code) -> void
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer error_code) -> void
+    def write_reset_stream: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id, Integer error_code) -> void
 
     # Writes a 500 error response as HTTP/2 frames.
     #
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param writer [Writer] lock-free frame writer for the connection
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
     # @param stream_id [Integer] the HTTP/2 stream identifier
     # @return [void]
     #
-    # @rbs (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
-    def write_http2_error_response: (OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
+    # @rbs (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
+    def write_error_response: (TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, Integer stream_id) -> void
 
-    # Instance-level wrapper around {Http.write_access_log} that routes to
-    # the configured `@access_log_io`.
+    # Builds a Rack environment hash from HTTP/2 headers and body.
+    #
+    # @param headers [Array<Array(String, String)>] HTTP/2 header pairs
+    # @param body [String] the request body
+    # @param socket [TCPSocket, OpenSSL::SSL::SSLSocket] the connection socket
+    # @param writer [Writer] frame writer for the connection
+    # @param flow_control [FlowControl] per-connection outbound flow controller
+    # @param stream_id [Integer] the HTTP/2 stream identifier
+    # @param remote_addr [String] the client IP address
+    # @return [Hash] fully populated Rack environment hash
+    #
+    # @rbs (Array[[String, String]] headers, String body, TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
+    def build_rack_env: (Array[[ String, String ]] headers, String body, TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
+
+    # Populates SERVER_NAME and SERVER_PORT from the HTTP_HOST header.
+    #
+    # @param env [Hash] the Rack environment to populate
+    # @return [void]
+    #
+    # @rbs (Hash[String, untyped] env) -> void
+    def populate_server_name_and_port: (Hash[String, untyped] env) -> void
+
+    # Writes a completed request to the access log.
     #
     # @param env [Hash] the Rack environment
     # @param status [Integer] the response status code
@@ -586,26 +603,5 @@ module Raptor
     #
     # @rbs (Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
     def write_access_log: (Hash[String, untyped] env, Integer status, String size, String remote_addr) -> void
-
-    # Builds a Rack environment hash from HTTP/2 headers and body.
-    #
-    # @param headers [Array<Array(String, String)>] HTTP/2 header pairs
-    # @param body [String] the request body
-    # @param socket [OpenSSL::SSL::SSLSocket] the connection socket
-    # @param writer [Writer] frame writer for the connection
-    # @param stream_id [Integer] the HTTP/2 stream identifier
-    # @param remote_addr [String] the client IP address
-    # @return [Hash] fully populated Rack environment hash
-    #
-    # @rbs (Array[[String, String]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
-    def build_rack_env: (Array[[ String, String ]] headers, String body, OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
-
-    # Populates SERVER_NAME and SERVER_PORT from the HTTP_HOST header.
-    #
-    # @param env [Hash] the Rack environment to populate
-    # @return [void]
-    #
-    # @rbs (Hash[String, untyped] env) -> void
-    def populate_server_name_and_port: (Hash[String, untyped] env) -> void
   end
 end

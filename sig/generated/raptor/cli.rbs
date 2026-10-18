@@ -57,17 +57,17 @@ module Raptor
 
     @parser: OptionParser
 
-    @options: Hash[Symbol, untyped]
-
     @command: Symbol
 
-    # Creates a new CLI instance from `argv`. A rackup file may be given
-    # as the first positional argument; every other value is parsed as a
-    # flag.
+    @options: Hash[Symbol, untyped]
+
+    # Creates a new CLI from `argv`. A rackup file may be given as the
+    # first positional argument; every other value is parsed as a flag.
     #
     # @param argv [Array<String>] command-line arguments to parse
     # @return [void]
     # @raise [OptionParser::ParseError] if invalid options are provided
+    # @raise [ArgumentError] if the config file or max threads value is invalid
     #
     # @rbs (Array[String] argv) -> void
     def initialize: (Array[String] argv) -> void
@@ -88,7 +88,7 @@ module Raptor
     # @rbs () -> void
     def run_stats: () -> void
 
-    # Returns the path from a `-c`/`--config` flag in `argv`, recognising
+    # Returns the path from a `-c`/`--config` flag in `argv`, recognizing
     # all four OptionParser-accepted forms (`-c PATH`, `-cPATH`,
     # `--config PATH`, `--config=PATH`).
     #

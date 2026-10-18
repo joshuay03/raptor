@@ -2,13 +2,28 @@
 
 require "test_helper"
 
+require "raptor/reactor"
+
 module Raptor
   class TestReactor < TestCase
+    def test_http1_connection_reset
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(nil)
+      socket.define_singleton_method(:read_nonblock) { |*| raise Errno::ECONNRESET }
+
+      reactor.add(id: 1, socket: socket, remote_addr: "127.0.0.1", url_scheme: "http")
+
+      assert_predicate socket, :closed?
+      assert_nil reactor.socket_for(1)
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
     def test_http1_detached_body_writes
       callbacks = Queue.new
-      thread_pool = Object.new
-      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
-      reactor, reactor_thread, reader, socket = build_running_http1_reactor(thread_pool)
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(callbacks)
       body = DetachedBody.new
       9.times { body.try_write("x") }
       body.close(trailers: { "x-status" => "complete" })
@@ -27,9 +42,7 @@ module Raptor
 
     def test_http1_detached_body_cancellation
       callbacks = Queue.new
-      thread_pool = Object.new
-      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
-      reactor, reactor_thread, reader, socket = build_running_http1_reactor(thread_pool)
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(callbacks)
       reason = nil
       body = DetachedBody.new
       body.on_close { |closed| reason = closed }
@@ -49,9 +62,7 @@ module Raptor
 
     def test_http1_detached_body_shutdown
       callbacks = Queue.new
-      thread_pool = Object.new
-      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
-      reactor, reactor_thread, reader, socket = build_running_http1_reactor(thread_pool)
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(callbacks)
       reason = nil
       body = DetachedBody.new
       body.on_close { |closed| reason = closed }
@@ -69,38 +80,59 @@ module Raptor
       socket&.close
     end
 
-    def test_http1_connection_reset
-      reactor, reactor_thread, reader, socket = build_running_http1_reactor(nil)
-      socket.define_singleton_method(:read_nonblock) { |*| raise Errno::ECONNRESET }
+    def test_http2_initial_timeout
+      reactor, socket, writer, = build_http2_reactor
+      reactor.instance_variable_get(:@socket_to_state)[socket][:http2_preface_received] = false
+      before = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-      reactor.add(id: 1, socket: socket, remote_addr: "127.0.0.1", url_scheme: "http")
+      reactor.send(:register, socket)
+      client = reactor.instance_variable_get(:@id_to_timeout)[1]
 
+      assert_in_delta before + 30, client.timeout_at, 0.1
+
+      reactor.send(:handle_timeout, client, client.timeout_at)
+
+      assert_empty writer.frames
       assert_predicate socket, :closed?
-      assert_nil reactor.socket_for(1)
-    ensure
-      reactor&.shutdown
-      Timeout.timeout(1) { reactor_thread&.join }
-      reader&.close
-      socket&.close
     end
 
-    def test_http2_stream_dispatch_during_drain
-      frames = []
-      writer = Object.new
-      writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
-      reactor = Reactor.allocate
-      reactor.instance_variable_set(:@id_to_socket, { 1 => Object.new })
-      reactor.instance_variable_set(:@id_to_writer, { 1 => writer })
-      reactor.instance_variable_set(:@id_to_flow_control, { 1 => Object.new })
-      reactor.instance_variable_set(:@id_to_http2_last_stream, {})
-      reactor.instance_variable_set(:@id_to_http2_drain_stream, {})
+    def test_http2_keepalive
+      reactor, socket, writer, flow_control = build_http2_reactor
+      before = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-      assert reactor.dispatch_http2_stream(1, 3)
-      reactor.drain_http2 { |stream_id| "goaway-#{stream_id}" }
+      reactor.send(:register, socket)
+      client = reactor.instance_variable_get(:@id_to_timeout).delete(1)
+      reactor.instance_variable_get(:@timeouts).delete!(client)
 
-      assert_equal ["goaway-3"], frames
-      assert reactor.dispatch_http2_stream(1, 3)
-      refute reactor.dispatch_http2_stream(1, 5)
+      assert_in_delta before + 10, client.timeout_at, 0.1
+
+      reactor.send(:handle_timeout, client, client.timeout_at)
+
+      assert_equal ["ping"], writer.frames
+
+      client = reactor.instance_variable_get(:@id_to_timeout).delete(1)
+      reactor.instance_variable_get(:@timeouts).delete!(client)
+
+      assert_in_delta before + 15, client.timeout_at, 0.1
+
+      reactor.send(:handle_timeout, client, client.timeout_at)
+
+      assert_predicate socket, :closed?
+      assert_predicate flow_control, :closed?
+    end
+
+    def test_http2_keepalive_acknowledgement
+      reactor, = build_http2_reactor
+      keepalive = reactor.instance_variable_get(:@id_to_http2_keepalive)[1]
+      keepalive[:deadline] = 105.0
+
+      reactor.acknowledge_http2_ping(1, ["different"])
+
+      assert_equal 105.0, keepalive[:deadline]
+
+      reactor.acknowledge_http2_ping(1, ["payload"])
+
+      refute_includes keepalive, :deadline
     end
 
     def test_http2_response_writes
@@ -133,7 +165,7 @@ module Raptor
       assert_same reactor_thread, write_thread
     ensure
       reactor&.shutdown
-      reactor_thread&.join
+      Timeout.timeout(1) { reactor_thread&.join }
       reader&.close
       socket&.close
     end
@@ -144,7 +176,7 @@ module Raptor
       writer.attach(reactor, 1)
       reactor.instance_variable_get(:@id_to_writer)[1] = writer
       attempts = 0
-      written = String.new
+      written = +""
       socket.define_singleton_method(:write_nonblock) do |data|
         attempts += 1
         if attempts == 1
@@ -162,7 +194,9 @@ module Raptor
       writer.write_frames(socket, ["response"])
 
       io = reactor.instance_variable_get(:@id_to_io)[1]
+
       assert_equal :write, io.wait
+
       monitor = io.monitor
       monitor.readiness = :w
       reactor.send(:handle_monitor, monitor)
@@ -175,9 +209,7 @@ module Raptor
 
     def test_http2_detached_body_writes
       callbacks = Queue.new
-      thread_pool = Object.new
-      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
-      reactor, reactor_thread, reader, socket = build_running_http2_reactor(thread_pool)
+      reactor, reactor_thread, reader, socket = build_running_http2_reactor(callbacks)
       body = DetachedBody.new
       9.times { body.try_write("x") }
       body.close
@@ -198,9 +230,7 @@ module Raptor
 
     def test_http2_detached_body_cancellation
       callbacks = Queue.new
-      thread_pool = Object.new
-      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
-      reactor, reactor_thread, reader, socket = build_running_http2_reactor(thread_pool)
+      reactor, reactor_thread, reader, socket = build_running_http2_reactor(callbacks)
       reason = nil
       body = DetachedBody.new
       body.on_close { |closed| reason = closed }
@@ -220,9 +250,7 @@ module Raptor
 
     def test_http2_detached_body_shutdown
       callbacks = Queue.new
-      thread_pool = Object.new
-      thread_pool.define_singleton_method(:<<) { |callback| callbacks << callback }
-      reactor, reactor_thread, reader, socket = build_running_http2_reactor(thread_pool)
+      reactor, reactor_thread, reader, socket = build_running_http2_reactor(callbacks)
       reason = nil
       body = DetachedBody.new
       body.on_close { |closed| reason = closed }
@@ -240,52 +268,23 @@ module Raptor
       socket&.close
     end
 
-    def test_http2_keepalive
-      reactor, socket, writer, flow_control = build_http2_reactor
-      before = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      reactor.send(:register, socket)
-      client = reactor.instance_variable_get(:@id_to_timeout).delete(1)
-      reactor.instance_variable_get(:@timeouts).delete!(client)
+    def test_http2_stream_dispatch_during_drain
+      frames = []
+      writer = Object.new
+      writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
+      reactor = Reactor.allocate
+      reactor.instance_variable_set(:@id_to_socket, { 1 => Object.new })
+      reactor.instance_variable_set(:@id_to_writer, { 1 => writer })
+      reactor.instance_variable_set(:@id_to_flow_control, { 1 => Object.new })
+      reactor.instance_variable_set(:@id_to_http2_last_stream, {})
+      reactor.instance_variable_set(:@id_to_http2_drain_stream, {})
 
-      assert_in_delta before + 10, client.timeout_at, 0.1
-      reactor.send(:handle_timeout, client, client.timeout_at)
+      assert reactor.dispatch_http2_stream(1, 3)
+      reactor.drain_http2 { |stream_id| "goaway-#{stream_id}" }
 
-      assert_equal ["ping"], writer.frames
-      client = reactor.instance_variable_get(:@id_to_timeout).delete(1)
-      reactor.instance_variable_get(:@timeouts).delete!(client)
-      assert_in_delta before + 15, client.timeout_at, 0.1
-
-      reactor.send(:handle_timeout, client, client.timeout_at)
-
-      assert socket.closed?
-      assert flow_control.closed?
-    end
-
-    def test_http2_keepalive_acknowledgement
-      reactor, = build_http2_reactor
-      keepalive = reactor.instance_variable_get(:@id_to_http2_keepalive)[1]
-      keepalive[:deadline] = 105.0
-
-      reactor.acknowledge_http2_ping(1, ["different"])
-      assert_equal 105.0, keepalive[:deadline]
-
-      reactor.acknowledge_http2_ping(1, ["payload"])
-      refute keepalive.key?(:deadline)
-    end
-
-    def test_http2_initial_timeout
-      reactor, socket, writer, = build_http2_reactor
-      reactor.instance_variable_get(:@socket_to_state)[socket][:http2_preface_received] = false
-      before = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-
-      reactor.send(:register, socket)
-      client = reactor.instance_variable_get(:@id_to_timeout)[1]
-
-      assert_in_delta before + 30, client.timeout_at, 0.1
-      reactor.send(:handle_timeout, client, client.timeout_at)
-
-      assert_empty writer.frames
-      assert socket.closed?
+      assert_equal ["goaway-3"], frames
+      assert reactor.dispatch_http2_stream(1, 3)
+      refute reactor.dispatch_http2_stream(1, 5)
     end
 
     private

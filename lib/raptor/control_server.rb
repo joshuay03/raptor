@@ -19,9 +19,10 @@ module Raptor
     # @rbs @client: Atom
     # @rbs @thread: Thread?
 
-    # Creates a control server for `url` without binding it.
+    # Creates a new ControlServer for `url` without binding it.
     #
     # @param url [String] `unix://` URL to listen on
+    # @yield for each stats request
     # @yieldreturn [Hash] cluster statistics
     # @return [void]
     # @raise [ArgumentError] if the URL is not a Unix socket
@@ -131,7 +132,7 @@ module Raptor
     # @rbs (UNIXSocket client) -> void
     def handle(client)
       request_line = client.gets
-      while line = client.gets
+      while (line = client.gets)
         break if line == "\r\n"
       end
 

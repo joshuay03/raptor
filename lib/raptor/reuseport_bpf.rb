@@ -23,6 +23,14 @@ module Raptor
     LIBBPF_LOADED = !!defined?(LibBPFRuby)
     BPF_OBJECT_PATH = File.expand_path("../../ext/raptor_bpf/reuseport_select.bpf.o", __dir__)
 
+    # @rbs self.@object: untyped
+    # @rbs self.@program_fd: Integer
+    # @rbs self.@socks_fd: Integer
+    # @rbs self.@loads_fd: Integer?
+    # @rbs self.@load_key: String
+    # @rbs self.@load_value: String
+    # @rbs self.@accepted_load_value: String
+
     # Returns true when the preconditions for BPF-directed reuseport are
     # met on this platform.
     #
@@ -133,7 +141,8 @@ module Raptor
     end
 
     # Marks a worker's slot as unavailable by parking its load at the
-    # sentinel maximum so the BPF program's least-loaded pick skips it.
+    # sentinel maximum so the BPF program's two-choice sampling prefers the
+    # other candidate.
     #
     # @param worker_index [Integer] slot index for the worker to mark
     # @return [void]

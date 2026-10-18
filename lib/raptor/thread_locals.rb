@@ -15,7 +15,8 @@ module Raptor
     # Returns a reusable value stored on the current thread.
     #
     # @param key [Symbol] thread-variable key used to cache the value
-    # @yieldreturn [Object] value to store when the key is unset
+    # @yield when the key is unset
+    # @yieldreturn [Object] the value to store
     # @return [Object] the existing or newly stored value
     #
     # @rbs (Symbol key) { () -> untyped } -> untyped
@@ -24,8 +25,8 @@ module Raptor
       thread.thread_variable_get(key) || thread.thread_variable_set(key, yield)
     end
 
-    # Clears application-owned true thread locals while retaining Raptor's
-    # reusable per-thread values.
+    # Clears application thread locals while retaining Raptor's reusable
+    # per-thread values.
     #
     # @return [void]
     #

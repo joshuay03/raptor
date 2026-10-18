@@ -24,7 +24,6 @@ module Raptor
       queued = []
       thread_pool = Object.new
       thread_pool.define_singleton_method(:queue_size) { 1 }
-      thread_pool.define_singleton_method(:size) { 3 }
       thread_pool.define_singleton_method(:<<) { |work| queued << work }
 
       socket = Object.new
@@ -57,7 +56,7 @@ module Raptor
       assert_equal [[socket, 1, 2], { remote_addr: "127.0.0.1", url_scheme: "http" }], persisted
     end
 
-    def test_response_corking
+    def test_write_response_corks_socket_only_for_streamed_bodies
       handler = Http1.allocate
       handler.instance_variable_set(:@write_timeout, 1)
 
