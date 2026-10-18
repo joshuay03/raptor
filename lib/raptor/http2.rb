@@ -1316,7 +1316,12 @@ module Raptor
           env[Http::CONTENT_LENGTH] = value
         else
           rack_key = "HTTP_#{name.upcase.tr("-", "_")}"
-          env[rack_key] = value
+          if (existing = env[rack_key])
+            separator = rack_key == Rack::HTTP_COOKIE ? "; " : ", "
+            env[rack_key] = "#{existing}#{separator}#{value}"
+          else
+            env[rack_key] = value
+          end
         end
       end
 

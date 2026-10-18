@@ -391,6 +391,15 @@ module Raptor
       assert_empty frames
     end
 
+    def test_build_rack_env_joins_repeated_headers
+      env = build_rack_env(
+        [["cookie", "a=1"], ["accept", "text/html"], ["cookie", "b=2"], ["accept", "application/json"]]
+      )
+
+      assert_equal "a=1; b=2", env[Rack::HTTP_COOKIE]
+      assert_equal "text/html, application/json", env["HTTP_ACCEPT"]
+    end
+
     def test_write_response_omits_body_for_head_request
       frames = write_response(request_method: "HEAD", status: 200, body: ["body"])
 
@@ -579,6 +588,13 @@ module Raptor
       )
 
       frames
+    end
+
+    def build_rack_env(headers = [], authority: "example.com")
+      handler = Http2.new(nil, 9292, http2_options: { max_concurrent_streams: 100 })
+      request_headers = [[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", authority]] + headers
+
+      handler.send(:build_rack_env, request_headers, "", nil, nil, nil, 1, remote_addr: "127.0.0.1")
     end
 
     def decode_header_blocks(frames)
