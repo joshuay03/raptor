@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Strip padding from HTTP/2 DATA and HEADERS frames
 - Encode and decode long HTTP/2 header strings without overflowing the stack
 - Limit HTTP/2 request header lists to 112 KiB
 - Reject HTTP/2 frames larger than the maximum frame size

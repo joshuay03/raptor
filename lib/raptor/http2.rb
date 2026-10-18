@@ -25,6 +25,7 @@ module Raptor
     FLAG_END_STREAM = 0x1
     FLAG_ACK = 0x1
     FLAG_END_HEADERS = 0x4
+    FLAG_PADDED = 0x8
     FLAG_PRIORITY = 0x20
 
     ERROR_NO_ERROR = 0x0
@@ -512,8 +513,13 @@ module Raptor
 
         when :headers
           stream_id = frame[:stream_id]
-          header_payload = frame[:payload]
+          header_payload = unpadded_payload(frame)
           trailers = streams.key?(stream_id)
+
+          unless header_payload
+            goaway_error = ERROR_PROTOCOL_ERROR
+            break
+          end
 
           unless trailers
             if stream_id.even? || stream_id <= last_client_stream_id
@@ -563,15 +569,16 @@ module Raptor
 
         when :data
           stream_id = frame[:stream_id]
+          chunk = unpadded_payload(frame)
 
-          unless streams.key?(stream_id)
+          if !streams.key?(stream_id) || !chunk
             goaway_error = ERROR_PROTOCOL_ERROR
             break
           end
 
           stream = streams[stream_id]
           existing_body = stream[:body] || ""
-          stream = stream.merge(body: existing_body + frame[:payload])
+          stream = stream.merge(body: existing_body + chunk)
 
           if frame[:payload].bytesize.positive?
             connection_window -= frame[:payload].bytesize
@@ -634,6 +641,22 @@ module Raptor
 
       build_result(data, buffer, hpack_table, streams, outgoing_frames, completed_requests, cancelled_streams, window_updates, ping_acknowledgements, peer_initial_window_size, connection_window, preface_received, last_client_stream_id, pending_headers, !!goaway_error)
     end
+
+    # Returns a DATA or HEADERS payload without padding, or nil if padding
+    # is invalid.
+    #
+    # @param frame [Hash] the parsed frame
+    # @return [String, nil]
+    #
+    # @rbs (Hash[Symbol, untyped] frame) -> String?
+    def self.unpadded_payload(frame)
+      payload = frame[:payload]
+      return payload if frame[:flags].nobits?(FLAG_PADDED)
+
+      pad_length = payload.getbyte(0)
+      payload.byteslice(1, payload.bytesize - 1 - pad_length) if pad_length && pad_length < payload.bytesize
+    end
+    private_class_method :unpadded_payload
 
     # Returns whether request pseudo-headers violate RFC 9113 section 8.3.
     #

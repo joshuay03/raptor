@@ -44,6 +44,30 @@ module Raptor
       assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
     end
 
+    def test_process_frames_strips_padding_from_headers_and_data
+      parser = Http2Parser.new
+      encoded = parser.encode_headers([[":method", "POST"], [":path", "/"], [":scheme", "https"], [":authority", "x"]])
+      priority = [0, 15].pack("NC")
+      headers = parser.build_frame(:headers, Http2::FLAG_END_HEADERS | Http2::FLAG_PADDED | Http2::FLAG_PRIORITY, 1, "\x03#{priority}#{encoded}\x00\x00\x00")
+      data = parser.build_frame(:data, Http2::FLAG_END_STREAM | Http2::FLAG_PADDED, 1, "\x02body\x00\x00")
+
+      result = process_frames_with(headers + data)
+
+      refute result[:close_connection]
+      assert_equal [":method", ":path", ":scheme", ":authority"], result[:completed_requests].first[:headers].map(&:first)
+      assert_equal "body", result[:completed_requests].first[:body]
+    end
+
+    def test_process_frames_rejects_padding_longer_than_frame
+      parser = Http2Parser.new
+      data = parser.build_frame(:data, Http2::FLAG_END_STREAM | Http2::FLAG_PADDED, 1, "\x05body")
+
+      result = process_frames_with(headers_frame(stream_id: 1, end_stream: false) + data)
+
+      assert result[:close_connection]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
+    end
+
     def test_process_frames_assembles_continuation_frames
       parser = Http2Parser.new
       encoded = parser.encode_headers([[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "x"]])

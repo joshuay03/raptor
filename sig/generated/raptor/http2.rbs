@@ -13,6 +13,8 @@ module Raptor
 
     FLAG_END_HEADERS: ::Integer
 
+    FLAG_PADDED: ::Integer
+
     FLAG_PRIORITY: ::Integer
 
     ERROR_NO_ERROR: ::Integer
@@ -311,6 +313,15 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
     def self.process_frames: (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
 
+    # Returns a DATA or HEADERS payload without padding, or nil if padding
+    # is invalid.
+    #
+    # @param frame [Hash] the parsed frame
+    # @return [String, nil]
+    #
+    # @rbs (Hash[Symbol, untyped] frame) -> String?
+    def self.unpadded_payload: (Hash[Symbol, untyped] frame) -> String?
+
     # Returns whether request pseudo-headers violate RFC 9113 section 8.3.
     #
     # @param headers [Array<Array(String, String)>] decoded header pairs
@@ -370,23 +381,23 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[Integer, Integer]] window_updates, Array[String] ping_acknowledgements, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
     def self.build_result: (Hash[Symbol, untyped] data, String buffer, Array[untyped] hpack_table, Hash[Integer, Hash[Symbol, untyped]] streams, Array[String] outgoing_frames, Array[Hash[Symbol, untyped]] completed_requests, Array[Integer] cancelled_streams, Array[[ Integer, Integer ]] window_updates, Array[String] ping_acknowledgements, Integer? peer_initial_window_size, Integer connection_window, bool preface_received, Integer last_client_stream_id, Hash[Symbol, untyped]? pending_headers, bool close_connection) -> Hash[Symbol, untyped]
 
-    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
-
-    @server_port_string: String
-
-    @write_timeout: Integer
-
-    @access_log_io: IO?
-
-    @clean_thread_locals: bool
-
-    @clean_fiber_locals: bool
-
-    @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
+    @initial_settings_frame: String
 
     @running: AtomicBoolean
 
-    @initial_settings_frame: String
+    @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
+
+    @clean_fiber_locals: bool
+
+    @clean_thread_locals: bool
+
+    @access_log_io: IO?
+
+    @write_timeout: Integer
+
+    @server_port_string: String
+
+    @app: ^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ]
 
     # Creates a new Http2 handler.
     #
