@@ -263,7 +263,7 @@ module Raptor
 
       File.open(@pid_file, File::CREAT | File::EXCL | File::WRONLY) { |file| file.write(Process.pid.to_s) } if @pid_file
 
-      @bpf_active = ReuseportBPF.setup(@worker_count)
+      @bpf_active = ReuseportBPF.setup(@worker_count, @binder.listeners.grep(TCPServer))
 
       @control_server&.bind
       @worker_count.times { |index| spawn_worker(index) }
@@ -885,7 +885,7 @@ module Raptor
 
       bpf_listeners = if @bpf_active
         ReuseportBPF.enable_load_reporting(index)
-        ReuseportBPF.create_worker_listeners(@binder.bind_uris, index, @binder.socket_backlog)
+        ReuseportBPF.create_worker_listeners(index, @binder.socket_backlog)
       else
         []
       end

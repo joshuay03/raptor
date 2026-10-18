@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require "socket"
-require "uri"
 
 begin
   require "libbpf-ruby"
@@ -15,20 +14,24 @@ module Raptor
   #
   # Auto-enabled on Linux when the `libbpf-ruby` gem is installed and the
   # BPF object file has been compiled. Falls back silently to standard
-  # `SO_REUSEPORT` when either is missing. Raises when the kernel refuses
-  # the BPF program. Wraps `tcp://` bindings only; non-tcp bindings are
-  # left to the binder's shared listeners.
+  # `SO_REUSEPORT` when either is missing, or when there are more workers
+  # or listeners than the BPF maps have slots for. Raises when the kernel
+  # refuses the BPF program. Wraps `tcp://` bindings only; non-tcp bindings
+  # are left to the binder's shared listeners.
   #
   module ReuseportBPF
     LIBBPF_LOADED = !!defined?(LibBPFRuby)
     BPF_OBJECT_PATH = File.expand_path("../../ext/raptor_bpf/reuseport_select.bpf.o", __dir__)
     TCP_INFO_UNACKED_OFFSET = 24
     UNAVAILABLE_LOAD = 0xffffffff
+    MAX_WORKERS = 64
+    MAX_LISTENERS = 16
 
     # @rbs self.@object: untyped
     # @rbs self.@program_fd: Integer
     # @rbs self.@socks_fd: Integer
     # @rbs self.@loads_fd: Integer?
+    # @rbs self.@shared_listeners: Array[TCPServer]
     # @rbs self.@worker_listeners: Array[TCPServer]
     # @rbs self.@load_key: String
     # @rbs self.@load_value: String
@@ -44,18 +47,22 @@ module Raptor
       LIBBPF_LOADED && File.exist?(BPF_OBJECT_PATH)
     end
 
-    # Prepares BPF-directed routing for `worker_count` workers.
+    # Prepares BPF-directed routing for `worker_count` workers across the
+    # addresses `shared_listeners` are bound to.
     #
     # Returns true when BPF-directed dispatch is active. Returns false
-    # when the platform is unsupported. Raises when the kernel refuses
-    # the program.
+    # when the platform is unsupported or the counts exceed the map slots.
+    # Raises when the kernel refuses the program.
     #
     # @param worker_count [Integer] number of worker processes that will bind sockets
+    # @param shared_listeners [Array<TCPServer>] the binder's tcp listeners
     # @return [Boolean]
     #
-    # @rbs (Integer worker_count) -> bool
-    def self.setup(worker_count)
-      return false unless supported?
+    # @rbs (Integer worker_count, Array[TCPServer] shared_listeners) -> bool
+    def self.setup(worker_count, shared_listeners)
+      return false unless supported? && worker_count <= MAX_WORKERS && shared_listeners.length <= MAX_LISTENERS
+
+      @shared_listeners = shared_listeners
 
       @object = LibBPFRuby::Object.new(BPF_OBJECT_PATH)
       @program_fd = @object.program_fd("select_less_loaded")
@@ -66,24 +73,18 @@ module Raptor
       true
     end
 
-    # Returns tcp listening sockets bound and registered for `worker_index`.
-    # Skips non-tcp bind URIs.
+    # Creates this worker's BPF-routed listeners at the shared listeners'
+    # bound addresses, including resolved `localhost` addresses and ports
+    # assigned by the kernel for port 0.
     #
-    # @param bind_uris [Array<String>] the configured bind URIs
     # @param worker_index [Integer] slot index for this worker in the socks map
     # @param socket_backlog [Integer] kernel listen() queue depth
     # @return [Array<TCPServer>] the tcp listening sockets created for this worker
     #
-    # @rbs (Array[String] bind_uris, Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
-    def self.create_worker_listeners(bind_uris, worker_index, socket_backlog)
-      @worker_listeners = bind_uris.filter_map do |bind_uri|
-        uri = URI(bind_uri)
-        next unless uri.scheme == "tcp"
-
-        host = uri.host
-        host = host[1..-2] if host&.start_with?("[")
-
-        addrinfo = Addrinfo.tcp(host, uri.port)
+    # @rbs (Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
+    def self.create_worker_listeners(worker_index, socket_backlog)
+      @worker_listeners = @shared_listeners.each_with_index.map do |shared_listener, listener_index|
+        addrinfo = shared_listener.local_address
         socket = Socket.new(addrinfo.afamily, Socket::SOCK_STREAM, 0)
         socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
         socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true)
@@ -92,7 +93,7 @@ module Raptor
         socket.bind(addrinfo)
         socket.listen(socket_backlog)
 
-        LibBPFRuby.sockmap_update(@socks_fd, [worker_index].pack("L"), socket)
+        LibBPFRuby.sockmap_update(@socks_fd, [listener_index * MAX_WORKERS + worker_index].pack("L"), socket)
         LibBPFRuby.attach_reuseport(socket, @program_fd)
 
         tcp_server = TCPServer.for_fd(socket.fileno)

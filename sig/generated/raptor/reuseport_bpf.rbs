@@ -6,9 +6,10 @@ module Raptor
   #
   # Auto-enabled on Linux when the `libbpf-ruby` gem is installed and the
   # BPF object file has been compiled. Falls back silently to standard
-  # `SO_REUSEPORT` when either is missing. Raises when the kernel refuses
-  # the BPF program. Wraps `tcp://` bindings only; non-tcp bindings are
-  # left to the binder's shared listeners.
+  # `SO_REUSEPORT` when either is missing, or when there are more workers
+  # or listeners than the BPF maps have slots for. Raises when the kernel
+  # refuses the BPF program. Wraps `tcp://` bindings only; non-tcp bindings
+  # are left to the binder's shared listeners.
   module ReuseportBPF
     LIBBPF_LOADED: untyped
 
@@ -18,6 +19,10 @@ module Raptor
 
     UNAVAILABLE_LOAD: ::Integer
 
+    MAX_WORKERS: ::Integer
+
+    MAX_LISTENERS: ::Integer
+
     self.@accepted_load_value: String
 
     self.@load_value: String
@@ -25,6 +30,8 @@ module Raptor
     self.@load_key: String
 
     self.@worker_listeners: Array[TCPServer]
+
+    self.@shared_listeners: Array[TCPServer]
 
     self.@loads_fd: Integer?
 
@@ -42,28 +49,30 @@ module Raptor
     # @rbs () -> bool
     def self.supported?: () -> bool
 
-    # Prepares BPF-directed routing for `worker_count` workers.
+    # Prepares BPF-directed routing for `worker_count` workers across the
+    # addresses `shared_listeners` are bound to.
     #
     # Returns true when BPF-directed dispatch is active. Returns false
-    # when the platform is unsupported. Raises when the kernel refuses
-    # the program.
+    # when the platform is unsupported or the counts exceed the map slots.
+    # Raises when the kernel refuses the program.
     #
     # @param worker_count [Integer] number of worker processes that will bind sockets
+    # @param shared_listeners [Array<TCPServer>] the binder's tcp listeners
     # @return [Boolean]
     #
-    # @rbs (Integer worker_count) -> bool
-    def self.setup: (Integer worker_count) -> bool
+    # @rbs (Integer worker_count, Array[TCPServer] shared_listeners) -> bool
+    def self.setup: (Integer worker_count, Array[TCPServer] shared_listeners) -> bool
 
-    # Returns tcp listening sockets bound and registered for `worker_index`.
-    # Skips non-tcp bind URIs.
+    # Creates this worker's BPF-routed listeners at the shared listeners'
+    # bound addresses, including resolved `localhost` addresses and ports
+    # assigned by the kernel for port 0.
     #
-    # @param bind_uris [Array<String>] the configured bind URIs
     # @param worker_index [Integer] slot index for this worker in the socks map
     # @param socket_backlog [Integer] kernel listen() queue depth
     # @return [Array<TCPServer>] the tcp listening sockets created for this worker
     #
-    # @rbs (Array[String] bind_uris, Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
-    def self.create_worker_listeners: (Array[String] bind_uris, Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
+    # @rbs (Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
+    def self.create_worker_listeners: (Integer worker_index, Integer socket_backlog) -> Array[TCPServer]
 
     # Prepares this worker's load-reporting slot so subsequent
     # {update_load} calls can publish its backlog.
