@@ -294,14 +294,8 @@ module Raptor
         return
       end
 
-      if !parser.finished?
+      unless parser.finished?
         fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
-        return
-      elsif Http1.invalid_host?(env) || Http1.request_smuggling?(env)
-        reject_malformed(socket)
-        return
-      elsif parser.has_body? && @max_body_size && parser.content_length > @max_body_size
-        reject_oversized(socket)
         return
       end
 
@@ -420,8 +414,15 @@ module Raptor
         end
 
         body = extract_body(buffer, env, parser, nread, decode_chunked: false)
-        if body == :incomplete
+        case body
+        when :incomplete
           fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
+          return
+        when :too_large
+          reject_oversized(socket)
+          return
+        when :malformed
+          reject_malformed(socket)
           return
         end
 
@@ -500,10 +501,10 @@ module Raptor
       [env, parse_data, nread, parser]
     end
 
-    # Resolves the request body for a finished parse. Returns the body
-    # `String` (or `nil` when the request has no body), or one of
-    # `:incomplete`, `:too_large`, `:malformed` when the caller must
-    # fall back or reject.
+    # Validates the framing of a finished parse and resolves its request
+    # body. Returns the body `String` (or `nil` when the request has no
+    # body), or one of `:incomplete`, `:too_large`, `:malformed` when the
+    # caller must fall back or reject.
     #
     # @param buffer [String] the raw request bytes
     # @param env [Hash] the Rack environment being built
@@ -514,7 +515,9 @@ module Raptor
     #
     # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread, decode_chunked: bool) -> (String | Symbol)?
     def extract_body(buffer, env, parser, nread, decode_chunked:)
+      return :malformed if Http1.invalid_host?(env) || Http1.request_smuggling?(env)
       return unless parser.has_body?
+      return :too_large if @max_body_size && parser.content_length > @max_body_size
 
       body = buffer.byteslice(nread..-1) || ""
 

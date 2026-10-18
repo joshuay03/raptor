@@ -237,10 +237,10 @@ module Raptor
     # @rbs (String buffer) -> [Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser]
     def parse_next_request: (String buffer) -> [ Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser ]
 
-    # Resolves the request body for a finished parse. Returns the body
-    # `String` (or `nil` when the request has no body), or one of
-    # `:incomplete`, `:too_large`, `:malformed` when the caller must
-    # fall back or reject.
+    # Validates the framing of a finished parse and resolves its request
+    # body. Returns the body `String` (or `nil` when the request has no
+    # body), or one of `:incomplete`, `:too_large`, `:malformed` when the
+    # caller must fall back or reject.
     #
     # @param buffer [String] the raw request bytes
     # @param env [Hash] the Rack environment being built

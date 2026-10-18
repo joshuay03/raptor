@@ -847,6 +847,31 @@ module Raptor
       end
     end
 
+    def test_conflicting_content_length_on_keepalive_returns_400
+      with_server("rack_input.ru") do |uri|
+        socket = TCPSocket.new(uri.host, uri.port)
+        socket.write("GET / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
+        first_response = +""
+        Timeout.timeout(5) do
+          first_response << socket.readpartial(1024) until first_response.end_with?("\r\n\r\n")
+        end
+
+        socket.write(
+          "POST / HTTP/1.1\r\n" \
+          "Host: #{uri.host}:#{uri.port}\r\n" \
+          "Content-Length: 5\r\n" \
+          "Content-Length: 6\r\n\r\n" \
+          "hello!"
+        )
+        response = Timeout.timeout(5) { socket.read }
+
+        assert_match(/200 OK/, first_response)
+        assert_match(/400 Bad Request/, response)
+      ensure
+        socket&.close
+      end
+    end
+
     def test_non_hex_chunk_size_returns_400
       with_server("rack_input.ru") do |uri|
         response = raw_request(
