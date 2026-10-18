@@ -374,7 +374,7 @@
       
       
         &mdash;
-        <div class='inline'><p>connection state restored after the response finishes</p></div>
+        <div class='inline'><p>connection state restored after the response finishes, including bytes the client pipelined after the request</p></div>
       
     </li>
   
@@ -405,7 +405,7 @@
   <span class='ivar'>@body</span> <span class='op'>=</span> <span class='id identifier rubyid_body'>body</span>
   <span class='ivar'>@state</span> <span class='op'>=</span> <span class='id identifier rubyid_state'>state</span>
   <span class='ivar'>@budget</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="../DetachedBody.html" title="Raptor::DetachedBody (class)">DetachedBody</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="../DetachedBody/Budget.html" title="Raptor::DetachedBody::Budget (class)">Budget</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="../DetachedBody/Budget.html#initialize-instance_method" title="Raptor::DetachedBody::Budget#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="../Reactor.html#DETACHED_CONNECTION_BUFFER_SIZE-constant" title="Raptor::Reactor::DETACHED_CONNECTION_BUFFER_SIZE (constant)">DETACHED_CONNECTION_BUFFER_SIZE</a></span></span><span class='rparen'>)</span>
-  <span class='ivar'>@input</span> <span class='op'>=</span> <span class='const'>String</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='label'>encoding:</span> <span class='const'>Encoding</span><span class='op'>::</span><span class='const'>ASCII_8BIT</span><span class='rparen'>)</span>
+  <span class='ivar'>@input</span> <span class='op'>=</span> <span class='const'>String</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:pipelined</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>encoding:</span> <span class='const'>Encoding</span><span class='op'>::</span><span class='const'>ASCII_8BIT</span><span class='rparen'>)</span>
   <span class='ivar'>@reading</span> <span class='op'>=</span> <span class='kw'>true</span>
   <span class='ivar'>@finishing</span> <span class='op'>=</span> <span class='kw'>false</span>
 <span class='kw'>end</span></pre>
@@ -753,7 +753,7 @@
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 11:45:11 2026 by
+  Generated on Sun Oct 18 13:50:52 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

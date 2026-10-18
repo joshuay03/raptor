@@ -103,6 +103,22 @@
 </div>
 
 
+  
+    <h2>
+      Constant Summary
+      <small><a href="#" class="constants_summary_toggle">collapse</a></small>
+    </h2>
+
+    <dl class="constants">
+      
+        <dt id="MAX_HEADER_LIST_SIZE-constant" class="">MAX_HEADER_LIST_SIZE =
+          
+        </dt>
+        <dd><pre class="code"><span class='const'>INT2NUM</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#MAX_HEADER_LIST_SIZE-constant" title="Raptor::Http2Parser::MAX_HEADER_LIST_SIZE (constant)">MAX_HEADER_LIST_SIZE</a></span></span><span class='rparen'>)</span></pre></dd>
+      
+    </dl>
+  
+
 
 
 
@@ -372,12 +388,12 @@
       <pre class="lines">
 
 
-834
-835
-836</pre>
+849
+850
+851</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 834</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 849</span>
 
 <span class='id identifier rubyid_static'>static</span> <span class='const'>VALUE</span> <span class='id identifier rubyid_h2_parser_connection_preface'>h2_parser_connection_preface</span><span class='lparen'>(</span><span class='const'>VALUE</span> <span class='kw'>self</span><span class='rparen'>)</span> <span class='lbrace'>{</span>
   <span class='kw'>return</span> <span class='id identifier rubyid_rb_str_new_lit'>rb_str_new_lit</span><span class='lparen'>(</span><span class='const'>CONNECTION_PREFACE</span><span class='rparen'>)</span><span class='semicolon'>;</span>
@@ -408,21 +424,6 @@
       <pre class="lines">
 
 
-689
-690
-691
-692
-693
-694
-695
-696
-697
-698
-699
-700
-701
-702
-703
 704
 705
 706
@@ -444,10 +445,25 @@
 722
 723
 724
-725</pre>
+725
+726
+727
+728
+729
+730
+731
+732
+733
+734
+735
+736
+737
+738
+739
+740</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 689</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 704</span>
 
 static VALUE h2_parser_build_frame(VALUE self, VALUE type, VALUE flags, VALUE stream_id, VALUE payload) {
   uint8_t frame_type;
@@ -506,16 +522,16 @@ static VALUE h2_parser_build_frame(VALUE self, VALUE type, VALUE flags, VALUE st
       <pre class="lines">
 
 
-813
-814
-815
-816
-817
-818
-819</pre>
+828
+829
+830
+831
+832
+833
+834</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 813</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 828</span>
 
 static VALUE h2_parser_build_settings(VALUE self, VALUE settings) {
   Check_Type(settings, T_HASH);
@@ -544,13 +560,13 @@ static VALUE h2_parser_build_settings(VALUE self, VALUE settings) {
       <pre class="lines">
 
 
-748
-749
-750
-751</pre>
+763
+764
+765
+766</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 748</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 763</span>
 
 static VALUE h2_parser_encode_headers(VALUE self, VALUE headers) {
   Check_Type(headers, T_ARRAY);
@@ -576,18 +592,18 @@ static VALUE h2_parser_encode_headers(VALUE self, VALUE headers) {
       <pre class="lines">
 
 
-753
-754
-755
-756
-757
-758
-759
-760
-761</pre>
+768
+769
+770
+771
+772
+773
+774
+775
+776</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 753</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 768</span>
 
 static VALUE h2_parser_encode_response_headers(VALUE self, VALUE status, VALUE headers) {
   Check_Type(headers, T_HASH);
@@ -618,17 +634,17 @@ static VALUE h2_parser_encode_response_headers(VALUE self, VALUE status, VALUE h
       <pre class="lines">
 
 
-763
-764
-765
-766
-767
-768
-769
-770</pre>
+778
+779
+780
+781
+782
+783
+784
+785</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 763</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 778</span>
 
 static VALUE h2_parser_encode_response_trailers(VALUE self, VALUE trailers) {
   Check_Type(trailers, T_HASH);
@@ -658,21 +674,6 @@ static VALUE h2_parser_encode_response_trailers(VALUE self, VALUE trailers) {
       <pre class="lines">
 
 
-665
-666
-667
-668
-669
-670
-671
-672
-673
-674
-675
-676
-677
-678
-679
 680
 681
 682
@@ -680,10 +681,25 @@ static VALUE h2_parser_encode_response_trailers(VALUE self, VALUE trailers) {
 684
 685
 686
-687</pre>
+687
+688
+689
+690
+691
+692
+693
+694
+695
+696
+697
+698
+699
+700
+701
+702</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 665</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 680</span>
 
 static VALUE h2_parser_parse_frame(VALUE self, VALUE buffer) {
   Check_Type(buffer, T_STRING);
@@ -728,29 +744,29 @@ static VALUE h2_parser_parse_frame(VALUE self, VALUE buffer) {
       <pre class="lines">
 
 
-727
-728
-729
-730
-731
-732
-733
-734
-735
-736
-737
-738
-739
-740
-741
 742
 743
 744
 745
-746</pre>
+746
+747
+748
+749
+750
+751
+752
+753
+754
+755
+756
+757
+758
+759
+760
+761</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 727</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 742</span>
 
 static VALUE h2_parser_parse_headers(VALUE self, VALUE header_block, VALUE dyn_table) {
   raptor_h2_parser *parser;
@@ -792,21 +808,6 @@ static VALUE h2_parser_parse_headers(VALUE self, VALUE header_block, VALUE dyn_t
       <pre class="lines">
 
 
-772
-773
-774
-775
-776
-777
-778
-779
-780
-781
-782
-783
-784
-785
-786
 787
 788
 789
@@ -831,10 +832,25 @@ static VALUE h2_parser_parse_headers(VALUE self, VALUE header_block, VALUE dyn_t
 808
 809
 810
-811</pre>
+811
+812
+813
+814
+815
+816
+817
+818
+819
+820
+821
+822
+823
+824
+825
+826</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 772</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 787</span>
 
 static VALUE h2_parser_parse_settings(VALUE self, VALUE payload) {
   Check_Type(payload, T_STRING);
@@ -896,21 +912,21 @@ static VALUE h2_parser_parse_settings(VALUE self, VALUE payload) {
       <pre class="lines">
 
 
-821
-822
-823
-824
-825
-826
-827
-828
-829
-830
-831
-832</pre>
+836
+837
+838
+839
+840
+841
+842
+843
+844
+845
+846
+847</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 821</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_http2/raptor_http2.c', line 836</span>
 
 static VALUE h2_parser_parse_window_update(VALUE self, VALUE payload) {
   Check_Type(payload, T_STRING);
@@ -934,7 +950,7 @@ static VALUE h2_parser_parse_window_update(VALUE self, VALUE payload) {
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 11:45:11 2026 by
+  Generated on Sun Oct 18 13:50:53 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
