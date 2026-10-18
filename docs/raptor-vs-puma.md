@@ -1,6 +1,6 @@
 # Raptor vs Puma: A Design Comparison
 
-Raptor is a Ruby web server built around Ractor-parallel protocol pipelines, a lock-free app thread pool, and an opinionated cluster architecture. Against the latest Puma release on the same hardware, it leads clearly on the IO-heavy HTTP/1.1 benchmark and lands within a few percent on CPU-heavy throughput, while Falcon's fibers remain the strongest fit for highly concurrent IO. Raptor also speaks HTTP/2 natively, which Puma does not. This document explains how those designs move requests and where each trade-off shows up.
+Raptor is a Ruby web server built around Ractor-parallel protocol pipelines, a lock-free app thread pool, and an opinionated cluster architecture. It also speaks HTTP/2 natively, which Puma does not. This document explains how the two servers move requests, how they compare on the same hardware, and where each trade-off shows up.
 
 ## Why this document exists
 
@@ -20,17 +20,18 @@ This document focuses on Puma because Puma is the incumbent that any new Ruby we
 
 Raptor is a research project. It hasn't run production traffic. The numbers in the README come from a repeatable microbenchmark, not from a real deployment. They use controlled Rack workloads to measure the full server path: accepting connections, parsing, dispatching, running the app, and writing responses. A real Rails application adds database time, downstream services, middleware, and application-specific contention, so a percentage here will not transfer directly to production.
 
-The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma and Falcon releases, run on the same hardware with the same Rack app on a recent Ruby with YJIT enabled. All servers run one worker process per available CPU. Puma and Raptor's fixed mode use three app threads per worker. Raptor's scaling mode starts at three and has no fixed limit, while Falcon uses unbounded fibers. Load generators use four client connections per baseline app thread, so on the 10-core machine that produced the current numbers that's 120 concurrent HTTP/1.1 client connections and 40 h2 connections × 3 streams each.
+The Raptor README carries the [current head-to-head numbers](../README.md#micro-benchmarks) against the latest Puma and Falcon releases, run on the same hardware with the same Rack app on Ruby head with YJIT enabled. Running on head means a Ruby regression shows up before it ships. All servers run one worker process per available CPU. Raptor and Puma are each run in two modes: **fixed** keeps three app threads per worker, and **scaling** starts at three and may grow to sixteen. Falcon uses unbounded fibers. Load generators use four client connections per baseline app thread, so on the 10-core machine that produced the current numbers that's 120 concurrent HTTP/1.1 client connections and 40 h2 connections × 3 streams each.
 
-Two workload profiles are measured. **IO-bound** is a GET endpoint that does 5 to 10 short sleeps interleaved with small CPU work per request, simulating a read path that makes several DB or cache calls throughout its lifetime. **CPU-bound** is a POST endpoint with a small JSON body that builds a JSON response in 3 to 5 chunks interleaved with sub-100µs sleeps, simulating a write path that does most of its work in Ruby with a few near-zero-cost cache hits. The workloads are interleaved rather than a single bulk sleep or single bulk serialise so a fiber-per-connection server like Falcon doesn't look artificially good from one-shot IO, and the CPU-bound workload is heavily CPU-dominated by design (roughly 95% CPU / 5% IO by wall time) so it actually measures CPU work rather than smuggling in enough IO for fibers to multiplex.
+Two workload profiles are measured. **IO-bound** is a GET endpoint that spends about 95% of each request waiting: it makes 5 to 10 simulated DB calls of 0.5 to 1.5ms each and renders a small JSON result after each one. **CPU-bound** is a POST endpoint that spends about 85% of each request running Ruby: it accepts a small JSON body, renders 2,100 to 7,000 JSON items in 3 to 5 chunks, each after a 25 to 50µs simulated cache hit, and returns a short response. The work is interleaved rather than one bulk sleep or one bulk render, so a fiber-per-connection server like Falcon doesn't look artificially good from one-shot IO, and the CPU-bound profile measures Ruby execution rather than smuggling in enough IO for fibers to multiplex.
 
-Each cell in the table reports the median throughput and median p95 latency independently across 3 runs, and every run boots a fresh server process so state cannot accumulate across measurements. Both Raptor modes are compared with both servers: fixed mode is the like-for-like comparison with Puma, while scaling mode tests whether adaptive OS threads can close the IO-concurrency gap with Falcon's much cheaper fibers. Rather than pin every number into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
+Each cell in the table reports the median throughput and median p95 latency independently across 3 runs, and every run boots a fresh server process so state cannot accumulate across measurements. The benchmark does not run external CPU spinners. Fixed mode compares the servers' request paths with the same number of threads. Scaling mode compares how each pool decides when to add threads: Puma adds one whenever work is waiting, while Raptor only adds one when queued work is blocked outside the GVL. Rather than pin every number into this document (they drift with Ruby versions and hardware), the shape of the result is what matters.
 
-- On IO-bound HTTP/1.1, fixed Raptor delivers a little over twice Puma's throughput with less than half its p95 latency. Scaling lifts Raptor to 8.63k req/s without keep-alive and 9.43k with it: still 29.3% behind Falcon on fresh connections, but 51.3% ahead with keep-alive.
-- On CPU-bound HTTP/1.1, fixed and scaling Raptor are effectively identical. Puma leads by 5.0% without keep-alive and 0.7% with it, while both Raptor modes lead Falcon. This is the intended result: the pool gets its IO gains without trading away CPU throughput.
-- On HTTP/2, Raptor and Falcon both implement it; Puma doesn't. Scaling raises Raptor's IO throughput from 1.14k to 4.46k req/s, though it remains 30.3% behind Falcon. On the CPU profile it narrows Falcon's throughput lead from 26.9% to 14.2% while keeping a lower p95. HTTP/2 also varies substantially more between runs in this benchmark, so those medians deserve less confidence than the stable HTTP/1.1 results.
+- On IO-bound HTTP/1.1, fixed mode holds application concurrency equal, while scaling mode lets each server add threads up to the same limit. Raptor also polls for accept capacity under saturation rather than parking, trading CPU time for throughput and latency. Equal thread counts do not imply equal CPU use.
+- On CPU-bound HTTP/1.1, extra threads cannot execute the Rack application in parallel within one worker's main Ractor. This profile checks whether adaptive scaling adds overhead when more threads cannot help.
+- On HTTP/2, Raptor and Falcon both implement it; Puma doesn't. The samples vary substantially more between runs than HTTP/1.1, so the README reports the spread as well as the medians.
+- The IO + SSE scenario repeats the keep-alive IO run while server-sent event streams stay open on every worker. Raptor hands each stream to the reactor with `Raptor::DetachedBody`, so the streams cost it no application threads, while a thread-per-request server parks one thread per open stream. The README table shows how much throughput each server keeps.
 
-The rest of this doc explains why the shape looks like that.
+The rest of this doc explains the design differences behind those comparisons; the README carries the measured rankings.
 
 ## The two servers at a glance
 
@@ -209,9 +210,9 @@ Successive thresholds promote fresh seeds. When the next threshold trips, the ma
 
 Master and seed communicate over two pipes opened before the initial fork. The fork pipe (`@fork_r`, `@fork_w`) carries an 8-byte packed `[slot_index, phase]` from master to seed for each replacement to fork. The response pipe (`@resp_r`, `@resp_w`) carries a 4-byte packed pid back the other way, plus a one-shot 4-byte zero the seed writes when it enters its loop so the master knows drain is complete. The master polls the ready marker non-blockingly on the supervision loop; the phased restart that fills the vacated slot and cycles the remaining workers only starts once the marker arrives (or the drain deadline expires, in which case the master clears the seed reference and falls back to direct forks).
 
-Workers forked by the seed are not the master's direct children. Before spawning anything the master calls `PR_SET_CHILD_SUBREAPER` (via a small `prctl` wrapper, `Raptor::Subreaper`), so seed-forked children reparent to the master immediately and `Process.wait2` sees them like any other child. When a seed is retired on the next promotion its still-running descendants stay attached to the master through the same subreaper bit. Refork depends on this. On platforms without `PR_SET_CHILD_SUBREAPER` (everything except Linux), `refork_after` defaults to `nil` and is ignored with a warning if the user sets it anyway.
+Workers forked by the seed are not the master's direct children. Before spawning anything the master calls `PR_SET_CHILD_SUBREAPER` (via a small `prctl` wrapper, `Raptor::Subreaper`). The seed then forks each worker through a short-lived intermediate process that exits as soon as the worker exists, so the worker reparents to the master immediately and `Process.wait2` sees it like any other child, including its real exit status when it dies. When a seed is retired on the next promotion its still-running descendants stay attached to the master through the same subreaper bit. Refork depends on this. On platforms without `PR_SET_CHILD_SUBREAPER` (everything except Linux), `refork_after` defaults to `nil` and is ignored with a warning if the user sets it anyway.
 
-The design is Pitchfork's, adapted for Raptor's process model. [Pitchfork](https://github.com/Shopify/pitchfork) was the first Ruby server built around `PR_SET_CHILD_SUBREAPER` and multi-generation mould promotion; Puma's shipping `fork_worker` keeps worker 0 serving traffic alongside its fork-server duties, and Instacart's [`mold_worker` PR #3643](https://github.com/puma/puma/pull/3643) is Puma catching up to the same shape Pitchfork established. Raptor's seed matches the Pitchfork shape: pure fork source, promoted from a warm worker, retired when the next generation takes over.
+The design is Pitchfork's, adapted for Raptor's process model. [Pitchfork](https://github.com/Shopify/pitchfork) was the first Ruby server built around `PR_SET_CHILD_SUBREAPER` and multi-generation mould promotion; Puma's shipping `fork_worker` keeps worker 0 serving traffic alongside its fork-server duties, and its `mold_worker` mode, merged in [PR #4038](https://github.com/puma/puma/pull/4038) after starting life as Instacart's [PR #3643](https://github.com/puma/puma/pull/3643), adopts the same shape Pitchfork established. Puma's mold forks workers directly and reaps them itself, so the master detects the workers it did not fork by probing them with signals; Raptor's double fork lets the master wait on every worker directly. Raptor's seed matches the Pitchfork shape: pure fork source, promoted from a warm worker, retired when the next generation takes over.
 
 ### Threading model
 
@@ -224,7 +225,7 @@ This is where Raptor diverges dramatically. Inside a worker there are several di
 5. **A collector thread per Ractor pool** that receives parsed results via a `Ractor::Port`.
 6. **An `AtomicThreadPool` of T baseline app threads** running the Rack app and writing responses, with optional adaptive growth.
 7. **One stats thread** that writes the shared-memory slot every second.
-8. **One load reporter thread when BPF dispatch is active** that publishes backlog to the kernel map.
+8. **One load reporter thread when BPF dispatch is active** that publishes the worker's load to the kernel map.
 
 That is a lot of moving parts. Let us go through why.
 
@@ -234,7 +235,7 @@ For a web server, this restriction turns out to be almost exactly right for HTTP
 
 The HTTP/1 parser also pre-interns the ~40 most common header keys (`HTTP_HOST`, `HTTP_USER_AGENT`, the `HTTP_ACCEPT_*` family, `CONTENT_LENGTH`, `HTTP_X_FORWARDED_*`, the `HTTP_SEC_FETCH_*` client hints, and so on) once at load time. During parsing, a `memcmp` lookup against that table returns the shared frozen `VALUE` for known keys and falls back to `rb_enc_interned_str` for the rest. Every request's env hash therefore reuses the same String object for its header names, which both skips per-request allocation and lets Ruby's hash lookup use the interned key's cached hash code.
 
-Your Rack app still runs on ordinary threads under one worker GVL, so the app does not need to be Ractor-safe. Requests that need the reactor pipeline can have their protocol work run in parallel in another Ractor. Complete requests found by the eager accept and keep-alive paths parse inline instead, avoiding a Ractor handoff when the bytes are already available.
+Your Rack app still runs on ordinary threads under one worker GVL, so the app does not need to be Ractor-safe. Requests that need the reactor pipeline can have their protocol work run in parallel in another Ractor. Complete requests found by the eager accept and keep-alive paths parse inline instead, avoiding a Ractor handoff when the bytes are already available. The same applies when the next request arrives on an idle keep-alive connection.
 
 **How the Ractor pools actually work.** Raptor uses the `ractor-pool` gem, which is another one of my libraries. Each pool has one coordinator Ractor and M pipeline Ractors. When a pipeline Ractor is idle, it sends itself back to the coordinator via `coordinator.send(Ractor.current, move: true)`. When work arrives at the coordinator, it either forwards it to a waiting Ractor (if any) or queues it. This coordinator-dispatch pattern guarantees that no Ractor sits idle while there is work. Results flow back through a shared `Ractor::Port` (a many-to-one channel added in recent Ruby versions and stable in 4.0) to a Ruby-side collector thread. If `M == 1` the coordinator is skipped and work goes straight to the single pipeline Ractor.
 
@@ -242,7 +243,7 @@ Raptor always runs an HTTP/1.1 pool because TCP, Unix, and SSL bindings support 
 
 **Why a custom thread pool.** The `AtomicThreadPool` in `atomic-ruby` (another one of my libraries) is backed by an `AtomicQueue`. The queue is a Michael-Scott multi-producer, multi-consumer FIFO: a singly linked list with a dummy sentinel and atomic head and tail pointers. Producers append nodes at the tail; consumers advance the head. Both operations are O(1) and make progress through compare-and-swap rather than a queue-wide mutex. Separate atoms track queue size and active app threads for backpressure.
 
-The pool starts at `threads` and scales without a fixed limit by default. Set `max_threads` to cap its growth, or set it to the same value as `threads` to keep the pool fixed. A native CRuby thread-event hook measures how much active workers spend running, blocked outside the GVL, and waiting to acquire it. The pool only adds a temporary thread after work has remained queued across several samples, every current worker is active, blocked time is above half of measured worker time, and GVL wait is below two percent. That last check matters: adding threads helps when existing threads are asleep in database or network calls, but hurts when CPU-bound Ruby threads are already fighting over the GVL. Temporary threads retire after the queue has remained empty for a second.
+The pool starts at `threads` and scales without a fixed limit by default. Set `max_threads` to cap its growth, or set it to the same value as `threads` to keep the pool fixed. A native CRuby thread-event hook measures how much time workers spend running Ruby, blocked outside the GVL, and waiting to acquire it. While work stays queued and every worker is busy, the pool adds temporary threads when workers spend most of their time blocked and Ruby execution is using less than three quarters of a CPU. When Ruby execution becomes the bottleneck it retires them again. That distinction matters: adding threads helps when existing threads are asleep in database or network calls, but hurts when CPU-bound Ruby threads are already fighting over the GVL. Temporary threads also retire after the queue has stayed empty for five seconds.
 
 The pool still uses an `AtomicConditionVariable` under the hood to park idle threads (idle threads call `Thread.stop` and get woken with `Thread#wakeup`; there is no spinning), because idle spinning would waste CPU. The difference from Puma's pool is not "no locks anywhere" but rather "the hot path (enqueue and dequeue when the queue has items) is lock-free". Once every worker is busy the mechanics look similar; where things diverge is under contention when you have many threads all trying to push and pop.
 
@@ -252,26 +253,27 @@ The knock-on effect is that the server thread can read `pool.queue_size + pool.a
 
 ### I/O model
 
-The server accept loop is an `IO.select` + `accept_nonblock` loop, similar to Puma. What is different is the pair of checks right before `accept`:
+The server accept loop is an `IO.select` + `accept_nonblock` loop, similar to Puma. What is different is the backpressure check right before `accept`:
 
 ```ruby
 backpressure_threshold = [(@thread_pool.size * BACKPRESSURE_THRESHOLD_MULTIPLIER).ceil, MIN_BACKPRESSURE_THRESHOLD].max
-# ...
-next if @reactor.backlog >= backpressure_threshold
-
-if @thread_pool.queue_size > @thread_pool.size
-  Thread.pass
+if @reactor.backlog >= backpressure_threshold || @thread_pool.queue_size > @thread_pool.size
+  CPU.yield
   next
 end
 ```
 
-The first is a hard skip. `@reactor.backlog` is `thread_pool.queue_size + thread_pool.active_count`; when the total load reaches the threshold, this worker stops accepting until it drains. `MIN_BACKPRESSURE_THRESHOLD` is 8, so a three-thread pool trips at 8 concurrent items rather than 4. The floor avoids overreacting to a few active requests while still bounding the amount of work a worker pulls from the kernel.
+The server thread only accepts while two things hold. The worker's total load, `@reactor.backlog` (queued plus active work), must be below its threshold, and the queue alone must not exceed the pool size. Otherwise the thread yields and returns to polling the listeners. On Linux, the yield also gives native threads returning from I/O a chance to run without putting the server thread to sleep. Under saturation this consumes CPU to keep checking capacity rather than parking until an app thread signals a change; that is a deliberate throughput and latency tradeoff.
 
-The second is a softer yield. When the queue alone exceeds the pool size — the app threads are all busy and there's a queue building on top of them — the accept loop yields the GVL via `Thread.pass` and re-checks the queue on the next iteration instead of accepting more work. This lets the app threads make progress before the server thread grabs another connection, and only fires under real pool pressure (queue depth greater than pool size), so IO-bound workloads where threads spend most of their time in `sleep` and rarely queue past the pool size aren't affected.
+The threshold is 1.2 times the current pool size, with a floor of 8, so a three-thread pool trips at 8 concurrent items rather than 4. The floor avoids overreacting to a few active requests while still bounding the amount of work a worker pulls from the kernel. Because it is recalculated from the current size, a pool that has grown to handle blocking work accepts proportionally more.
 
-On Linux, Raptor can replace the shared TCP listener with one `SO_REUSEPORT` listener per worker and attach a small BPF program to the group. A reporter thread publishes each worker's backlog into a kernel map every millisecond. For each new connection, the program hashes to two distinct workers and selects the one with the lower reported load: the power-of-two-choices strategy. It then atomically increments that worker's map slot before routing the connection, reserving capacity immediately rather than waiting for the next reporter tick. The accept path also publishes `reactor.backlog + 1` as soon as Ruby receives the socket. These reservations stop a burst of connections from repeatedly choosing the same stale minimum while retaining hash-based spread across the cluster.
+This limit applies to new connections, not to new requests on existing keep-alive connections. Existing connections can therefore keep a worker busy enough that it stops accepting new ones. Polling does not guarantee those new connections will make progress.
 
-This path only wraps plain `tcp://` bindings. TLS listeners and non-TCP bindings remain shared listeners inherited from the master. If `libbpf-ruby` or the compiled BPF object is unavailable, Raptor silently uses those shared listeners for TCP too; if the prerequisites exist but the kernel refuses the program, startup raises. In either mode, a worker under Raptor's explicit backpressure stops competing for new accepts until its current work drains.
+On Linux, Raptor also sets `TCP_DEFER_ACCEPT` on its TCP listeners, so the kernel only hands over a connection once the client has sent data. Fresh connections therefore usually arrive with their request already readable, which is what the eager fast path below relies on.
+
+On Linux, Raptor can give each worker its own `SO_REUSEPORT` listener on every plain TCP address it binds and attach a small BPF program to each address's group. One program serves them all: its socket map holds a row of worker listeners per address, and it routes each connection to the chosen worker's listener in the group the connection arrived on. A reporter thread publishes each worker's load into a kernel map every millisecond: its queued and active work plus any connections still waiting in its accept queue, which the worker cannot see from Ruby until it accepts them. For each new connection, the program hashes to two distinct workers and selects the one with the lower reported load: the power-of-two-choices strategy. Once the connection is routed, it atomically increments that worker's map slot, reserving capacity immediately rather than waiting for the next reporter tick. The accept path also publishes its load as soon as Ruby receives the socket. These reservations stop a burst of connections from repeatedly choosing the same stale minimum while retaining hash-based spread across the cluster.
+
+This path only wraps plain `tcp://` bindings. Every worker still accepts on the shared listeners inherited from the master, which carry TLS and non-TCP bindings as well as any TCP connection the BPF program cannot route, such as one arriving before every worker has booted. If `libbpf-ruby` or the compiled BPF object is unavailable, Raptor silently uses those shared listeners for TCP too; if the prerequisites exist but the kernel refuses the program, startup raises. In either mode, a worker under Raptor's explicit backpressure stops competing for new accepts until its current work drains.
 
 The BPF-based approach was inspired by [a comment](https://github.com/puma/puma/issues/3934#issuecomment-4356462590) by John Hawthorn ([@jhawthorn](https://github.com/jhawthorn)) on a Puma issue about `EPOLLEXCLUSIVE`, where he floated `SO_ATTACH_REUSEPORT_EBPF` as a way to route each connection to the least-busy worker.
 
@@ -324,7 +326,7 @@ The thread checks for bytes without waiting. If they are already available, it p
 
 Puma has a similar shape. It checks buffered back-to-back requests, then eagerly drains bytes already available on the socket. If a complete request is ready and the pool has a waiting thread, the current thread loops inline; otherwise Puma queues the client or returns it to the reactor.
 
-The `reactor.persist` call re-registers the socket with the reactor using `persistent_data_timeout` (65s) as the new deadline. When the next bytes arrive, the reactor treats the socket like any other partially-read connection.
+The `reactor.persist` call re-registers the socket with the reactor using `persistent_data_timeout` (65s) as the new deadline. When the next bytes arrive, the reactor hands the socket back to the thread pool, and an app thread reads and parses the request inline. Only a request that is still incomplete takes the Ractor pipeline.
 
 A `Raptor::DetachedBody` returns the application thread while keeping the response open, chunked on HTTP/1.1 and ended by closing the connection on HTTP/1.0. The reactor owns the response until it closes, buffers later writes within fixed limits, and pauses the connection's next request without occupying an application thread.
 
@@ -365,7 +367,7 @@ flowchart TB
     end
 
     subgraph Worker["Raptor worker process, one of N"]
-        SRV["Server thread<br/>IO.select + accept_nonblock<br/>backpressure check<br/>reactor.backlog vs pool_size"]
+        SRV["Server thread<br/>IO.select + accept_nonblock<br/>waits for pool capacity"]
 
         RCT["Reactor thread<br/>NIO::Selector<br/>read_nonblock 64KB<br/>Red-Black-Tree timeouts"]
 
@@ -409,6 +411,7 @@ flowchart TB
         KA -->|"yes"| EAG
         EAG -.->|"bytes ready, parse+dispatch on same thread"| ATP
         EAG -->|"no bytes, reactor.persist"| RCT
+        RCT -.->|"keep-alive bytes ready, push proc"| ATP
         RCT -->|"deadline expired"| TO["PING or close"]
 
         STA -.->|"writes slot"| SHM[("mmap shared memory")]
@@ -439,9 +442,9 @@ The critical structural difference from Puma is that Raptor has a separate proto
 
 **Puma.** Parsing happens on an app thread. The C parser callbacks build the env hash. A fresh client first enters the thread pool, where eager reads may complete it immediately; partial and idle keep-alive connections wait in the reactor before returning to the pool. Parsing shares the worker's GVL with the app.
 
-**Raptor.** Fresh and immediate keep-alive requests parse inline on the server or app thread. A connection that needs more bytes takes the longer path: reactor (I/O) → protocol Ractor pool (parse) → collector → app thread pool (Rack + write). Between keep-alive requests, the app thread checks for bytes without waiting before returning an idle connection to the reactor. Parsing in the Ractor pipeline has its own GVL; parsing on an eager path does not.
+**Raptor.** Fresh and immediate keep-alive requests parse inline on the server or app thread. A connection that needs more bytes takes the longer path: reactor (I/O) → protocol Ractor pool (parse) → collector → app thread pool (Rack + write). Between keep-alive requests, the app thread checks for bytes without waiting before returning an idle connection to the reactor, which hands it back to an app thread once the next request arrives. Parsing in the Ractor pipeline has its own GVL; parsing on an eager path does not.
 
-In practice, Puma has one process-wide GVL per worker. Every Ruby thread inside that worker takes turns holding it. Raptor has the same main-Ractor GVL plus one GVL per protocol Ractor, so a pipeline Ractor can parse one connection while an app thread executes Rack for another. That parallelism is real, but so are the costs of making state shareable and crossing the Ractor and collector boundaries. Which side wins depends on how much work the request gives the protocol pipeline; the current CPU benchmark leaves Raptor and Puma close rather than proving a universal parsing advantage.
+In practice, Puma has one process-wide GVL per worker. Every Ruby thread inside that worker takes turns holding it. Raptor has the same main-Ractor GVL plus one GVL per protocol Ractor, so a pipeline Ractor can parse one connection while an app thread executes Rack for another. That parallelism is real, but so are the costs of making state shareable and crossing the Ractor and collector boundaries. The current CPU-bound HTTP/1.1 results favour Puma in three of four configurations; Raptor leads slightly with scaling threads and keep-alive. These are full-server measurements, not an isolated comparison of the parsers.
 
 ### Timeout management
 
@@ -465,7 +468,7 @@ Under moderate load, queue mechanics are unlikely to dominate either server. Und
 
 **Puma.** After a response, if the connection is keep-alive and there are already buffered bytes for the next request (`has_back_to_back_requests?`) and there is a spare app thread, loop inline. Otherwise, if `eagerly_finish` (non-blocking reads while data is already buffered) returns true, either loop inline (if spare threads) or hand back to the thread pool (`@thread_pool << client`). Otherwise, back to the reactor with `@persistent_timeout`.
 
-**Raptor.** After a response, the app thread checks `socket.wait_readable(0)`. If bytes are already available, it parses the next request inline. If other work is waiting, the parsed request goes to the back of the pool queue; otherwise the same thread dispatches it inline. If no bytes are ready, `reactor.persist` and return.
+**Raptor.** After a response, the app thread checks `socket.wait_readable(0)`. If bytes are already available, it parses the next request inline. If other work is waiting, the parsed request goes to the back of the pool queue; otherwise the same thread dispatches it inline. If no bytes are ready, `reactor.persist` and return. When the next request arrives, the reactor queues the connection for an app thread, which reads and parses it inline without a Ractor round trip.
 
 Both servers therefore keep a back-to-back request on an app thread when its bytes are already waiting, and return an idle connection to the reactor without deliberately holding an app thread open. The details of their parsing and pool handoff still differ, but neither widens the inline window by waiting for the client.
 
@@ -475,7 +478,7 @@ Raptor closes an HTTP/1.1 connection after 1,000 requests by default. The finite
 
 **Puma.** Cluster mode uses `accept_loop_delay` (sleep proportional to busy ratio) to prevent thundering herd across workers. Single-worker backpressure is implicit; if all threads are busy and the queue is growing, new accepts pile up in the kernel accept queue. Puma does have `queue_requests` (default true) which pushes partial requests into the reactor, freeing the accept loop, but there is no explicit "stop accepting" signal from the worker.
 
-**Raptor.** Explicit backpressure, read every iteration of the accept loop: hard skip when `backlog >= max(pool_size * 1.2, 8)`, and a softer `Thread.pass` yield when the queue alone exceeds the pool size. On supported Linux TCP bindings, the BPF reuseport program samples two workers, routes to the less loaded one, and reserves its map slot. TLS, Unix sockets, unsupported platforms, and installations without the BPF prerequisites use inherited shared listeners instead.
+**Raptor.** Explicit backpressure before every accept: the server thread yields and polls again while `backlog >= max(pool_size * 1.2, 8)` or the queue alone exceeds the pool size. On supported Linux TCP bindings, the BPF reuseport program samples two workers, routes to the less loaded one, and reserves its map slot, counting connections still waiting in each worker's accept queue. TLS, Unix sockets, unsupported platforms, and installations without the BPF prerequisites use inherited shared listeners instead.
 
 ### Shared state (worker ↔ master)
 
@@ -571,6 +574,7 @@ sequenceDiagram
     RP->>RR: reactor.persist
     Client->>RR: request bytes
     RR->>RP: dispatch back to thread pool
+    RP->>RP: read + parse inline
     RP->>Client: response 3
 ```
 
@@ -580,21 +584,21 @@ In this timing, both servers keep Request 2 inline and return Request 3 to the r
 
 ### IO-bound work, where app concurrency matters
 
-On the IO-bound benchmark profile, each request does 5 to 10 short sleeps interleaved with small CPU work, simulating a request that makes several DB or cache calls throughout its lifetime. The bottleneck is how many requests a worker can keep in flight while they wait on IO. Fixed Raptor and Puma cap application execution at three threads per worker. Falcon spawns a fiber per connection and cooperatively yields on every sleep, so many more client connections can make progress while others wait. That advantage gives Falcon the clear lead over both fixed-thread servers, especially without keep-alive.
+On the IO-bound benchmark profile, each request makes 5 to 10 simulated DB calls and renders a small JSON result after each one, spending about 95% of its time waiting. The bottleneck is how many requests a worker can keep in flight while they wait on IO. Fixed Raptor and Puma cap application execution at three threads per worker. Falcon spawns a fiber per connection and cooperatively yields on every sleep, so many more client connections can make progress while others wait. Raptor's accept-side polling also keeps CPUs active under saturation, which can affect the timing of these short sleeps. The fixed-thread comparison therefore measures more than parsing and dispatch overhead.
 
-Scaling Raptor starts with the same three threads, then adds temporary threads while work is queued and the active threads are mostly blocked outside the GVL. In the current results that raises throughput from 3.11k to 8.63k req/s without keep-alive, and from 3.21k to 9.43k with it. Falcon still leads the first by 29.3%; scaling Raptor leads the second by 51.3%. The benchmark reports fixed and scaling Raptor separately rather than hiding that difference in one result.
+Scaling Raptor starts with the same three threads, then adds temporary threads while work is queued and the active threads are mostly blocked outside the GVL. Puma adds a thread whenever work is waiting. Raptor's stricter rule is intended to avoid adding threads that CPU-bound work cannot use. In the current HTTP/1.1 IO results, fixed Raptor delivers roughly 1.8 to 2.1 times Puma's throughput, while the two servers are approximately tied when both can scale. The benchmark reports the modes separately rather than hiding that distinction in one result.
 
-Between the thread-based servers, Raptor holds a clear lead over Puma on both throughput and p95. Its eager paths, explicit admission control, response batching, and app pool are all designed to reduce coordination, but the benchmark does not isolate enough variables to assign the result to one of them.
+Long-lived responses change the picture. In the IO + SSE scenario, every worker also holds server-sent event streams open for the whole run. Raptor serves them with `Raptor::DetachedBody`, which hands the socket to the reactor and returns the application thread to the pool, so fixed Raptor keeps all three threads for ordinary requests. Puma streams each event from an application thread that sleeps between events, so every open stream takes a thread away from the rest of the traffic until the stream closes. Fixed Raptor delivers 8.3 times Puma's throughput in the current results, with Puma also reporting timeouts. With scaling threads, the gap narrows to a few percent. The README table includes requests the load generator abandoned after 20 seconds.
 
 Real applications that spend most of their time waiting on a database or an upstream service look like this. If your app is IO-heavy and you're free to adopt the `async` ecosystem, Falcon and scaling Raptor are the interesting comparison: fibers are cheaper, while Raptor can run ordinary blocking Rack code without requiring a fiber-aware stack.
 
-### CPU-bound HTTP/1.1, where Puma and Raptor converge
+### CPU-bound HTTP/1.1, where extra threads cannot help
 
-On the CPU-bound benchmark profile, each POST request accepts a small JSON body and builds a JSON response in 3 to 5 chunks totalling 450 to 1500 items, with sub-100µs sleeps between chunks. It's roughly 95% CPU by wall time, so fibers can't multiplex their way to an advantage. The CPU work happens under a single Ruby VM regardless of concurrency model.
+On the CPU-bound benchmark profile, each POST request accepts a small JSON body and renders 2,100 to 7,000 JSON items in 3 to 5 chunks, each after a 25 to 50µs simulated cache hit. It spends about 85% of its time running Ruby, so fibers can't multiplex their way to an advantage. The CPU work happens under a single Ruby VM regardless of concurrency model.
 
-**Without keep-alive**, every request opens a fresh TCP connection, gets parsed, dispatched, served, and closes. Puma leads fixed Raptor by 5.0% on throughput and has the lower p95; Raptor still leads Falcon. Fixed and scaling Raptor both deliver 8.22k req/s. The Puma/Raptor gap is small enough that neither architecture has overwhelmed the CPU cost of the Rack workload.
+**Without keep-alive**, every request opens a fresh TCP connection, gets parsed, dispatched, served, and closes. This includes accept and connection setup costs alongside the Rack workload.
 
-**With keep-alive**, Puma leads fixed Raptor by 0.7% on throughput, while Raptor's p95 is 0.4ms lower; Raptor leads Falcon on both. Fixed and scaling Raptor both deliver 8.49k req/s, with scaling p95 matching Puma. The result is more useful as a guardrail than a victory claim: adaptive scaling provides the IO-bound gains without hurting this CPU-bound profile.
+**With keep-alive**, subsequent requests reuse the connection, putting more emphasis on request handling and application execution. Comparing fixed and scaling modes checks whether adaptive scaling preserves CPU throughput while adding useful concurrency on the IO-bound profile.
 
 ### HTTP/2, when it matters
 
@@ -602,7 +606,7 @@ Puma doesn't implement HTTP/2, and most Rails production terminates HTTP/2 at ng
 
 Where Raptor's HTTP/2 support does matter is the all-Ruby stack: clients can speak h2 directly over TLS, or a trusted proxy can use cleartext HTTP/2 to an `h2c://` listener. In that setup, Puma uses HTTP/1.1 instead, so the app-server connection does not get HTTP/2 multiplexing or HPACK header compression.
 
-Falcon also speaks HTTP/2 natively, so it's the interesting comparison there rather than Puma. On the CPU profile, scaling narrows Raptor's throughput gap from 26.9% to 14.2% and improves its p95 advantage from 12.3% to 21.3%. On IO, scaling raises Raptor from 1.14k to 4.46k req/s, but remains 30.3% behind Falcon. The h2 samples vary substantially more than the h1 samples, so these results establish broad shape rather than a precise ranking.
+Falcon also speaks HTTP/2 natively, so it's the interesting comparison there rather than Puma. Both workload profiles compare the full HTTP/2 path, including TLS, multiplexing, and flow control. The h2 samples vary substantially more than the h1 samples; the README gives the current throughput, p95, and spread rather than treating one run as a precise ranking.
 
 The benchmark's h2 listener uses TLS, while Raptor's BPF reuseport path only wraps plain TCP listeners. BPF dispatch therefore cannot explain the h2 variance. With 40 physical connections spread across 10 workers, each carrying three streams, placement and per-connection scheduling have coarse granularity; more instrumentation is needed before assigning the variance to a specific mechanism.
 
@@ -610,11 +614,13 @@ Raptor's HTTP/2 CPU-bound throughput remains in the same broad range as its HTTP
 
 ## Part V: What Raptor gives up
 
-No design comes free. Two disclosures matter most.
+No design comes free. Three disclosures matter most.
 
 **Battle-tested.** Puma has been running production Rails apps since 2011. Raptor has been running my benchmarks since 2026. Those are not the same thing. Raptor is still young code. If your risk tolerance requires a decade of production hardening baked into the server itself, Puma is the answer today.
 
 **Ruby version.** Raptor requires Ruby 4.0 because it depends on `Ractor::Port` and on Ractor internals having stabilised. Puma works on 3.0 and up. If you need to support older Ruby, Puma wins by default.
+
+**Ractor overhead.** Starting any Ractor puts the VM into multi-Ractor mode, and on Ruby 4.0 that makes ordinary Ruby in the same process measurably slower, even on threads that never touch a Ractor. On Ruby head, which becomes 4.1, that cost is gone in my measurements, and 4.1 also collects each Ractor's heap on its own instead of stopping every Ractor for each GC. Ractors are still experimental, so I expect this side of the trade-off to keep shrinking.
 
 A handful of smaller trade-offs are worth naming briefly. A request on Raptor's reactor pipeline pays for shareability and Ractor/collector handoffs; eager requests avoid them. Raptor's core dependencies (`ractor-pool`, `atomic-ruby`, `red-black-tree`, `mmap-ruby`, `libbpf-ruby`) are libraries I wrote specifically to make it work, which is either "purpose-built" or "narrower testing surface" depending on how you look at it. Debugging is harder because the slow path crosses Ractor and thread boundaries, so tracing it end-to-end means stitching several stack traces together. Raptor has no single-process mode, and on a single-CPU container that adds coordination without the possibility of parallel execution.
 
