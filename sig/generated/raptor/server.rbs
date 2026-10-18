@@ -18,23 +18,27 @@ module Raptor
 
     MIN_BACKPRESSURE_THRESHOLD: ::Integer
 
-    @running: AtomicBoolean
-
-    @bpf_active: bool
-
-    @drain_accept_queue: bool
-
-    @listeners: Array[TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener]
-
-    @first_data_timeout: Integer
-
-    @http2: Http2
-
-    @http1: Http1
+    @reactor: Reactor
 
     @thread_pool: AtomicThreadPool
 
-    @reactor: Reactor
+    @http1: Http1
+
+    @http2: Http2
+
+    @first_data_timeout: Integer
+
+    @listeners: Array[TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener]
+
+    @drain_accept_queue: bool
+
+    @worker_index: Integer?
+
+    @running: AtomicBoolean
+
+    @thread: Thread?
+
+    @load_reporter: Thread?
 
     # Creates a new Server.
     #

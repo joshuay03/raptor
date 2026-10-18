@@ -34,8 +34,10 @@ module Raptor
     # @rbs @first_data_timeout: Integer
     # @rbs @listeners: Array[TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener]
     # @rbs @drain_accept_queue: bool
-    # @rbs @bpf_active: bool
+    # @rbs @worker_index: Integer?
     # @rbs @running: AtomicBoolean
+    # @rbs @thread: Thread?
+    # @rbs @load_reporter: Thread?
 
     # Creates a new Server.
     #
@@ -59,8 +61,10 @@ module Raptor
       @first_data_timeout = connection_options[:first_data_timeout]
       @listeners = listeners
       @drain_accept_queue = drain_accept_queue
-      @bpf_active = !!worker_index
+      @worker_index = worker_index
       @running = AtomicBoolean.new(true)
+      @thread = nil
+      @load_reporter = nil
     end
 
     # Starts the server's main accept loop in a new thread.
@@ -69,9 +73,9 @@ module Raptor
     #
     # @rbs () -> Thread
     def run
-      spawn_load_reporter if @bpf_active
+      @load_reporter = spawn_load_reporter if @worker_index
 
-      Thread.new do
+      @thread = Thread.new do
         Thread.current.name = "Server"
 
         while @running.true?
@@ -89,7 +93,15 @@ module Raptor
             next
           end
 
+          break if @running.false?
+
           ready_servers.each { |listener| accept_connection(listener) }
+        end
+
+        if @worker_index
+          # Stop load updates before parking the slot so the sentinel survives.
+          @load_reporter.join
+          ReuseportBPF.mark_unavailable(@worker_index)
         end
       end
     end
@@ -103,6 +115,7 @@ module Raptor
     # @rbs () -> void
     def stop_accepting
       @running.make_false
+      @thread&.wakeup rescue nil
       drain_accept_queue if @drain_accept_queue
     end
 
@@ -172,7 +185,7 @@ module Raptor
         return true
       end
 
-      ReuseportBPF.update_accepted_load(@reactor.backlog + 1) if @bpf_active
+      ReuseportBPF.update_accepted_load(@reactor.backlog + 1) if @worker_index && @running.true?
 
       if listener.is_a?(Binder::SslListener)
         @thread_pool << proc do

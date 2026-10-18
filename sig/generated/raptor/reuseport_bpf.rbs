@@ -16,6 +16,8 @@ module Raptor
 
     TCP_INFO_UNACKED_OFFSET: ::Integer
 
+    UNAVAILABLE_LOAD: ::Integer
+
     self.@accepted_load_value: String
 
     self.@load_value: String
@@ -90,9 +92,8 @@ module Raptor
     # @rbs (Integer backlog) -> void
     def self.update_accepted_load: (Integer backlog) -> void
 
-    # Marks a worker's slot as unavailable by parking its load at the
-    # sentinel maximum so the BPF program's two-choice sampling prefers the
-    # other candidate.
+    # Parks a worker's load at the maximum so BPF favors other workers.
+    # Stop publishing its load first to avoid overwriting the sentinel.
     #
     # @param worker_index [Integer] slot index for the worker to mark
     # @return [void]

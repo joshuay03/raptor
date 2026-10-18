@@ -2,6 +2,7 @@
 #include <bpf/bpf_helpers.h>
 
 #define MAX_WORKERS 64
+#define UNAVAILABLE_LOAD 0xffffffff
 
 // Per-worker listening sockets, keyed by worker index.
 struct {
@@ -48,7 +49,7 @@ int select_less_loaded(struct sk_reuseport_md *ctx) {
     }
   }
 
-  if (chosen_load) {
+  if (chosen_load && *chosen_load != UNAVAILABLE_LOAD) {
     __sync_fetch_and_add(chosen_load, 1);
   }
 

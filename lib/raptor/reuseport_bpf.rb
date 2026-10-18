@@ -23,6 +23,7 @@ module Raptor
     LIBBPF_LOADED = !!defined?(LibBPFRuby)
     BPF_OBJECT_PATH = File.expand_path("../../ext/raptor_bpf/reuseport_select.bpf.o", __dir__)
     TCP_INFO_UNACKED_OFFSET = 24
+    UNAVAILABLE_LOAD = 0xffffffff
 
     # @rbs self.@object: untyped
     # @rbs self.@program_fd: Integer
@@ -145,18 +146,15 @@ module Raptor
       LibBPFRuby.map_update(@loads_fd, @load_key, @accepted_load_value)
     end
 
-    # Marks a worker's slot as unavailable by parking its load at the
-    # sentinel maximum so the BPF program's two-choice sampling prefers the
-    # other candidate.
+    # Parks a worker's load at the maximum so BPF favors other workers.
+    # Stop publishing its load first to avoid overwriting the sentinel.
     #
     # @param worker_index [Integer] slot index for the worker to mark
     # @return [void]
     #
     # @rbs (Integer worker_index) -> void
     def self.mark_unavailable(worker_index)
-      return unless @loads_fd
-
-      LibBPFRuby.map_update(@loads_fd, [worker_index + 1].pack("L"), [0xffffffff].pack("L"))
+      LibBPFRuby.map_update(@loads_fd, [worker_index + 1].pack("L"), [UNAVAILABLE_LOAD].pack("L"))
     end
 
     # Returns the number of connections waiting in this worker's accept

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Stop BPF dispatch from routing connections to workers that stopped accepting
 - Restart workers forked by the seed when they exit
 - Keep draining HTTP/2 connections when another attaches during shutdown
 - Close HTTP/1.1 connections on the reactor thread when a detached body fails to open

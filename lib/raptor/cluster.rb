@@ -563,7 +563,6 @@ module Raptor
 
       retire_current_seed
       Log.info "Promoting worker #{index} to seed for phased refork"
-      ReuseportBPF.mark_unavailable(index) if @bpf_active
       Process.kill("URG", pid) rescue nil
       @workers.delete(index)
       @seed_pid = pid
@@ -884,12 +883,11 @@ module Raptor
       )
       reactor_thread = reactor.run
 
-      worker_listeners = if @bpf_active
-        bpf_listeners = ReuseportBPF.create_worker_listeners(@binder.bind_uris, index, @binder.socket_backlog)
+      bpf_listeners = if @bpf_active
         ReuseportBPF.enable_load_reporting(index)
-        bpf_listeners + @binder.listeners
+        ReuseportBPF.create_worker_listeners(@binder.bind_uris, index, @binder.socket_backlog)
       else
-        @binder.listeners
+        []
       end
 
       server = Server.new(
@@ -899,7 +897,7 @@ module Raptor
         http2,
         connection_options: @connection_options,
         drain_accept_queue: @drain_accept_queue,
-        listeners: worker_listeners,
+        listeners: bpf_listeners + @binder.listeners,
         worker_index: (index if @bpf_active)
       )
       server_thread = server.run
@@ -945,6 +943,8 @@ module Raptor
       end
 
       server_thread.join
+      # A seed never accepts again, and the workers it forks bind their own.
+      bpf_listeners.each(&:close) if promote_to_seed
       http1.shutdown
       http2.shutdown(reactor)
       reactor.drain_detached_bodies(@worker_drain_timeout)
