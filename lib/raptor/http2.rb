@@ -546,6 +546,10 @@ module Raptor
           end
 
           pending_headers = pending_headers.merge(buffer: pending_headers[:buffer] + frame[:payload])
+          if pending_headers[:buffer].bytesize > Http2Parser::MAX_HEADER_LIST_SIZE
+            goaway_error = ERROR_PROTOCOL_ERROR
+            break
+          end
 
           if frame[:flags].anybits?(FLAG_END_HEADERS)
             stream_id = pending_headers[:stream_id]
@@ -812,7 +816,8 @@ module Raptor
       parser = Http2Parser.new
       settings_payload = parser.build_settings(
         max_concurrent_streams: http2_options[:max_concurrent_streams],
-        initial_window_size: DEFAULT_WINDOW_SIZE
+        initial_window_size: DEFAULT_WINDOW_SIZE,
+        max_header_list_size: Http2Parser::MAX_HEADER_LIST_SIZE
       )
       @initial_settings_frame = parser.build_frame(:settings, 0, 0, settings_payload).freeze
     end

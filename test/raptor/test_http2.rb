@@ -58,6 +58,18 @@ module Raptor
       assert_equal [":method", ":path", ":scheme", ":authority"], result[:completed_requests].first[:headers].map(&:first)
     end
 
+    def test_process_frames_rejects_header_block_beyond_size_limit
+      parser = Http2Parser.new
+      fragment = "\x20".b * Http2::MAX_FRAME_SIZE
+      headers = parser.build_frame(:headers, 0, 1, fragment)
+      continuations = Array.new(7) { parser.build_frame(:continuation, 0, 1, fragment) }.join
+
+      result = process_frames_with(headers + continuations)
+
+      assert result[:close_connection]
+      assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
+    end
+
     def test_process_frames_rejects_continuation_without_pending_headers
       parser = Http2Parser.new
       continuation = parser.build_frame(:continuation, Http2::FLAG_END_HEADERS, 1, "")

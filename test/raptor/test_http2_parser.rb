@@ -35,6 +35,22 @@ module Raptor
       end
     end
 
+    def test_parse_headers_accepts_header_list_within_size_limit
+      parser = Http2Parser.new
+
+      headers, _table = parser.parse_headers(repeated_indexed_field_block(27), [])
+
+      assert_equal Array.new(28) { ["x", "a" * 4000] }, headers
+    end
+
+    def test_parse_headers_rejects_header_list_beyond_size_limit
+      parser = Http2Parser.new
+
+      assert_raises(Http2ParserError) do
+        parser.parse_headers(repeated_indexed_field_block(28), [])
+      end
+    end
+
     def test_encode_response_headers_prepends_status_pseudo_header
       parser = Http2Parser.new
       encoded = parser.encode_response_headers(200, { "content-type" => "text/plain" })
@@ -90,6 +106,14 @@ module Raptor
       encoded = parser.encode_response_trailers({ "Grpc-Status" => "0", ":status" => "500" })
 
       assert_equal [["grpc-status", "0"]], parser.parse_headers(encoded, []).first
+    end
+
+    private
+
+    # Each decoded field costs 4,033 bytes, even when encoded as a one-byte index.
+    def repeated_indexed_field_block(repeats)
+      literal_with_indexing = "\x40\x01x\x7f\xa1\x1e".b + ("a" * 4000)
+      literal_with_indexing + ("\xbe".b * repeats)
     end
   end
 end

@@ -5,6 +5,10 @@
 #define FRAME_HEADER_SIZE 9
 #define DEFAULT_HEADER_TABLE_SIZE 4096
 #define ENTRY_OVERHEAD 32
+// Largest decoded request header list, matching the HTTP/1.1 header section
+// limit. Fields are sized as in RFC 7541 section 4.1, so fields indexed from
+// the dynamic table count at their full decoded size.
+#define MAX_HEADER_LIST_SIZE (112 * 1024)
 #define CONNECTION_PREFACE "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
 #define FRAME_DATA          0x0
@@ -418,6 +422,7 @@ static int hpack_decode_header_block(const uint8_t *buf, size_t len,
                                      VALUE headers_out, VALUE *dyn_table,
                                      long *max_table_size) {
   size_t pos = 0;
+  size_t list_size = 0;
 
   while (pos < len) {
     uint8_t byte = buf[pos];
@@ -432,6 +437,8 @@ static int hpack_decode_header_block(const uint8_t *buf, size_t len,
       if (hpack_table_lookup(*dyn_table, (long)index, &name, &value) < 0) return -1;
 
       rb_ary_push(headers_out, rb_ary_new_from_args(2, name, value));
+      list_size += RSTRING_LEN(name) + RSTRING_LEN(value) + ENTRY_OVERHEAD;
+      if (list_size > MAX_HEADER_LIST_SIZE) return -1;
 
     } else if ((byte & 0xc0) == 0x40) {
       // Literal header field with incremental indexing (RFC 7541 6.2.1).
@@ -448,6 +455,8 @@ static int hpack_decode_header_block(const uint8_t *buf, size_t len,
       if (hpack_decode_string(buf, len, &pos, &value) < 0) return -1;
 
       rb_ary_push(headers_out, rb_ary_new_from_args(2, name, value));
+      list_size += RSTRING_LEN(name) + RSTRING_LEN(value) + ENTRY_OVERHEAD;
+      if (list_size > MAX_HEADER_LIST_SIZE) return -1;
       *dyn_table = hpack_dynamic_table_add(*dyn_table, name, value, *max_table_size);
 
     } else if ((byte & 0xf0) == 0x00 || (byte & 0xf0) == 0x10) {
@@ -465,6 +474,8 @@ static int hpack_decode_header_block(const uint8_t *buf, size_t len,
       if (hpack_decode_string(buf, len, &pos, &value) < 0) return -1;
 
       rb_ary_push(headers_out, rb_ary_new_from_args(2, name, value));
+      list_size += RSTRING_LEN(name) + RSTRING_LEN(value) + ENTRY_OVERHEAD;
+      if (list_size > MAX_HEADER_LIST_SIZE) return -1;
 
     } else if ((byte & 0xe0) == 0x20) {
       // Dynamic table size update (RFC 7541 6.3).
@@ -838,6 +849,7 @@ RUBY_FUNC_EXPORTED void Init_raptor_http2(void) {
   VALUE mRaptor = rb_define_module("Raptor");
   VALUE cHttp2Parser = rb_define_class_under(mRaptor, "Http2Parser", rb_cObject);
   eHttp2ParserError = rb_define_class_under(mRaptor, "Http2ParserError", rb_eStandardError);
+  rb_define_const(cHttp2Parser, "MAX_HEADER_LIST_SIZE", INT2NUM(MAX_HEADER_LIST_SIZE));
 
   id_type = rb_intern("type");
   id_length = rb_intern("length");
