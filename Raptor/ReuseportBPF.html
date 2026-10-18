@@ -94,9 +94,10 @@
 load sampling, atomically reserving the selected slot before routing.</p>
 <p>Auto-enabled on Linux when the <code>libbpf-ruby</code> gem is installed and the
 BPF object file has been compiled. Falls back silently to standard
-<code>SO_REUSEPORT</code> when either is missing. Raises when the kernel refuses
-the BPF program. Wraps <code>tcp://</code> bindings only; non-tcp bindings are
-left to the binder's shared listeners.</p>
+<code>SO_REUSEPORT</code> when either is missing, or when there are more workers
+or listeners than the BPF maps have slots for. Raises when the kernel
+refuses the BPF program. Wraps <code>tcp://</code> bindings only; non-tcp bindings
+are left to the binder's shared listeners.</p>
 
   </div>
 </div>
@@ -220,6 +221,60 @@ left to the binder's shared listeners.</p>
         </dt>
         <dd><pre class="code"><span class='int'>0xffffffff</span></pre></dd>
       
+        <dt id="MAX_WORKERS-constant" class="">MAX_WORKERS =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='int'>64</span></pre></dd>
+      
+        <dt id="MAX_LISTENERS-constant" class="">MAX_LISTENERS =
+          <div class="docstring">
+  <div class="discussion">
+    
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>::Integer</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div>
+        </dt>
+        <dd><pre class="code"><span class='int'>16</span></pre></dd>
+      
     </dl>
   
 
@@ -240,7 +295,7 @@ left to the binder's shared listeners.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#create_worker_listeners-class_method" title="create_worker_listeners (class method)">.<strong>create_worker_listeners</strong>(bind_uris, worker_index, socket_backlog)  &#x21d2; Array&lt;TCPServer&gt; </a>
+      <a href="#create_worker_listeners-class_method" title="create_worker_listeners (class method)">.<strong>create_worker_listeners</strong>(worker_index, socket_backlog)  &#x21d2; Array&lt;TCPServer&gt; </a>
     
 
     
@@ -254,7 +309,7 @@ left to the binder's shared listeners.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns tcp listening sockets bound and registered for <code>worker_index</code>.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Returns listening sockets for <code>worker_index</code> that join the reuseport group of each shared listener, registered in that listener's row of worker slots.</p></div></span>
   
 </li>
 
@@ -306,7 +361,7 @@ left to the binder's shared listeners.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#setup-class_method" title="setup (class method)">.<strong>setup</strong>(worker_count)  &#x21d2; Boolean </a>
+      <a href="#setup-class_method" title="setup (class method)">.<strong>setup</strong>(worker_count, shared_listeners)  &#x21d2; Boolean </a>
     
 
     
@@ -320,7 +375,7 @@ left to the binder's shared listeners.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Prepares BPF-directed routing for <code>worker_count</code> workers.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Prepares BPF-directed routing for <code>worker_count</code> workers across the addresses <code>shared_listeners</code> are bound to.</p></div></span>
   
 </li>
 
@@ -404,7 +459,7 @@ left to the binder's shared listeners.</p>
       <div class="method_details first">
   <h3 class="signature first" id="create_worker_listeners-class_method">
   
-    .<strong>create_worker_listeners</strong>(bind_uris, worker_index, socket_backlog)  &#x21d2; <tt>Array&lt;TCPServer&gt;</tt> 
+    .<strong>create_worker_listeners</strong>(worker_index, socket_backlog)  &#x21d2; <tt>Array&lt;TCPServer&gt;</tt> 
   
 
   
@@ -412,28 +467,17 @@ left to the binder's shared listeners.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Returns tcp listening sockets bound and registered for <code>worker_index</code>.
-Skips non-tcp bind URIs.</p>
+    <p>Returns listening sockets for <code>worker_index</code> that join the reuseport
+group of each shared listener, registered in that listener's row of
+worker slots. Binding the shared listener's address rather than its
+bind URI covers every address <code>localhost</code> expanded to and the port
+the kernel picked for port 0.</p>
 
   </div>
 </div>
 <div class="tags">
   <p class="tag_title">Parameters:</p>
 <ul class="param">
-  
-    <li>
-      
-        <span class='name'>bind_uris</span>
-      
-      
-        <span class='type'>(<tt>Array&lt;String&gt;</tt>)</span>
-      
-      
-      
-        &mdash;
-        <div class='inline'><p>the configured bind URIs</p></div>
-      
-    </li>
   
     <li>
       
@@ -488,15 +532,6 @@ Skips non-tcp bind URIs.</p>
       <pre class="lines">
 
 
-78
-79
-80
-81
-82
-83
-84
-85
-86
 87
 88
 89
@@ -512,20 +547,17 @@ Skips non-tcp bind URIs.</p>
 99
 100
 101
-102</pre>
+102
+103
+104
+105</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 78</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 87</span>
 
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_create_worker_listeners'>create_worker_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='comma'>,</span> <span class='id identifier rubyid_worker_index'>worker_index</span><span class='comma'>,</span> <span class='id identifier rubyid_socket_backlog'>socket_backlog</span><span class='rparen'>)</span>
-  <span class='ivar'>@worker_listeners</span> <span class='op'>=</span> <span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='period'>.</span><span class='id identifier rubyid_filter_map'>filter_map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='op'>|</span>
-    <span class='id identifier rubyid_uri'>uri</span> <span class='op'>=</span> <span class='const'>URI</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uri'>bind_uri</span><span class='rparen'>)</span>
-    <span class='kw'>next</span> <span class='kw'>unless</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_scheme'>scheme</span> <span class='op'>==</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tcp</span><span class='tstring_end'>&quot;</span></span>
-
-    <span class='id identifier rubyid_host'>host</span> <span class='op'>=</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_host'>host</span>
-    <span class='id identifier rubyid_host'>host</span> <span class='op'>=</span> <span class='id identifier rubyid_host'>host</span><span class='lbracket'>[</span><span class='int'>1</span><span class='op'>..</span><span class='op'>-</span><span class='int'>2</span><span class='rbracket'>]</span> <span class='kw'>if</span> <span class='id identifier rubyid_host'>host</span><span class='op'>&amp;.</span><span class='id identifier rubyid_start_with?'>start_with?</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>[</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
-
-    <span class='id identifier rubyid_addrinfo'>addrinfo</span> <span class='op'>=</span> <span class='const'>Addrinfo</span><span class='period'>.</span><span class='id identifier rubyid_tcp'>tcp</span><span class='lparen'>(</span><span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_port'>port</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_create_worker_listeners'>create_worker_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='comma'>,</span> <span class='id identifier rubyid_socket_backlog'>socket_backlog</span><span class='rparen'>)</span>
+  <span class='ivar'>@worker_listeners</span> <span class='op'>=</span> <span class='ivar'>@shared_listeners</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_shared_listener'>shared_listener</span><span class='comma'>,</span> <span class='id identifier rubyid_listener_index'>listener_index</span><span class='op'>|</span>
+    <span class='id identifier rubyid_addrinfo'>addrinfo</span> <span class='op'>=</span> <span class='id identifier rubyid_shared_listener'>shared_listener</span><span class='period'>.</span><span class='id identifier rubyid_local_address'>local_address</span>
     <span class='id identifier rubyid_socket'>socket</span> <span class='op'>=</span> <span class='const'>Socket</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='period'>.</span><span class='id identifier rubyid_afamily'>afamily</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOCK_STREAM</span><span class='comma'>,</span> <span class='int'>0</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOL_SOCKET</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SO_REUSEADDR</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_setsockopt'>setsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>SOL_SOCKET</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>SO_REUSEPORT</span><span class='comma'>,</span> <span class='kw'>true</span><span class='rparen'>)</span>
@@ -534,7 +566,7 @@ Skips non-tcp bind URIs.</p>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_bind'>bind</span><span class='lparen'>(</span><span class='id identifier rubyid_addrinfo'>addrinfo</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_listen'>listen</span><span class='lparen'>(</span><span class='id identifier rubyid_socket_backlog'>socket_backlog</span><span class='rparen'>)</span>
 
-    <span class='const'>LibBPFRuby</span><span class='period'>.</span><span class='id identifier rubyid_sockmap_update'>sockmap_update</span><span class='lparen'>(</span><span class='ivar'>@socks_fd</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='comma'>,</span> <span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
+    <span class='const'>LibBPFRuby</span><span class='period'>.</span><span class='id identifier rubyid_sockmap_update'>sockmap_update</span><span class='lparen'>(</span><span class='ivar'>@socks_fd</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_listener_index'>listener_index</span> <span class='op'>*</span> <span class='const'><span class='object_link'><a href="#MAX_WORKERS-constant" title="Raptor::ReuseportBPF::MAX_WORKERS (constant)">MAX_WORKERS</a></span></span> <span class='op'>+</span> <span class='id identifier rubyid_worker_index'>worker_index</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='comma'>,</span> <span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
     <span class='const'>LibBPFRuby</span><span class='period'>.</span><span class='id identifier rubyid_attach_reuseport'>attach_reuseport</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='ivar'>@program_fd</span><span class='rparen'>)</span>
 
     <span class='id identifier rubyid_tcp_server'>tcp_server</span> <span class='op'>=</span> <span class='const'>TCPServer</span><span class='period'>.</span><span class='id identifier rubyid_for_fd'>for_fd</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='period'>.</span><span class='id identifier rubyid_fileno'>fileno</span><span class='rparen'>)</span>
@@ -590,14 +622,14 @@ Skips non-tcp bind URIs.</p>
       <pre class="lines">
 
 
-111
-112
-113
 114
-115</pre>
+115
+116
+117
+118</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 111</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 114</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_enable_load_reporting'>enable_load_reporting</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='ivar'>@load_key</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -654,12 +686,12 @@ publishing the worker's load first so the sentinel is not overwritten.</p>
       <pre class="lines">
 
 
-158
-159
-160</pre>
+161
+162
+163</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 158</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 161</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_mark_unavailable'>mark_unavailable</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='const'>LibBPFRuby</span><span class='period'>.</span><span class='id identifier rubyid_map_update'>map_update</span><span class='lparen'>(</span><span class='ivar'>@loads_fd</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#UNAVAILABLE_LOAD-constant" title="Raptor::ReuseportBPF::UNAVAILABLE_LOAD (constant)">UNAVAILABLE_LOAD</a></span></span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rparen'>)</span>
@@ -672,7 +704,7 @@ publishing the worker's load first so the sentinel is not overwritten.</p>
       <div class="method_details ">
   <h3 class="signature " id="setup-class_method">
   
-    .<strong>setup</strong>(worker_count)  &#x21d2; <tt>Boolean</tt> 
+    .<strong>setup</strong>(worker_count, shared_listeners)  &#x21d2; <tt>Boolean</tt> 
   
 
   
@@ -680,10 +712,11 @@ publishing the worker's load first so the sentinel is not overwritten.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Prepares BPF-directed routing for <code>worker_count</code> workers.</p>
+    <p>Prepares BPF-directed routing for <code>worker_count</code> workers across the
+addresses <code>shared_listeners</code> are bound to.</p>
 <p>Returns true when BPF-directed dispatch is active. Returns false
-when the platform is unsupported. Raises when the kernel refuses
-the program.</p>
+when the platform is unsupported or the counts exceed the map slots.
+Raises when the kernel refuses the program.</p>
 
   </div>
 </div>
@@ -702,6 +735,20 @@ the program.</p>
       
         &mdash;
         <div class='inline'><p>number of worker processes that will bind sockets</p></div>
+      
+    </li>
+  
+    <li>
+      
+        <span class='name'>shared_listeners</span>
+      
+      
+        <span class='type'>(<tt>Array&lt;TCPServer&gt;</tt>)</span>
+      
+      
+      
+        &mdash;
+        <div class='inline'><p>the binder's tcp listeners</p></div>
       
     </li>
   
@@ -727,23 +774,27 @@ the program.</p>
       <pre class="lines">
 
 
-57
-58
-59
-60
-61
 62
 63
 64
 65
 66
-67</pre>
+67
+68
+69
+70
+71
+72
+73
+74</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 57</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 62</span>
 
-<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_setup'>setup</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_count'>worker_count</span><span class='rparen'>)</span>
-  <span class='kw'>return</span> <span class='kw'>false</span> <span class='kw'>unless</span> <span class='id identifier rubyid_supported?'>supported?</span>
+<span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_setup'>setup</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_count'>worker_count</span><span class='comma'>,</span> <span class='id identifier rubyid_shared_listeners'>shared_listeners</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='kw'>false</span> <span class='kw'>unless</span> <span class='id identifier rubyid_supported?'>supported?</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_worker_count'>worker_count</span> <span class='op'>&lt;=</span> <span class='const'><span class='object_link'><a href="#MAX_WORKERS-constant" title="Raptor::ReuseportBPF::MAX_WORKERS (constant)">MAX_WORKERS</a></span></span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_shared_listeners'>shared_listeners</span><span class='period'>.</span><span class='id identifier rubyid_length'>length</span> <span class='op'>&lt;=</span> <span class='const'><span class='object_link'><a href="#MAX_LISTENERS-constant" title="Raptor::ReuseportBPF::MAX_LISTENERS (constant)">MAX_LISTENERS</a></span></span>
+
+  <span class='ivar'>@shared_listeners</span> <span class='op'>=</span> <span class='id identifier rubyid_shared_listeners'>shared_listeners</span>
 
   <span class='ivar'>@object</span> <span class='op'>=</span> <span class='const'>LibBPFRuby</span><span class='op'>::</span><span class='const'>Object</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#BPF_OBJECT_PATH-constant" title="Raptor::ReuseportBPF::BPF_OBJECT_PATH (constant)">BPF_OBJECT_PATH</a></span></span><span class='rparen'>)</span>
   <span class='ivar'>@program_fd</span> <span class='op'>=</span> <span class='ivar'>@object</span><span class='period'>.</span><span class='id identifier rubyid_program_fd'>program_fd</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>select_less_loaded</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -796,12 +847,12 @@ met on this platform.</p>
       <pre class="lines">
 
 
-43
-44
-45</pre>
+46
+47
+48</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 43</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 46</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_supported?'>supported?</span>
   <span class='const'><span class='object_link'><a href="#LIBBPF_LOADED-constant" title="Raptor::ReuseportBPF::LIBBPF_LOADED (constant)">LIBBPF_LOADED</a></span></span> <span class='op'>&amp;&amp;</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='const'><span class='object_link'><a href="#BPF_OBJECT_PATH-constant" title="Raptor::ReuseportBPF::BPF_OBJECT_PATH (constant)">BPF_OBJECT_PATH</a></span></span><span class='rparen'>)</span>
@@ -855,17 +906,17 @@ different threads.</p>
       <pre class="lines">
 
 
-140
-141
-142
 143
 144
 145
 146
-147</pre>
+147
+148
+149
+150</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 140</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 143</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_accepted_load'>update_accepted_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_load'>load</span> <span class='op'>=</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>+</span> <span class='id identifier rubyid_accept_queue_length'>accept_queue_length</span>
@@ -922,17 +973,17 @@ different threads.</p>
       <pre class="lines">
 
 
-123
-124
-125
 126
 127
 128
 129
-130</pre>
+130
+131
+132
+133</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 123</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 126</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_load'>update_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_load'>load</span> <span class='op'>=</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>+</span> <span class='id identifier rubyid_accept_queue_length'>accept_queue_length</span>
@@ -952,7 +1003,7 @@ different threads.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 13:50:51 2026 by
+  Generated on Sun Oct 18 20:40:52 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
