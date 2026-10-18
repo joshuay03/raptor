@@ -311,6 +311,26 @@ module Raptor
       refute reactor.dispatch_http2_stream(1, 5)
     end
 
+    def test_http2_drain_tolerates_connections_attaching_meanwhile
+      frames = []
+      writer = Object.new
+      writer.define_singleton_method(:write_frames) { |_socket, outgoing| frames.concat(outgoing) }
+      flow_controls = { 1 => Object.new }
+      reactor = Reactor.allocate
+      reactor.instance_variable_set(:@id_to_socket, { 1 => Object.new })
+      reactor.instance_variable_set(:@id_to_writer, { 1 => writer })
+      reactor.instance_variable_set(:@id_to_flow_control, flow_controls)
+      reactor.instance_variable_set(:@id_to_http2_last_stream, {})
+      reactor.instance_variable_set(:@id_to_http2_drain_stream, {})
+
+      reactor.drain_http2 do |stream_id|
+        flow_controls[2] = Object.new
+        "goaway-#{stream_id}"
+      end
+
+      assert_equal ["goaway-0"], frames
+    end
+
     private
 
     def build_reactor(thread_pool = nil)

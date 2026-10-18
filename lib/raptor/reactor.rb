@@ -462,7 +462,8 @@ module Raptor
     #
     # @rbs () { (Integer stream_id) -> String } -> void
     def drain_http2
-      @id_to_flow_control.each_key do |id|
+      # Connections may attach on other threads while this iterates.
+      @id_to_flow_control.keys.each do |id|
         last_stream = @id_to_http2_last_stream[id] || 0
         @id_to_http2_drain_stream[id] = last_stream
         writer = @id_to_writer[id]

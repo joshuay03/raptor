@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Keep draining HTTP/2 connections when another attaches during shutdown
 - Close HTTP/1.1 connections on the reactor thread when a detached body fails to open
 - Apply HTTP/2 initial window changes to responses waiting for flow control
 - Default `SERVER_NAME` for HTTP/2 requests without a host name
