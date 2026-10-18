@@ -84,6 +84,15 @@ module Raptor
     # @rbs (Hash[String, untyped] env) -> bool
     def self.request_smuggling?: (Hash[String, untyped] env) -> bool
 
+    # Returns any pipelined bytes following the request, or nil if none remain.
+    #
+    # @param buffer [String] the raw request bytes
+    # @param offset [Integer] the byte offset where the request ends
+    # @return [String, nil]
+    #
+    # @rbs (String buffer, Integer offset) -> String?
+    def self.pipelined_bytes: (String buffer, Integer offset) -> String?
+
     # Encodes one HTTP/1.1 response chunk.
     #
     # @param chunk [String] response body bytes
@@ -102,7 +111,8 @@ module Raptor
 
     # Advances an HTTP/1.x request parse from the state hash's buffered
     # bytes. A complete well-formed request returns with `:complete` set
-    # plus populated `:env` and `:body`; malformed or oversized input flips
+    # plus populated `:env` and `:body`, and records any bytes after it in
+    # the parse data's `:pipelined`; malformed or oversized input flips
     # `:malformed` or `:too_large`; incomplete input returns the state
     # so the reactor can wait for more.
     #
@@ -209,10 +219,11 @@ module Raptor
     # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @param resumed [Boolean] whether the reactor queued the connection once its next request became readable
+    # @param pipelined [String, nil] bytes the client sent after the previous request
     # @return [void]
     #
-    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool) -> void
-    def eager_keepalive: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool) -> void
+    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool, ?pipelined: String?) -> void
+    def eager_keepalive: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool, ?pipelined: String?) -> void
 
     private
 
@@ -237,19 +248,18 @@ module Raptor
     # @rbs (String buffer) -> [Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser]
     def parse_next_request: (String buffer) -> [ Hash[String, untyped], Hash[Symbol, untyped], Integer, HttpParser ]
 
-    # Validates the framing of a finished parse and resolves its request
-    # body. Returns the body `String` (or `nil` when the request has no
-    # body), or one of `:incomplete`, `:too_large`, `:malformed` when the
-    # caller must fall back or reject.
+    # Validates request framing and extracts the body, preserving pipelined bytes.
     #
     # @param buffer [String] the raw request bytes
     # @param env [Hash] the Rack environment being built
+    # @param parse_data [Hash] metadata from the parsing pass
     # @param parser [HttpParser] the parser holding the finished parse state
     # @param nread [Integer] the byte offset where the body begins in `buffer`
-    # @return [String, nil, Symbol]
+    # @return [String, nil, Symbol] body, nil when absent, or `:incomplete`,
+    #   `:too_large`, or `:malformed`
     #
-    # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread) -> (String | Symbol)?
-    def extract_body: (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread) -> (String | Symbol)?
+    # @rbs (String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, HttpParser parser, Integer nread) -> (String | Symbol)?
+    def extract_body: (String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, HttpParser parser, Integer nread) -> (String | Symbol)?
 
     # Returns true when the request expects a 100 Continue response per
     # RFC 9110 section 10.1.1.

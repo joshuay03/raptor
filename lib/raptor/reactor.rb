@@ -117,7 +117,7 @@ module Raptor
       # Creates I/O state for an HTTP/1.x detached response.
       #
       # @param body [DetachedBody] the response body
-      # @param state [Hash] connection state restored after the response finishes
+      # @param state [Hash] connection state restored after the response finishes, including bytes the client pipelined after the request
       # @return [void]
       #
       # @rbs (DetachedBody body, Hash[Symbol, untyped] state) -> void
@@ -126,7 +126,7 @@ module Raptor
         @body = body
         @state = state
         @budget = DetachedBody::Budget.new(DETACHED_CONNECTION_BUFFER_SIZE)
-        @input = String.new(encoding: Encoding::ASCII_8BIT)
+        @input = String.new(state[:pipelined] || "", encoding: Encoding::ASCII_8BIT)
         @reading = true
         @finishing = false
       end

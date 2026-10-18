@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Keep pipelined HTTP/1.1 requests out of the previous request's body
 - Process chunked requests on kept-alive HTTP/1.1 connections without waiting for more data
 - Validate request framing on kept-alive HTTP/1.1 connections
 - Reject `Content-Length` values that overflow 64 bits

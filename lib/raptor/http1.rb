@@ -102,6 +102,17 @@ module Raptor
       false
     end
 
+    # Returns any pipelined bytes following the request, or nil if none remain.
+    #
+    # @param buffer [String] the raw request bytes
+    # @param offset [Integer] the byte offset where the request ends
+    # @return [String, nil]
+    #
+    # @rbs (String buffer, Integer offset) -> String?
+    def self.pipelined_bytes(buffer, offset)
+      buffer.byteslice(offset..-1) if offset < buffer.bytesize
+    end
+
     # Encodes one HTTP/1.1 response chunk.
     #
     # @param chunk [String] response body bytes
@@ -132,7 +143,8 @@ module Raptor
 
     # Advances an HTTP/1.x request parse from the state hash's buffered
     # bytes. A complete well-formed request returns with `:complete` set
-    # plus populated `:env` and `:body`; malformed or oversized input flips
+    # plus populated `:env` and `:body`, and records any bytes after it in
+    # the parse data's `:pipelined`; malformed or oversized input flips
     # `:malformed` or `:too_large`; incomplete input returns the state
     # so the reactor can wait for more.
     #
@@ -166,11 +178,12 @@ module Raptor
           if max_body_size && parser.content_length > max_body_size
             data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
           elsif parser.chunked?
-            decoded_body, chunked_state = HttpParser.decode_chunked(body_buffer, max_body_size)
+            decoded_body, chunked_state, consumed = HttpParser.decode_chunked(body_buffer, max_body_size)
 
             case chunked_state
             when :complete
               env.delete(HTTP_TRANSFER_ENCODING)
+              parse_data[:pipelined] = pipelined_bytes(body_buffer, consumed)
               data.merge(env: env, body: decoded_body, parse_data: parse_data, complete: true)
             when :too_large
               data.merge(env: env, body: nil, parse_data: parse_data, complete: true, too_large: true)
@@ -182,9 +195,11 @@ module Raptor
           elsif parser.content_length > body_buffer.bytesize
             data.merge(env: env, parse_data: parse_data)
           else
-            data.merge(env: env, body: body_buffer, parse_data: parse_data, complete: true)
+            parse_data[:pipelined] = pipelined_bytes(body_buffer, parser.content_length)
+            data.merge(env: env, body: body_buffer.byteslice(0, parser.content_length), parse_data: parse_data, complete: true)
           end
         else
+          parse_data[:pipelined] = pipelined_bytes(data[:buffer], nread)
           data.merge(env: env, body: nil, parse_data: parse_data, complete: true)
         end
       else
@@ -299,7 +314,7 @@ module Raptor
         return
       end
 
-      body = extract_body(buffer, env, parser, nread)
+      body = extract_body(buffer, env, parse_data, parser, nread)
       case body
       when :incomplete
         fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, 0, remote_addr, url_scheme, persisted: false)
@@ -376,29 +391,34 @@ module Raptor
     # @param remote_addr [String] the client IP address
     # @param url_scheme [String] "http" or "https"
     # @param resumed [Boolean] whether the reactor queued the connection once its next request became readable
+    # @param pipelined [String, nil] bytes the client sent after the previous request
     # @return [void]
     #
-    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool) -> void
-    def eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme, resumed: false)
+    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool, ?pipelined: String?) -> void
+    def eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme, resumed: false, pipelined: nil)
       loop do
         unless @running.true?
           socket.close rescue nil
           return
         end
 
-        unless resumed || socket.wait_readable(0)
-          reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
-          return
-        end
+        if pipelined
+          buffer = pipelined
+        else
+          unless resumed || socket.wait_readable(0)
+            reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
+            return
+          end
 
-        begin
-          buffer = read_into_thread_buffer(socket)
-        rescue IO::WaitReadable
-          reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
-          return
-        rescue EOFError, IOError, SystemCallError
-          socket.close rescue nil
-          return
+          begin
+            buffer = read_into_thread_buffer(socket)
+          rescue IO::WaitReadable
+            reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
+            return
+          rescue EOFError, IOError, SystemCallError
+            socket.close rescue nil
+            return
+          end
         end
 
         env, parse_data, nread, parser = begin
@@ -413,7 +433,7 @@ module Raptor
           return
         end
 
-        body = extract_body(buffer, env, parser, nread)
+        body = extract_body(buffer, env, parse_data, parser, nread)
         case body
         when :incomplete
           fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
@@ -447,6 +467,7 @@ module Raptor
         end
 
         resumed = false
+        pipelined = parse_data[:pipelined]
         keep_alive = process_request(
           socket,
           id,
@@ -501,38 +522,39 @@ module Raptor
       [env, parse_data, nread, parser]
     end
 
-    # Validates the framing of a finished parse and resolves its request
-    # body. Returns the body `String` (or `nil` when the request has no
-    # body), or one of `:incomplete`, `:too_large`, `:malformed` when the
-    # caller must fall back or reject.
+    # Validates request framing and extracts the body, preserving pipelined bytes.
     #
     # @param buffer [String] the raw request bytes
     # @param env [Hash] the Rack environment being built
+    # @param parse_data [Hash] metadata from the parsing pass
     # @param parser [HttpParser] the parser holding the finished parse state
     # @param nread [Integer] the byte offset where the body begins in `buffer`
-    # @return [String, nil, Symbol]
+    # @return [String, nil, Symbol] body, nil when absent, or `:incomplete`,
+    #   `:too_large`, or `:malformed`
     #
-    # @rbs (String buffer, Hash[String, untyped] env, HttpParser parser, Integer nread) -> (String | Symbol)?
-    def extract_body(buffer, env, parser, nread)
+    # @rbs (String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, HttpParser parser, Integer nread) -> (String | Symbol)?
+    def extract_body(buffer, env, parse_data, parser, nread)
       return :malformed if Http1.invalid_host?(env) || Http1.request_smuggling?(env)
-      return unless parser.has_body?
+
+      unless parser.has_body?
+        parse_data[:pipelined] = Http1.pipelined_bytes(buffer, nread)
+        return
+      end
+
       return :too_large if @max_body_size && parser.content_length > @max_body_size
 
-      body = buffer.byteslice(nread..-1) || ""
-
       if parser.chunked?
-        body, chunked_state = HttpParser.decode_chunked(body, @max_body_size)
-        case chunked_state
-        when :complete
-          env.delete(HTTP_TRANSFER_ENCODING)
-          body
-        else
-          chunked_state
-        end
-      elsif parser.content_length > body.bytesize
+        body, chunked_state, consumed = HttpParser.decode_chunked(buffer.byteslice(nread..-1), @max_body_size)
+        return chunked_state unless chunked_state == :complete
+
+        env.delete(HTTP_TRANSFER_ENCODING)
+        parse_data[:pipelined] = Http1.pipelined_bytes(buffer, nread + consumed)
+        body
+      elsif nread + parser.content_length > buffer.bytesize
         :incomplete
       else
-        body
+        parse_data[:pipelined] = Http1.pipelined_bytes(buffer, nread + parser.content_length)
+        buffer.byteslice(nread, parser.content_length)
       end
     end
 
@@ -589,7 +611,7 @@ module Raptor
     # @rbs (TCPSocket socket, Integer id, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, String? body, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
     def process_client(socket, id, env, parse_data, body, reactor, thread_pool, request_count, remote_addr, url_scheme)
       keep_alive = process_request(socket, id, env, parse_data, body, reactor, request_count, remote_addr, url_scheme)
-      eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme) if keep_alive
+      eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme, pipelined: parse_data[:pipelined]) if keep_alive
     end
 
     # Processes a single request, isolating fiber and thread locals as
@@ -666,7 +688,14 @@ module Raptor
               socket,
               id,
               body,
-              { chunked: chunked, keep_alive: keep_alive, request_count: request_count, remote_addr: remote_addr, url_scheme: url_scheme },
+              {
+                chunked: chunked,
+                keep_alive: keep_alive,
+                request_count: request_count,
+                remote_addr: remote_addr,
+                url_scheme: url_scheme,
+                pipelined: parse_data[:pipelined]
+              },
               finished
             )
           else

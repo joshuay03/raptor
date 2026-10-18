@@ -1306,6 +1306,9 @@ static const char *find_crlf(const char *buf, size_t len) {
   return NULL;
 }
 
+// Decodes a chunked body into [decoded, state], appending the number of bytes
+// the body consumed when state is :complete so the caller can find any
+// pipelined request that follows it.
 static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
   VALUE buffer, max_size;
   rb_scan_args(argc, argv, "11", &buffer, &max_size);
@@ -1352,7 +1355,7 @@ static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
         if (trailer_offset >= len) return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
         const char *tcrlf = find_crlf(buf + trailer_offset, len - trailer_offset);
         if (!tcrlf) return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
-        if (tcrlf == buf + trailer_offset) return rb_ary_new_from_args(2, decoded, ID2SYM(id_complete));
+        if (tcrlf == buf + trailer_offset) return rb_ary_new_from_args(3, decoded, ID2SYM(id_complete), SIZET2NUM(trailer_offset + 2));
         trailer_offset = (size_t)(tcrlf - buf) + 2;
       }
     }

@@ -578,6 +578,22 @@ module Raptor
       end
     end
 
+    def test_pipelined_requests_are_framed_separately
+      with_server("rack_input.ru") do |uri|
+        host = "Host: #{uri.host}:#{uri.port}\r\n"
+        response = raw_request(
+          uri,
+          "POST / HTTP/1.1\r\n#{host}Content-Length: 5\r\n\r\nhello" \
+          "POST / HTTP/1.1\r\n#{host}Transfer-Encoding: chunked\r\n\r\n5\r\nworld\r\n0\r\n\r\n" \
+          "GET / HTTP/1.1\r\n#{host}Connection: close\r\n\r\n"
+        )
+
+        bodies = response.split(%r{HTTP/1\.1 200 OK\r\n}).drop(1).map { |part| part.split("\r\n\r\n", 2).last }
+
+        assert_equal ["hello", "world", ""], bodies
+      end
+    end
+
     def test_http10_connection_defaults_to_close
       with_server do |uri|
         response = raw_request(uri, "GET / HTTP/1.0\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")

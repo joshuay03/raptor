@@ -8,6 +8,16 @@ module Raptor
   class TestHttp1 < TestCase
     parallelize_me!
 
+    def test_parse_leaves_pipelined_request_out_of_body
+      request = "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 5\r\n\r\nhello"
+      pipelined = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
+
+      parsed = Http1.parse({ buffer: request + pipelined }, {}, nil)
+
+      assert_equal "hello", parsed[:body]
+      assert_equal pipelined, parsed[:parse_data][:pipelined]
+    end
+
     def test_eager_keepalive_requeues_when_work_is_waiting
       handler = Http1.allocate
       handler.instance_variable_set(:@running, AtomicBoolean.new(true))
