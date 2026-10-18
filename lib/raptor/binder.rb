@@ -251,6 +251,7 @@ module Raptor
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true) if Socket.const_defined?(:SO_REUSEPORT)
       socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+      socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_DEFER_ACCEPT, 1) if Socket.const_defined?(:TCP_DEFER_ACCEPT)
       socket.bind(addrinfo)
       socket.listen(@socket_backlog)
 

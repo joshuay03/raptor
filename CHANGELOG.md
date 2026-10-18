@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Defer accepting TCP connections until the client sends data
 - Accept connections the BPF program cannot route to a worker
 - Count connections waiting in accept queues towards BPF worker load
 - Scale accept backpressure with the thread pool and yield at capacity

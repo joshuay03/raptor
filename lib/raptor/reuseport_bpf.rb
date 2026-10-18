@@ -87,6 +87,7 @@ module Raptor
         socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
         socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEPORT, true)
         socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+        socket.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_DEFER_ACCEPT, 1)
         socket.bind(addrinfo)
         socket.listen(socket_backlog)
 
