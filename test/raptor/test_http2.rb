@@ -69,6 +69,19 @@ module Raptor
       assert_equal Http2::ERROR_PROTOCOL_ERROR, goaway_error_code(result)
     end
 
+    def test_process_frames_ignores_data_for_reset_stream
+      parser = Http2Parser.new
+      encoded = parser.encode_headers([[":method", "POST"], [":scheme", "https"], [":authority", "x"]])
+      invalid_headers = parser.build_frame(:headers, Http2::FLAG_END_HEADERS, 1, encoded)
+      data = parser.build_frame(:data, 0, 1, "x" * 16_000)
+
+      result = process_frames_with(invalid_headers + data + data + data + headers_frame(stream_id: 3))
+
+      refute result[:close_connection]
+      assert_equal [3], result[:completed_requests].map { |request| request[:stream_id] }
+      assert_equal [[0, 48_000]], window_updates_sent(result)
+    end
+
     def test_process_frames_assembles_continuation_frames
       parser = Http2Parser.new
       encoded = parser.encode_headers([[":method", "GET"], [":path", "/"], [":scheme", "https"], [":authority", "x"]])

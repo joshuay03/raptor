@@ -571,11 +571,12 @@ module Raptor
           stream_id = frame[:stream_id]
           chunk = unpadded_payload(frame)
 
-          if !streams.key?(stream_id) || !chunk
+          if stream_id.zero? || stream_id > last_client_stream_id || !chunk
             goaway_error = ERROR_PROTOCOL_ERROR
             break
           end
 
+          # DATA for closed streams still counts toward connection flow control.
           connection_window -= frame[:length]
           if connection_window < DEFAULT_WINDOW_SIZE / 2
             outgoing_frames << parser.build_frame(:window_update, 0, 0, [DEFAULT_WINDOW_SIZE - connection_window].pack("N"))
@@ -583,6 +584,8 @@ module Raptor
           end
 
           stream = streams[stream_id]
+          next unless stream
+
           stream_window_used = (stream[:window_used] || 0) + frame[:length]
           if stream_window_used >= DEFAULT_WINDOW_SIZE / 2 && frame[:flags].nobits?(FLAG_END_STREAM)
             outgoing_frames << parser.build_frame(:window_update, 0, stream_id, [stream_window_used].pack("N"))

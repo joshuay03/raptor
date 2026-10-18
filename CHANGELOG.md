@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Ignore HTTP/2 DATA frames for streams that already closed
 - Credit each HTTP/2 stream window for the data that stream receives
 - Strip padding from HTTP/2 DATA and HEADERS frames
 - Encode and decode long HTTP/2 header strings without overflowing the stack
