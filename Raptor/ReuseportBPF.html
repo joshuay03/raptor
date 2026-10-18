@@ -381,7 +381,7 @@ left to the binder's shared listeners.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Publishes this worker's load, its reactor backlog plus the connections still waiting in its accept queues, to the BPF map.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Publishes this worker's load to the BPF map.</p></div></span>
   
 </li>
 
@@ -434,12 +434,12 @@ queues, which the reactor backlog cannot see.</p>
       <pre class="lines">
 
 
+145
 146
-147
-148</pre>
+147</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 146</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 145</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_accept_queue_length'>accept_queue_length</span>
   <span class='ivar'>@worker_listeners</span><span class='period'>.</span><span class='id identifier rubyid_sum'>sum</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_listener'>listener</span><span class='op'>|</span> <span class='id identifier rubyid_listener'>listener</span><span class='period'>.</span><span class='id identifier rubyid_getsockopt'>getsockopt</span><span class='lparen'>(</span><span class='const'>Socket</span><span class='op'>::</span><span class='const'>IPPROTO_TCP</span><span class='comma'>,</span> <span class='const'>Socket</span><span class='op'>::</span><span class='const'>TCP_INFO</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_data'>data</span><span class='period'>.</span><span class='id identifier rubyid_unpack1'>unpack1</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>offset:</span> <span class='const'><span class='object_link'><a href="#TCP_INFO_UNACKED_OFFSET-constant" title="Raptor::ReuseportBPF::TCP_INFO_UNACKED_OFFSET (constant)">TCP_INFO_UNACKED_OFFSET</a></span></span><span class='rparen'>)</span> <span class='rbrace'>}</span>
@@ -700,14 +700,14 @@ sentinel maximum so the BPF program's least-loaded pick skips it.</p>
       <pre class="lines">
 
 
+156
 157
 158
 159
-160
-161</pre>
+160</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 157</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 156</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_mark_unavailable'>mark_unavailable</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@loads_fd</span>
@@ -905,17 +905,17 @@ different threads.</p>
       <pre class="lines">
 
 
+130
 131
 132
 133
 134
 135
 136
-137
-138</pre>
+137</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 131</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 130</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_accepted_load'>update_accepted_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_load'>load</span> <span class='op'>=</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>+</span> <span class='id identifier rubyid_accept_queue_length'>accept_queue_length</span>
@@ -941,8 +941,7 @@ different threads.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Publishes this worker's load, its reactor backlog plus the connections
-still waiting in its accept queues, to the BPF map.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Publishes this worker's load to the BPF map.</p>
 
   </div>
 </div>
@@ -973,17 +972,17 @@ still waiting in its accept queues, to the BPF map.</p>
       <pre class="lines">
 
 
+113
 114
 115
 116
 117
 118
 119
-120
-121</pre>
+120</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 114</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 113</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_load'>update_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_load'>load</span> <span class='op'>=</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>+</span> <span class='id identifier rubyid_accept_queue_length'>accept_queue_length</span>
@@ -1003,7 +1002,7 @@ still waiting in its accept queues, to the BPF map.</p>
 </div>
 
       <div id="footer">
-  Generated on Sun Oct 18 03:16:18 2026 by
+  Generated on Sun Oct 18 03:26:18 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
