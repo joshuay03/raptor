@@ -371,6 +371,96 @@ module Raptor
       end
     end
 
+    # Processes kept-alive requests on application threads, yielding to queued
+    # work and returning idle or incomplete connections to the reactor.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique connection identifier
+    # @param reactor [Reactor] the reactor for fallback registration
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @param request_count [Integer] number of requests handled on this connection
+    # @param remote_addr [String] the client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @param resumed [Boolean] whether the reactor queued the connection once its next request became readable
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool) -> void
+    def eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme, resumed: false)
+      loop do
+        unless @running.true?
+          socket.close rescue nil
+          return
+        end
+
+        unless resumed || socket.wait_readable(0)
+          reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
+          return
+        end
+
+        begin
+          buffer = read_into_thread_buffer(socket)
+        rescue IO::WaitReadable
+          reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
+          return
+        rescue EOFError, IOError, SystemCallError
+          socket.close rescue nil
+          return
+        end
+
+        env, parse_data, nread, parser = begin
+          parse_next_request(buffer)
+        rescue HttpParserError
+          reject_malformed(socket)
+          return
+        end
+
+        unless parser.finished?
+          fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
+          return
+        end
+
+        body = extract_body(buffer, env, parser, nread, decode_chunked: false)
+        if body == :incomplete
+          fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
+          return
+        end
+
+        request_count += 1
+
+        if !resumed && thread_pool.queue_size.positive?
+          thread_pool << proc do
+            process_client(
+              socket,
+              id,
+              env,
+              parse_data,
+              body,
+              reactor,
+              thread_pool,
+              request_count,
+              remote_addr,
+              url_scheme
+            )
+          end
+          return
+        end
+
+        resumed = false
+        keep_alive = process_request(
+          socket,
+          id,
+          env,
+          parse_data,
+          body,
+          reactor,
+          request_count,
+          remote_addr,
+          url_scheme
+        )
+        return unless keep_alive
+      end
+    end
+
     private
 
     # Reads pending bytes off `socket` into the thread-local read buffer,
@@ -630,94 +720,6 @@ module Raptor
         @on_error.call(rack_env, error) rescue nil
       else
         raise error
-      end
-    end
-
-    # Processes kept-alive requests on application threads, yielding to queued
-    # work and returning idle or incomplete connections to the reactor.
-    #
-    # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique connection identifier
-    # @param reactor [Reactor] the reactor for fallback registration
-    # @param thread_pool [AtomicThreadPool] thread pool for application processing
-    # @param request_count [Integer] number of requests handled on this connection
-    # @param remote_addr [String] the client IP address
-    # @param url_scheme [String] "http" or "https"
-    # @return [void]
-    #
-    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
-    def eager_keepalive(socket, id, reactor, thread_pool, request_count, remote_addr, url_scheme)
-      loop do
-        unless @running.true?
-          socket.close rescue nil
-          return
-        end
-
-        unless socket.wait_readable(0)
-          reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
-          return
-        end
-
-        begin
-          buffer = read_into_thread_buffer(socket)
-        rescue IO::WaitReadable
-          reactor.persist(socket, id, request_count, remote_addr: remote_addr, url_scheme: url_scheme)
-          return
-        rescue EOFError, IOError, SystemCallError
-          socket.close rescue nil
-          return
-        end
-
-        env, parse_data, nread, parser = begin
-          parse_next_request(buffer)
-        rescue HttpParserError
-          reject_malformed(socket)
-          return
-        end
-
-        if !parser.finished?
-          fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
-          return
-        end
-
-        body = extract_body(buffer, env, parser, nread, decode_chunked: false)
-        if body == :incomplete
-          fallback_to_reactor(socket, id, buffer, env, parse_data, reactor, request_count, remote_addr, url_scheme)
-          return
-        end
-
-        request_count += 1
-
-        if thread_pool.queue_size.positive?
-          thread_pool << proc do
-            process_client(
-              socket,
-              id,
-              env,
-              parse_data,
-              body,
-              reactor,
-              thread_pool,
-              request_count,
-              remote_addr,
-              url_scheme
-            )
-          end
-          return
-        end
-
-        keep_alive = process_request(
-          socket,
-          id,
-          env,
-          parse_data,
-          body,
-          reactor,
-          request_count,
-          remote_addr,
-          url_scheme
-        )
-        return unless keep_alive
       end
     end
 

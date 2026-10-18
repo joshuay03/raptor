@@ -874,6 +874,7 @@ module Raptor
       end
 
       reactor = Reactor.new(
+        http1,
         http1_ractor_pool,
         http2_ractor_pool,
         thread_pool,

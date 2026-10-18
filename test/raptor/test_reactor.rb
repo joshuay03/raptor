@@ -293,6 +293,7 @@ module Raptor
       Reactor.new(
         nil,
         nil,
+        nil,
         thread_pool,
         connection_options: { first_data_timeout: 30, chunk_data_timeout: 10, write_timeout: 5 },
         http1_options: { persistent_data_timeout: 65 },

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Resume idle HTTP/1.1 keep-alive connections on application threads
 - Defer accepting TCP connections until the client sends data
 - Accept connections the BPF program cannot route to a worker
 - Count connections waiting in accept queues towards BPF worker load

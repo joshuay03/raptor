@@ -8,6 +8,7 @@ require "atomic-ruby/atom"
 require "atomic-ruby/atomic_boolean"
 require "atomic-ruby/atomic_condition_variable"
 require "atomic-ruby/atomic_queue"
+require "atomic-ruby/atomic_thread_pool"
 require "nio"
 require "red-black-tree"
 
@@ -171,6 +172,7 @@ module Raptor
       end
     end
 
+    # @rbs @http1: Http1
     # @rbs @http1_ractor_pool: RactorPool
     # @rbs @http2_ractor_pool: RactorPool?
     # @rbs @thread_pool: AtomicThreadPool
@@ -201,6 +203,7 @@ module Raptor
 
     # Creates a new Reactor.
     #
+    # @param http1 [Http1] the HTTP/1.1 handler that resumes idle keep-alive connections
     # @param http1_ractor_pool [RactorPool] ractor pool for HTTP/1.x parsing
     # @param http2_ractor_pool [RactorPool, nil] ractor pool for HTTP/2 parsing, or nil when no listener supports HTTP/2
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
@@ -215,8 +218,9 @@ module Raptor
     # @option http2_options [Integer] :keepalive_timeout time to await a PING acknowledgement
     # @return [void]
     #
-    # @rbs (RactorPool http1_ractor_pool, RactorPool? http2_ractor_pool, AtomicThreadPool thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
-    def initialize(http1_ractor_pool, http2_ractor_pool, thread_pool, connection_options:, http1_options:, http2_options:)
+    # @rbs (Http1 http1, RactorPool http1_ractor_pool, RactorPool? http2_ractor_pool, AtomicThreadPool thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
+    def initialize(http1, http1_ractor_pool, http2_ractor_pool, thread_pool, connection_options:, http1_options:, http2_options:)
+      @http1 = http1
       @http1_ractor_pool = http1_ractor_pool
       @http2_ractor_pool = http2_ractor_pool
       @thread_pool = thread_pool
@@ -1366,7 +1370,8 @@ module Raptor
       remove_connection(id)
     end
 
-    # Handles socket wakeup by deregistering and queuing for processing.
+    # Deregisters a readable socket and resumes its idle keep-alive
+    # connection or queues its bytes for parsing.
     #
     # @param socket [TCPSocket] the socket that became ready
     # @return [void]
@@ -1377,7 +1382,38 @@ module Raptor
       state = @socket_to_state[socket]
       client = @id_to_timeout.delete(state[:id])
       @timeouts.delete!(client) if client
-      read_and_queue_for_parse(socket, state)
+
+      if state[:persisted] && !state.key?(:buffer)
+        resume_keepalive(socket, state)
+      else
+        read_and_queue_for_parse(socket, state)
+      end
+    end
+
+    # Resumes a readable keep-alive connection on an application thread,
+    # avoiding a Ractor round trip for complete requests.
+    #
+    # @param socket [TCPSocket] the readable client socket
+    # @param state [Hash] current connection state
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Hash[Symbol, untyped] state) -> void
+    def resume_keepalive(socket, state)
+      remove(state[:id])
+      @thread_pool << proc do
+        @http1.eager_keepalive(
+          socket,
+          state[:id],
+          self,
+          @thread_pool,
+          state[:request_count],
+          state[:remote_addr],
+          state[:url_scheme],
+          resumed: true
+        )
+      end
+    rescue AtomicThreadPool::EnqueuedWorkAfterShutdownError
+      socket.close rescue nil
     end
 
     # Reads data from a socket and either queues it for parsing or

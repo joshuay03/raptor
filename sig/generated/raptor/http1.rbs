@@ -198,6 +198,22 @@ module Raptor
     # @rbs (Hash[Symbol, untyped] parsed_request, Reactor reactor, AtomicThreadPool thread_pool) -> void
     def handle_parsed_request: (Hash[Symbol, untyped] parsed_request, Reactor reactor, AtomicThreadPool thread_pool) -> void
 
+    # Processes kept-alive requests on application threads, yielding to queued
+    # work and returning idle or incomplete connections to the reactor.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @param id [Integer] unique connection identifier
+    # @param reactor [Reactor] the reactor for fallback registration
+    # @param thread_pool [AtomicThreadPool] thread pool for application processing
+    # @param request_count [Integer] number of requests handled on this connection
+    # @param remote_addr [String] the client IP address
+    # @param url_scheme [String] "http" or "https"
+    # @param resumed [Boolean] whether the reactor queued the connection once its next request became readable
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool) -> void
+    def eager_keepalive: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme, ?resumed: bool) -> void
+
     private
 
     # Reads pending bytes off `socket` into the thread-local read buffer,
@@ -324,21 +340,6 @@ module Raptor
     #
     # @rbs (TCPSocket socket, Hash[String, untyped]? rack_env, untyped status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
     def handle_app_error: (TCPSocket socket, Hash[String, untyped]? rack_env, untyped status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
-
-    # Processes kept-alive requests on application threads, yielding to queued
-    # work and returning idle or incomplete connections to the reactor.
-    #
-    # @param socket [TCPSocket] the client socket
-    # @param id [Integer] unique connection identifier
-    # @param reactor [Reactor] the reactor for fallback registration
-    # @param thread_pool [AtomicThreadPool] thread pool for application processing
-    # @param request_count [Integer] number of requests handled on this connection
-    # @param remote_addr [String] the client IP address
-    # @param url_scheme [String] "http" or "https"
-    # @return [void]
-    #
-    # @rbs (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
-    def eager_keepalive: (TCPSocket socket, Integer id, Reactor reactor, AtomicThreadPool thread_pool, Integer request_count, String remote_addr, String url_scheme) -> void
 
     # Re-registers a socket with the reactor for further processing when
     # an incomplete request is received on the fast path.

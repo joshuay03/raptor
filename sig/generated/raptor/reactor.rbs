@@ -131,8 +131,6 @@ module Raptor
       def empty?: () -> bool
     end
 
-    @timeouts: RedBlackTree[TimeoutClient]
-
     @io_applied: AtomicConditionVariable
 
     @io_queue: AtomicQueue
@@ -158,6 +156,10 @@ module Raptor
     @http2_ractor_pool: RactorPool?
 
     @http1_ractor_pool: RactorPool
+
+    @http1: Http1
+
+    @timeouts: RedBlackTree[TimeoutClient]
 
     @id_to_socket: Hash[Integer, TCPSocket]
 
@@ -187,6 +189,7 @@ module Raptor
 
     # Creates a new Reactor.
     #
+    # @param http1 [Http1] the HTTP/1.1 handler that resumes idle keep-alive connections
     # @param http1_ractor_pool [RactorPool] ractor pool for HTTP/1.x parsing
     # @param http2_ractor_pool [RactorPool, nil] ractor pool for HTTP/2 parsing, or nil when no listener supports HTTP/2
     # @param thread_pool [AtomicThreadPool] thread pool for application processing
@@ -201,8 +204,8 @@ module Raptor
     # @option http2_options [Integer] :keepalive_timeout time to await a PING acknowledgement
     # @return [void]
     #
-    # @rbs (RactorPool http1_ractor_pool, RactorPool? http2_ractor_pool, AtomicThreadPool thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
-    def initialize: (RactorPool http1_ractor_pool, RactorPool? http2_ractor_pool, AtomicThreadPool thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
+    # @rbs (Http1 http1, RactorPool http1_ractor_pool, RactorPool? http2_ractor_pool, AtomicThreadPool thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
+    def initialize: (Http1 http1, RactorPool http1_ractor_pool, RactorPool? http2_ractor_pool, AtomicThreadPool thread_pool, connection_options: Hash[Symbol, untyped], http1_options: Hash[Symbol, untyped], http2_options: Hash[Symbol, untyped]) -> void
 
     # Starts the reactor's main event loop in a new thread. Runs until
     # shutdown work and pending writes are drained.
@@ -673,13 +676,24 @@ module Raptor
     # @rbs (NIO::Monitor monitor, Integer id) -> void
     def handle_http1_detached_monitor: (NIO::Monitor monitor, Integer id) -> void
 
-    # Handles socket wakeup by deregistering and queuing for processing.
+    # Deregisters a readable socket and resumes its idle keep-alive
+    # connection or queues its bytes for parsing.
     #
     # @param socket [TCPSocket] the socket that became ready
     # @return [void]
     #
     # @rbs (TCPSocket socket) -> void
     def wakeup!: (TCPSocket socket) -> void
+
+    # Resumes a readable keep-alive connection on an application thread,
+    # avoiding a Ractor round trip for complete requests.
+    #
+    # @param socket [TCPSocket] the readable client socket
+    # @param state [Hash] current connection state
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket, Hash[Symbol, untyped] state) -> void
+    def resume_keepalive: (TCPSocket socket, Hash[Symbol, untyped] state) -> void
 
     # Reads data from a socket and either queues it for parsing or
     # returns it to the selector.

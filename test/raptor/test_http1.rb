@@ -29,10 +29,37 @@ module Raptor
       socket = Object.new
       socket.define_singleton_method(:wait_readable) { |_| true }
 
-      handler.send(:eager_keepalive, socket, 1, nil, thread_pool, 1, "127.0.0.1", "http")
+      handler.eager_keepalive(socket, 1, nil, thread_pool, 1, "127.0.0.1", "http")
 
       assert_equal 1, queued.length
       refute processed
+    end
+
+    def test_eager_keepalive_processes_resumed_connections_inline
+      handler = Http1.allocate
+      handler.instance_variable_set(:@running, AtomicBoolean.new(true))
+
+      parser = Object.new
+      parser.define_singleton_method(:finished?) { true }
+      handler.define_singleton_method(:read_into_thread_buffer) { |_| "" }
+      handler.define_singleton_method(:parse_next_request) { |_| [{}, {}, 0, parser] }
+      handler.define_singleton_method(:extract_body) { |*| nil }
+
+      processed = 0
+      handler.define_singleton_method(:process_request) do |*|
+        processed += 1
+        false
+      end
+
+      queued = []
+      thread_pool = Object.new
+      thread_pool.define_singleton_method(:queue_size) { 1 }
+      thread_pool.define_singleton_method(:<<) { |work| queued << work }
+
+      handler.eager_keepalive(Object.new, 1, nil, thread_pool, 1, "127.0.0.1", "http", resumed: true)
+
+      assert_equal 1, processed
+      assert_empty queued
     end
 
     def test_eager_keepalive_persists_idle_connections
@@ -50,7 +77,7 @@ module Raptor
       reactor = Object.new
       reactor.define_singleton_method(:persist) { |*args, **options| persisted = [args, options] }
 
-      handler.send(:eager_keepalive, socket, 1, reactor, nil, 2, "127.0.0.1", "http")
+      handler.eager_keepalive(socket, 1, reactor, nil, 2, "127.0.0.1", "http")
 
       assert_equal 0, timeout
       assert_equal [[socket, 1, 2], { remote_addr: "127.0.0.1", url_scheme: "http" }], persisted
