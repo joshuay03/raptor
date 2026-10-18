@@ -31,7 +31,7 @@ typedef struct {
   size_t query_start;
   size_t nread;
   size_t body_start;
-  off_t content_len;
+  int64_t content_len;
   unsigned int flags;
   VALUE request;
   // Scratch space for the env key: "HTTP_" prefix + field name + NUL.
@@ -145,6 +145,18 @@ static int contains_chunked(const char *value, long len) {
     if (i == chunked_len) return 1;
   }
   return 0;
+}
+
+// Ruby checks for non-digit characters when it validates request framing.
+static int64_t parse_content_length(const char *value, long len) {
+  int64_t content_len = 0;
+  for (long i = 0; i < len && value[i] >= '0' && value[i] <= '9'; i++) {
+    int digit = value[i] - '0';
+    if (content_len > (INT64_MAX - digit) / 10)
+      rb_raise(eHttpParserError, "content length too large");
+    content_len = content_len * 10 + digit;
+  }
+  return content_len;
 }
 
 static const int raptor_parser_start = 1;
@@ -411,7 +423,7 @@ tr26:
     rb_str_set_len(value, value_real_len);
 
     if (!needs_http_prefix && parser->field_len == 14) {
-      parser->content_len = strtoul(RSTRING_PTR(value), NULL, 10);
+      parser->content_len = parse_content_length(value_ptr, value_real_len);
       if (parser->content_len > 0)
         parser->flags |= FLAG_HAS_BODY;
     } else if (needs_http_prefix && parser->field_len == 17 &&
@@ -471,7 +483,7 @@ tr29:
     rb_str_set_len(value, value_real_len);
 
     if (!needs_http_prefix && parser->field_len == 14) {
-      parser->content_len = strtoul(RSTRING_PTR(value), NULL, 10);
+      parser->content_len = parse_content_length(value_ptr, value_real_len);
       if (parser->content_len > 0)
         parser->flags |= FLAG_HAS_BODY;
     } else if (needs_http_prefix && parser->field_len == 17 &&
@@ -1275,7 +1287,7 @@ static VALUE parser_chunked_p(VALUE self) {
 static VALUE parser_content_length(VALUE self) {
   raptor_parser *parser;
   TypedData_Get_Struct(self, raptor_parser, &parser_type, parser);
-  return SIZET2NUM((size_t)parser->content_len);
+  return LL2NUM(parser->content_len);
 }
 
 static VALUE parser_reset(VALUE self) {
