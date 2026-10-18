@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Default `SERVER_NAME` for HTTP/2 requests without a host name
 - Join repeated HTTP/2 request headers instead of keeping only the last
 - Ignore HTTP/2 DATA frames for streams that already closed
 - Credit each HTTP/2 stream window for the data that stream receives

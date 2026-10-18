@@ -1369,7 +1369,7 @@ module Raptor
         else
           host, port = http_host.split(":", 2)
         end
-        env[Rack::SERVER_NAME] ||= host
+        env[Rack::SERVER_NAME] ||= host || Server::DEFAULT_SERVER_NAME
         env[Rack::SERVER_PORT] ||= port || @server_port_string
       else
         env[Rack::SERVER_NAME] ||= Server::DEFAULT_SERVER_NAME

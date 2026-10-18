@@ -400,6 +400,12 @@ module Raptor
       assert_equal "text/html, application/json", env["HTTP_ACCEPT"]
     end
 
+    def test_build_rack_env_defaults_server_name_for_empty_authority
+      env = build_rack_env(authority: "")
+
+      assert_equal Server::DEFAULT_SERVER_NAME, env[Rack::SERVER_NAME]
+    end
+
     def test_write_response_omits_body_for_head_request
       frames = write_response(request_method: "HEAD", status: 200, body: ["body"])
 
