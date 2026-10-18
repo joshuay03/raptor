@@ -60,6 +60,30 @@ module Raptor
       socket&.close
     end
 
+    def test_http1_detached_body_open_failure_closes_connection_on_reactor_thread
+      callbacks = Queue.new
+      reactor, reactor_thread, reader, socket = build_running_http1_reactor(callbacks)
+      closed_by = Queue.new
+      socket.define_singleton_method(:close) do
+        closed_by << Thread.current
+        super()
+      end
+      body = DetachedBody.new
+      body.on_open { raise ArgumentError }
+
+      assert_raises(ArgumentError) do
+        Timeout.timeout(1) { reactor.attach_http1_body(socket, 1, body, http1_state, proc {}) }
+      end
+
+      assert_same reactor_thread, Timeout.timeout(1) { closed_by.pop }
+      assert_predicate body, :closed?
+    ensure
+      reactor&.shutdown
+      Timeout.timeout(1) { reactor_thread&.join }
+      reader&.close
+      socket&.close
+    end
+
     def test_http1_detached_body_shutdown
       callbacks = Queue.new
       reactor, reactor_thread, reader, socket = build_running_http1_reactor(callbacks)

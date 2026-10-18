@@ -429,7 +429,8 @@ module Raptor
       body.open
       true
     rescue
-      remove_connection(id)
+      @io_queue << [:cancel_http1, id]
+      @selector.wakeup rescue nil
       raise
     end
 
@@ -716,6 +717,8 @@ module Raptor
           end
         when :ready_http1
           flush_http1_detached_body(id)
+        when :cancel_http1
+          remove_http1_detached_body(id, :cancelled)
         when :ready_http2
           mark_http2_detached_body_ready(id, value)
           connections[id] = true
