@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Credit each HTTP/2 stream window for the data that stream receives
 - Strip padding from HTTP/2 DATA and HEADERS frames
 - Encode and decode long HTTP/2 header strings without overflowing the stack
 - Limit HTTP/2 request header lists to 112 KiB

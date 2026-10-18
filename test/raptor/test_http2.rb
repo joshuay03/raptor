@@ -12,6 +12,7 @@ module Raptor
     HEADERS_FRAME_TYPE = 0x1
     RST_STREAM_FRAME_TYPE = 0x3
     GOAWAY_FRAME_TYPE = 0x7
+    WINDOW_UPDATE_FRAME_TYPE = 0x8
 
     def test_process_frames_accepts_monotonic_odd_stream_ids
       result = process_frames_with(headers_frame(stream_id: 1) + headers_frame(stream_id: 3))
@@ -226,6 +227,16 @@ module Raptor
 
       assert_empty result[:completed_requests]
       assert_equal Http2::ERROR_PROTOCOL_ERROR, rst_stream_error_code(result, stream_id: 1)
+    end
+
+    def test_process_frames_credits_each_stream_for_its_own_data
+      parser = Http2Parser.new
+      chunk = "x" * 16_000
+      frames = [1, 1, 3, 1].map { |stream_id| parser.build_frame(:data, 0, stream_id, chunk) }.join
+
+      result = process_frames_with(headers_frame(stream_id: 1, end_stream: false) + headers_frame(stream_id: 3, end_stream: false) + frames)
+
+      assert_equal [[0, 48_000], [1, 48_000]], window_updates_sent(result)
     end
 
     def test_process_frames_extracts_window_updates
@@ -630,6 +641,14 @@ module Raptor
       return unless rst
 
       rst.byteslice(9, 4).unpack1("N")
+    end
+
+    def window_updates_sent(result)
+      result[:outgoing_frames].filter_map do |frame|
+        next unless frame.getbyte(3) == WINDOW_UPDATE_FRAME_TYPE
+
+        [frame.byteslice(5, 4).unpack1("N"), frame.byteslice(9, 4).unpack1("N")]
+      end
     end
 
     def drain_windows(flow_control, stream_id:)

@@ -576,20 +576,19 @@ module Raptor
             break
           end
 
-          stream = streams[stream_id]
-          existing_body = stream[:body] || ""
-          stream = stream.merge(body: existing_body + chunk)
-
-          if frame[:payload].bytesize.positive?
-            connection_window -= frame[:payload].bytesize
-            if connection_window < DEFAULT_WINDOW_SIZE / 2
-              increment = DEFAULT_WINDOW_SIZE - connection_window
-              window_update_payload = [increment].pack("N")
-              outgoing_frames << parser.build_frame(:window_update, 0, 0, window_update_payload)
-              outgoing_frames << parser.build_frame(:window_update, 0, stream_id, window_update_payload)
-              connection_window += increment
-            end
+          connection_window -= frame[:length]
+          if connection_window < DEFAULT_WINDOW_SIZE / 2
+            outgoing_frames << parser.build_frame(:window_update, 0, 0, [DEFAULT_WINDOW_SIZE - connection_window].pack("N"))
+            connection_window = DEFAULT_WINDOW_SIZE
           end
+
+          stream = streams[stream_id]
+          stream_window_used = (stream[:window_used] || 0) + frame[:length]
+          if stream_window_used >= DEFAULT_WINDOW_SIZE / 2 && frame[:flags].nobits?(FLAG_END_STREAM)
+            outgoing_frames << parser.build_frame(:window_update, 0, stream_id, [stream_window_used].pack("N"))
+            stream_window_used = 0
+          end
+          stream = stream.merge(body: (stream[:body] || "") + chunk, window_used: stream_window_used)
 
           if frame[:flags].anybits?(FLAG_END_STREAM)
             stream_headers = stream[:headers] || []
