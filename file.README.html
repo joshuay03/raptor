@@ -265,7 +265,7 @@ are disabled, and both threaded servers allow 999 requests per HTTP/1.1 keep-ali
 <p>Each cell reports the median throughput and median p95 latency independently across 3 runs, so the two numbers in a row
 may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
 state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
-((max - min) / 2 / median) between runs of a single cell was ±30.1% for throughput and ±29.1% for p95.</p>
+((max - min) / 2 / median) between runs of a single cell was ±25.8% for throughput and ±40.8% for p95.</p>
 <table>
 <thead>
 <tr>
@@ -289,211 +289,211 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <td>HTTP/1.1</td>
 <td>IO</td>
 <td>Fixed</td>
-<td>3.20k req/s</td>
-<td>49.70 ms</td>
-<td>3.38k req/s</td>
-<td>47.40 ms</td>
-<td>5.3% lower</td>
-<td>4.9% higher</td>
-<td>11.11k req/s</td>
-<td>17.30 ms</td>
-<td>71.2% lower</td>
-<td>187.3% higher</td>
+<td>3.14k req/s</td>
+<td>50.50 ms</td>
+<td>1.49k req/s</td>
+<td>128.50 ms</td>
+<td>111.2% higher</td>
+<td>60.7% lower</td>
+<td>10.79k req/s</td>
+<td>16.30 ms</td>
+<td>70.9% lower</td>
+<td>209.8% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>IO</td>
 <td>Scaling</td>
-<td>9.37k req/s</td>
-<td>20.10 ms</td>
-<td>10.16k req/s</td>
-<td>18.00 ms</td>
-<td>7.8% lower</td>
-<td>11.7% higher</td>
-<td>11.11k req/s</td>
-<td>17.30 ms</td>
-<td>15.6% lower</td>
-<td>16.2% higher</td>
+<td>8.17k req/s</td>
+<td>22.10 ms</td>
+<td>8.27k req/s</td>
+<td>21.90 ms</td>
+<td>1.2% lower</td>
+<td>0.9% higher</td>
+<td>10.79k req/s</td>
+<td>16.30 ms</td>
+<td>24.2% lower</td>
+<td>35.6% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>CPU</td>
 <td>Fixed</td>
-<td>3.51k req/s</td>
-<td>64.10 ms</td>
-<td>3.49k req/s</td>
-<td>55.80 ms</td>
-<td>0.5% higher</td>
-<td>14.9% higher</td>
-<td>3.40k req/s</td>
-<td>49.50 ms</td>
-<td>3.2% higher</td>
-<td>29.5% higher</td>
+<td>2.80k req/s</td>
+<td>78.80 ms</td>
+<td>3.25k req/s</td>
+<td>61.80 ms</td>
+<td>13.8% lower</td>
+<td>27.5% higher</td>
+<td>3.53k req/s</td>
+<td>46.30 ms</td>
+<td>20.6% lower</td>
+<td>70.2% higher</td>
 </tr>
 <tr>
 <td>HTTP/1.1</td>
 <td>CPU</td>
 <td>Scaling</td>
-<td>3.43k req/s</td>
-<td>60.50 ms</td>
-<td>3.56k req/s</td>
-<td>52.50 ms</td>
+<td>2.46k req/s</td>
+<td>81.30 ms</td>
+<td>3.40k req/s</td>
+<td>49.00 ms</td>
+<td>27.8% lower</td>
+<td>65.9% higher</td>
+<td>3.53k req/s</td>
+<td>46.30 ms</td>
+<td>30.3% lower</td>
+<td>75.6% higher</td>
+</tr>
+<tr>
+<td>HTTP/1.1 (keep-alive)</td>
+<td>IO</td>
+<td>Fixed</td>
+<td>2.69k req/s</td>
+<td>50.50 ms</td>
+<td>1.48k req/s</td>
+<td>102.80 ms</td>
+<td>81.8% higher</td>
+<td>50.9% lower</td>
+<td>7.32k req/s</td>
+<td>24.60 ms</td>
+<td>63.3% lower</td>
+<td>105.3% higher</td>
+</tr>
+<tr>
+<td>HTTP/1.1 (keep-alive)</td>
+<td>IO</td>
+<td>Scaling</td>
+<td>7.29k req/s</td>
+<td>24.90 ms</td>
+<td>7.57k req/s</td>
+<td>23.90 ms</td>
 <td>3.7% lower</td>
-<td>15.2% higher</td>
-<td>3.40k req/s</td>
-<td>49.50 ms</td>
-<td>0.7% higher</td>
-<td>22.2% higher</td>
-</tr>
-<tr>
-<td>HTTP/1.1 (keep-alive)</td>
-<td>IO</td>
-<td>Fixed</td>
-<td>3.07k req/s</td>
-<td>49.90 ms</td>
-<td>3.41k req/s</td>
-<td>46.80 ms</td>
-<td>9.9% lower</td>
-<td>6.6% higher</td>
-<td>11.73k req/s</td>
-<td>16.90 ms</td>
-<td>73.8% lower</td>
-<td>195.3% higher</td>
-</tr>
-<tr>
-<td>HTTP/1.1 (keep-alive)</td>
-<td>IO</td>
-<td>Scaling</td>
-<td>10.08k req/s</td>
-<td>18.80 ms</td>
-<td>10.09k req/s</td>
-<td>18.90 ms</td>
-<td>0.1% lower</td>
-<td>0.5% lower</td>
-<td>11.73k req/s</td>
-<td>16.90 ms</td>
-<td>14.1% lower</td>
-<td>11.2% higher</td>
-</tr>
-<tr>
-<td>HTTP/1.1 (keep-alive)</td>
-<td>CPU</td>
-<td>Fixed</td>
-<td>3.48k req/s</td>
-<td>54.70 ms</td>
-<td>3.58k req/s</td>
-<td>53.60 ms</td>
-<td>2.9% lower</td>
-<td>2.1% higher</td>
-<td>3.62k req/s</td>
-<td>66.40 ms</td>
-<td>4.0% lower</td>
-<td>17.6% lower</td>
-</tr>
-<tr>
-<td>HTTP/1.1 (keep-alive)</td>
-<td>CPU</td>
-<td>Scaling</td>
-<td>3.37k req/s</td>
-<td>62.80 ms</td>
-<td>3.38k req/s</td>
-<td>65.60 ms</td>
-<td>0.5% lower</td>
-<td>4.3% lower</td>
-<td>3.62k req/s</td>
-<td>66.40 ms</td>
-<td>7.0% lower</td>
-<td>5.4% lower</td>
-</tr>
-<tr>
-<td>HTTP/1.1 (keep-alive)</td>
-<td>IO + SSE</td>
-<td>Fixed</td>
-<td>3.37k req/s</td>
-<td>37.20 ms</td>
-<td>1.04k req/s (22 timeouts, 2 stalled streams)</td>
-<td>132.10 ms</td>
-<td>223.2% higher</td>
-<td>71.8% lower</td>
-<td>11.43k req/s</td>
-<td>17.80 ms</td>
-<td>70.5% lower</td>
-<td>109.0% higher</td>
-</tr>
-<tr>
-<td>HTTP/1.1 (keep-alive)</td>
-<td>IO + SSE</td>
-<td>Scaling</td>
-<td>10.03k req/s</td>
-<td>18.80 ms</td>
-<td>9.63k req/s</td>
-<td>20.90 ms</td>
 <td>4.2% higher</td>
-<td>10.0% lower</td>
-<td>11.43k req/s</td>
-<td>17.80 ms</td>
-<td>12.3% lower</td>
-<td>5.6% higher</td>
+<td>7.32k req/s</td>
+<td>24.60 ms</td>
+<td>0.4% lower</td>
+<td>1.2% higher</td>
+</tr>
+<tr>
+<td>HTTP/1.1 (keep-alive)</td>
+<td>CPU</td>
+<td>Fixed</td>
+<td>2.49k req/s</td>
+<td>63.60 ms</td>
+<td>3.55k req/s</td>
+<td>55.40 ms</td>
+<td>29.9% lower</td>
+<td>14.8% higher</td>
+<td>3.54k req/s</td>
+<td>66.00 ms</td>
+<td>29.7% lower</td>
+<td>3.6% lower</td>
+</tr>
+<tr>
+<td>HTTP/1.1 (keep-alive)</td>
+<td>CPU</td>
+<td>Scaling</td>
+<td>3.31k req/s</td>
+<td>56.90 ms</td>
+<td>3.11k req/s</td>
+<td>61.60 ms</td>
+<td>6.4% higher</td>
+<td>7.6% lower</td>
+<td>3.54k req/s</td>
+<td>66.00 ms</td>
+<td>6.5% lower</td>
+<td>13.8% lower</td>
+</tr>
+<tr>
+<td>HTTP/1.1 (keep-alive)</td>
+<td>IO + SSE</td>
+<td>Fixed</td>
+<td>2.91k req/s</td>
+<td>53.90 ms</td>
+<td>0.35k req/s (11 timeouts)</td>
+<td>371.20 ms</td>
+<td>730.0% higher</td>
+<td>85.5% lower</td>
+<td>7.25k req/s</td>
+<td>25.20 ms</td>
+<td>59.9% lower</td>
+<td>113.9% higher</td>
+</tr>
+<tr>
+<td>HTTP/1.1 (keep-alive)</td>
+<td>IO + SSE</td>
+<td>Scaling</td>
+<td>7.53k req/s</td>
+<td>24.10 ms</td>
+<td>7.20k req/s</td>
+<td>25.20 ms</td>
+<td>4.5% higher</td>
+<td>4.4% lower</td>
+<td>7.25k req/s</td>
+<td>25.20 ms</td>
+<td>3.8% higher</td>
+<td>4.4% lower</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>IO</td>
 <td>Fixed</td>
-<td>2.75k req/s</td>
-<td>73.84 ms</td>
+<td>1.23k req/s</td>
+<td>136.80 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>6.18k req/s</td>
-<td>35.96 ms</td>
-<td>55.6% lower</td>
-<td>105.4% higher</td>
+<td>7.39k req/s</td>
+<td>27.76 ms</td>
+<td>83.3% lower</td>
+<td>392.8% higher</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>IO</td>
 <td>Scaling</td>
-<td>7.56k req/s</td>
-<td>27.38 ms</td>
+<td>7.98k req/s</td>
+<td>24.94 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>6.18k req/s</td>
-<td>35.96 ms</td>
-<td>22.3% higher</td>
-<td>23.9% lower</td>
+<td>7.39k req/s</td>
+<td>27.76 ms</td>
+<td>7.9% higher</td>
+<td>10.1% lower</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>CPU</td>
 <td>Fixed</td>
-<td>3.23k req/s</td>
-<td>69.26 ms</td>
+<td>3.04k req/s</td>
+<td>61.67 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>1.64k req/s</td>
-<td>137.96 ms</td>
-<td>96.7% higher</td>
-<td>49.8% lower</td>
+<td>2.19k req/s</td>
+<td>181.59 ms</td>
+<td>39.0% higher</td>
+<td>66.0% lower</td>
 </tr>
 <tr>
 <td>HTTP/2</td>
 <td>CPU</td>
 <td>Scaling</td>
-<td>2.22k req/s</td>
-<td>91.39 ms</td>
+<td>3.04k req/s</td>
+<td>64.45 ms</td>
 <td>N/A</td>
 <td>N/A</td>
 <td>-</td>
 <td>-</td>
-<td>1.64k req/s</td>
-<td>137.96 ms</td>
-<td>35.2% higher</td>
-<td>33.8% lower</td>
+<td>2.19k req/s</td>
+<td>181.59 ms</td>
+<td>39.0% higher</td>
+<td>64.5% lower</td>
 </tr>
 </tbody>
 </table>
@@ -501,8 +501,7 @@ state accumulated in a previous run cannot bias the next. Across the whole table
 <p>ruby 4.1.0dev (2026-10-17T18:56:13Z master 5b1c373522) +YJIT +PRISM [aarch64-linux]
 10 worker processes; fixed Raptor and Puma run 3 threads per worker; scaling Raptor and Puma run 3 to 16;
 Falcon runs unbounded fibers per worker; 120 concurrent HTTP/1.1 client connections; 40 concurrent HTTP/2 client
-connections × 3 streams each; 20 open SSE streams in IO + SSE runs; idle-priority spinners keep every CPU awake
-so short sleeps stay accurate</p>
+connections × 3 streams each; 20 open SSE streams in IO + SSE runs</p>
 </blockquote>
 <p>See <a href="bin/benchmark">bin/benchmark</a> for more details.</p>
 <h2 id="Development">Development</h2>
@@ -523,7 +522,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Mon Oct 19 09:50:51 2026 by
+  Generated on Mon Oct 19 10:30:43 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
