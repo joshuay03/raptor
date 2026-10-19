@@ -309,7 +309,7 @@ are left to the binder's shared listeners.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Returns listening sockets for <code>worker_index</code> that join the reuseport group of each shared listener, registered in that listener's row of worker slots.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Creates this worker's BPF-routed listeners at the shared listeners' bound addresses, including resolved <code>localhost</code> addresses and ports assigned by the kernel for port 0.</p></div></span>
   
 </li>
 
@@ -353,7 +353,7 @@ are left to the binder's shared listeners.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Marks a worker's slot as unavailable by parking its load at the sentinel maximum, which the BPF program's two-choice sampling never prefers over another worker and never increments.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Parks a worker's load at the maximum so BPF favors other workers.</p></div></span>
   
 </li>
 
@@ -467,11 +467,9 @@ are left to the binder's shared listeners.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p>Returns listening sockets for <code>worker_index</code> that join the reuseport
-group of each shared listener, registered in that listener's row of
-worker slots. Binding the shared listener's address rather than its
-bind URI covers every address <code>localhost</code> expanded to and the port
-the kernel picked for port 0.</p>
+    <p>Creates this worker's BPF-routed listeners at the shared listeners'
+bound addresses, including resolved <code>localhost</code> addresses and ports
+assigned by the kernel for port 0.</p>
 
   </div>
 </div>
@@ -532,6 +530,8 @@ the kernel picked for port 0.</p>
       <pre class="lines">
 
 
+85
+86
 87
 88
 89
@@ -548,12 +548,10 @@ the kernel picked for port 0.</p>
 100
 101
 102
-103
-104
-105</pre>
+103</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 87</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 85</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_create_worker_listeners'>create_worker_listeners</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='comma'>,</span> <span class='id identifier rubyid_socket_backlog'>socket_backlog</span><span class='rparen'>)</span>
   <span class='ivar'>@worker_listeners</span> <span class='op'>=</span> <span class='ivar'>@shared_listeners</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span><span class='period'>.</span><span class='id identifier rubyid_map'>map</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_shared_listener'>shared_listener</span><span class='comma'>,</span> <span class='id identifier rubyid_listener_index'>listener_index</span><span class='op'>|</span>
@@ -622,14 +620,14 @@ the kernel picked for port 0.</p>
       <pre class="lines">
 
 
+112
+113
 114
 115
-116
-117
-118</pre>
+116</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 114</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 112</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_enable_load_reporting'>enable_load_reporting</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='ivar'>@load_key</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span>
@@ -652,10 +650,8 @@ the kernel picked for port 0.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Marks a worker's slot as unavailable by parking its load at the
-sentinel maximum, which the BPF program's two-choice sampling never
-prefers over another worker and never increments. Callers must stop
-publishing the worker's load first so the sentinel is not overwritten.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Parks a worker's load at the maximum so BPF favors other workers.
+Stop publishing its load first to avoid overwriting the sentinel.</p>
 
   </div>
 </div>
@@ -686,12 +682,12 @@ publishing the worker's load first so the sentinel is not overwritten.</p>
       <pre class="lines">
 
 
-161
-162
-163</pre>
+157
+158
+159</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 161</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 157</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_mark_unavailable'>mark_unavailable</span><span class='lparen'>(</span><span class='id identifier rubyid_worker_index'>worker_index</span><span class='rparen'>)</span>
   <span class='const'>LibBPFRuby</span><span class='period'>.</span><span class='id identifier rubyid_map_update'>map_update</span><span class='lparen'>(</span><span class='ivar'>@loads_fd</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='id identifier rubyid_worker_index'>worker_index</span> <span class='op'>+</span> <span class='int'>1</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='comma'>,</span> <span class='lbracket'>[</span><span class='const'><span class='object_link'><a href="#UNAVAILABLE_LOAD-constant" title="Raptor::ReuseportBPF::UNAVAILABLE_LOAD (constant)">UNAVAILABLE_LOAD</a></span></span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>L</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rparen'>)</span>
@@ -906,17 +902,17 @@ different threads.</p>
       <pre class="lines">
 
 
+141
+142
 143
 144
 145
 146
 147
-148
-149
-150</pre>
+148</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 143</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 141</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_accepted_load'>update_accepted_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_load'>load</span> <span class='op'>=</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>+</span> <span class='id identifier rubyid_accept_queue_length'>accept_queue_length</span>
@@ -973,17 +969,17 @@ different threads.</p>
       <pre class="lines">
 
 
+124
+125
 126
 127
 128
 129
 130
-131
-132
-133</pre>
+131</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 126</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reuseport_bpf.rb', line 124</span>
 
 <span class='kw'>def</span> <span class='kw'>self</span><span class='period'>.</span><span class='id identifier rubyid_update_load'>update_load</span><span class='lparen'>(</span><span class='id identifier rubyid_backlog'>backlog</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_load'>load</span> <span class='op'>=</span> <span class='id identifier rubyid_backlog'>backlog</span> <span class='op'>+</span> <span class='id identifier rubyid_accept_queue_length'>accept_queue_length</span>
@@ -1003,7 +999,7 @@ different threads.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Oct 19 08:59:46 2026 by
+  Generated on Mon Oct 19 09:50:51 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>

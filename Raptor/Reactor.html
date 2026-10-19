@@ -1273,7 +1273,7 @@ to the caller-provided handlers.</p>
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Hands an idle keep-alive connection whose next request has arrived to an application thread, which reads and parses it without a Ractor round trip.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Resumes a readable keep-alive connection on an application thread, avoiding a Ractor round trip for complete requests.</p></div></span>
   
 </li>
 
@@ -3105,6 +3105,7 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+1461
 1462
 1463
 1464
@@ -3130,11 +3131,10 @@ or awaiting processing.</p>
 1484
 1485
 1486
-1487
-1488</pre>
+1487</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1462</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1461</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_cleanup'>cleanup</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_state'>state</span> <span class='op'>=</span> <span class='ivar'>@socket_to_state</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='rparen'>)</span>
@@ -3414,12 +3414,12 @@ or awaiting processing.</p>
       <pre class="lines">
 
 
+1495
 1496
-1497
-1498</pre>
+1497</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1496</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1495</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_complete?'>complete?</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:complete</span><span class='rbracket'>]</span>
@@ -4350,12 +4350,12 @@ connection may dispatch while existing application work drains.</p>
       <pre class="lines">
 
 
+1505
 1506
-1507
-1508</pre>
+1507</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1506</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1505</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_first_data_received?'>first_data_received?</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_complete?'>complete?</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='period'>.</span><span class='id identifier rubyid_dig'>dig</span><span class='lparen'>(</span><span class='symbol'>:parse_data</span><span class='comma'>,</span> <span class='symbol'>:parse_count</span><span class='rparen'>)</span> <span class='op'>||</span> <span class='int'>0</span><span class='rparen'>)</span> <span class='op'>&gt;=</span> <span class='int'>1</span>
@@ -5542,6 +5542,7 @@ returns it to the selector.</p>
       <pre class="lines">
 
 
+1431
 1432
 1433
 1434
@@ -5563,11 +5564,10 @@ returns it to the selector.</p>
 1450
 1451
 1452
-1453
-1454</pre>
+1453</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1432</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1431</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_read_and_queue_for_parse'>read_and_queue_for_parse</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_data'>data</span> <span class='op'>=</span> <span class='kw'>begin</span>
@@ -6163,9 +6163,8 @@ open so the worker can write the response.</p>
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Hands an idle keep-alive connection whose next request has arrived to
-an application thread, which reads and parses it without a Ractor
-round trip.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Resumes a readable keep-alive connection on an application thread,
+avoiding a Ractor round trip for complete requests.</p>
 
   </div>
 </div>
@@ -6210,6 +6209,7 @@ round trip.</p>
       <pre class="lines">
 
 
+1405
 1406
 1407
 1408
@@ -6225,11 +6225,10 @@ round trip.</p>
 1418
 1419
 1420
-1421
-1422</pre>
+1421</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1406</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/reactor.rb', line 1405</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_resume_keepalive'>resume_keepalive</span><span class='lparen'>(</span><span class='id identifier rubyid_socket'>socket</span><span class='comma'>,</span> <span class='id identifier rubyid_state'>state</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_remove'>remove</span><span class='lparen'>(</span><span class='id identifier rubyid_state'>state</span><span class='lbracket'>[</span><span class='symbol'>:id</span><span class='rbracket'>]</span><span class='rparen'>)</span>
@@ -7314,7 +7313,7 @@ connection.</p>
 </div>
 
       <div id="footer">
-  Generated on Mon Oct 19 08:59:48 2026 by
+  Generated on Mon Oct 19 09:50:52 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
