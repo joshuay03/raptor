@@ -145,6 +145,28 @@
 </li>
 
       
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#yield-class_method" title="yield (class method)">.<strong>yield</strong>  &#x21d2; Object </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Ruby's ready queue.</p></div></span>
+  
+</li>
+
+      
     </ul>
     
   
@@ -170,7 +192,6 @@
       <pre class="lines">
 
 
-75
 76
 77
 78
@@ -179,10 +200,11 @@
 81
 82
 83
-84</pre>
+84
+85</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 75</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 76</span>
 
 static VALUE cpu_count(VALUE self) {
 #ifdef __linux__
@@ -223,7 +245,6 @@ static VALUE cpu_count(VALUE self) {
       <pre class="lines">
 
 
-46
 47
 48
 49
@@ -250,10 +271,11 @@ static VALUE cpu_count(VALUE self) {
 70
 71
 72
-73</pre>
+73
+74</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 46</span>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 47</span>
 
 static VALUE cpu_pin(VALUE self, VALUE cpu) {
 #ifdef __linux__
@@ -288,12 +310,59 @@ static VALUE cpu_pin(VALUE self, VALUE cpu) {
 </table>
 </div>
     
+      <div class="method_details ">
+  <h3 class="signature " id="yield-class_method">
+  
+    .<strong>yield</strong>  &#x21d2; <tt>Object</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>Ruby's ready queue.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+96
+97
+98
+99
+100
+101
+102</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'ext/raptor_native/raptor_native.c', line 96</span>
+
+<span class='id identifier rubyid_static'>static</span> <span class='const'>VALUE</span> <span class='id identifier rubyid_cpu_yield'>cpu_yield</span><span class='lparen'>(</span><span class='const'>VALUE</span> <span class='kw'>self</span><span class='rparen'>)</span> <span class='lbrace'>{</span>
+  <span class='id identifier rubyid_rb_thread_schedule'>rb_thread_schedule</span><span class='lparen'>(</span><span class='rparen'>)</span><span class='semicolon'>;</span>
+<span class='comment'>#ifdef __linux__
+</span>  <span class='id identifier rubyid_rb_thread_call_without_gvl'>rb_thread_call_without_gvl</span><span class='lparen'>(</span><span class='id identifier rubyid_cpu_yield_without_gvl'>cpu_yield_without_gvl</span><span class='comma'>,</span> <span class='const'>NULL</span><span class='comma'>,</span> <span class='const'>NULL</span><span class='comma'>,</span> <span class='const'>NULL</span><span class='rparen'>)</span><span class='semicolon'>;</span>
+<span class='comment'>#endif
+</span>  <span class='kw'>return</span> <span class='const'>Qnil</span><span class='semicolon'>;</span>
+<span class='rbrace'>}</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
   </div>
 
 </div>
 
       <div id="footer">
-  Generated on Mon Oct 19 20:33:11 2026 by
+  Generated on Mon Oct 19 22:13:04 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.7).
 </div>
