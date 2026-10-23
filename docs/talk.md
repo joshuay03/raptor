@@ -2,9 +2,11 @@
 
 ## A Ruby 4 Web Server
 
-<img src="https://github.com/joshuay03.png" width="200" alt="Joshua Young" />
+<img src="./assets/profile_picture.png" width="200" alt="Joshua Young" />
 
-_Joshua Young ([`@joshuay03`](https://github.com/joshuay03)) · Senior Software Engineer at [Buildkite](https://buildkite.com/)_
+_Joshua Young ([`@joshuay03`](https://github.com/joshuay03))_
+
+_Senior Software Engineer at [Buildkite](https://buildkite.com/)_
 
 _On the [Rails](https://github.com/rails/rails), [Puma](https://github.com/puma/puma), and [Concurrent Ruby](https://github.com/ruby-concurrency/concurrent-ruby) maintainer teams_
 
