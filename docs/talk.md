@@ -2,15 +2,25 @@
 
 ## A Ruby 4 Web Server
 
-<img src="https://github.com/joshuay03.png" width="200" alt="Joshua Young" />
+<img src="./assets/startup_output.svg" width="60%" align="right" alt="The README's complete Raptor startup output, including log prefixes, the process tree, and all ten worker boot messages." />
 
-_Joshua Young ([`@joshuay03`](https://github.com/joshuay03)) · Senior Software Engineer at [Buildkite](https://buildkite.com/)_
+<img src="./assets/profile_picture.png" width="200" alt="Joshua Young" />
 
-_On the [Rails](https://github.com/rails/rails), [Puma](https://github.com/puma/puma), and [Concurrent Ruby](https://github.com/ruby-concurrency/concurrent-ruby) maintainer teams_
+_Joshua Young ([`@joshuay03`](https://github.com/joshuay03))_
+
+_Senior Software Engineer at [Buildkite](https://buildkite.com/)_
+
+_[Rails](https://github.com/rails/rails) Issues team member_
+
+_[Puma](https://github.com/puma/puma), [Concurrent Ruby](https://github.com/ruby-concurrency/concurrent-ruby), and [Vernier](https://github.com/jhawthorn/vernier) maintainer_
+
+<hr width="35%" align="left">
 
 _[BrisRails](https://luma.com/t3l24s8h) · August 2026_
 
 _[Ruby Melbourne](https://www.meetup.com/ruby-melbourne/events/313408465/) · October 2026_
+
+<br clear="all" />
 
 <br>
 <br>
@@ -32,21 +42,19 @@ _[Ruby Melbourne](https://www.meetup.com/ruby-melbourne/events/313408465/) · Oc
 <br>
 <br>
 
-## Hi
+## How Raptor started
 
-<big>I'm Josh. By day I work on Buildkite's Rails monolith, and I also spend a lot of time in the internals of Puma and Rails.</big>
+<big>Working on Puma made me curious about what a web server built around Ractors could look like.</big>
 
-<big>Over the past year that turned into my own Ruby web server, Raptor. It runs any Rack app, Rails included, and parses HTTP in parallel using Ractors.</big>
+<big>That became Raptor. It runs Rack apps, Rails included, and parses HTTP in parallel using Ractors.</big>
 
-<big>It's still young though, so I wouldn't put your production app behind it just yet.</big>
+<big>**Your app doesn't need to be Ractor-safe.** It runs on ordinary threads,
+with the same thread-safety requirements as multithreaded Puma.</big>
 
-Today is a tour of what's inside it, and the parts of Ruby and Linux I had to learn along the way:
+<big>It's still young, and I'd love more people to try it on their apps and tell me what works and what doesn't.</big>
 
-- <big>Ractors, and what changed in Ruby 4</big>
-- <big>Lock-free data structures built on compare-and-swap</big>
-- <big>Red-black trees</big>
-- <big>Shared memory between processes</big>
-- <big>Tiny programs that run inside the Linux kernel</big>
+Today we'll look inside Raptor at its Ractors, lock-free queues, red-black trees,
+shared memory, and a tiny program running inside Linux.
 
 <br>
 <br>
@@ -70,18 +78,14 @@ Today is a tour of what's inside it, and the parts of Ruby and Linux I had to le
 
 ## What a web server actually does
 
-Rails isn't a web server. [Rack](https://github.com/rack/rack) isn't one either. Rack is the contract between a web server and your app:
+[Rack](https://github.com/rack/rack) gives us a small boundary between the server and your app.
 
 ```ruby
 # A complete Rack app. Nothing more is needed.
 run ->(env) { [200, { "content-type" => "text/plain" }, ["hello\n"]] }
 ```
 
-- <big>Your app is anything that responds to `#call`</big>
-- <big>It takes a `Hash` describing the request (the "Rack env")</big>
-- <big>It returns `[status, headers, body]`</big>
-
-Everything else is the web server's job:
+<big>Your app responds to `call`. It takes a request hash, the "Rack env", and returns `[status, headers, body]`.</big>
 
 ```mermaid
 sequenceDiagram
@@ -100,9 +104,7 @@ sequenceDiagram
     Note over C,S: Close, or keep the connection open for the next request
 ```
 
-- <big>The kernel does the TCP handshake. The server just calls `accept` and gets a ready socket.</big>
-- <big>The server reads bytes, parses them, calls your app, and writes the response back</big>
-- <big>With keep-alive, the same connection carries the next request</big>
+<big>The kernel handles TCP. The server handles HTTP.</big>
 
 <br>
 <br>
@@ -132,9 +134,10 @@ sequenceDiagram
 
 **[Falcon](https://github.com/socketry/falcon)**
 
-<big>Built by Samuel Williams on his [`async`](https://github.com/socketry/async) gem. It uses fibers instead of a thread pool, speaks HTTP/2, and is great at streaming.</big>
+<big>Built on [`async`](https://github.com/socketry/async). It uses fibers instead of a thread pool, speaks HTTP/2, and is great at streaming.</big>
 
-Both are great, but both were designed before Ractors were usable.
+Fibers are another concurrency model. Raptor keeps your thread-safe Puma app on ordinary threads,
+without requiring app changes.
 
 <br>
 <br>
@@ -160,13 +163,10 @@ Both are great, but both were designed before Ractors were usable.
 
 <big>Ractors have been around since Ruby 3.0, but the API kept changing, so most of us never touched them.</big>
 
-<big>Ruby 4 reworked them around `Ractor::Port`, which many Ractors can send to and one can receive from. That's exactly the shape of "many workers, one collector".</big>
+<big>[Ruby 4.0](https://www.ruby-lang.org/en/news/2025/12/25/ruby-4-0-0-released/#ractor-improvements) introduced `Ractor::Port`.
+Many Ractors can send to one receiver. A good fit for "many workers, one collector".</big>
 
-<big>They're still marked experimental, but Ruby 4.1 moves them closer to dropping that label. For one, each Ractor will collect its own garbage without stopping the others.</big>
-
-That got me wondering:
-
-> What would a Ruby web server look like if it was built around Ractors from the start?
+<big>They're still marked experimental, but [Ruby 4.1 adds Ractor-local garbage collection](https://www.ruby-lang.org/en/news/2026/10/12/ruby-4-1-0-preview1-released/#ractor-improvements), so most collections no longer stop all the Ractors.</big>
 
 <br>
 <br>
@@ -190,20 +190,20 @@ That got me wondering:
 
 ## Ractors in one slide
 
-Ruby has a Global VM Lock (GVL). Only one thread at a time can run Ruby code.
+Ruby threads normally share a Global VM Lock (GVL), so only one of them can run Ruby code at a time.
 
 A Ractor is an isolated area of Ruby with **its own GVL**, so two Ractors can run Ruby on two cores at the same time.
 
-The catch is isolation. A Ractor can't reach into its surroundings:
+The catch is isolation. A Ractor can't reach into its surroundings.
 
 ```ruby
 data = { name: "hello" }
 
 Ractor.new { puts data }
-# ArgumentError: can not isolate a Proc because it accesses outer variables (data).
+# Error: the block accesses an outer variable (data).
 ```
 
-Instead, Ractors pass messages:
+Instead, Ractors pass messages.
 
 ```ruby
 port = Ractor::Port.new
@@ -216,9 +216,9 @@ worker.send("hello")
 port.receive # => "processed: hello"
 ```
 
-- <big>Frozen values are shared as is</big>
-- <big>Mutable values are deep-copied, or moved with `move: true` so the sender can't touch them again</big>
-- <big>No shared mutable state means no data races</big>
+<big>Shareable values, like deeply frozen arrays and hashes, are shared as is. Mutable values are copied, or moved with `move: true` so the sender can no longer use them.</big>
+
+<big>Isolation keeps ordinary mutable objects from being changed by two Ractors at once.</big>
 
 <br>
 <br>
@@ -242,12 +242,9 @@ port.receive # => "processed: hello"
 
 ## What Ractors are good for
 
-They won't make your app parallel on their own, because almost no gem you use is Ractor-safe. Where they do help is work that is:
+They won't make your Rails app parallel on their own. Rails and many of its gems aren't Ractor-safe.
 
-- <big>Small and CPU-heavy</big>
-- <big>Free of global state</big>
-- <big>Free of gem dependencies</big>
-- <big>Easy to hand off: bytes in, result out</big>
+<big>They suit small, CPU-heavy jobs that are easy to hand off, without relying on global state or Ractor-unsafe gems.</big>
 
 That describes HTTP parsing exactly.
 
@@ -273,13 +270,18 @@ That describes HTTP parsing exactly.
 
 ## The idea
 
-Puma parses each request on the same thread that's about to run your app. Parsing and your app take turns on the same GVL.
+In Puma, parsing and your app share the worker's GVL, even when they run on different threads.
 
-If parsing runs in a Ractor instead, it gets its own GVL:
+If parsing runs in a Ractor instead, it gets its own GVL.
 
 ```mermaid
+---
+config:
+    gantt:
+        leftPadding: 220
+---
 gantt
-    title One worker process, over time
+    title One worker process, over time (illustrative)
     dateFormat x
     axisFormat %L ms
 
@@ -326,21 +328,21 @@ If a whole request arrives in one read, Raptor skips the Ractor and parses it st
 
 ```mermaid
 flowchart TB
-    M["Master process<br/>starts and watches workers"]
+    M["Master<br/>starts and watches workers"]
 
     subgraph W["Worker process (one of many)"]
-        SRV["Server thread<br/>accepts connections"]
-        RCT["Reactor thread<br/>waits on idle and partial connections"]
-        RP["Ractor pools<br/>parse HTTP/1.1 and HTTP/2<br/>on their own GVLs"]
-        COL["Collector threads<br/>gather parsed requests"]
-        APP["App thread pool<br/>runs your Rack app<br/>and writes responses"]
+        SRV["Server thread<br/>accepts sockets"]
+        RCT["Reactor thread<br/>waits for bytes"]
+        RP["Parser Ractors<br/>HTTP/1.1 and HTTP/2"]
+        COL["Collector threads"]
+        APP["App threads<br/>Rack + response"]
 
-        SRV -->|"whole request already here"| APP
-        SRV -->|"needs more bytes"| RCT
-        RCT -->|"raw bytes"| RP
+        SRV -->|"complete request"| APP
+        SRV -->|"incomplete"| RCT
+        RCT -->|"bytes"| RP
         RP --> COL
-        COL -->|"complete request"| APP
-        COL -->|"still incomplete"| RCT
+        COL -->|"ready"| APP
+        COL -->|"incomplete"| RCT
     end
 
     M -->|"fork"| W
@@ -370,7 +372,8 @@ Let's walk through each piece.
 
 ## The Ractor pools
 
-Each protocol gets its own pool of parser Ractors. A coordinator hands work to whichever parser is free.
+Each protocol gets its own pool of parser Ractors.
+With multiple parsers, a coordinator hands work to whichever is free.
 
 ```mermaid
 sequenceDiagram
@@ -381,7 +384,7 @@ sequenceDiagram
     box Coordinator Ractor
         participant C as Coordinator thread
     end
-    box Parser Ractor
+    box One parser Ractor
         participant P as Parser thread
     end
 
@@ -424,9 +427,9 @@ I pulled this pattern out into its own gem, **[`ractor-pool`](https://github.com
 
 This is where your Rack app runs.
 
-Puma's pool is a queue guarded by a `Mutex`, so when things get busy, threads line up behind the lock.
+Puma's work queue is guarded by a `Mutex`. Adding and taking work both acquire it.
 
-Raptor's pool has **no locks** at all. To explain how, we need one tiny CPU instruction.
+Raptor's work queue has **no mutex**. To explain how, we need one tiny CPU instruction.
 
 <br>
 <br>
@@ -455,7 +458,7 @@ Raptor's pool has **no locks** at all. To explain how, we need one tiny CPU inst
 ```mermaid
 sequenceDiagram
     participant A as Thread A
-    participant M as Memory: count
+    participant M as Memory holding count
     participant B as Thread B
 
     Note over M: count = 42
@@ -463,7 +466,7 @@ sequenceDiagram
     M-->>A: ✅ swapped, count is now 43
     B->>M: CAS(expected 42, new 43)
     M-->>B: ❌ failed, count is 43 not 42
-    B->>M: retry: CAS(expected 43, new 44)
+    B->>M: retry CAS(expected 43, new 44)
     M-->>B: ✅ swapped, count is now 44
 ```
 
@@ -505,8 +508,8 @@ Raptor's work queue is [`atomic-ruby`](https://github.com/joshuay03/atomic-ruby)
 flowchart LR
     H(["head"]) --> S["sentinel"] --> A["work A"] --> B["work B"]
     T(["tail"]) --> B
-    B -. "① CAS: link C after B" .-> C["work C"]
-    T -. "② CAS: move tail to C" .-> C
+    B -. "① CAS links C after B" .-> C["work C"]
+    T -. "② CAS moves tail" .-> C
 ```
 
 **Taking work**
@@ -514,7 +517,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     H(["head"]) --> S["sentinel"] --> A["work A"] --> B["work B"]
-    H -. "CAS: move head to A, return A's work<br/>(A becomes the new sentinel)" .-> A
+    H -. "CAS moves head to A, returns A's work<br/>(A becomes the new sentinel)" .-> A
 ```
 
 <big>Adding and taking never block each other. If two threads race, one CAS wins and the other retries.</big>
@@ -539,11 +542,12 @@ flowchart LR
 <br>
 <br>
 
-## No mutexes at all
+## No mutexes in Raptor's own code
 
 There isn't a single `Mutex` in Raptor's own code. Shared state is either owned by one thread, passed along as a message, or updated with CAS.
 
-That's not only about speed. Under the GVL, a thread can be switched out at almost any point, including while it's holding a lock:
+That's not only about speed. Under the GVL, a thread can be switched out at almost any point,
+including while it's holding a lock.
 
 ```mermaid
 sequenceDiagram
@@ -564,7 +568,7 @@ sequenceDiagram
 
 <big>CAS has nothing to hold. A thread switched out mid-update can't block anyone, and if it lost the race, it just retries.</big>
 
-It also means there's no lock ordering to get wrong, which is where deadlocks come from.
+It also means there's no lock ordering to get wrong, removing one source of deadlocks.
 
 <br>
 <br>
@@ -588,22 +592,29 @@ It also means there's no lock ordering to get wrong, which is where deadlocks co
 
 ## How many threads?
 
-Most requests spend their time waiting on the database or the network. More threads help with waiting, but not with running Ruby.
+Thread counts are hard to tune. Too few leave requests queued. Too many can compete for the GVL.
+The right count changes with the workload.
 
-Raptor uses [`atomic-ruby`](https://github.com/joshuay03/atomic-ruby)'s `AtomicThreadPool`, which uses a CRuby hook to see what each thread is actually doing:
+[`atomic-ruby`](https://github.com/joshuay03/atomic-ruby)'s pool uses CRuby's thread-event API
+to measure time holding the GVL, waiting for it, and blocked outside it, such as during I/O.
+
+It combines those timings with CPU time to decide whether more threads would help.
 
 ```mermaid
-flowchart TB
-    Q{"Are requests waiting<br/>in the queue?"}
-    Q -->|"yes"| W{"What are the threads<br/>mostly doing?"}
-    Q -->|"no"| I{"Has the queue been<br/>empty for 5 seconds?"}
+flowchart LR
+    Q{"Work queued?"}
+    Q -->|"yes"| W{"Where is time<br/>being spent?"}
+    Q -->|"no"| I{"Queue empty<br/>for 5 seconds?"}
     W -->|"waiting on I/O<br/>(database, network)"| Add["Add more threads"]
-    W -->|"running Ruby<br/>(CPU is the limit)"| Trim["Trim back towards<br/>the base size"]
+    W -->|"Ruby CPU saturated"| Trim["Trim back towards<br/>the base size"]
     I -->|"no"| Stay["Keep the current size"]
-    I -->|"yes"| Retire["Retire the extra threads"]
+    I -->|"yes"| Retire["Retire extra threads<br/>after their current work"]
 ```
 
-<big>It starts at `threads` (3 by default). Set `max_threads` to cap the growth, or match `threads` for a fixed pool.</big>
+<big>It starts at `threads` (3 per worker by default) and adapts to the workload,
+with no hard maximum. You don't have to choose one fixed thread count.</big>
+
+<big>Set `max_threads` to fit your database pool or other resource limits, or match `threads` for a fixed pool.</big>
 
 <br>
 <br>
@@ -627,15 +638,15 @@ flowchart TB
 
 ## The reactor
 
-Some connections aren't ready to be read yet: slow clients, half-sent requests, idle keep-alive connections. The reactor watches all of them at once.
+Slow clients, half-sent requests, and idle keep-alive connections aren't ready to be read yet. The reactor watches all of them at once.
 
-- <big>Built on [`nio4r`](https://github.com/socketry/nio4r) (`epoll` on Linux, `kqueue` on macOS), same as Puma</big>
-- <big>Every connection also has a deadline:</big>
-  - 30s to send the first bytes
-  - 10s between chunks of a request
-  - 65s idle between keep-alive requests
+<big>Like Puma, it uses [`nio4r`](https://github.com/socketry/nio4r), backed by `epoll` on Linux
+and `kqueue` on macOS.</big>
 
-Every time a connection sends bytes, its deadline moves. So the reactor needs a cheap way to keep **thousands of deadlines in order**.
+<big>The HTTP/1.1 defaults are 30 seconds for the first bytes,
+10 seconds between request chunks, and 65 seconds idle on keep-alive.</big>
+
+As bytes arrive, deadlines move. The reactor needs to keep **thousands of them in order**.
 
 <br>
 <br>
@@ -661,7 +672,7 @@ Every time a connection sends bytes, its deadline moves. So the reactor needs a 
 
 **Puma** keeps an `Array` and sorts it after changes. Sorting is O(n log n), and removing a specific connection means scanning the whole list.
 
-**Raptor** keeps a **red-black tree**: a binary search tree that rebalances itself as it changes.
+**Raptor** keeps a **red-black tree**, a binary search tree that rebalances itself as it changes.
 
 ```mermaid
 flowchart TB
@@ -676,9 +687,9 @@ flowchart TB
     class LL,LR red
 ```
 
-<big>Inserting, removing, and finding the soonest deadline are all O(log n). Expiring connections means walking from the leftmost node until one isn't due.</big>
+<big>Inserting and removing are O(log n). Finding the soonest deadline is O(1), because it's cached.</big>
 
-With a hundred connections you wouldn't notice the difference, but it adds up once you have thousands.
+The reactor removes expired deadlines from the front. Keeping this cheap matters with thousands of connections.
 
 That one became another gem, **[`red-black-tree`](https://github.com/joshuay03/red-black-tree)**.
 
@@ -705,6 +716,7 @@ That one became another gem, **[`red-black-tree`](https://github.com/joshuay03/r
 ## Writing the response
 
 Once your app returns, the response still has to become bytes on the socket.
+Here's the common HTTP/1.1 path with an array body.
 
 ```mermaid
 flowchart LR
@@ -717,17 +729,17 @@ flowchart LR
 
     subgraph R["Raptor"]
         direction TB
-        RH["status line + headers<br/>(built in C)"] --> RV["writev"]
+        RH["cached status line<br/>+ headers formatted in C"] --> RV["writev"]
         RBody["body"] --> RV
-        RV -->|"one syscall, no copy"| RS(["socket"])
+        RV -->|"headers + body together"| RS(["socket"])
     end
 
     P ~~~ R
 ```
 
-<big>Puma builds the response in Ruby, then either copies small bodies into its header buffer or corks the socket for larger ones.</big>
+<big>Puma formats headers in Ruby and copies small bodies into the same buffer. It asks the OS to batch separate writes.</big>
 
-<big>Raptor builds it in C and sends the headers and body together with one `writev` call, without copying them into one string.</big>
+<big>Raptor formats headers in C. `writev` sends headers and body without joining them into one string, in one syscall when possible.</big>
 <br>
 <br>
 <br>
@@ -750,7 +762,8 @@ flowchart LR
 
 ## HTTP/2 in one slide
 
-HTTP/1.1 sends one request at a time on a connection. HTTP/2 sends many at once, split into small binary frames:
+HTTP/1.1 sends one request at a time on a connection. HTTP/2 sends many at once,
+split into small binary frames.
 
 ```mermaid
 sequenceDiagram
@@ -766,9 +779,7 @@ sequenceDiagram
     S->>C: HEADERS (stream 5): 201
 ```
 
-- <big>**Multiplexing**: many requests (streams) share one connection</big>
-- <big>**Header compression** (HPACK): headers you've already sent become tiny numbers</big>
-- <big>**Flow control**: each side says how much data it's ready to receive</big>
+<big>**Multiplexing** lets many requests share one connection. **Header compression** reuses earlier headers. **Flow control** limits how much data each side can send.</big>
 
 Raptor speaks HTTP/2 natively, and so does Falcon. Puma [leaves it to a proxy](https://github.com/puma/puma/issues/2697) like nginx.
 
@@ -796,7 +807,7 @@ Raptor speaks HTTP/2 natively, and so does Falcon. Puma [leaves it to a proxy](h
 
 <big>HTTP/2 gets its own C parser and Ractor pool. Each stream is its own job, so one connection can use several app threads.</big>
 
-<big>Only the reactor ever writes to the socket. App threads hand it frames and carry on.</big>
+<big>For established connections, the reactor owns socket writes. App threads queue frames rather than competing to write to the same socket.</big>
 
 ```mermaid
 flowchart LR
@@ -807,7 +818,7 @@ flowchart LR
     R --> S(["socket"])
 ```
 
-<big>No thread ever waits for a slow client to read, and there's no lock around the socket because only one thread owns it.</big>
+<big>An ordinary response can still wait for HTTP/2 flow control. Long-lived streams need a way to release the app thread too.</big>
 
 <br>
 <br>
@@ -831,9 +842,7 @@ flowchart LR
 
 ## Streams that outlive the request
 
-Some responses stay open for minutes, like server-sent events or gRPC streams. Normally each one ties up an app thread the whole time.
-
-Raptor's answer is `Raptor::DetachedBody`:
+SSE and gRPC responses can stay open for minutes. `Raptor::DetachedBody` lets them release the app thread.
 
 ```ruby
 run ->(env) {
@@ -842,7 +851,6 @@ run ->(env) {
   body.on_close { Subscribers.remove(body) }
   [200, { "content-type" => "text/event-stream" }, body]
 }
-
 # Later, from any thread
 Subscribers.each { |body| body.try_write("data: update\n\n") }
 ```
@@ -855,19 +863,15 @@ sequenceDiagram
     participant C as Client
 
     A->>R: hand over the headers and the body
-    A->>P: on_open adds the body
-    Note over A: Thread goes back to the pool
     P->>R: try_write(message)
     R->>C: write when the socket is ready
     C--xR: client disconnects
-    R->>P: on_close removes the body
+    R->>A: schedule on_close on the app pool
 ```
 
-<big>The app thread returns straight away and the reactor owns the stream from then on. `try_write` never blocks.</big>
+<big>`try_write` never waits for the client. It returns `:accepted`, `:full` (no buffer space), or `:closed`. Your publisher decides whether to retry or drop an update.</big>
 
-<big>When the client disconnects or the server shuts down, `on_close` runs immediately. It works over both HTTP/1.1 and HTTP/2.</big>
-
-The first time I tried this at work, every new stream still held a thread for about 1.5ms. The handoff was polling, so I changed it to wake the thread instead.
+Cleanup runs on the app pool via `on_close`. This works over HTTP/1.1 and HTTP/2.
 
 <br>
 <br>
@@ -891,17 +895,18 @@ The first time I tried this at work, every new stream still held a thread for ab
 
 ## Enough HTTP/2 for gRPC
 
-gRPC runs over HTTP/2 and relies on parts of it most apps never touch. Raptor supports them, so a `DetachedBody` can serve gRPC:
+Raptor provides the HTTP/2 pieces for unary and server-streaming gRPC.
+`DetachedBody` streams the response after the request body arrives in full.
 
 ```ruby
-body.try_write(encoded_message)
-body.close(trailers: { "grpc-status" => "0" })
+if body.try_write(encoded_message) == :accepted
+  body.close(trailers: { "grpc-status" => "0" })
+end # On :full, retry later rather than losing the message.
 ```
 
-- <big>**Trailers**: headers sent after the body. gRPC puts its final status there, because it isn't known until the stream ends.</big>
-- <big>**Cancellation**: when a client gives up on a stream, Raptor passes that on to your body straight away</big>
-- <big>**Keepalive PINGs**: idle connections get pinged, so dead ones are noticed and closed</big>
-- <big>**Graceful shutdown**: `GOAWAY` tells clients to stop opening new streams while the current ones finish</big>
+<big>**Trailers** carry gRPC's final status after the body. **Cancellation** closes abandoned streams, and **PINGs** help detect dead connections.</big>
+
+<big>On shutdown, `GOAWAY` tells clients to stop opening streams while existing ones finish.</big>
 
 <br>
 <br>
@@ -923,11 +928,11 @@ body.close(trailers: { "grpc-status" => "0" })
 <br>
 <br>
 
-## Zooming out: the processes
+## Zooming out to the processes
 
 So far we've been inside one worker. Let's look at how the workers live together.
 
-**Preforking**: the master loads your app once, then forks a copy for each worker.
+With **preforking**, the master loads your app once, then forks a copy for each worker.
 
 ```mermaid
 flowchart TB
@@ -964,9 +969,9 @@ flowchart TB
 
 ## Refork
 
-Copy-on-write savings fade as workers warm caches, compile YJIT code, and load gems lazily. Eventually each worker has its own copy of most pages.
+Copy-on-write savings fade as workers warm caches, compile YJIT code, and load gems lazily. Workers can lose much of that sharing as they warm up independently.
 
-The fix: periodically fork new workers from a **warm** worker instead of the master.
+The fix is to fork replacement workers from a **warm** worker instead of the master.
 
 ```mermaid
 sequenceDiagram
@@ -974,7 +979,7 @@ sequenceDiagram
     participant W as Warm worker
     participant N as New workers
 
-    Note over M: Every refork_after requests
+    Note over M: Warm worker reaches the configured request threshold
     M->>W: You're the seed now
     W->>W: Finish in-flight requests
     M->>W: Fork replacement workers
@@ -982,9 +987,11 @@ sequenceDiagram
     Note over N: Start with the warm caches and YJIT code,<br/>shared copy-on-write
 ```
 
-<big>The idea comes from Shopify's [Pitchfork](https://github.com/Shopify/pitchfork). Puma's version is the experimental `fork_worker`, which I've fixed a few bugs in.</big>
+<big>The idea comes from Shopify's [Pitchfork](https://github.com/Shopify/pitchfork). Puma has experimental `fork_worker` support too.</big>
 
-<big>It relies on `PR_SET_CHILD_SUBREAPER`, so the master can adopt workers it didn't fork. That makes it Linux only.</big>
+<big>I recently added [`mold_worker`](https://github.com/puma/puma/pull/4038) on Puma's main branch. Like Raptor's seed, the mold stops serving requests and only forks replacements.</big>
+
+Raptor uses Linux's `PR_SET_CHILD_SUBREAPER` so the master can adopt workers it didn't fork.
 
 <br>
 <br>
@@ -1029,7 +1036,7 @@ flowchart LR
 
 <big>The master creates the region with `mmap` before forking, so every worker inherits it. Each worker owns one 49-byte slot, so writes never clash.</big>
 
-<big>Updating stats is just a write to memory, with no pipe, no parsing, and no syscall.</big>
+<big>Updating stats is a write to shared memory, with no pipe or syscall to send the update.</big>
 
 That's where **[`mmap-ruby`](https://github.com/joshuay03/mmap-ruby)** came from.
 
@@ -1055,11 +1062,11 @@ That's where **[`mmap-ruby`](https://github.com/joshuay03/mmap-ruby)** came from
 
 ## Which worker gets the next connection?
 
-All workers listen on the same port, and by default Linux spreads connections by hashing the client's address. That's even **on average**, but blind to which workers are busy.
+With Linux's `SO_REUSEPORT`, workers get separate listeners on the same port. The kernel hashes connection details to pick one, without knowing which workers are busy.
 
-Puma nudges the odds. Busier workers pause briefly before accepting, so quieter ones tend to win.
+In Puma, busier workers pause briefly before accepting new connections. This gives less busy workers more chance to accept them.
 
-Raptor lets the kernel decide using real load, with **BPF**.
+On Linux, Raptor can use **BPF** to route plain TCP connections using real load.
 
 <big>BPF lets you run tiny, kernel-verified programs inside Linux. It's the same technology behind `bpftrace` and Cilium.</big>
 
@@ -1086,22 +1093,25 @@ Raptor lets the kernel decide using real load, with **BPF**.
 ## Raptor's BPF program
 
 ```mermaid
-flowchart TB
+flowchart LR
     New(["new connection"]) --> Hash["hash picks two workers"]
-    Hash --> A["Worker 0<br/>5 waiting requests"]
-    Hash --> B["Worker 3<br/>6 waiting requests"]
+    Hash --> A["Worker 0<br/>load 5"]
+    Hash --> B["Worker 3<br/>load 6"]
     A --> Pick{"pick the less busy one"}
     B --> Pick
-    Pick -->|"reserve: 5 → 6"| W0["Worker 0 accepts it"]
+    Pick -->|"reserve 5 → 6"| W0["Worker 0 accepts it"]
 ```
 
-<big>Each worker publishes its load, including connections still waiting to be accepted, to a map the kernel can read. The program compares two workers and picks the quieter one ("power of two choices").</big>
+<big>A kernel-readable map tracks each worker's load, including pending connections.
+The program compares two workers and picks the quieter one.</big>
 
-<big>It bumps that worker's count straight away, so a burst doesn't all land on one worker.</big>
+<big>Checking every worker adds work to every connection. The "power of two choices"
+helps avoid busy workers without scanning the whole cluster.</big>
 
-<big>The whole program is about 70 lines of C. If BPF isn't available, Raptor quietly falls back to the default behaviour.</big>
+It reserves the connection straight away, so the next arrival sees the updated load.
 
-To load it from Ruby, I wrote **[`libbpf-ruby`](https://github.com/joshuay03/libbpf-ruby)**.
+The program is about 70 lines of C, loaded through **[`libbpf-ruby`](https://github.com/joshuay03/libbpf-ruby)**.
+Without the optional dependencies, Raptor uses normal listeners.
 
 <br>
 <br>
@@ -1125,11 +1135,12 @@ To load it from Ruby, I wrote **[`libbpf-ruby`](https://github.com/joshuay03/lib
 
 ## Pinning workers to cores
 
-Linux moves processes between cores whenever it likes, and each move lands a worker on cold caches.
+Moving workers between cores can lose warm CPU caches.
 
-<big>With `cpu_affinity` on, each worker pins itself to its own core and keeps its caches warm. Puma doesn't offer this.</big>
+<big>On Linux, `cpu_affinity` pins workers to cores when enough are available.
+Puma doesn't have a built-in setting for this.</big>
 
-<big>It's opt-in, because a pinned worker's threads and Ractors share one core. I've seen it help, but I don't have numbers yet.</big>
+<big>It's opt-in, because a pinned worker's threads and Ractors share one core.</big>
 
 <br>
 <br>
@@ -1153,19 +1164,14 @@ Linux moves processes between cores whenever it likes, and each move lands a wor
 
 ## The numbers
 
-Full results and the setup are in the [README](../README.md#micro-benchmarks). **I/O** requests mostly wait on fake database calls, and **CPU** requests mostly run Ruby.
+Synthetic Rack workloads on Ruby 4.1-dev with YJIT, not predictions for your Rails app.
 
-- <big>**I/O-heavy HTTP/1.1 with 3 threads per worker**: roughly 2.3 times Puma's throughput</big>
-  - Raptor polls for accept capacity under saturation. That trades CPU time for throughput and latency; the same thread count doesn't mean the same CPU use.
-  - Existing keep-alive traffic can also delay new connections at saturation; throughput and p95 don't capture every client's wait.
-- <big>**I/O-heavy HTTP/1.1 with scaling threads**: approximately tied with Puma</big>
-  - Puma adds a thread whenever work is waiting. Raptor only adds one when the busy threads are blocked, to avoid adding threads CPU-heavy apps can't use.
-- <big>**HTTP/2**: direct multiplexing, compared with Falcon</big>
-  - Puma doesn't implement HTTP/2. Raptor and Falcon do; their numbers move around a lot between runs, so check the spread as well as the medians.
-- <big>**I/O with server-sent events and 3 threads per worker**: 9.5 times Puma's throughput, with Puma also reporting timeouts</big>
-  - A detached body hands the stream to the reactor, so the app thread is free again. On Puma, every open stream holds a thread until it closes.
+- <big>On **I/O-heavy HTTP/1.1**, Raptor delivers roughly 2.3 times Puma's throughput with 3 threads per worker. They're approximately tied when both can scale.</big>
+- <big>On **CPU-heavy HTTP/1.1**, throughput is close to Puma. Raptor has lower p95 latency with keep-alive. Puma has lower p95 latency on fresh connections.</big>
+- <big>With **I/O and server-sent events**, Raptor delivers 9.5 times Puma's throughput with 3 threads per worker, and Puma reports timeouts. Raptor is only a few percent ahead with scaling.</big>
+- <big>On **HTTP/2**, Raptor beats Falcon on CPU-heavy throughput. It trails on I/O with fixed threads and roughly matches Falcon with scaling. Results vary widely.</big>
 
-Raptor wins on throughput in three of the four CPU-heavy HTTP/1.1 comparisons; Puma leads slightly with fixed threads and keep-alive. Puma still has lower p95 on fresh connections, while Raptor has lower p95 with keep-alive. These are micro benchmarks though, so benchmark your own application before choosing a server.
+Under saturation, Raptor's accept polling uses extra CPU, and existing keep-alive traffic can delay new connections. These aren't predictions for your app, so try it and measure. Full results and the setup are in the [README](../README.md#micro-benchmarks).
 
 <br>
 <br>
@@ -1189,10 +1195,12 @@ Raptor wins on throughput in three of the four CPU-heavy HTTP/1.1 comparisons; P
 
 ## What you give up
 
-- <big>**Battle-testing**: Puma has run production Rails since 2011. Raptor is less than a year old.</big>
-- <big>**Older Rubies**: Raptor needs Ruby 4.0.</big>
-- <big>**Ractor overhead**: on Ruby 4.0, once a process starts a Ractor, the rest of its Ruby runs slower too. On the upcoming Ruby 4.1, it's gone in my measurements.</big>
-- <big>**Easy debugging**: a request can cross threads and Ractors, so tracing it means stitching stack traces together.</big>
+<big>Raptor has less **battle-testing**. Puma has years of production Rails use. Raptor is less than a year old.</big>
+
+<big>It needs **Ruby 4.0 or newer**. Ractors add overhead on 4.0 that I don't see in my 4.1 measurements.</big>
+
+<big>**Debugging server internals** can involve tracing work across threads and Ractors.
+Most app developers won't need to do that. Your app stays on ordinary threads.</big>
 
 <br>
 <br>
@@ -1216,14 +1224,18 @@ Raptor wins on throughput in three of the four CPU-heavy HTTP/1.1 comparisons; P
 
 ## Why it's worth being curious
 
-I'm not asking you to swap your production server. What I hope you take away is how much more is possible from Ruby now:
+I'd love you to try Raptor, but I also hope you leave curious about what's possible from Ruby now.
 
-- <big>Ractors are finally practical</big>
-- <big>We can build lock-free data structures in Ruby</big>
-- <big>We can share memory between processes with `mmap`</big>
-- <big>We can load BPF programs into the kernel from Ruby</big>
+<big>Raptor combines Ractors, lock-free queues, shared memory, and BPF in one Rack server.</big>
 
-None of these ideas are new on their own. What's new is that we can combine them in one Ruby server, and see how far that gets us.
+<big>Let the pool adapt instead of choosing one fixed thread count.
+Your app still runs on ordinary Rack threads.</big>
+
+In these tests, scaling threads match Falcon's I/O throughput over keep-alive HTTP/1.1 and HTTP/2.
+
+<big>Native HTTP/2 and detached streaming are there when you need them.</big>
+
+Try your own workload to see how these pieces work together.
 
 <br>
 <br>
@@ -1248,15 +1260,17 @@ None of these ideas are new on their own. What's new is that we can combine them
 ## Try it
 
 ```
-gem install raptor           # Ruby 4.0+
+bundle add raptor            # Ruby 4.0+
 bundle exec raptor           # boots config.ru
 bundle exec rails server -u raptor
 ```
 
-- <big>The CLI mirrors Puma's on purpose</big>
-- <big>Feedback and bug reports very welcome</big>
+<big>The CLI mirrors Puma's on purpose. Try it on your app.
+Feedback and bug reports are very welcome.</big>
 
-The long version of this talk, with much more detail, is [`docs/raptor-vs-puma.md`](raptor-vs-puma.md).
+Test your real traffic, then try a small production canary with an easy way back to Puma.
+
+For a detailed comparison of Raptor and Puma's designs, see [`docs/raptor-vs-puma.md`](raptor-vs-puma.md).
 
 <br>
 <br>
@@ -1286,10 +1300,14 @@ The long version of this talk, with much more detail, is [`docs/raptor-vs-puma.m
 
 **The gems that came out of it**
 
-- <big>[`ractor-pool`](https://github.com/joshuay03/ractor-pool): a pool of Ractor workers</big>
-- <big>[`atomic-ruby`](https://github.com/joshuay03/atomic-ruby): lock-free primitives and the thread pool</big>
-- <big>[`red-black-tree`](https://github.com/joshuay03/red-black-tree): a self-balancing tree</big>
-- <big>[`mmap-ruby`](https://github.com/joshuay03/mmap-ruby): shared memory</big>
-- <big>[`libbpf-ruby`](https://github.com/joshuay03/libbpf-ruby): BPF from Ruby</big>
+[`ractor-pool`](https://github.com/joshuay03/ractor-pool) provides Ractor workers.
+
+[`atomic-ruby`](https://github.com/joshuay03/atomic-ruby) provides lock-free primitives and the thread pool.
+
+[`red-black-tree`](https://github.com/joshuay03/red-black-tree) keeps deadlines in order.
+
+[`mmap-ruby`](https://github.com/joshuay03/mmap-ruby) provides shared memory.
+
+[`libbpf-ruby`](https://github.com/joshuay03/libbpf-ruby) loads BPF programs from Ruby.
 
 _Questions?_

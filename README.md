@@ -36,29 +36,29 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 
 ```
 > bundle exec raptor -w 10 -t 3 hello_world.ru
-[Raptor 72876|Main|Main] Cluster initializing:
-[Raptor 72876|Main|Main] ├─ Version: 0.23.0
-[Raptor 72876|Main|Main] ├─ Ruby Version: ruby 4.0.6 (2026-07-14 revision 03b6d3f889) +YJIT +PRISM [arm64-darwin23]
-[Raptor 72876|Main|Main] ├─ Environment: development
-[Raptor 72876|Main|Main] ├─ Master PID: 72876
-[Raptor 72876|Main|Main] │  └─ 10 worker processes
-[Raptor 72876|Main|Main] │     ├─ 1 server thread
-[Raptor 72876|Main|Main] │     ├─ 1 reactor thread
-[Raptor 72876|Main|Main] │     ├─ 1 HTTP/1.1 pipeline ractor
-[Raptor 72876|Main|Main] │     ├─ 1 pipeline collector thread
-[Raptor 72876|Main|Main] │     ├─ 3 worker threads (scaling, no limit)
-[Raptor 72876|Main|Main] │     └─ 1 stats thread
-[Raptor 72876|Main|Main] └─ Listening on 0.0.0.0:9292
-[Raptor 72884|Main|Main] Worker 0 booted
-[Raptor 72885|Main|Main] Worker 1 booted
-[Raptor 72886|Main|Main] Worker 2 booted
-[Raptor 72887|Main|Main] Worker 3 booted
-[Raptor 72891|Main|Main] Worker 7 booted
-[Raptor 72888|Main|Main] Worker 4 booted
-[Raptor 72890|Main|Main] Worker 6 booted
-[Raptor 72889|Main|Main] Worker 5 booted
-[Raptor 72892|Main|Main] Worker 8 booted
-[Raptor 72893|Main|Main] Worker 9 booted
+[Raptor 39704|Main|Main] Cluster initializing:
+[Raptor 39704|Main|Main] ├─ Version: 0.23.0
+[Raptor 39704|Main|Main] ├─ Ruby Version: ruby 4.0.9 (2026-10-23 revision 3e93b23afc) +YJIT +PRISM [arm64-darwin25]
+[Raptor 39704|Main|Main] ├─ Environment: development
+[Raptor 39704|Main|Main] ├─ Master PID: 39704
+[Raptor 39704|Main|Main] │  └─ 10 worker processes
+[Raptor 39704|Main|Main] │     ├─ 1 server thread
+[Raptor 39704|Main|Main] │     ├─ 1 reactor thread
+[Raptor 39704|Main|Main] │     ├─ 1 HTTP/1.1 pipeline ractor
+[Raptor 39704|Main|Main] │     ├─ 1 pipeline collector thread
+[Raptor 39704|Main|Main] │     ├─ 3 worker threads (scaling, no limit)
+[Raptor 39704|Main|Main] │     └─ 1 stats thread
+[Raptor 39704|Main|Main] └─ Listening on 0.0.0.0:9292
+[Raptor 39720|Main|Main] Worker 1 booted
+[Raptor 39719|Main|Main] Worker 0 booted
+[Raptor 39722|Main|Main] Worker 3 booted
+[Raptor 39721|Main|Main] Worker 2 booted
+[Raptor 39723|Main|Main] Worker 4 booted
+[Raptor 39725|Main|Main] Worker 6 booted
+[Raptor 39724|Main|Main] Worker 5 booted
+[Raptor 39728|Main|Main] Worker 8 booted
+[Raptor 39726|Main|Main] Worker 7 booted
+[Raptor 39730|Main|Main] Worker 9 booted
 ```
 
 ```
