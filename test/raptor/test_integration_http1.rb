@@ -635,19 +635,19 @@ module Raptor
     end
 
     def test_on_error_callback_invoked_on_app_error
-      log_path = "/tmp/raptor_test_on_error_#{Process.pid}.log"
-      File.delete(log_path) rescue nil
-      @options[:on_error] = ->(env, error) { File.write(log_path, "#{env[Rack::PATH_INFO]}:#{error.class}") }
+      reader, writer = IO.pipe
+      @options[:on_error] = ->(env, error) { writer.puts("#{env[Rack::PATH_INFO]}:#{error.class}") }
 
       with_server("error_500.ru") do |uri|
         Net::HTTP.get_response(uri)
 
-        wait_until { File.size?(log_path) }
+        result = Timeout.timeout(5) { reader.gets }
 
-        assert_equal "/:RuntimeError", File.read(log_path)
+        assert_equal "/:RuntimeError\n", result
       end
     ensure
-      File.delete(log_path) rescue nil
+      reader&.close
+      writer&.close
     end
 
     def test_thread_locals_are_cleaned_by_default
