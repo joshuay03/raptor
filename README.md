@@ -208,50 +208,125 @@ Set `control_url` to a Unix socket URL such as `unix:///tmp/raptor-control.sock`
 
 ## (Micro) Benchmarks
 
-Raptor 0.23.0 vs Puma 8.0.2 vs Falcon 0.57.0 across two workload profiles. **IO-bound** is a GET endpoint that spends
-about 95% of each request waiting. It makes 5-10 simulated DB calls of 0.5-1.5ms each and renders a small JSON result
-after each one. **CPU-bound** is a POST endpoint that spends about 85% of each request running Ruby. It accepts a small
-JSON body, renders 2,100-7,000 JSON items in 3-5 chunks, each after a 25-50µs simulated cache hit, and returns a short
-response. **IO + SSE** repeats the IO-bound keep-alive run while 2 server-sent event streams per worker stay open,
-each receiving an event every second. Raptor serves them with `Raptor::DetachedBody`, which hands the stream to the
-reactor and frees the application thread, while Puma and Falcon stream from an Enumerator that sleeps between events.
-Puma keeps accepting connections while every thread in a worker is busy, so a stream or request it accepts can wait
-behind streams that never finish. Streams that got no response within 2 seconds and requests that hey gave up on
-after 20 seconds are counted in parentheses.
+Raptor 0.23.0 vs Puma 8.0.2 vs Falcon 0.57.0. Each case has 3 fresh-process samples, interleaved in seeded shuffled
+rounds. Each sample warms up for 3s and measures for 15s. Metrics are independent medians. ± is (max − min) / 2 /
+median, not a confidence interval. Failure counts below each table sum all samples, so a failed run cannot disappear in
+a median. Throughput counts successful ordinary requests only.
 
-Raptor and Puma are run in two modes: **Fixed** keeps 3 application threads per worker, while **Scaling** starts with 3
-and may grow to 16. Puma adds a thread whenever work is waiting, while Raptor only adds one when queued work is blocked
-outside the GVL. Falcon is compared against both modes. Raptor request-local cleanup and Puma's Fiber-per-request mode
-are disabled, and both threaded servers allow 999 requests per HTTP/1.1 keep-alive connection.
+Comparison columns show each server's change from Raptor's median for the baseline mode. Higher req/s is better. Lower
+p95 is better. Falcon's measurements are repeated against each Raptor mode, not rerun.
 
-Each cell reports the median throughput and median p95 latency independently across 3 runs, so the two numbers in a row
-may come from different runs. Every run starts a fresh server process so the samples are independent of each other;
-state accumulated in a previous run cannot bias the next. Across the whole table, the widest spread
-((max - min) / 2 / median) between runs of a single cell was ±48.9% for throughput and ±38.0% for p95.
+**IO** interleaves 5–10 sleeps of 0.5–1.5ms with small JSON renders. **CPU** interleaves 3–5 larger JSON renders with
+25–50µs sleeps. Both discard the rendered JSON and return a short response. **64 KiB body** sends a prebuilt response to
+isolate response transfer. **SSE (native)** uses Raptor's detached body versus blocking Enumerators. **Raptor (enum)**
+uses the same blocking body as Puma and Falcon, reusing their existing samples for comparison. The 20 streams are
+cluster-wide connections, not guaranteed to be evenly placed. Streams without complete headers after 2s remain connected
+and are counted as stalled.
 
-| Protocol              | Workload | Mode    | Raptor req/s | Raptor p95 | Puma req/s                | Puma p95  | vs Puma req/s | vs Puma p95  | Falcon req/s | Falcon p95 | vs Falcon req/s | vs Falcon p95 |
-| --------------------- | -------- | ------- | ------------ | ---------- | ------------------------- | --------- | ------------- | ------------ | ------------ | ---------- | --------------- | ------------- |
-| HTTP/1.1              | IO       | Fixed   | 3.41k req/s  | 45.60 ms   | 1.48k req/s               | 127.40 ms | 130.1% higher | 64.2% lower  | 10.72k req/s | 16.40 ms   | 68.2% lower     | 178.0% higher |
-| HTTP/1.1              | IO       | Scaling | 8.28k req/s  | 21.90 ms   | 8.06k req/s               | 22.70 ms  | 2.7% higher   | 3.5% lower   | 10.72k req/s | 16.40 ms   | 22.8% lower     | 33.5% higher  |
-| HTTP/1.1              | CPU      | Fixed   | 3.54k req/s  | 62.40 ms   | 3.44k req/s               | 52.20 ms  | 2.9% higher   | 19.5% higher | 3.57k req/s  | 45.90 ms   | 1.0% lower      | 35.9% higher  |
-| HTTP/1.1              | CPU      | Scaling | 3.40k req/s  | 63.40 ms   | 3.14k req/s               | 51.80 ms  | 8.0% higher   | 22.4% higher | 3.57k req/s  | 45.90 ms   | 4.9% lower      | 38.1% higher  |
-| HTTP/1.1 (keep-alive) | IO       | Fixed   | 3.38k req/s  | 37.50 ms   | 1.46k req/s               | 102.20 ms | 131.7% higher | 63.3% lower  | 7.23k req/s  | 25.20 ms   | 53.2% lower     | 48.8% higher  |
-| HTTP/1.1 (keep-alive) | IO       | Scaling | 7.38k req/s  | 24.70 ms   | 7.40k req/s               | 24.70 ms  | 0.3% lower    | 0.0% higher  | 7.23k req/s  | 25.20 ms   | 2.0% higher     | 2.0% lower    |
-| HTTP/1.1 (keep-alive) | CPU      | Fixed   | 3.34k req/s  | 49.70 ms   | 3.45k req/s               | 53.90 ms  | 3.3% lower    | 7.8% lower   | 3.71k req/s  | 57.80 ms   | 9.9% lower      | 14.0% lower   |
-| HTTP/1.1 (keep-alive) | CPU      | Scaling | 3.30k req/s  | 49.70 ms   | 3.06k req/s               | 62.90 ms  | 8.0% higher   | 21.0% lower  | 3.71k req/s  | 57.80 ms   | 10.9% lower     | 14.0% lower   |
-| HTTP/1.1 (keep-alive) | IO + SSE | Fixed   | 3.33k req/s  | 41.90 ms   | 0.35k req/s (21 timeouts) | 323.40 ms | 852.5% higher | 87.0% lower  | 7.26k req/s  | 25.10 ms   | 54.2% lower     | 66.9% higher  |
-| HTTP/1.1 (keep-alive) | IO + SSE | Scaling | 7.33k req/s  | 24.80 ms   | 7.16k req/s               | 25.50 ms  | 2.4% higher   | 2.7% lower   | 7.26k req/s  | 25.10 ms   | 1.0% higher     | 1.2% lower    |
-| HTTP/2                | IO       | Fixed   | 1.23k req/s  | 138.77 ms  | N/A                       | N/A       | -             | -            | 6.54k req/s  | 34.34 ms   | 81.2% lower     | 304.2% higher |
-| HTTP/2                | IO       | Scaling | 6.87k req/s  | 31.13 ms   | N/A                       | N/A       | -             | -            | 6.54k req/s  | 34.34 ms   | 5.2% higher     | 9.3% lower    |
-| HTTP/2                | CPU      | Fixed   | 3.37k req/s  | 68.35 ms   | N/A                       | N/A       | -             | -            | 1.75k req/s  | 158.85 ms  | 92.7% higher    | 57.0% lower   |
-| HTTP/2                | CPU      | Scaling | 3.28k req/s  | 62.50 ms   | N/A                       | N/A       | -             | -            | 1.75k req/s  | 158.85 ms  | 87.5% higher    | 60.7% lower   |
+Fixed (3), Scaling (3–16), and the IO-only Fixed (16) control separate tight concurrency, pool growth, and a prestarted
+larger pool. Falcon uses unbounded fibers and runs once per workload/protocol. Raptor request-local cleanup, CPU
+affinity, and reforking, and Puma's Fiber-per-request mode are disabled. Both threaded servers allow 999 requests per
+keep-alive connection.
 
-> ruby 4.1.0dev (2026-10-17T18:56:13Z master 5b1c373522) +YJIT +PRISM [aarch64-linux]
-> 10 worker processes; fixed Raptor and Puma run 3 threads per worker; scaling Raptor and Puma run 3 to 16;
-> Falcon runs unbounded fibers per worker; 120 concurrent HTTP/1.1 client connections; 40 concurrent HTTP/2 client
-> connections × 3 streams each; 20 open SSE streams in IO + SSE runs
+CPU includes the server master and descendants, including SSE event production, but excludes client CPU and warmup. CPU
+ms/req divides that CPU time by successful ordinary requests. Peak aggregate PSS is sampled every 0.5s, proportionally
+accounting for shared pages instead of counting them fully in every worker.
 
-See [bin/benchmark](bin/benchmark) for more details.
+### IO over HTTP/1.1
+
+| Server | Mode           | Raptor baseline | req/s        | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------ | -------------- | --------------- | ------------ | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor | Fixed (3)      | -               | 3.41k ±0.3%  | -               | 45.86  | -             | 2.418      | 352.5   |
+| Raptor | Scaling (3–16) | -               | 8.15k ±0.3%  | -               | 22.23  | -             | 0.472      | 339.9   |
+| Puma   | Fixed (3)      | Fixed (3)       | 1.55k ±0.9%  | 54.6% lower     | 116.06 | 153.1% higher | 0.953      | 296.2   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 8.14k ±0.5%  | 0.1% lower      | 22.27  | 0.2% higher   | 0.467      | 343.4   |
+| Falcon | Fibers         | Fixed (3)       | 11.24k ±0.5% | 229.9% higher   | 15.16  | 66.9% lower   | 0.427      | 462.2   |
+| Falcon | Fibers         | Scaling (3–16)  | 11.24k ±0.5% | 37.9% higher    | 15.16  | 31.8% lower   | 0.427      | 462.2   |
+
+### IO over HTTP/1.1 keep-alive
+
+| Server | Mode           | Raptor baseline | req/s       | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------ | -------------- | --------------- | ----------- | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor | Fixed (3)      | -               | 3.40k ±2.4% | -               | 36.30  | -             | 2.425      | 365.9   |
+| Raptor | Scaling (3–16) | -               | 7.42k ±2.0% | -               | 24.27  | -             | 0.461      | 362.8   |
+| Raptor | Fixed (16)     | -               | 7.49k ±0.9% | -               | 24.07  | -             | 0.446      | 367.4   |
+| Puma   | Fixed (3)      | Fixed (3)       | 1.49k ±0.8% | 56.1% lower     | 108.05 | 197.7% higher | 1.013      | 302.0   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 7.34k ±0.1% | 1.1% lower      | 24.67  | 1.6% higher   | 0.423      | 346.4   |
+| Puma   | Fixed (16)     | Fixed (16)      | 7.62k ±0.2% | 1.8% higher     | 23.70  | 1.5% lower    | 0.423      | 352.8   |
+| Falcon | Fibers         | Fixed (3)       | 7.35k ±2.4% | 116.6% higher   | 24.51  | 32.5% lower   | 0.375      | 317.6   |
+| Falcon | Fibers         | Scaling (3–16)  | 7.35k ±2.4% | 0.9% lower      | 24.51  | 1.0% higher   | 0.375      | 317.6   |
+| Falcon | Fibers         | Fixed (16)      | 7.35k ±2.4% | 1.8% lower      | 24.51  | 1.9% higher   | 0.375      | 317.6   |
+
+### IO over HTTP/2
+
+| Server | Mode           | Raptor baseline | req/s        | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------ | -------------- | --------------- | ------------ | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor | Fixed (3)      | -               | 1.59k ±0.5%  | -               | 137.45 | -             | 0.928      | 414.4   |
+| Raptor | Scaling (3–16) | -               | 7.17k ±11.3% | -               | 29.93  | -             | 0.544      | 916.8   |
+| Falcon | Fibers         | Fixed (3)       | 7.13k ±3.5%  | 347.2% higher   | 27.05  | 80.3% lower   | 0.425      | 496.1   |
+| Falcon | Fibers         | Scaling (3–16)  | 7.13k ±3.5%  | 0.5% lower      | 27.05  | 9.6% lower    | 0.425      | 496.1   |
+
+### CPU over HTTP/1.1
+
+| Server | Mode           | Raptor baseline | req/s       | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------ | -------------- | --------------- | ----------- | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor | Fixed (3)      | -               | 3.61k ±2.0% | -               | 62.23  | -             | 2.384      | 484.7   |
+| Raptor | Scaling (3–16) | -               | 3.54k ±2.1% | -               | 58.68  | -             | 2.347      | 505.5   |
+| Puma   | Fixed (3)      | Fixed (3)       | 3.29k ±0.5% | 8.9% lower      | 54.53  | 12.4% lower   | 2.414      | 482.6   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 2.89k ±1.0% | 18.4% lower     | 53.12  | 9.5% lower    | 2.311      | 550.0   |
+| Falcon | Fibers         | Fixed (3)       | 3.86k ±0.3% | 6.9% higher     | 42.79  | 31.2% lower   | 2.227      | 381.3   |
+| Falcon | Fibers         | Scaling (3–16)  | 3.86k ±0.3% | 8.9% higher     | 42.79  | 27.1% lower   | 2.227      | 381.3   |
+
+### CPU over HTTP/1.1 keep-alive
+
+| Server | Mode           | Raptor baseline | req/s       | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------ | -------------- | --------------- | ----------- | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor | Fixed (3)      | -               | 3.12k ±4.6% | -               | 53.11  | -             | 2.541      | 522.7   |
+| Raptor | Scaling (3–16) | -               | 3.09k ±1.2% | -               | 50.46  | -             | 2.480      | 529.8   |
+| Puma   | Fixed (3)      | Fixed (3)       | 3.61k ±1.3% | 15.7% higher    | 48.24  | 9.2% lower    | 2.246      | 408.7   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 2.88k ±1.3% | 6.6% lower      | 63.29  | 25.4% higher  | 2.228      | 492.4   |
+| Falcon | Fibers         | Fixed (3)       | 3.75k ±1.0% | 20.1% higher    | 60.37  | 13.7% higher  | 2.338      | 556.5   |
+| Falcon | Fibers         | Scaling (3–16)  | 3.75k ±1.0% | 21.4% higher    | 60.37  | 19.6% higher  | 2.338      | 556.5   |
+
+### CPU over HTTP/2
+
+| Server | Mode           | Raptor baseline | req/s        | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------ | -------------- | --------------- | ------------ | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor | Fixed (3)      | -               | 3.70k ±4.9%  | -               | 58.06  | -             | 2.267      | 594.4   |
+| Raptor | Scaling (3–16) | -               | 3.37k ±1.4%  | -               | 64.86  | -             | 2.239      | 632.4   |
+| Falcon | Fibers         | Fixed (3)       | 2.79k ±25.3% | 24.6% lower     | 131.81 | 127.0% higher | 2.121      | 546.9   |
+| Falcon | Fibers         | Scaling (3–16)  | 2.79k ±25.3% | 17.2% lower     | 131.81 | 103.2% higher | 2.121      | 546.9   |
+
+### 64 KiB body over HTTP/1.1 keep-alive
+
+This case was rerun on Ruby 4.1-dev (`33ac6afea7`); the other cases use `cda3527671`.
+
+| Server | Mode           | Raptor baseline | req/s         | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------ | -------------- | --------------- | ------------- | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor | Scaling (3–16) | -               | 102.11k ±0.4% | -               | 3.37   | -             | 0.047      | 513.5   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 88.55k ±0.6%  | 13.3% lower     | 3.63   | 7.9% higher   | 0.054      | 1371.1  |
+| Falcon | Fibers         | Scaling (3–16)  | 104.10k ±0.5% | 2.0% higher     | 3.81   | 13.2% higher  | 0.051      | 520.9   |
+
+### IO + SSE (native) over HTTP/1.1 keep-alive
+
+| Server        | Mode           | Raptor baseline | req/s        | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------------- | -------------- | --------------- | ------------ | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor        | Fixed (3)      | -               | 3.46k ±6.8%  | -               | 35.01  | -             | 2.431      | 374.8   |
+| Raptor        | Scaling (3–16) | -               | 7.48k ±0.4%  | -               | 24.11  | -             | 0.456      | 371.6   |
+| Puma          | Fixed (3)      | Fixed (3)       | 0.35k ±5.0%  | 90.0% lower     | 317.72 | 807.6% higher | 1.711      | 264.7   |
+| Puma          | Scaling (3–16) | Scaling (3–16)  | 7.14k ±4.3%  | 4.5% lower      | 25.45  | 5.6% higher   | 0.419      | 342.9   |
+| Falcon        | Fibers         | Fixed (3)       | 7.28k ±0.7%  | 110.5% higher   | 25.00  | 28.6% lower   | 0.374      | 332.1   |
+| Falcon        | Fibers         | Scaling (3–16)  | 7.28k ±0.7%  | 2.6% lower      | 25.00  | 3.7% higher   | 0.374      | 332.1   |
+| Raptor (enum) | Fixed (3)      | -               | 0.89k ±15.9% | -               | 59.24  | -             | 8.100      | 363.8   |
+
+Puma, Fixed (3) had 54 timeouts, 1 stalled stream across all samples.
+
+Raptor (enum), Fixed (3) had 21 timeouts across all samples.
+
+> ruby 4.1.0dev (2026-10-27T07:37:34Z HEAD cda3527671) +YJIT +PRISM [aarch64-linux]
+> 10 workers, 120 HTTP/1.1 client connections, 40 HTTP/2 connections × 3 streams.
+
+Run [bin/benchmark](bin/benchmark) to reproduce.
 
 ## Development
 

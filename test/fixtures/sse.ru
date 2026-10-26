@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-IO_APP = Rack::Builder.parse_file(File.expand_path("bench_io.ru", __dir__))
+IO_APP = Rack::Builder.parse_file(File.expand_path("io_bound.ru", __dir__))
 SSE_HEADERS = { "content-type" => "text/event-stream", "cache-control" => "no-cache" }.freeze
 OPENED = ": open\n\n"
 EVENT = "data: tick\n\n"
 
-open_stream = if defined?(Raptor::DetachedBody)
+open_stream = if ENV["RAPTOR_SSE_BODY"] != "enumerator" && defined?(Raptor::DetachedBody)
   # Detached bodies release the application thread, so one thread per worker
   # writes an event to every open stream each second.
   new_streams = Queue.new
@@ -41,5 +41,5 @@ else
 end
 
 run proc { |env|
-  env["PATH_INFO"] == "/stream" ? [200, SSE_HEADERS, open_stream.call] : IO_APP.call(env)
+  env["PATH_INFO"] == "/stream" ? [200, SSE_HEADERS.dup, open_stream.call] : IO_APP.call(env)
 }

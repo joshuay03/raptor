@@ -1,5 +1,11 @@
 FROM golang:bookworm AS hey-builder
-RUN CGO_ENABLED=0 go install github.com/rakyll/hey@latest
+RUN CGO_ENABLED=0 go install github.com/rakyll/hey@v0.1.5
+
+WORKDIR /go/pkg/mod/github.com/rakyll/hey@v0.1.5
+# Keep the bounded initial allocation, but retain every response for full-window p95.
+RUN sed -i '/if len(r.resLats) < maxRes {/d; /r.offsets = append(r.offsets, res.offset.Seconds())/{n;d;}' requester/report.go \
+    && gofmt -w requester/report.go \
+    && CGO_ENABLED=0 go build -o /go/bin/hey .
 
 FROM rubylang/ruby:master-dev
 

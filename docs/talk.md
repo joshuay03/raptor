@@ -1162,16 +1162,91 @@ Puma doesn't have a built-in setting for this.</big>
 <br>
 <br>
 
-## The numbers
+## The numbers over HTTP/1.1 without keep-alive
 
-Synthetic Rack workloads on Ruby 4.1-dev with YJIT, not predictions for your Rails app.
+Scaling uses 3–16 threads per worker. Fixed uses 3. Falcon uses unbounded fibers.
 
-- <big>On **I/O-heavy HTTP/1.1**, Raptor delivers roughly 2.3 times Puma's throughput with 3 threads per worker. They're approximately tied when both can scale.</big>
-- <big>On **CPU-heavy HTTP/1.1**, throughput is close to Puma. Raptor has lower p95 latency with keep-alive. Puma has lower p95 latency on fresh connections.</big>
-- <big>With **I/O and server-sent events**, Raptor delivers 9.5 times Puma's throughput with 3 threads per worker, and Puma reports timeouts. Raptor is only a few percent ahead with scaling.</big>
-- <big>On **HTTP/2**, Raptor beats Falcon on CPU-heavy throughput. It trails on I/O with fixed threads and roughly matches Falcon with scaling. Results vary widely.</big>
+**I/O-bound requests**
 
-Under saturation, Raptor's accept polling uses extra CPU, and existing keep-alive traffic can delay new connections. These aren't predictions for your app, so try it and measure. Full results and the setup are in the [README](../README.md#micro-benchmarks).
+<big>With scaling threads, Raptor matches Puma on throughput and p95.
+Falcon has 38% higher throughput than Raptor, with lower p95.
+With 3 fixed threads, Raptor has over twice Puma's throughput.</big>
+
+**CPU-bound requests**
+
+<big>With scaling threads, Raptor gets about 23% more throughput than Puma, with 10% higher p95.
+With 3 fixed threads, the throughput lead is 10%. Falcon leads on both metrics.</big>
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+---
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+## The numbers over HTTP/1.1 keep-alive
+
+Scaling uses 3–16 threads per worker. Fixed uses 3. Falcon uses unbounded fibers.
+
+**I/O-bound requests**
+
+<big>With scaling threads, Raptor matches Puma and Falcon on throughput and p95.
+With 3 fixed threads, Raptor has over twice Puma's throughput.</big>
+
+**CPU-bound requests**
+
+<big>With scaling threads, Raptor gets 7% more throughput and 20% lower p95 than scaling Puma.
+With 3 fixed threads, Puma leads on both metrics.
+Falcon has higher throughput, but Raptor's p95 is lower.</big>
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+---
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+## The numbers over HTTP/2
+
+Raptor vs Falcon. Puma has no native HTTP/2.
+
+**I/O-bound requests**
+
+<big>With scaling threads, Raptor matches Falcon's throughput, with p95 around 30 ms versus 27 ms.
+With 3 fixed threads, throughput is 78% lower than Falcon.</big>
+
+**CPU-bound requests**
+
+<big>With scaling threads, Raptor gets 21% more throughput than Falcon at about half the p95.
+With 3 fixed threads, the throughput lead is 33%.</big>
+
+Full results and the setup are in the [README](../README.md#micro-benchmarks).
 
 <br>
 <br>
