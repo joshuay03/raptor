@@ -252,6 +252,8 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 rounds. Each sample warms up for 3s and measures for 15s. Metrics are independent medians. ± is (max − min) / 2 /
 median, not a confidence interval. Failure counts below each table sum all samples, so a failed run cannot disappear in
 a median. Throughput counts successful ordinary requests only.</p>
+<p>Comparison columns show each server's change from Raptor's median for the baseline mode. Higher req/s is better. Lower
+p95 is better. Falcon's measurements are repeated against each Raptor mode, not rerun.</p>
 <p><strong>IO</strong> interleaves 5–10 sleeps of 0.5–1.5ms with small JSON renders. <strong>CPU</strong> interleaves 3–5 larger JSON renders with
 25–50µs sleeps. Both discard the rendered JSON and return a short response. <strong>64 KiB body</strong> sends a prebuilt response to
 isolate response transfer. <strong>SSE (native)</strong> uses Raptor's detached body versus blocking Enumerators. <strong>Raptor (enum)</strong>
@@ -271,8 +273,11 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <th>Server</th>
 <th>Mode</th>
+<th>Raptor baseline</th>
 <th>req/s</th>
+<th>vs Raptor req/s</th>
 <th>p95 ms</th>
+<th>vs Raptor p95</th>
 <th>CPU ms/req</th>
 <th>PSS MiB</th>
 </tr>
@@ -281,42 +286,68 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <td>Raptor</td>
 <td>Fixed (3)</td>
-<td>3.23k ±4.6%</td>
-<td>52.33</td>
-<td>2.811</td>
-<td>357.9</td>
+<td>-</td>
+<td>3.41k ±0.3%</td>
+<td>-</td>
+<td>45.86</td>
+<td>-</td>
+<td>2.418</td>
+<td>352.5</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
-<td>7.37k ±7.6%</td>
-<td>24.70</td>
-<td>0.443</td>
-<td>368.6</td>
+<td>-</td>
+<td>8.15k ±0.3%</td>
+<td>-</td>
+<td>22.23</td>
+<td>-</td>
+<td>0.472</td>
+<td>339.9</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
-<td>1.50k ±0.2%</td>
-<td>130.80</td>
-<td>0.575</td>
-<td>309.4</td>
+<td>Fixed (3)</td>
+<td>1.55k ±0.9%</td>
+<td>54.6% lower</td>
+<td>116.06</td>
+<td>153.1% higher</td>
+<td>0.953</td>
+<td>296.2</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
-<td>7.08k ±0.6%</td>
-<td>25.65</td>
-<td>0.429</td>
-<td>379.4</td>
+<td>Scaling (3–16)</td>
+<td>8.14k ±0.5%</td>
+<td>0.1% lower</td>
+<td>22.27</td>
+<td>0.2% higher</td>
+<td>0.467</td>
+<td>343.4</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
-<td>10.87k ±3.1%</td>
-<td>16.50</td>
-<td>0.457</td>
-<td>430.4</td>
+<td>Fixed (3)</td>
+<td>11.24k ±0.5%</td>
+<td>229.9% higher</td>
+<td>15.16</td>
+<td>66.9% lower</td>
+<td>0.427</td>
+<td>462.2</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Scaling (3–16)</td>
+<td>11.24k ±0.5%</td>
+<td>37.9% higher</td>
+<td>15.16</td>
+<td>31.8% lower</td>
+<td>0.427</td>
+<td>462.2</td>
 </tr>
 </tbody>
 </table>
@@ -326,8 +357,11 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <th>Server</th>
 <th>Mode</th>
+<th>Raptor baseline</th>
 <th>req/s</th>
+<th>vs Raptor req/s</th>
 <th>p95 ms</th>
+<th>vs Raptor p95</th>
 <th>CPU ms/req</th>
 <th>PSS MiB</th>
 </tr>
@@ -336,58 +370,101 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <td>Raptor</td>
 <td>Fixed (3)</td>
-<td>3.02k ±9.0%</td>
-<td>55.73</td>
-<td>2.574</td>
-<td>364.7</td>
+<td>-</td>
+<td>3.40k ±2.4%</td>
+<td>-</td>
+<td>36.30</td>
+<td>-</td>
+<td>2.425</td>
+<td>365.9</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
-<td>6.81k ±1.9%</td>
-<td>26.47</td>
-<td>0.398</td>
-<td>383.9</td>
+<td>-</td>
+<td>7.42k ±2.0%</td>
+<td>-</td>
+<td>24.27</td>
+<td>-</td>
+<td>0.461</td>
+<td>362.8</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Fixed (16)</td>
-<td>6.98k ±0.7%</td>
-<td>25.61</td>
-<td>0.385</td>
-<td>388.2</td>
+<td>-</td>
+<td>7.49k ±0.9%</td>
+<td>-</td>
+<td>24.07</td>
+<td>-</td>
+<td>0.446</td>
+<td>367.4</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
-<td>1.47k ±4.5%</td>
-<td>103.56</td>
-<td>0.510</td>
-<td>315.7</td>
+<td>Fixed (3)</td>
+<td>1.49k ±0.8%</td>
+<td>56.1% lower</td>
+<td>108.05</td>
+<td>197.7% higher</td>
+<td>1.013</td>
+<td>302.0</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
-<td>6.82k ±2.7%</td>
-<td>26.38</td>
-<td>0.351</td>
-<td>370.2</td>
+<td>Scaling (3–16)</td>
+<td>7.34k ±0.1%</td>
+<td>1.1% lower</td>
+<td>24.67</td>
+<td>1.6% higher</td>
+<td>0.423</td>
+<td>346.4</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (16)</td>
-<td>6.88k ±5.4%</td>
-<td>26.35</td>
-<td>0.388</td>
-<td>366.3</td>
+<td>Fixed (16)</td>
+<td>7.62k ±0.2%</td>
+<td>1.8% higher</td>
+<td>23.70</td>
+<td>1.5% lower</td>
+<td>0.423</td>
+<td>352.8</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
-<td>6.85k ±4.3%</td>
-<td>26.56</td>
-<td>0.321</td>
-<td>359.1</td>
+<td>Fixed (3)</td>
+<td>7.35k ±2.4%</td>
+<td>116.6% higher</td>
+<td>24.51</td>
+<td>32.5% lower</td>
+<td>0.375</td>
+<td>317.6</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Scaling (3–16)</td>
+<td>7.35k ±2.4%</td>
+<td>0.9% lower</td>
+<td>24.51</td>
+<td>1.0% higher</td>
+<td>0.375</td>
+<td>317.6</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Fixed (16)</td>
+<td>7.35k ±2.4%</td>
+<td>1.8% lower</td>
+<td>24.51</td>
+<td>1.9% higher</td>
+<td>0.375</td>
+<td>317.6</td>
 </tr>
 </tbody>
 </table>
@@ -397,8 +474,11 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <th>Server</th>
 <th>Mode</th>
+<th>Raptor baseline</th>
 <th>req/s</th>
+<th>vs Raptor req/s</th>
 <th>p95 ms</th>
+<th>vs Raptor p95</th>
 <th>CPU ms/req</th>
 <th>PSS MiB</th>
 </tr>
@@ -407,26 +487,46 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <td>Raptor</td>
 <td>Fixed (3)</td>
-<td>1.55k ±1.5%</td>
-<td>119.48</td>
-<td>0.632</td>
-<td>511.6</td>
+<td>-</td>
+<td>1.59k ±0.5%</td>
+<td>-</td>
+<td>137.45</td>
+<td>-</td>
+<td>0.928</td>
+<td>414.4</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
-<td>6.77k ±14.6%</td>
-<td>31.57</td>
-<td>0.489</td>
-<td>910.2</td>
+<td>-</td>
+<td>7.17k ±11.3%</td>
+<td>-</td>
+<td>29.93</td>
+<td>-</td>
+<td>0.544</td>
+<td>916.8</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
-<td>7.62k ±4.1%</td>
-<td>27.06</td>
-<td>0.371</td>
-<td>546.4</td>
+<td>Fixed (3)</td>
+<td>7.13k ±3.5%</td>
+<td>347.2% higher</td>
+<td>27.05</td>
+<td>80.3% lower</td>
+<td>0.425</td>
+<td>496.1</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Scaling (3–16)</td>
+<td>7.13k ±3.5%</td>
+<td>0.5% lower</td>
+<td>27.05</td>
+<td>9.6% lower</td>
+<td>0.425</td>
+<td>496.1</td>
 </tr>
 </tbody>
 </table>
@@ -436,8 +536,11 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <th>Server</th>
 <th>Mode</th>
+<th>Raptor baseline</th>
 <th>req/s</th>
+<th>vs Raptor req/s</th>
 <th>p95 ms</th>
+<th>vs Raptor p95</th>
 <th>CPU ms/req</th>
 <th>PSS MiB</th>
 </tr>
@@ -446,42 +549,68 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <td>Raptor</td>
 <td>Fixed (3)</td>
-<td>3.92k ±7.9%</td>
-<td>44.22</td>
-<td>2.385</td>
-<td>397.2</td>
+<td>-</td>
+<td>3.61k ±2.0%</td>
+<td>-</td>
+<td>62.23</td>
+<td>-</td>
+<td>2.384</td>
+<td>484.7</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
-<td>3.09k ±23.4%</td>
-<td>80.25</td>
-<td>2.822</td>
-<td>429.1</td>
+<td>-</td>
+<td>3.54k ±2.1%</td>
+<td>-</td>
+<td>58.68</td>
+<td>-</td>
+<td>2.347</td>
+<td>505.5</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
-<td>3.71k ±5.1%</td>
-<td>49.52</td>
-<td>2.307</td>
-<td>366.7</td>
+<td>Fixed (3)</td>
+<td>3.29k ±0.5%</td>
+<td>8.9% lower</td>
+<td>54.53</td>
+<td>12.4% lower</td>
+<td>2.414</td>
+<td>482.6</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
-<td>3.21k ±3.3%</td>
-<td>52.08</td>
-<td>2.334</td>
-<td>464.5</td>
+<td>Scaling (3–16)</td>
+<td>2.89k ±1.0%</td>
+<td>18.4% lower</td>
+<td>53.12</td>
+<td>9.5% lower</td>
+<td>2.311</td>
+<td>550.0</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
-<td>3.31k ±9.7%</td>
-<td>49.89</td>
-<td>2.821</td>
-<td>409.9</td>
+<td>Fixed (3)</td>
+<td>3.86k ±0.3%</td>
+<td>6.9% higher</td>
+<td>42.79</td>
+<td>31.2% lower</td>
+<td>2.227</td>
+<td>381.3</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Scaling (3–16)</td>
+<td>3.86k ±0.3%</td>
+<td>8.9% higher</td>
+<td>42.79</td>
+<td>27.1% lower</td>
+<td>2.227</td>
+<td>381.3</td>
 </tr>
 </tbody>
 </table>
@@ -491,8 +620,11 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <th>Server</th>
 <th>Mode</th>
+<th>Raptor baseline</th>
 <th>req/s</th>
+<th>vs Raptor req/s</th>
 <th>p95 ms</th>
+<th>vs Raptor p95</th>
 <th>CPU ms/req</th>
 <th>PSS MiB</th>
 </tr>
@@ -501,42 +633,68 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <td>Raptor</td>
 <td>Fixed (3)</td>
-<td>3.38k ±12.6%</td>
-<td>47.96</td>
-<td>2.465</td>
-<td>420.4</td>
+<td>-</td>
+<td>3.12k ±4.6%</td>
+<td>-</td>
+<td>53.11</td>
+<td>-</td>
+<td>2.541</td>
+<td>522.7</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
-<td>3.13k ±25.3%</td>
-<td>53.01</td>
-<td>2.592</td>
-<td>436.2</td>
+<td>-</td>
+<td>3.09k ±1.2%</td>
+<td>-</td>
+<td>50.46</td>
+<td>-</td>
+<td>2.480</td>
+<td>529.8</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
-<td>3.74k ±1.2%</td>
-<td>49.82</td>
-<td>2.288</td>
-<td>366.5</td>
+<td>Fixed (3)</td>
+<td>3.61k ±1.3%</td>
+<td>15.7% higher</td>
+<td>48.24</td>
+<td>9.2% lower</td>
+<td>2.246</td>
+<td>408.7</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
-<td>3.19k ±8.6%</td>
-<td>62.27</td>
-<td>2.136</td>
-<td>441.8</td>
+<td>Scaling (3–16)</td>
+<td>2.88k ±1.3%</td>
+<td>6.6% lower</td>
+<td>63.29</td>
+<td>25.4% higher</td>
+<td>2.228</td>
+<td>492.4</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
-<td>3.85k ±2.1%</td>
-<td>49.17</td>
-<td>2.520</td>
-<td>395.8</td>
+<td>Fixed (3)</td>
+<td>3.75k ±1.0%</td>
+<td>20.1% higher</td>
+<td>60.37</td>
+<td>13.7% higher</td>
+<td>2.338</td>
+<td>556.5</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Scaling (3–16)</td>
+<td>3.75k ±1.0%</td>
+<td>21.4% higher</td>
+<td>60.37</td>
+<td>19.6% higher</td>
+<td>2.338</td>
+<td>556.5</td>
 </tr>
 </tbody>
 </table>
@@ -546,8 +704,11 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <th>Server</th>
 <th>Mode</th>
+<th>Raptor baseline</th>
 <th>req/s</th>
+<th>vs Raptor req/s</th>
 <th>p95 ms</th>
+<th>vs Raptor p95</th>
 <th>CPU ms/req</th>
 <th>PSS MiB</th>
 </tr>
@@ -556,26 +717,46 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <td>Raptor</td>
 <td>Fixed (3)</td>
-<td>3.17k ±7.2%</td>
-<td>67.99</td>
-<td>2.847</td>
-<td>566.4</td>
+<td>-</td>
+<td>3.70k ±4.9%</td>
+<td>-</td>
+<td>58.06</td>
+<td>-</td>
+<td>2.267</td>
+<td>594.4</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
-<td>3.29k ±5.4%</td>
-<td>69.45</td>
-<td>2.425</td>
-<td>569.6</td>
+<td>-</td>
+<td>3.37k ±1.4%</td>
+<td>-</td>
+<td>64.86</td>
+<td>-</td>
+<td>2.239</td>
+<td>632.4</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
-<td>2.97k ±18.3%</td>
-<td>99.77</td>
-<td>2.387</td>
-<td>516.5</td>
+<td>Fixed (3)</td>
+<td>2.79k ±25.3%</td>
+<td>24.6% lower</td>
+<td>131.81</td>
+<td>127.0% higher</td>
+<td>2.121</td>
+<td>546.9</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Scaling (3–16)</td>
+<td>2.79k ±25.3%</td>
+<td>17.2% lower</td>
+<td>131.81</td>
+<td>103.2% higher</td>
+<td>2.121</td>
+<td>546.9</td>
 </tr>
 </tbody>
 </table>
@@ -585,8 +766,11 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <th>Server</th>
 <th>Mode</th>
+<th>Raptor baseline</th>
 <th>req/s</th>
+<th>vs Raptor req/s</th>
 <th>p95 ms</th>
+<th>vs Raptor p95</th>
 <th>CPU ms/req</th>
 <th>PSS MiB</th>
 </tr>
@@ -595,26 +779,35 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
-<td>99.94k ±10.5%</td>
-<td>3.50</td>
-<td>0.048</td>
-<td>482.3</td>
+<td>-</td>
+<td>101.83k ±2.0%</td>
+<td>-</td>
+<td>3.47</td>
+<td>-</td>
+<td>0.047</td>
+<td>492.3</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
-<td>72.05k ±11.9%</td>
-<td>4.68</td>
-<td>0.070</td>
-<td>1545.8</td>
+<td>Scaling (3–16)</td>
+<td>87.82k ±0.3%</td>
+<td>13.8% lower</td>
+<td>3.62</td>
+<td>4.3% higher</td>
+<td>0.054</td>
+<td>1341.9</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
-<td>80.78k ±9.3%</td>
-<td>4.95</td>
-<td>0.069</td>
-<td>705.6</td>
+<td>Scaling (3–16)</td>
+<td>104.40k ±0.6%</td>
+<td>2.5% higher</td>
+<td>3.88</td>
+<td>11.8% higher</td>
+<td>0.050</td>
+<td>446.1</td>
 </tr>
 </tbody>
 </table>
@@ -624,8 +817,11 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <th>Server</th>
 <th>Mode</th>
+<th>Raptor baseline</th>
 <th>req/s</th>
+<th>vs Raptor req/s</th>
 <th>p95 ms</th>
+<th>vs Raptor p95</th>
 <th>CPU ms/req</th>
 <th>PSS MiB</th>
 </tr>
@@ -634,57 +830,86 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <tr>
 <td>Raptor</td>
 <td>Fixed (3)</td>
-<td>3.41k ±13.1%</td>
-<td>36.39</td>
-<td>2.499</td>
-<td>378.2</td>
+<td>-</td>
+<td>3.46k ±6.8%</td>
+<td>-</td>
+<td>35.01</td>
+<td>-</td>
+<td>2.431</td>
+<td>374.8</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
-<td>6.99k ±4.3%</td>
-<td>26.05</td>
-<td>0.428</td>
-<td>390.0</td>
+<td>-</td>
+<td>7.48k ±0.4%</td>
+<td>-</td>
+<td>24.11</td>
+<td>-</td>
+<td>0.456</td>
+<td>371.6</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
-<td>0.35k ±4.9%</td>
-<td>301.77</td>
-<td>0.681</td>
-<td>262.6</td>
+<td>Fixed (3)</td>
+<td>0.35k ±5.0%</td>
+<td>90.0% lower</td>
+<td>317.72</td>
+<td>807.6% higher</td>
+<td>1.711</td>
+<td>264.7</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
-<td>6.88k ±5.9%</td>
-<td>26.27</td>
-<td>0.373</td>
-<td>369.0</td>
+<td>Scaling (3–16)</td>
+<td>7.14k ±4.3%</td>
+<td>4.5% lower</td>
+<td>25.45</td>
+<td>5.6% higher</td>
+<td>0.419</td>
+<td>342.9</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
-<td>7.55k ±10.5%</td>
-<td>25.90</td>
-<td>0.349</td>
-<td>380.6</td>
+<td>Fixed (3)</td>
+<td>7.28k ±0.7%</td>
+<td>110.5% higher</td>
+<td>25.00</td>
+<td>28.6% lower</td>
+<td>0.374</td>
+<td>332.1</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Scaling (3–16)</td>
+<td>7.28k ±0.7%</td>
+<td>2.6% lower</td>
+<td>25.00</td>
+<td>3.7% higher</td>
+<td>0.374</td>
+<td>332.1</td>
 </tr>
 <tr>
 <td>Raptor (enum)</td>
 <td>Fixed (3)</td>
-<td>0.88k ±13.2%</td>
-<td>66.78</td>
-<td>8.608</td>
-<td>336.9</td>
+<td>-</td>
+<td>0.89k ±15.9%</td>
+<td>-</td>
+<td>59.24</td>
+<td>-</td>
+<td>8.100</td>
+<td>363.8</td>
 </tr>
 </tbody>
 </table>
-<p>Puma, Fixed (3) had 57 timeouts across all samples.</p>
-<p>Raptor (enum), Fixed (3) had 29 timeouts, 1 stalled stream across all samples.</p>
+<p>Puma, Fixed (3) had 54 timeouts, 1 stalled stream across all samples.</p>
+<p>Raptor (enum), Fixed (3) had 21 timeouts across all samples.</p>
 <blockquote>
-<p>ruby 4.1.0dev (2026-10-17T18:56:13Z master 5b1c373522) +YJIT +PRISM [aarch64-linux]
+<p>ruby 4.1.0dev (2026-10-27T07:37:34Z HEAD cda3527671) +YJIT +PRISM [aarch64-linux]
 10 workers, 120 HTTP/1.1 client connections, 40 HTTP/2 connections × 3 streams.</p>
 </blockquote>
 <p>Run <a href="bin/benchmark">bin/benchmark</a> to reproduce.</p>
@@ -706,7 +931,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Tue Oct 27 15:38:31 2026 by
+  Generated on Tue Oct 27 16:30:20 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
