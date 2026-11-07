@@ -31,6 +31,19 @@ module Raptor
       end
     end
 
+    def test_parse_trims_header_whitespace_across_fragments
+      request = "POST / HTTP/1.1\r\nHost:\t example.test \t\r\nContent-Length: \t5\t \r\n\r\nhello"
+      (1...request.bytesize).each do |split|
+        partial = Http1.parse({ buffer: request.byteslice(0, split) }, {}, nil)
+        parsed = Http1.parse(partial.merge(buffer: partial[:buffer] + request.byteslice(split..)), {}, nil)
+
+        refute parsed[:malformed], "split at #{split}"
+        assert parsed[:complete]
+        assert_equal "example.test", parsed[:env]["HTTP_HOST"]
+        assert_equal "hello", parsed[:body]
+      end
+    end
+
     def test_eager_keepalive_requeues_when_work_is_waiting
       handler = Http1.allocate
       handler.instance_variable_set(:@running, AtomicBoolean.new(true))

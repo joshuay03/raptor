@@ -26,6 +26,19 @@ module Raptor
       assert_equal "legacy", env["HTTP_X_AUTH_TOKEN"]
     end
 
+    def test_header_values_trim_optional_whitespace_but_preserve_interior_tabs
+      env = {}
+      request = "POST / HTTP/1.1\r\nHost:\t example.test \t\r\nContent-Length: \t5\t \r\nX-Note:\t first\tsecond \t\r\nX-Empty: \t \r\n\r\n"
+      parser = HttpParser.new
+      parser.execute(env, request, 0)
+
+      assert_equal "example.test", env["HTTP_HOST"]
+      assert_equal "5", env["CONTENT_LENGTH"]
+      assert_equal 5, parser.content_length
+      assert_equal "first\tsecond", env["HTTP_X_NOTE"]
+      assert_equal "", env["HTTP_X_EMPTY"]
+    end
+
     def test_rejects_underscore_framing_aliases
       ["Content_Length: 1", "Transfer_Encoding: chunked"].each do |header|
         assert_raises(HttpParserError) do

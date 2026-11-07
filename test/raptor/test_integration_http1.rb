@@ -231,10 +231,17 @@ module Raptor
 
     def test_rack_input_with_post_body
       with_server("rack_input.ru") do |uri|
-        response = Net::HTTP.post(uri, "request body data")
+        body = "request body data"
+        [" ", "\t "].each do |whitespace|
+          response = raw_request(
+            uri,
+            "POST / HTTP/1.1\r\nHost:#{whitespace}localhost#{whitespace}\r\n" \
+            "Content-Length:#{whitespace}#{body.bytesize}#{whitespace}\r\nConnection: close\r\n\r\n#{body}"
+          )
 
-        assert_equal 200, response.code.to_i
-        assert_equal "request body data", response.body.strip
+          assert_match(%r{\AHTTP/1\.1 200 }, response)
+          assert_equal body, response.split("\r\n\r\n", 2).last
+        end
       end
     end
 
@@ -808,14 +815,16 @@ module Raptor
 
     def test_empty_host_returns_400
       with_server do |uri|
-        response = raw_request(
-          uri,
-          "GET / HTTP/1.1\r\n" \
-          "Host: \r\n" \
-          "Connection: close\r\n\r\n"
-        )
+        ["", " ", " \t "].each do |value|
+          response = raw_request(
+            uri,
+            "GET / HTTP/1.1\r\n" \
+            "Host:#{value}\r\n" \
+            "Connection: close\r\n\r\n"
+          )
 
-        assert_match(/400 Bad Request/, response)
+          assert_match(/400 Bad Request/, response)
+        end
       end
     end
 

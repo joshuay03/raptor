@@ -547,6 +547,7 @@ st18:
 		goto _test_eof18;
 case 18:
 	switch( (*p) ) {
+		case 9: goto tr27;
 		case 13: goto tr26;
 		case 32: goto tr27;
 		case 127: goto st0;
