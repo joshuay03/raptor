@@ -34,6 +34,8 @@ module Raptor
 
     INTERNAL_SERVER_ERROR_RESPONSE: ::String
 
+    NOT_IMPLEMENTED_RESPONSE: ::String
+
     CHUNKED_TERMINATOR: ::String
 
     CONNECTION_CLOSE: ::String
@@ -72,17 +74,14 @@ module Raptor
     # @rbs (Hash[String, untyped] env) -> bool
     def self.invalid_host?: (Hash[String, untyped] env) -> bool
 
-    # Returns true when the message framing shows a request-smuggling vector
-    # per RFC 9112 section 6.3: a `Transfer-Encoding` where `chunked` is
-    # missing, not the final encoding, or duplicated; a `Transfer-Encoding`
-    # paired with a `Content-Length`; or a `Content-Length` containing any
-    # non-digit character.
+    # Rejects ambiguous message framing per RFC 9112 section 6.3 and
+    # transfer codings other than a single `chunked`.
     #
     # @param env [Hash] the Rack environment after header parsing
-    # @return [Boolean]
+    # @return [Symbol, nil] `:malformed`, `:unsupported_encoding`, or nil
     #
-    # @rbs (Hash[String, untyped] env) -> bool
-    def self.request_smuggling?: (Hash[String, untyped] env) -> bool
+    # @rbs (Hash[String, untyped] env) -> Symbol?
+    def self.framing_error: (Hash[String, untyped] env) -> Symbol?
 
     # Returns any pipelined bytes following the request, or nil if none remain.
     #
@@ -112,9 +111,9 @@ module Raptor
     # Advances an HTTP/1.x request parse from the state hash's buffered
     # bytes. A complete well-formed request returns with `:complete` set
     # plus populated `:env` and `:body`, and records any bytes after it in
-    # the parse data's `:pipelined`; malformed or oversized input flips
-    # `:malformed` or `:too_large`; incomplete input returns the state
-    # so the reactor can wait for more.
+    # the parse data's `:pipelined`. Rejected input sets `:malformed`,
+    # `:too_large`, or `:unsupported_encoding`; incomplete input returns
+    # the state so the reactor can wait for more.
     #
     # @param data [Hash] the current parse state
     # @param env_template [Hash] the Rack env template to seed the request with
@@ -256,7 +255,7 @@ module Raptor
     # @param parser [HttpParser] the parser holding the finished parse state
     # @param nread [Integer] the byte offset where the body begins in `buffer`
     # @return [String, nil, Symbol] body, nil when absent, or `:incomplete`,
-    #   `:too_large`, or `:malformed`
+    #   `:too_large`, `:malformed`, or `:unsupported_encoding`
     #
     # @rbs (String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, HttpParser parser, Integer nread) -> (String | Symbol)?
     def extract_body: (String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, HttpParser parser, Integer nread) -> (String | Symbol)?
@@ -383,6 +382,14 @@ module Raptor
     #
     # @rbs (TCPSocket socket) -> void
     def reject_malformed: (TCPSocket socket) -> void
+
+    # Writes a 501 response and closes the socket.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket) -> void
+    def reject_unsupported_encoding: (TCPSocket socket) -> void
 
     # Builds a Rack environment hash from parsed HTTP request data.
     #

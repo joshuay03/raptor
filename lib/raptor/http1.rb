@@ -43,6 +43,7 @@ module Raptor
     BAD_REQUEST_RESPONSE = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     CONTENT_TOO_LARGE_RESPONSE = "HTTP/1.1 413 Content Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     INTERNAL_SERVER_ERROR_RESPONSE = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    NOT_IMPLEMENTED_RESPONSE = "HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     CHUNKED_TERMINATOR = "0\r\n\r\n"
 
     CONNECTION_CLOSE = "close"
@@ -75,31 +76,29 @@ module Raptor
       !http_host || http_host.empty? || http_host.include?(",")
     end
 
-    # Returns true when the message framing shows a request-smuggling vector
-    # per RFC 9112 section 6.3: a `Transfer-Encoding` where `chunked` is
-    # missing, not the final encoding, or duplicated; a `Transfer-Encoding`
-    # paired with a `Content-Length`; or a `Content-Length` containing any
-    # non-digit character.
+    # Rejects ambiguous message framing per RFC 9112 section 6.3 and
+    # transfer codings other than a single `chunked`.
     #
     # @param env [Hash] the Rack environment after header parsing
-    # @return [Boolean]
+    # @return [Symbol, nil] `:malformed`, `:unsupported_encoding`, or nil
     #
-    # @rbs (Hash[String, untyped] env) -> bool
-    def self.request_smuggling?(env)
+    # @rbs (Hash[String, untyped] env) -> Symbol?
+    def self.framing_error(env)
       transfer_encoding = env[HTTP_TRANSFER_ENCODING]
       content_length = env[Http::CONTENT_LENGTH]
 
       if transfer_encoding
-        return true if content_length
+        return :malformed if content_length
 
-        encodings = transfer_encoding.downcase.split(",").map(&:strip)
-        return true if encodings.last != TRANSFER_ENCODING_CHUNKED
-        return true if encodings.count(TRANSFER_ENCODING_CHUNKED) > 1
+        encodings = transfer_encoding.downcase.split(",", -1).map(&:strip)
+        return :malformed if encodings.any?(&:empty?) || encodings.last != TRANSFER_ENCODING_CHUNKED
+        return :malformed if encodings.count(TRANSFER_ENCODING_CHUNKED) > 1
+        return :unsupported_encoding if encodings.size > 1
       elsif content_length
-        return true if content_length.match?(/[^\d]/)
+        return :malformed unless content_length.match?(/\A[0-9]+\z/)
       end
 
-      false
+      nil
     end
 
     # Returns any pipelined bytes following the request, or nil if none remain.
@@ -144,9 +143,9 @@ module Raptor
     # Advances an HTTP/1.x request parse from the state hash's buffered
     # bytes. A complete well-formed request returns with `:complete` set
     # plus populated `:env` and `:body`, and records any bytes after it in
-    # the parse data's `:pipelined`; malformed or oversized input flips
-    # `:malformed` or `:too_large`; incomplete input returns the state
-    # so the reactor can wait for more.
+    # the parse data's `:pipelined`. Rejected input sets `:malformed`,
+    # `:too_large`, or `:unsupported_encoding`; incomplete input returns
+    # the state so the reactor can wait for more.
     #
     # @param data [Hash] the current parse state
     # @param env_template [Hash] the Rack env template to seed the request with
@@ -170,8 +169,9 @@ module Raptor
       parse_data[:parse_count] += 1
 
       message = if parser.finished?
-        if invalid_host?(env) || request_smuggling?(env)
-          data.merge(env: env, body: nil, parse_data: parse_data, complete: true, malformed: true)
+        error = invalid_host?(env) ? :malformed : framing_error(env)
+        if error
+          data.merge(env: env, body: nil, parse_data: parse_data, complete: true, error => true)
         elsif parser.has_body?
           body_buffer = data[:buffer].byteslice(nread..-1) || ""
 
@@ -325,6 +325,9 @@ module Raptor
       when :malformed
         reject_malformed(socket)
         return
+      when :unsupported_encoding
+        reject_unsupported_encoding(socket)
+        return
       end
 
       thread_pool << proc do
@@ -351,6 +354,12 @@ module Raptor
       if parsed_request[:malformed]
         socket = reactor.remove(parsed_request[:id])
         reject_malformed(socket) if socket
+        return
+      end
+
+      if parsed_request[:unsupported_encoding]
+        socket = reactor.remove(parsed_request[:id])
+        reject_unsupported_encoding(socket) if socket
         return
       end
 
@@ -444,6 +453,9 @@ module Raptor
         when :malformed
           reject_malformed(socket)
           return
+        when :unsupported_encoding
+          reject_unsupported_encoding(socket)
+          return
         end
 
         request_count += 1
@@ -530,11 +542,13 @@ module Raptor
     # @param parser [HttpParser] the parser holding the finished parse state
     # @param nread [Integer] the byte offset where the body begins in `buffer`
     # @return [String, nil, Symbol] body, nil when absent, or `:incomplete`,
-    #   `:too_large`, or `:malformed`
+    #   `:too_large`, `:malformed`, or `:unsupported_encoding`
     #
     # @rbs (String buffer, Hash[String, untyped] env, Hash[Symbol, untyped] parse_data, HttpParser parser, Integer nread) -> (String | Symbol)?
     def extract_body(buffer, env, parse_data, parser, nread)
-      return :malformed if Http1.invalid_host?(env) || Http1.request_smuggling?(env)
+      return :malformed if Http1.invalid_host?(env)
+      error = Http1.framing_error(env)
+      return error if error
 
       unless parser.has_body?
         parse_data[:pipelined] = Http1.pipelined_bytes(buffer, nread)
@@ -806,6 +820,17 @@ module Raptor
     # @rbs (TCPSocket socket) -> void
     def reject_malformed(socket)
       socket.write(BAD_REQUEST_RESPONSE) rescue nil
+      socket.close rescue nil
+    end
+
+    # Writes a 501 response and closes the socket.
+    #
+    # @param socket [TCPSocket] the client socket
+    # @return [void]
+    #
+    # @rbs (TCPSocket socket) -> void
+    def reject_unsupported_encoding(socket)
+      socket.write(NOT_IMPLEMENTED_RESPONSE) rescue nil
       socket.close rescue nil
     end
 

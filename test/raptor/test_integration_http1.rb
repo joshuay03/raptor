@@ -865,129 +865,51 @@ module Raptor
       end
     end
 
-    def test_transfer_encoding_with_content_length_returns_400
+    def test_rejected_request_framing_closes_without_continue_or_pipeline_dispatch
       with_server("rack_input.ru") do |uri|
-        response = raw_request(
-          uri,
-          "POST / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Transfer-Encoding: chunked\r\n" \
-          "Content-Length: 5\r\n" \
-          "Connection: close\r\n\r\n" \
-          "5\r\nhello\r\n0\r\n\r\n"
-        )
+        {
+          "Content-Length: " => 400,
+          "Content-Length: \t " => 400,
+          "Content-Length: -5" => 400,
+          "Content-Length: 10abc" => 400,
+          "Content-Length: 9223372036854775808" => 400,
+          "Content-Length: 100\r\nContent-Length: 200" => 400,
+          "Transfer-Encoding: chunked\r\nContent-Length: 5" => 400,
+          "Transfer-Encoding: gzip" => 400,
+          "Transfer-Encoding: chunked, gzip" => 400,
+          "Transfer-Encoding: ,chunked" => 400,
+          "Transfer-Encoding: chunked," => 400,
+          "Transfer-Encoding: gzip, chunked" => 501,
+          "Transfer-Encoding: gzip; level=1, chunked" => 501
+        }.each do |header, status|
+          [:initial, :keepalive, :fragmented, :pipelined].each do |path|
+            socket = TCPSocket.new(uri.host, uri.port)
+            if path == :keepalive
+              socket.write("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n")
+              assert_match(/200 OK/, Timeout.timeout(5) { socket.gets("\r\n\r\n") })
+            elsif path == :fragmented
+              socket.write("POST / HTTP/1.1\r\nHost: localhost\r\n")
+              refute socket.wait_readable(0.05), "headers are not complete yet"
+            end
 
-        assert_match(/400 Bad Request/, response)
-      end
-    end
-
-    def test_transfer_encoding_without_chunked_returns_400
-      with_server("rack_input.ru") do |uri|
-        response = raw_request(
-          uri,
-          "POST / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Transfer-Encoding: gzip\r\n" \
-          "Connection: close\r\n\r\n"
-        )
-
-        assert_match(/400 Bad Request/, response)
-      end
-    end
-
-    def test_chunked_not_last_in_transfer_encoding_returns_400
-      with_server("rack_input.ru") do |uri|
-        response = raw_request(
-          uri,
-          "POST / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Transfer-Encoding: chunked, gzip\r\n" \
-          "Connection: close\r\n\r\n"
-        )
-
-        assert_match(/400 Bad Request/, response)
-      end
-    end
-
-    def test_negative_content_length_returns_400
-      with_server("rack_input.ru") do |uri|
-        response = raw_request(
-          uri,
-          "POST / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Content-Length: -5\r\n" \
-          "Connection: close\r\n\r\n"
-        )
-
-        assert_match(/400 Bad Request/, response)
-      end
-    end
-
-    def test_content_length_overflowing_int64_returns_400
-      with_server("rack_input.ru") do |uri|
-        response = raw_request(
-          uri,
-          "POST / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Content-Length: 9223372036854775808\r\n" \
-          "Connection: close\r\n\r\n"
-        )
-
-        assert_match(/400 Bad Request/, response)
-      end
-    end
-
-    def test_non_digit_content_length_returns_400
-      with_server("rack_input.ru") do |uri|
-        response = raw_request(
-          uri,
-          "POST / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Content-Length: 10abc\r\n" \
-          "Connection: close\r\n\r\n"
-        )
-
-        assert_match(/400 Bad Request/, response)
-      end
-    end
-
-    def test_duplicate_content_length_returns_400
-      with_server("rack_input.ru") do |uri|
-        response = raw_request(
-          uri,
-          "POST / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Content-Length: 100\r\n" \
-          "Content-Length: 200\r\n" \
-          "Connection: close\r\n\r\n"
-        )
-
-        assert_match(/400 Bad Request/, response)
-      end
-    end
-
-    def test_conflicting_content_length_on_keepalive_returns_400
-      with_server("rack_input.ru") do |uri|
-        socket = TCPSocket.new(uri.host, uri.port)
-        socket.write("GET / HTTP/1.1\r\nHost: #{uri.host}:#{uri.port}\r\n\r\n")
-        first_response = +""
-        Timeout.timeout(5) do
-          first_response << socket.readpartial(1024) until first_response.end_with?("\r\n\r\n")
+            request = if path == :fragmented
+              "#{header}\r\nExpect: 100-continue\r\n\r\n"
+            else
+              "POST / HTTP/1.1\r\nHost: localhost\r\n#{header}\r\nExpect: 100-continue\r\n\r\n"
+            end
+            if path == :pipelined
+              request += "0\r\n\r\nGET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+            end
+            socket.write(request)
+            response = Timeout.timeout(5) { socket.read }
+            context = "#{path}: #{header}"
+            assert_match(%r{\AHTTP/1\.1 #{status} }, response, context)
+            assert_match(/\r\nconnection: close\r\n/i, response, context)
+            assert_equal 1, response.scan(%r{HTTP/1\.[01] \d{3} }).size, context
+          ensure
+            socket&.close
+          end
         end
-
-        socket.write(
-          "POST / HTTP/1.1\r\n" \
-          "Host: #{uri.host}:#{uri.port}\r\n" \
-          "Content-Length: 5\r\n" \
-          "Content-Length: 6\r\n\r\n" \
-          "hello!"
-        )
-        response = Timeout.timeout(5) { socket.read }
-
-        assert_match(/200 OK/, first_response)
-        assert_match(/400 Bad Request/, response)
-      ensure
-        socket&.close
       end
     end
 
