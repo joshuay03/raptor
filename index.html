@@ -178,8 +178,8 @@ working directory. Pass <code>-c PATH</code> to point at a specific file.</p>
 database or network calls. It stops adding them once Ruby execution becomes the bottleneck, and the extra threads
 retire when the queue is idle. Set <code>max_threads</code> to cap this growth, or set it to <code>threads</code> for a fixed pool.</p>
 <h2 id="Plugins">Plugins</h2>
-<p>Plugins run in the master process, independently of application threads. Use them for metrics exporters, probes, or
-other process-level integrations. Enable them in your config with <code>plugins: [:stats_logger]</code>.</p>
+<p>Plugins start in the master process and can register lifecycle hooks that run in workers. Use them for metrics
+exporters, probes, or other integrations. Enable them in your config with <code>plugins: [:stats_logger]</code>.</p>
 <p>Raptor loads each name from <code>raptor/plugin/&lt;name&gt;</code> on Ruby's load path. A gem can provide that file, or you can require
 an application-local plugin before returning the config hash.</p>
 <pre class="code ruby"><code class="ruby"><span class='comment'># lib/raptor/plugin/stats_logger.rb
@@ -964,7 +964,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sat Nov  7 09:50:56 2026 by
+  Generated on Sat Nov  7 10:01:28 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>

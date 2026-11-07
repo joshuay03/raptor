@@ -538,8 +538,6 @@
       <pre class="lines">
 
 
-133
-134
 135
 136
 137
@@ -554,10 +552,12 @@
 146
 147
 148
-149</pre>
+149
+150
+151</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 133</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 135</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle'>handle</span><span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_request_line'>request_line</span> <span class='op'>=</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_gets'>gets</span>
@@ -621,8 +621,6 @@
       <pre class="lines">
 
 
-93
-94
 95
 96
 97
@@ -630,10 +628,12 @@
 99
 100
 101
-102</pre>
+102
+103
+104</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 93</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 95</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_stale_socket'>remove_stale_socket</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span>
@@ -674,8 +674,6 @@
       <pre class="lines">
 
 
-109
-110
 111
 112
 113
@@ -690,10 +688,12 @@
 122
 123
 124
-125</pre>
+125
+126
+127</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 109</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 111</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_serve'>serve</span>
   <span class='kw'>until</span> <span class='ivar'>@client</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="#SHUTDOWN-constant" title="Raptor::ControlServer::SHUTDOWN (constant)">SHUTDOWN</a></span></span>
@@ -751,12 +751,16 @@
 80
 81
 82
-83</pre>
+83
+84
+85</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 73</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@server</span>
+
   <span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='kw'>nil</span>
   <span class='ivar'>@client</span><span class='period'>.</span><span class='id identifier rubyid_swap'>swap</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_current'>current</span><span class='op'>|</span>
     <span class='id identifier rubyid_client'>client</span> <span class='op'>=</span> <span class='id identifier rubyid_current'>current</span>
@@ -830,7 +834,7 @@
 </div>
 
       <div id="footer">
-  Generated on Sat Nov  7 09:50:58 2026 by
+  Generated on Sat Nov  7 10:01:31 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>

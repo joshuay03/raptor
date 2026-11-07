@@ -106,7 +106,7 @@
 
 <h2>Overview</h2><div class="docstring">
   <div class="discussion">
-    <p>A master-process extension, loaded from <code>raptor/plugin/&lt;name&gt;</code> or
+    <p>An extension, loaded from <code>raptor/plugin/&lt;name&gt;</code> or
 registered explicitly by application code.</p>
 
   </div>
@@ -698,7 +698,13 @@ threads after calling <code>stop</code>; use <code>ensure</code> in the block fo
 88
 89
 90
-91</pre>
+91
+92
+93
+94
+95
+96
+97</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 85</span>
@@ -708,7 +714,13 @@ threads after calling <code>stop</code>; use <code>ensure</code> in the block fo
 <span class='kw'>ensure</span>
   <span class='id identifier rubyid_threads'>threads</span> <span class='op'>=</span> <span class='ivar'>@threads</span> <span class='op'>||</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
   <span class='id identifier rubyid_threads'>threads</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:kill</span><span class='rparen'>)</span>
-  <span class='id identifier rubyid_threads'>threads</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:join</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_error'>error</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='id identifier rubyid_threads'>threads</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_thread'>thread</span><span class='op'>|</span>
+    <span class='id identifier rubyid_thread'>thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
+  <span class='kw'>rescue</span> <span class='const'>StandardError</span> <span class='op'>=&gt;</span> <span class='id identifier rubyid_thread_error'>thread_error</span>
+    <span class='id identifier rubyid_error'>error</span> <span class='op'>||=</span> <span class='id identifier rubyid_thread_error'>thread_error</span>
+  <span class='kw'>end</span>
+  <span class='id identifier rubyid_raise'>raise</span> <span class='id identifier rubyid_error'>error</span> <span class='kw'>if</span> <span class='id identifier rubyid_error'>error</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -811,7 +823,7 @@ Also called if startup fails, so resources may be only partly opened.</p>
 </div>
 
       <div id="footer">
-  Generated on Sat Nov  7 09:50:57 2026 by
+  Generated on Sat Nov  7 10:01:30 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
