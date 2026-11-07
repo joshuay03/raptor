@@ -43,26 +43,16 @@ module Raptor
     end
 
     def test_plaintext_worker_does_not_start_http2_ractors
-      reader, writer = IO.pipe
       @options[:http1] = @options[:http1].merge(ractors: 1)
       @options[:http2] = @options[:http2].merge(ractors: 1)
-      @options[:before_worker_boot] = [proc { writer.write([Ractor.count].pack("L")) }]
+      @options[:app] = ->(_env) { [200, { "content-type" => "text/plain" }, [Ractor.count.to_s]] }
 
-      cluster = without_output { Cluster.new(@options) }
-      cluster_pid = fork do
-        reader.close
-        without_output { cluster.run }
+      with_server do |uri|
+        response = Net::HTTP.get_response(uri)
+
+        assert_equal 200, response.code.to_i
+        assert_equal "2", response.body
       end
-      cluster.instance_variable_get(:@binder).close
-      writer.close
-
-      ractor_count = Timeout.timeout(5) { reader.read(4).unpack1("L") }
-
-      assert_equal 2, ractor_count
-    ensure
-      stop_cluster(cluster_pid)
-      reader&.close
-      writer&.close
     end
 
     def test_pid_file_written_and_removed
@@ -484,27 +474,14 @@ module Raptor
       File.delete(marker_path) rescue nil
     end
 
-    def test_before_worker_boot_hooks_run_in_each_worker_before_serving
-      marker_path = "/tmp/raptor_test_before_worker_boot_#{Process.pid}.marker"
-      File.delete(marker_path) rescue nil
+    def test_before_worker_boot_hooks_block_requests_on_initial_boot_and_crash_replacement
+      assert_worker_boot_hooks_block_requests(replacement: :crash)
+    end
 
-      @options[:workers] = 1
-      @options[:before_worker_boot] = [proc { |index| File.write(marker_path, "#{index}:#{Process.pid}") }]
+    def test_before_worker_boot_hooks_block_requests_on_refork
+      skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Subreaper.enable
 
-      cluster = without_output { Cluster.new(@options) }
-      server_port = cluster.instance_variable_get(:@server_port)
-      cluster_pid = fork { without_output { cluster.run } }
-      cluster.instance_variable_get(:@binder).close
-
-      wait_for_server(server_port)
-
-      wait_until(timeout: 10) { File.exist?(marker_path) && !File.read(marker_path).empty? }
-      worker_pid = child_pids(cluster_pid).first
-
-      assert_equal "0:#{worker_pid}", File.read(marker_path)
-    ensure
-      stop_cluster(cluster_pid)
-      File.delete(marker_path) rescue nil
+      assert_worker_boot_hooks_block_requests(replacement: :refork)
     end
 
     def test_before_worker_shutdown_hooks_run_in_each_worker_before_graceful_exit
@@ -646,6 +623,81 @@ module Raptor
     end
 
     private
+
+    def assert_worker_boot_hooks_block_requests(replacement:)
+      hook_reader, hook_writer = IO.pipe
+      release_reader, release_writer = IO.pipe
+      app_reader, app_writer = IO.pipe
+      callbacks = []
+      @options[:refork_after] = 1000 if replacement == :refork
+      @options[:before_worker_boot] = [
+        proc { callbacks = [:first] },
+        proc do |index|
+          hook_writer.puts "#{Process.pid}:#{index}"
+          release_reader.read(1)
+          callbacks << index
+        end,
+        proc { callbacks << :last }
+      ]
+      @options[:app] = ->(_env) {
+        app_writer.write("a")
+        [200, { "content-type" => "application/json" }, [JSON.generate(callbacks)]]
+      }
+
+      cluster = without_output { Cluster.new(@options) }
+      server_port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork do
+        hook_reader.close
+        release_writer.close
+        app_reader.close
+        without_output { cluster.run }
+      end
+      cluster.instance_variable_get(:@binder).close
+      hook_writer.close
+      release_reader.close
+      app_writer.close
+
+      client_socket = nil
+      original_pid = nil
+      2.times do |boot|
+        worker_pid, index = Timeout.timeout(10) { hook_reader.gets.split(":").map(&:to_i) }
+        assert_equal 0, index
+        refute_equal original_pid, worker_pid if original_pid
+        original_pid ||= worker_pid
+
+        worker = cluster.stats.first
+        assert_equal worker_pid, worker[:pid]
+        refute worker[:booted], "worker must not announce boot while its hook is blocked"
+
+        client_socket = TCPSocket.new("127.0.0.1", server_port)
+        client_socket.write("GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        refute app_reader.wait_readable(0.5), "boot #{boot}: request entered the app before the hook completed"
+
+        release_writer.write("r")
+        assert_equal "a", Timeout.timeout(5) { app_reader.read(1) }
+        response = Timeout.timeout(5) { client_socket.read }
+        assert_match(%r{\AHTTP/1\.1 200 OK}, response)
+        assert_equal ["first", 0, "last"], JSON.parse(response.split("\r\n\r\n", 2).last)
+        client_socket.close
+        client_socket = nil
+
+        next unless boot.zero?
+
+        wait_until { cluster.stats.first[:booted] }
+        if replacement == :crash
+          Process.kill("KILL", worker_pid)
+        else
+          Process.kill("URG", cluster_pid)
+        end
+      end
+    ensure
+      release_writer&.close unless release_writer&.closed?
+      client_socket&.close
+      stop_cluster(cluster_pid)
+      [hook_reader, hook_writer, release_reader, app_reader, app_writer].each do |io|
+        io&.close unless io&.closed?
+      end
+    end
 
     def child_pids(pid)
       `pgrep -P #{pid}`.strip.split.map(&:to_i).reject(&:zero?).sort

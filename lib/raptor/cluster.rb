@@ -854,6 +854,8 @@ module Raptor
         booted: false
       )
 
+      @before_worker_boot.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index) }
+
       reactor = nil
 
       counting_app = ->(env) {
@@ -936,8 +938,6 @@ module Raptor
         worker_index: (index if @bpf_active)
       )
       server_thread = server.run
-
-      @before_worker_boot.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index) }
 
       Log.info "Worker #{index} booted"
 

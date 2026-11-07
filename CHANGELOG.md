@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Run worker boot hooks before starting application threads, parsers, and request handling
 - Close HTTP/2 response bodies when writing fails or a stream is cancelled
 - Bound HTTP/1 chunk size lines and trailers, including incomplete metadata
 - Reject invalid CRLF delimiters after HTTP/1 chunk payloads
