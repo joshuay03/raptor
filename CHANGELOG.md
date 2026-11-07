@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Close HTTP/2 response bodies when writing fails or a stream is cancelled
 - Bound HTTP/1 chunk size lines and trailers, including incomplete metadata
 - Reject invalid CRLF delimiters after HTTP/1 chunk payloads
 - Prefer hyphenated request headers over underscore aliases and reject HTTP/1 framing aliases

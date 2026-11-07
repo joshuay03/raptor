@@ -1140,11 +1140,6 @@ module Raptor
         trailers: env[RESPONSE_TRAILERS],
         request_method: env[Rack::REQUEST_METHOD]
       ) { response_started = true }
-      if response_body.is_a?(DetachedBody)
-        response_body.finish(:closed)
-      elsif response_body.respond_to?(:close)
-        response_body.close
-      end
       write_access_log(env, status, response_size, remote_addr) if @access_log_io
       Http.call_response_finished(env, status, response_headers, nil)
     rescue StreamClosedError => error
@@ -1230,6 +1225,12 @@ module Raptor
       stream.close
 
       stream.bytes_written.to_s
+    ensure
+      if body.is_a?(DetachedBody)
+        body.finish($! ? :cancelled : :closed)
+      elsif body.respond_to?(:close)
+        body.close
+      end
     end
 
     # Sends an HTTP 103 Early Hints response.

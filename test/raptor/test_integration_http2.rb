@@ -140,6 +140,34 @@ module Raptor
       end
     end
 
+    def test_body_failure_closes_before_response_finished
+      reader, writer = IO.pipe
+      body = Object.new
+      body.define_singleton_method(:each) do |&block|
+        block.call("partial response")
+        raise "stream failed"
+      end
+      body.define_singleton_method(:close) { writer.puts "closed" }
+      @options[:on_error] = proc {}
+      @options[:app] = proc do |env|
+        env[Rack::RACK_RESPONSE_FINISHED] << proc { |_env, _status, _headers, error| writer.puts "finished #{error.message}" }
+        [200, {}, body]
+      end
+      with_http2_server do |port|
+        writer.close
+        response = http2_get(port, "/").first
+
+        assert_equal "200", response[:status]
+        assert_equal "partial response", response[:body]
+        assert_equal "closed\n", Timeout.timeout(5) { reader.gets }
+        assert_equal "finished stream failed\n", Timeout.timeout(5) { reader.gets }
+        refute reader.wait_readable(0)
+      end
+    ensure
+      reader&.close
+      writer&.close unless writer&.closed?
+    end
+
     def test_concurrent_streams
       with_http2_server do |port|
         responses = http2_concurrent_gets(port, ["/", "/", "/"])

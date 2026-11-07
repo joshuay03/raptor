@@ -328,10 +328,13 @@ module Raptor
 
     def test_perform_stream_request_supports_response_lifecycle
       callback_arguments = nil
+      closed = 0
+      body = ["body"]
+      body.define_singleton_method(:close) { closed += 1 }
       app = proc do |env|
         env[Rack::RACK_EARLY_HINTS].call("link" => "</style.css>; rel=preload")
         env[Rack::RACK_RESPONSE_FINISHED] << proc { |*arguments| callback_arguments = arguments }
-        [200, { "content-type" => "text/plain" }, ["body"]]
+        [200, { "content-type" => "text/plain" }, body]
       end
 
       frames = perform_stream_request(app)
@@ -339,6 +342,7 @@ module Raptor
       assert_equal [HEADERS_FRAME_TYPE, HEADERS_FRAME_TYPE, DATA_FRAME_TYPE, DATA_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
       assert_equal ["103", "200"], decode_header_blocks(frames).map { |headers| headers.assoc(":status").last }
       assert_equal [200, { "content-type" => "text/plain" }, nil], callback_arguments.drop(1)
+      assert_equal 1, closed
     end
 
     def test_perform_stream_request_writes_response_trailers
@@ -358,14 +362,19 @@ module Raptor
     def test_perform_stream_request_handles_body_errors
       callback_error = nil
       handled_error = nil
+      events = []
       error = RuntimeError.new("stream failed")
       body = Object.new
       body.define_singleton_method(:each) do |&block|
         block.call("body")
         raise error
       end
+      body.define_singleton_method(:close) { events << :closed }
       app = proc do |env|
-        env[Rack::RACK_RESPONSE_FINISHED] << proc { |_env, _status, _headers, response_error| callback_error = response_error }
+        env[Rack::RACK_RESPONSE_FINISHED] << proc do |_env, _status, _headers, response_error|
+          callback_error = response_error
+          events << :finished
+        end
         [200, {}, body]
       end
 
@@ -374,6 +383,56 @@ module Raptor
       assert_equal [HEADERS_FRAME_TYPE, DATA_FRAME_TYPE, RST_STREAM_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
       assert_same error, callback_error
       assert_same error, handled_error
+      assert_equal [:closed, :finished], events
+    end
+
+    def test_perform_stream_request_closes_body_when_cancelled_during_flow_control
+      flow_control = Http2::FlowControl.new
+      flow_control.set_initial_stream_window(0)
+      events = []
+      started = Queue.new
+      body = Object.new
+      body.define_singleton_method(:each) do |&block|
+        started << true
+        block.call("body")
+      end
+      body.define_singleton_method(:close) { events << :closed }
+      app = proc do |env|
+        env[Rack::RACK_RESPONSE_FINISHED] << proc { |_env, _status, _headers, error| events << error }
+        [200, {}, body]
+      end
+      thread = Thread.new { perform_stream_request(app, flow_control: flow_control) }
+      Timeout.timeout(5) { started.pop }
+      wait_until { thread.status == "sleep" }
+      flow_control.cancel_stream(1)
+      frames = Timeout.timeout(5) { thread.value }
+
+      assert_equal [HEADERS_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
+      assert_equal 2, events.length
+      assert_equal :closed, events.first
+      assert_instance_of Http2::StreamClosedError, events.last
+    ensure
+      flow_control&.close
+      thread&.join
+    end
+
+    def test_perform_stream_request_reports_close_failure_once
+      events = []
+      error = IOError.new("close failed")
+      body = ["body"]
+      body.define_singleton_method(:close) do
+        events << :closed
+        raise error
+      end
+      app = proc do |env|
+        env[Rack::RACK_RESPONSE_FINISHED] << proc { |_env, _status, _headers, response_error| events << response_error }
+        [200, {}, body]
+      end
+
+      frames = perform_stream_request(app, on_error: proc {})
+
+      assert_equal RST_STREAM_FRAME_TYPE, frames.last.getbyte(3)
+      assert_equal [:closed, error], events
     end
 
     def test_perform_stream_request_handles_stream_cancellation
@@ -414,17 +473,23 @@ module Raptor
     end
 
     def test_write_response_omits_body_for_head_request
-      frames = write_response(request_method: "HEAD", status: 200, body: ["body"])
+      closed = 0
+      body = ["body"]
+      body.define_singleton_method(:close) { closed += 1 }
+      frames = write_response(request_method: "HEAD", status: 200, body: body)
 
       assert_equal [HEADERS_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
       assert_operator frames.first.getbyte(4), :anybits?, Http2::FLAG_END_STREAM
+      assert_equal 1, closed
     end
 
     def test_write_response_omits_body_for_no_entity_status
-      frames = write_response(request_method: "GET", status: 204, body: ["body"])
+      body = DetachedBody.new
+      frames = write_response(request_method: "GET", status: 204, body: body)
 
       assert_equal [HEADERS_FRAME_TYPE], frames.map { |frame| frame.getbyte(3) }
       assert_operator frames.first.getbyte(4), :anybits?, Http2::FLAG_END_STREAM
+      assert_predicate body, :closed?
     end
 
     def test_write_response_streams_enumerable_body
