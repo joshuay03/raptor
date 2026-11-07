@@ -958,6 +958,19 @@ module Raptor
       end
     end
 
+    def test_invalid_chunk_delimiter_closes_without_dispatching_pipeline
+      with_server("rack_input.ru") do |uri|
+        ["XX", "\rX"].each do |delimiter|
+          request = "POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n" \
+            "1\r\nA#{delimiter}0\r\n\r\nGET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+          response = Timeout.timeout(5) { raw_request(uri, request) }
+
+          assert_match(%r{\AHTTP/1.1 400 Bad Request}, response)
+          refute_includes response, "200 OK"
+        end
+      end
+    end
+
     def test_excessive_chunk_overhead_returns_400
       with_server("rack_input.ru") do |uri|
         bloated_extension = "A" * (HttpParser::MAX_CHUNK_OVERHEAD + 1)

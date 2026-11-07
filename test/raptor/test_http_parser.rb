@@ -48,6 +48,29 @@ module Raptor
       assert_equal :complete, state
     end
 
+    def test_decode_chunked_validates_payload_delimiters
+      ["XX", "\n\n", "\rX", "X"].each do |delimiter|
+        _decoded, state = HttpParser.decode_chunked("1\r\nA#{delimiter}0\r\n\r\n")
+
+        assert_equal :malformed, state, delimiter.inspect
+      end
+    end
+
+    def test_decode_chunked_waits_for_split_delimiters_and_preserves_pipeline
+      body = "3\r\nA\r\n\r\n1\r\nB\r\n0\r\n\r\n"
+      (0...body.bytesize).each do |split|
+        _decoded, state = HttpParser.decode_chunked(body.byteslice(0, split))
+
+        assert_equal :incomplete, state, "split at #{split}"
+      end
+
+      decoded, state, consumed = HttpParser.decode_chunked(body + "GET / HTTP/1.0\r\n\r\n")
+
+      assert_equal "A\r\nB", decoded
+      assert_equal :complete, state
+      assert_equal body.bytesize, consumed
+    end
+
     def test_decode_chunked_accepts_mixed_case_hex_size
       decoded, state = HttpParser.decode_chunked("Ff\r\n#{"x" * 255}\r\n0\r\n\r\n")
 

@@ -1318,6 +1318,15 @@ static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
     size_t bytes_to_copy = (size_t)chunk_size < available ? (size_t)chunk_size : available;
     rb_str_cat(decoded, buf + data_offset, (long)bytes_to_copy);
 
+    if (available <= (size_t)chunk_size)
+      return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
+    if (buf[data_offset + (size_t)chunk_size] != '\r')
+      return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
+    if (available == (size_t)chunk_size + 1)
+      return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
+    if (buf[data_offset + (size_t)chunk_size + 1] != '\n')
+      return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
+
     offset = data_offset + (size_t)chunk_size + 2;
   }
 
