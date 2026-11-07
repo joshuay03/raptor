@@ -106,6 +106,7 @@ module Rackup
         result[:before_worker_boot] = config.fetch(:before_worker_boot, cli_defaults[:before_worker_boot])
         result[:before_worker_shutdown] = config.fetch(:before_worker_shutdown, cli_defaults[:before_worker_shutdown])
         result[:before_refork] = config.fetch(:before_refork, cli_defaults[:before_refork])
+        result[:plugins] = config.fetch(:plugins, cli_defaults[:plugins])
         result[:stats_file] = config.fetch(:stats_file, cli_defaults[:stats_file])
         result[:control_url] = config[:control_url] if config.key?(:control_url)
         result[:pid_file] = config[:pid_file] if config.key?(:pid_file)
@@ -113,7 +114,7 @@ module Rackup
         result[:stderr_file] = config[:stderr_file] if config.key?(:stderr_file)
         result[:access_log_file] = config[:access_log_file] if config.key?(:access_log_file)
         result[:on_error] = config[:on_error] if config.key?(:on_error)
-        result
+        config.merge(result)
       end
       private_class_method :build_cluster_options
     end

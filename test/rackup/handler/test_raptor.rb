@@ -171,6 +171,8 @@ module Rackup
             before_worker_boot: [->(index) { index + 1 }],
             before_worker_shutdown: [->(index) { index + 2 }],
             before_refork: [-> { :refork }],
+            plugins: [:metrics],
+            metrics_port: 9394,
             stats_file: "tmp/c.json",
             control_url: "unix:///tmp/c.sock",
             pid_file: "tmp/c.pid",
@@ -187,6 +189,8 @@ module Rackup
           assert_equal [8], opts[:before_worker_boot].map { |hook| hook.call(7) }
           assert_equal [9], opts[:before_worker_shutdown].map { |hook| hook.call(7) }
           assert_equal [:refork], opts[:before_refork].map(&:call)
+          assert_equal [:metrics], opts[:plugins]
+          assert_equal 9394, opts[:metrics_port]
           assert_equal "tmp/c.json", opts[:stats_file]
           assert_equal "unix:///tmp/c.sock", opts[:control_url]
           assert_equal "tmp/c.pid", opts[:pid_file]

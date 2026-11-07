@@ -37,7 +37,12 @@ module Raptor
       error = assert_raises(RuntimeError) { server.bind }
 
       assert_equal "Socket #{socket_path.inspect} is already in use", error.message
+      server.shutdown
+      socket = UNIXSocket.new(socket_path)
+
+      assert_kind_of UNIXSocket, socket
     ensure
+      socket&.close
       listener&.close
       File.delete(socket_path) rescue nil
     end

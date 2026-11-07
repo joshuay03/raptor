@@ -70,6 +70,7 @@ module Raptor
       before_worker_boot: [].freeze,
       before_worker_shutdown: [].freeze,
       before_refork: [].freeze,
+      plugins: [].freeze,
       stats_file: "tmp/raptor.json",
       control_url: nil,
       pid_file: nil,

@@ -71,6 +71,8 @@ module Raptor
     #
     # @rbs () -> void
     def shutdown
+      return unless @server
+
       client = nil
       @client.swap do |current|
         client = current

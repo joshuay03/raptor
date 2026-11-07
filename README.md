@@ -127,6 +127,7 @@ working directory. Pass `-c PATH` to point at a specific file.
   before_worker_boot: [],
   before_worker_shutdown: [],
   before_refork: [],
+  plugins: [],
   stats_file: "tmp/raptor.json",
   control_url: nil,
   pid_file: nil,
@@ -141,6 +142,46 @@ working directory. Pass `-c PATH` to point at a specific file.
 By default each worker adds threads beyond `threads` only while queued requests are waiting on blocking work such as
 database or network calls. It stops adding them once Ruby execution becomes the bottleneck, and the extra threads
 retire when the queue is idle. Set `max_threads` to cap this growth, or set it to `threads` for a fixed pool.
+
+## Plugins
+
+Plugins start in the master process and can register lifecycle hooks that run in workers. Use them for metrics
+exporters, probes, or other integrations. Enable them in your config with `plugins: [:stats_logger]`.
+
+Raptor loads each name from `raptor/plugin/<name>` on Ruby's load path. A gem can provide that file, or you can require
+an application-local plugin before returning the config hash.
+
+```ruby
+# lib/raptor/plugin/stats_logger.rb
+require "raptor/plugin"
+
+Raptor::Plugin.create(:stats_logger) do
+  def start(cluster)
+    in_background do
+      loop do
+        Raptor::Log.info(JSON.generate(cluster.stats_hash))
+        sleep 10
+      end
+    end
+  end
+end
+```
+
+For an existing class, inherit from `Raptor::Plugin` and register it with
+`Raptor::Plugin.register(:stats_logger, MyStatsLogger)` instead.
+
+`start(cluster)` runs once before the initial workers fork. `cluster.options` exposes configuration, including
+plugin-specific keys. Append callbacks to its `before_fork`, `before_worker_boot`, `before_worker_shutdown`, and
+`before_refork` arrays during startup. If your plugin opens a listener, close the worker's inherited copy with
+`cluster.options[:before_worker_boot] << proc { @listener.close }` so only the master serves it.
+
+`cluster.stats` returns per-worker snapshots. `cluster.stats_hash` returns the same aggregate structure as `GET /stats`,
+including boot status, busy threads, capacity, backlog, and request counts. Both remain available while workers drain.
+
+Override `stop` to close listeners and flush exporters. Raptor calls it after workers exit, in reverse plugin order,
+then stops and joins threads created with `in_background`. These callbacks also run before hot restart and when startup
+fails, so `stop` must handle partially initialized resources. Worker replacement and phased restart keep the same
+master plugin instances running.
 
 ## Bindings
 

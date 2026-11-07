@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Add plugins with lifecycle hooks, cluster stats, and managed background threads
+
 ## [0.23.0] - 2026-10-18
 
 - Route connections through BPF dispatch on every TCP bind

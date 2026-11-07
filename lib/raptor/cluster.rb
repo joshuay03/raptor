@@ -14,6 +14,7 @@ require_relative "control_server"
 require_relative "http1"
 require_relative "http2"
 require_relative "log"
+require_relative "plugin"
 require_relative "raptor_native"
 require_relative "reactor"
 require_relative "reuseport_bpf"
@@ -126,6 +127,12 @@ module Raptor
     # @rbs @resp_r: IO?
     # @rbs @resp_w: IO?
     # @rbs @bpf_active: bool
+    # @rbs @plugins: Array[Plugin]
+
+    # Returns the cluster configuration available to plugins.
+    #
+    # @return [Hash{Symbol => untyped}]
+    attr_reader :options #: Hash[Symbol, untyped]
 
     # Creates a new Cluster with the given options.
     #
@@ -155,6 +162,7 @@ module Raptor
     # @option options [Array<Proc>] :before_worker_boot procs called with the worker index before it begins serving
     # @option options [Array<Proc>] :before_worker_shutdown procs called with the worker index before its graceful shutdown
     # @option options [Array<Proc>] :before_refork procs called in a worker before it transitions to a seed
+    # @option options [Array<String, Symbol>] :plugins plugins to load and start in order
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :control_url `unix://` URL serving cluster stats, or nil to disable
     # @option options [String, nil] :pid_file path to write the master PID to, or nil to disable
@@ -168,6 +176,8 @@ module Raptor
     #
     # @rbs (Hash[Symbol, untyped] options) -> void
     def initialize(options)
+      @options = options = options.dup
+      @plugins = []
       @drain_accept_queue = options[:drain_accept_queue]
       @worker_count = options[:workers]
       @http1_ractor_count = options[:http1][:ractors] || self.class.default_http1_ractor_count(@worker_count)
@@ -185,10 +195,10 @@ module Raptor
       @worker_timeout = options[:worker_timeout]
       @worker_drain_timeout = options[:worker_drain_timeout]
       @worker_shutdown_timeout = options[:worker_shutdown_timeout]
-      @before_fork = Array(options[:before_fork])
-      @before_worker_boot = Array(options[:before_worker_boot])
-      @before_worker_shutdown = Array(options[:before_worker_shutdown])
-      @before_refork = Array(options[:before_refork])
+      @before_fork = options[:before_fork] = Array(options[:before_fork]).dup
+      @before_worker_boot = options[:before_worker_boot] = Array(options[:before_worker_boot]).dup
+      @before_worker_shutdown = options[:before_worker_shutdown] = Array(options[:before_worker_shutdown]).dup
+      @before_refork = options[:before_refork] = Array(options[:before_refork]).dup
       @stats_file = options[:stats_file]
       @control_server = ControlServer.new(options[:control_url]) { stats_hash } if options[:control_url]
       @pid_file = options[:pid_file]
@@ -265,40 +275,50 @@ module Raptor
 
       @bpf_active = ReuseportBPF.setup(@worker_count, @binder.listeners.grep(TCPServer))
 
-      @control_server&.bind
-      @worker_count.times { |index| spawn_worker(index) }
-      @control_server&.start
-
-      stats_file_thread = if @stats_file
-        Thread.new do
-          Thread.current.name = "Stats File Writer"
-
-          write_stats_file_loop
+      begin
+        Array(@options[:plugins]).each do |name|
+          plugin = Plugin.load(name)
+          @plugins << plugin
+          plugin.start(self)
         end
+
+        @control_server&.bind
+        @worker_count.times { |index| spawn_worker(index) }
+        @control_server&.start
+
+        stats_file_thread = if @stats_file
+          Thread.new do
+            Thread.current.name = "Stats File Writer"
+
+            write_stats_file_loop
+          end
+        end
+
+        Systemd.notify("READY=1\nMAINPID=#{Process.pid}")
+
+        until @shutdown
+          break if reap_workers == :no_children
+
+          perform_hot_restart if @hot_restart_requested
+          poll_seed_ready if @seed_pid && !@seed_ready
+          perform_phased_restart if @phased_restart_requested && !@phased_restarting
+          check_refork_trigger if @refork_thresholds.any? && !@phased_restarting
+          timeout_hung_workers
+
+          sleep 0.1
+        end
+      ensure
+        @shutdown = true
+        Systemd.notify("STOPPING=1")
+        stop_workers
+        stats_file_thread&.join
+        stop_plugins
+        @control_server&.shutdown
+        File.delete(@stats_file) rescue nil if @stats_file
+        File.delete(@pid_file) rescue nil if @pid_file
+        @stats.unmap
+        @binder.close
       end
-
-      Systemd.notify("READY=1\nMAINPID=#{Process.pid}")
-
-      until @shutdown
-        break if reap_workers == :no_children
-
-        perform_hot_restart if @hot_restart_requested
-        poll_seed_ready if @seed_pid && !@seed_ready
-        perform_phased_restart if @phased_restart_requested && !@phased_restarting
-        check_refork_trigger if @refork_thresholds.any? && !@phased_restarting
-        timeout_hung_workers
-
-        sleep 0.1
-      end
-
-      Systemd.notify("STOPPING=1")
-      stop_workers
-      stats_file_thread&.join
-      @control_server&.shutdown
-      File.delete(@stats_file) rescue nil if @stats_file
-      File.delete(@pid_file) rescue nil if @pid_file
-      @stats.unmap
-      @binder.close
     end
 
     # Returns stats for all worker processes.
@@ -312,11 +332,9 @@ module Raptor
       @stats.all
     end
 
-    private
-
-    # Returns cluster statistics for the control server. For an adaptive
-    # pool, `max_threads` is the number of threads currently running so
-    # utilization reflects the capacity available at that moment.
+    # Returns cluster statistics for plugins and the control server.
+    # For an adaptive pool, `max_threads` is the number of threads currently
+    # running so utilization reflects the capacity available at that moment.
     #
     # @return [Hash] cluster statistics
     #
@@ -356,6 +374,22 @@ module Raptor
         old_workers: worker_status.count { |worker| worker[:phase] != @phase },
         worker_status: worker_status
       }
+    end
+
+    private
+
+    # Stops plugins in reverse startup order.
+    #
+    # @rbs () -> void
+    def stop_plugins
+      until @plugins.empty?
+        plugin = @plugins.pop
+        begin
+          plugin.shutdown
+        rescue StandardError => error
+          Log.rescued_error(error)
+        end
+      end
     end
 
     # @rbs (Numeric time) -> String
@@ -767,6 +801,7 @@ module Raptor
       Systemd.notify("RELOADING=1\nMONOTONIC_USEC=#{monotonic_usec}")
       @shutdown = true
       stop_workers
+      stop_plugins
       @binder.clear_close_on_exec
       ENV[INHERITED_FDS_ENV] = JSON.generate(@binder.inheritable_fds)
       @control_server&.shutdown

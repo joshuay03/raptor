@@ -1,0 +1,52 @@
+# Generated from lib/raptor/plugin.rb with RBS::Inline
+
+module Raptor
+  # An extension, loaded from `raptor/plugin/<name>` or
+  # registered explicitly by application code.
+  class Plugin
+    class UnknownPlugin < LoadError
+    end
+
+    self.@registry: Hash[String, singleton(Plugin)]
+
+    # Registers a plugin class under a name.
+    #
+    # @rbs (String | Symbol name, singleton(Plugin) plugin) -> void
+    def self.register: (String | Symbol name, singleton(Plugin) plugin) -> void
+
+    # Defines and registers a plugin without a named subclass.
+    #
+    # @rbs (String | Symbol name) { () -> void } -> singleton(Plugin)
+    def self.create: (String | Symbol name) { () -> void } -> singleton(Plugin)
+
+    # Loads a registered plugin, requiring its conventional path if needed.
+    #
+    # @rbs (String | Symbol name) -> Plugin
+    def self.load: (String | Symbol name) -> Plugin
+
+    @threads: Array[Thread]?
+
+    # Starts in the master before workers fork. Override to open resources
+    # and append callbacks to the cluster's lifecycle hook arrays.
+    #
+    # @rbs (Cluster cluster) -> void
+    def start: (Cluster cluster) -> void
+
+    # Stops in the master after workers exit, including before hot restart.
+    # Also called if startup fails, so resources may be only partly opened.
+    #
+    # @rbs () -> void
+    def stop: () -> void
+
+    # Runs a block on a master-owned thread. Raptor stops and joins these
+    # threads after calling `stop`; use `ensure` in the block for cleanup.
+    #
+    # @rbs () { () -> void } -> Thread
+    def in_background: () { () -> void } -> Thread
+
+    # Calls the plugin's stop callback and joins its background threads.
+    #
+    # @rbs () -> void
+    def shutdown: () -> void
+  end
+end
