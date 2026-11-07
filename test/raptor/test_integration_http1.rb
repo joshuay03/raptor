@@ -987,6 +987,25 @@ module Raptor
       end
     end
 
+    def test_oversized_chunk_metadata_is_rejected_without_waiting_for_crlf
+      with_server("rack_input.ru") do |uri|
+        ["8;", "0;", "0\r\nX-Trailer: "].each do |prefix|
+          socket = TCPSocket.new(uri.host, uri.port)
+          socket.write("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n")
+          assert_equal "HTTP/1.1 100 Continue\r\n\r\n", Timeout.timeout(5) { socket.gets("\r\n\r\n") }
+
+          metadata = prefix + "a" * (HttpParser::MAX_CHUNK_OVERHEAD + 1 - prefix.bytesize)
+          metadata.scan(/.{1,257}/m).each { |fragment| socket.write(fragment) }
+          response = Timeout.timeout(5) { socket.read }
+
+          assert_match(%r{\AHTTP/1.1 400 Bad Request}, response)
+          refute_includes response, "200 OK"
+        ensure
+          socket&.close
+        end
+      end
+    end
+
     private
 
     def with_unix_server(socket_path, fixture = "hello_world.ru")

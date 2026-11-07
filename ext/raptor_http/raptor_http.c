@@ -15,8 +15,8 @@
 #define MAX_FIELD_NAME 256
 #define MAX_FIELD_VALUE (80 * 1024)
 
-// Upper bound on chunk-size lines, extensions and CRLFs a chunked body may
-// carry beyond its payload before it is rejected as malformed.
+// Bounds each chunk-size line and the terminal chunk/trailer section, including
+// CRLFs. Also limits cumulative nonterminal overhead beyond the payload size.
 #define MAX_CHUNK_OVERHEAD (16 * 1024)
 
 #define FLAG_CHUNKED  0x1
@@ -1268,6 +1268,9 @@ static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
 
   while (offset < len) {
     const char *crlf = find_crlf(buf + offset, len - offset);
+    size_t line_bytes = crlf ? (size_t)(crlf - (buf + offset)) + 2 : len - offset;
+    if (line_bytes > MAX_CHUNK_OVERHEAD)
+      return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
     if (!crlf) return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
 
     size_t line_len = (size_t)(crlf - (buf + offset));
@@ -1297,6 +1300,9 @@ static VALUE parser_decode_chunked(int argc, VALUE *argv, VALUE self) {
       while (1) {
         if (trailer_offset >= len) return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
         const char *tcrlf = find_crlf(buf + trailer_offset, len - trailer_offset);
+        size_t terminal_bytes = tcrlf ? (size_t)(tcrlf - (buf + offset)) + 2 : len - offset;
+        if (terminal_bytes > MAX_CHUNK_OVERHEAD)
+          return rb_ary_new_from_args(2, decoded, ID2SYM(id_malformed));
         if (!tcrlf) return rb_ary_new_from_args(2, decoded, ID2SYM(id_incomplete));
         if (tcrlf == buf + trailer_offset) return rb_ary_new_from_args(3, decoded, ID2SYM(id_complete), SIZET2NUM(trailer_offset + 2));
         trailer_offset = (size_t)(tcrlf - buf) + 2;

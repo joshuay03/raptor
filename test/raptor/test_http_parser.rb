@@ -154,6 +154,48 @@ module Raptor
       assert_equal :malformed, state
     end
 
+    def test_decode_chunked_bounds_size_lines_before_their_terminator
+      limit = HttpParser::MAX_CHUNK_OVERHEAD
+      ["0;", "8;"].each do |prefix|
+        line = prefix + "a" * (limit - 2)
+        assert_equal :incomplete, HttpParser.decode_chunked(line)[1]
+        assert_equal :malformed, HttpParser.decode_chunked(line + "a")[1]
+        assert_equal :malformed, HttpParser.decode_chunked(line + "\r\n")[1]
+      end
+
+      line = "8;#{"a" * (limit - 4)}\r\n"
+      decoded, state = HttpParser.decode_chunked("#{line}payload!\r\n0\r\n\r\n")
+      assert_equal :complete, state
+      assert_equal "payload!", decoded
+      assert_equal :malformed, HttpParser.decode_chunked("#{line.chomp("\r\n")}a\r\npayload!\r\n0\r\n\r\n")[1]
+    end
+
+    def test_decode_chunked_bounds_terminal_metadata_independently_of_payload
+      limit = HttpParser::MAX_CHUNK_OVERHEAD
+      terminals = [
+        "0;#{"a" * (limit - 6)}\r\n\r\n",
+        "0\r\nX: #{"a" * (limit - 10)}\r\n\r\n",
+        "0\r\n#{"X: a\r\n" * 8}Y: #{"a" * (limit - 58)}\r\n\r\n"
+      ]
+      payload = "8000\r\n#{"x" * 32_768}\r\n"
+      terminals.each do |terminal|
+        assert_equal limit, terminal.bytesize
+        ["", payload].each do |prefix|
+          decoded, state, consumed = HttpParser.decode_chunked(prefix + terminal + "GET / HTTP/1.0\r\n\r\n")
+          assert_equal :complete, state
+          assert_equal prefix.empty? ? "" : "x" * 32_768, decoded
+          assert_equal prefix.bytesize + limit, consumed
+
+          oversized = terminal.sub("\r\n\r\n", "a\r\n\r\n")
+          assert_equal :malformed, HttpParser.decode_chunked(prefix + oversized)[1]
+        end
+      end
+
+      partial = "0\r\nX: #{"a" * (limit - 6)}"
+      assert_equal :incomplete, HttpParser.decode_chunked(partial)[1]
+      assert_equal :malformed, HttpParser.decode_chunked(partial + "a")[1]
+    end
+
     def test_decode_chunked_returns_too_large_above_max_size
       _decoded, state = HttpParser.decode_chunked("a\r\n0123456789\r\n0\r\n\r\n", 5)
 

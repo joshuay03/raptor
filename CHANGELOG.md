@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Bound HTTP/1 chunk size lines and trailers, including incomplete metadata
 - Reject invalid CRLF delimiters after HTTP/1 chunk payloads
 - Prefer hyphenated request headers over underscore aliases and reject HTTP/1 framing aliases
 - Add plugins with lifecycle hooks, cluster stats, and managed background threads
