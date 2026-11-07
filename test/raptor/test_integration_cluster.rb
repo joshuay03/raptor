@@ -3,6 +3,7 @@
 require "test_helper"
 
 require "json"
+require "tmpdir"
 
 require "nio"
 
@@ -484,6 +485,71 @@ module Raptor
       assert_worker_boot_hooks_block_requests(replacement: :refork)
     end
 
+    def test_systemd_ready_waits_for_all_workers_while_plugin_remains_available
+      with_systemd_boot_barriers do |cluster, pid, notify, hooks, releases, plugin_path|
+        2.times { Timeout.timeout(10) { hooks.gets } }
+
+        stats = Timeout.timeout(5) do
+          UNIXSocket.open(plugin_path) { |socket| JSON.parse(socket.gets, symbolize_names: true) }
+        end
+        assert_equal pid, stats[:pid]
+        assert_equal 0, stats.dig(:stats, :booted_workers)
+        refute notify.wait_readable(0.3), "READY must wait for blocked boot hooks"
+
+        releases[0].write("r")
+        wait_until { cluster.stats[0][:booted] }
+        refute notify.wait_readable(0.3), "one booted worker is not enough"
+
+        releases[1].write("r")
+        assert notify.wait_readable(10), "READY was not sent after all workers booted"
+        assert_equal "READY=1\nMAINPID=#{pid}", notify.recv(1024)
+        refute notify.wait_readable(0.3), "READY must be sent exactly once"
+      end
+    end
+
+    def test_systemd_ready_waits_for_replacement_after_boot_hook_failure
+      with_systemd_boot_barriers do |cluster, pid, notify, hooks, releases, _plugin_path|
+        workers = 2.times.map { Timeout.timeout(10) { hooks.gets.split(":").map(&:to_i) } }.to_h
+        releases[0].write("f")
+        replacement_index, replacement_pid = Timeout.timeout(10) { hooks.gets.split(":").map(&:to_i) }
+        assert_equal 0, replacement_index
+        refute_equal workers[0], replacement_pid
+
+        releases[1].write("r")
+        wait_until { cluster.stats[1][:booted] }
+        refute notify.wait_readable(0.3), "a failed boot hook must not make the cluster ready"
+
+        releases[0].write("r")
+        assert notify.wait_readable(10), "READY was not sent after the replacement booted"
+        assert_equal "READY=1\nMAINPID=#{pid}", notify.recv(1024)
+        refute notify.wait_readable(0.3), "READY must be sent exactly once"
+      end
+    end
+
+    def test_systemd_ready_rejects_a_stale_booted_slot_during_replacement
+      with_systemd_boot_barriers do |cluster, pid, notify, hooks, releases, _plugin_path|
+        workers = 2.times.map { Timeout.timeout(10) { hooks.gets.split(":").map(&:to_i) } }.to_h
+        releases[0].write("r")
+        stale = wait_until { cluster.stats[0] if cluster.stats[0][:booted] }
+        Process.kill("KILL", workers[0])
+        replacement_index, replacement_pid = Timeout.timeout(10) { hooks.gets.split(":").map(&:to_i) }
+        assert_equal 0, replacement_index
+        refute_equal workers[0], replacement_pid
+
+        # Preserve the old booted slot while the replacement is held in its
+        # hook, as can happen before a newly forked worker first writes stats.
+        cluster.instance_variable_get(:@stats).write(0, **stale.reject { |key, _| key == :index })
+        releases[1].write("r")
+        wait_until { cluster.stats[1][:booted] }
+        refute notify.wait_readable(0.3), "the previous PID's booted slot must not count as ready"
+
+        releases[0].write("r")
+        assert notify.wait_readable(10), "READY was not sent after the current workers booted"
+        assert_equal "READY=1\nMAINPID=#{pid}", notify.recv(1024)
+        refute notify.wait_readable(0.3), "READY must be sent exactly once"
+      end
+    end
+
     def test_before_worker_shutdown_hooks_run_in_each_worker_before_graceful_exit
       marker_path = "/tmp/raptor_test_before_worker_shutdown_#{Process.pid}.marker"
       File.delete(marker_path) rescue nil
@@ -623,6 +689,45 @@ module Raptor
     end
 
     private
+
+    def with_systemd_boot_barriers
+      directory = Dir.mktmpdir("raptor-ready-", "/tmp")
+      notify_path = File.join(directory, "notify.sock")
+      plugin_path = File.join(directory, "plugin.sock")
+      notify = Socket.new(Socket::AF_UNIX, Socket::SOCK_DGRAM, 0)
+      notify.bind(Socket.pack_sockaddr_un(notify_path))
+      hook_reader, hook_writer = IO.pipe
+      releases = Array.new(2) { IO.pipe }
+      @options[:workers] = 2
+      @options[:plugins] = [:fixture_listener]
+      @options[:plugin_test] = { socket: plugin_path, events: File.join(directory, "events.jsonl") }
+      cluster = without_output { Cluster.new(@options) }
+      cluster_pid = fork do
+        notify.close
+        hook_reader.close
+        releases.each { |_, writer| writer.close }
+        ENV["NOTIFY_SOCKET"] = notify_path
+        require fixture_path("plugins/raptor/plugin/fixture_listener")
+        cluster.options[:before_worker_boot] << proc do |index|
+          hook_writer.puts "#{index}:#{Process.pid}"
+          raise "injected boot hook failure" if releases[index][0].read(1) == "f"
+        end
+        without_output { cluster.run }
+      end
+      cluster.instance_variable_get(:@binder).close
+      hook_writer.close
+      releases.each { |reader, _| reader.close }
+
+      yield cluster, cluster_pid, notify, hook_reader, releases.map(&:last), plugin_path
+    ensure
+      releases&.each { |_, writer| writer.close unless writer.closed? }
+      stop_cluster(cluster_pid)
+      [hook_reader, hook_writer, *releases.to_a.flatten, notify].each do |io|
+        io&.close unless io&.closed?
+      end
+      cluster&.instance_variable_get(:@stats)&.unmap
+      FileUtils.remove_entry(directory) if directory
+    end
 
     def assert_worker_boot_hooks_block_requests(replacement:)
       hook_reader, hook_writer = IO.pipe

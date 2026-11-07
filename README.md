@@ -211,7 +211,8 @@ to configuration, dependencies, or Raptor itself.
 ## systemd
 
 Raptor supports socket activation and `sd_notify`, so it works with `Type=notify` units. When the socket unit is
-active, Raptor serves the listening sockets systemd passes in place of `binds`.
+active, Raptor serves the listening sockets systemd passes in place of `binds`. Raptor sends `READY=1` after all
+workers have finished booting, including their `before_worker_boot` hooks.
 
 ```ini
 # /etc/systemd/system/myapp.socket

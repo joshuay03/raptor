@@ -294,7 +294,7 @@ module Raptor
           end
         end
 
-        Systemd.notify("READY=1\nMAINPID=#{Process.pid}")
+        ready = false
 
         until @shutdown
           break if reap_workers == :no_children
@@ -304,6 +304,17 @@ module Raptor
           perform_phased_restart if @phased_restart_requested && !@phased_restarting
           check_refork_trigger if @refork_thresholds.any? && !@phased_restarting
           timeout_hung_workers
+
+          unless ready || @shutdown
+            stats = @stats.all
+            if @workers.size == @worker_count && @workers.all? { |index, pid|
+              stat = stats[index]
+              stat[:pid] == pid && stat[:phase] == @phase && stat[:booted] && !@timed_out.include?(pid)
+            }
+              Systemd.notify("READY=1\nMAINPID=#{Process.pid}")
+              ready = true
+            end
+          end
 
           sleep 0.1
         end

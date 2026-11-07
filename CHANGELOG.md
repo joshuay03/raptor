@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Wait for all current workers to boot before notifying systemd that Raptor is ready
 - Prefer each over call for HTTP/1 Rack response bodies that implement both
 - Reject empty HTTP/1 Content-Length values and unsupported transfer codings before reading request bodies
 - Preserve request Version headers instead of replacing them with the HTTP protocol
