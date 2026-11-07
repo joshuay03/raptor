@@ -9,7 +9,7 @@ require "atomic-ruby/atomic_boolean"
 require "atomic-ruby/atomic_condition_variable"
 require "atomic-ruby/atomic_queue"
 require "atomic-ruby/atomic_thread_pool"
-require "nio"
+require "io/event"
 require "red-black-tree"
 
 require_relative "detached_body"
@@ -76,7 +76,6 @@ module Raptor
       attr_accessor :wait #: Symbol?
       attr_accessor :reading #: bool
       attr_accessor :closing #: bool
-      attr_accessor :monitor #: NIO::Monitor?
       attr_accessor :timeout #: TimeoutClient?
       attr_reader :output #: Array[String]
 
@@ -91,7 +90,6 @@ module Raptor
         @wait = nil
         @reading = false
         @closing = false
-        @monitor = nil
         @timeout = nil
       end
 
@@ -182,7 +180,10 @@ module Raptor
     # @rbs @persistent_data_timeout: Integer
     # @rbs @http2_keepalive_interval: Integer
     # @rbs @http2_keepalive_timeout: Integer
-    # @rbs @selector: NIO::Selector
+    # @rbs @selector: untyped
+    # @rbs @wakeup: Fiber?
+    # @rbs @waiters: Hash[TCPSocket, [Fiber, Integer]]
+    # @rbs @ready: Array[[TCPSocket, Integer]]
     # @rbs @queue: Queue[TCPSocket]
     # @rbs @io_queue: AtomicQueue
     # @rbs @io_applied: AtomicConditionVariable
@@ -231,7 +232,10 @@ module Raptor
       @http2_keepalive_interval = http2_options[:keepalive_interval]
       @http2_keepalive_timeout = http2_options[:keepalive_timeout]
 
-      @selector = NIO::Selector.new
+      @selector = nil
+      @wakeup = nil
+      @waiters = {}
+      @ready = []
       @queue = Queue.new
       @io_queue = AtomicQueue.new
       @io_applied = AtomicConditionVariable.new
@@ -262,13 +266,19 @@ module Raptor
       Thread.new do
         Thread.current.name = "Reactor"
         @thread = Thread.current
+        selector = IO::Event::Selector.new(Fiber.current)
+        @wakeup = Fiber.new { loop { selector.transfer } }
+        @selector = selector
 
         until stopped?
           begin
             now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
             timeout = @timeouts.min&.timeout(now)
-            @selector.select(timeout) do |monitor|
-              handle_monitor(monitor)
+            timeout = 0 unless @ready.empty? && @queue.empty? && @io_queue.empty?
+            @selector.select(timeout)
+            until @ready.empty?
+              socket, events = @ready.shift
+              handle_ready(socket, events)
             end
 
             now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -283,6 +293,8 @@ module Raptor
           end
         end
 
+        @waiters.keys.each { |socket| deregister(socket) }
+        @ready.clear
         @id_to_flow_control.each_value(&:close)
         @id_to_socket.each_value { |socket| socket.close rescue nil }
         @id_to_socket.clear
@@ -330,7 +342,7 @@ module Raptor
 
       @socket_to_state[socket] = state
       @queue << socket
-      @selector.wakeup
+      wakeup
     rescue ClosedQueueError
       socket.close
     end
@@ -372,7 +384,7 @@ module Raptor
       @id_to_socket[id] = socket
       @socket_to_state[socket] = state
       @queue << socket
-      @selector.wakeup
+      wakeup
     rescue ClosedQueueError
       socket.close
     end
@@ -422,7 +434,7 @@ module Raptor
     def attach_http1_body(socket, id, body, state, finished)
       attached = AtomicBoolean.new(false)
       @io_queue << [:attach_http1, id, socket, body, attached, finished, state]
-      @selector.wakeup rescue nil
+      wakeup rescue nil
       @io_applied.wait { attached.true? }
       return false if body.closed?
 
@@ -430,7 +442,7 @@ module Raptor
       true
     rescue
       @io_queue << [:cancel_http1, id]
-      @selector.wakeup rescue nil
+      wakeup rescue nil
       raise
     end
 
@@ -490,7 +502,7 @@ module Raptor
         flush_output(id, io) if io && !io.wait
       else
         @io_queue << [:write, id, data]
-        @selector.wakeup rescue nil
+        wakeup rescue nil
       end
     end
 
@@ -506,7 +518,7 @@ module Raptor
     def attach_http2_body(id, stream_id, body, finished)
       attached = AtomicBoolean.new(false)
       @io_queue << [:attach_http2, id, stream_id, body, attached, finished]
-      @selector.wakeup rescue nil
+      wakeup rescue nil
       @io_applied.wait { attached.true? }
       return false if body.closed?
 
@@ -527,7 +539,7 @@ module Raptor
       return if @detached_count.value.zero?
 
       @io_queue << [:resume_http2, id]
-      @selector.wakeup rescue nil
+      wakeup rescue nil
     end
 
     # Cancels a detached response stream.
@@ -541,7 +553,7 @@ module Raptor
       return if @detached_count.value.zero?
 
       @io_queue << [:cancel_http2, id, stream_id]
-      @selector.wakeup rescue nil
+      wakeup rescue nil
     end
 
     # Waits for detached responses to finish, then cancels any that outlive
@@ -554,7 +566,7 @@ module Raptor
     def drain_detached_bodies(timeout)
       barrier = AtomicBoolean.new(false)
       @io_queue << [:barrier, nil, barrier]
-      @selector.wakeup rescue nil
+      wakeup rescue nil
       @io_applied.wait { barrier.true? }
 
       Timeout.timeout(timeout) do
@@ -562,7 +574,7 @@ module Raptor
       end
     rescue Timeout::Error
       @io_queue << [:cancel_all]
-      @selector.wakeup rescue nil
+      wakeup rescue nil
       @detached_drained.wait { @detached_count.value.zero? }
     end
 
@@ -617,7 +629,7 @@ module Raptor
       return unless socket
 
       @queue << socket
-      @selector.wakeup
+      wakeup
     rescue ClosedQueueError
       socket.close
     end
@@ -630,7 +642,7 @@ module Raptor
     # @rbs (Integer id) -> void
     def close_connection(id)
       @io_queue << [:close, id]
-      @selector.wakeup rescue nil
+      wakeup rescue nil
     end
 
     # Closes the registration queue and wakes the selector so the
@@ -641,7 +653,7 @@ module Raptor
     # @rbs () -> void
     def shutdown
       @queue.close
-      @selector.wakeup
+      wakeup
     end
 
     # Returns the number of complete requests either being processed
@@ -655,6 +667,17 @@ module Raptor
     end
 
     private
+
+    # Wakes the event loop, including work queued before it starts waiting.
+    #
+    # @rbs () -> void
+    def wakeup
+      selector = @selector
+      return unless selector
+
+      selector.push(@wakeup)
+      selector.wakeup
+    end
 
     # Returns whether shutdown has no registrations or writes left to drain.
     #
@@ -760,7 +783,7 @@ module Raptor
       dispatch = proc { |callback| @thread_pool << callback }
       wake = proc do
         @io_queue << [:ready_http1, id]
-        @selector.wakeup rescue nil
+        wakeup rescue nil
       end
       unless body.attach([io.budget, @detached_budget], wake, dispatch, finished)
         socket.close rescue nil
@@ -771,7 +794,7 @@ module Raptor
       @socket_to_state[socket] = { id: id, protocol: :http1, detached: true }
       @id_to_io[id] = io
       @detached_count.swap { |count| count + 1 }
-      update_monitor(id, io)
+      update_interests(id, io)
     end
 
     # Writes buffered HTTP/1.x body chunks without blocking.
@@ -803,7 +826,7 @@ module Raptor
 
       if !io.finishing && !io.wait && io.body&.next_size
         @io_queue << [:ready_http1, id]
-        @selector.wakeup rescue nil
+        wakeup rescue nil
       end
     end
 
@@ -823,7 +846,7 @@ module Raptor
       body.finish(:closed)
       detached_body_removed
       @id_to_io.delete(id)
-      deregister(socket, io)
+      deregister(socket)
       clear_write_timeout(io)
 
       if io.state[:keep_alive]
@@ -887,7 +910,7 @@ module Raptor
 
       wake = proc do
         @io_queue << [:ready_http2, id, stream_id]
-        @selector.wakeup rescue nil
+        wakeup rescue nil
       end
       return unless body.attach([io.budget, @detached_budget], wake, dispatch, finished)
 
@@ -967,7 +990,7 @@ module Raptor
 
       if !io.wait && io.output.empty? && !io.ready.empty?
         @io_queue << [:flush_http2, id]
-        @selector.wakeup rescue nil
+        wakeup rescue nil
       end
     end
 
@@ -1133,7 +1156,7 @@ module Raptor
       elsif io.closing
         remove_connection(id)
       else
-        update_monitor(id, io)
+        update_interests(id, io)
       end
     end
 
@@ -1148,7 +1171,7 @@ module Raptor
     def wait_for_write(id, io, readiness)
       io.wait = readiness
       track_write_timeout(id, io)
-      update_monitor(id, io)
+      update_interests(id, io)
     end
 
     # Updates selector interest for one reactor-owned connection.
@@ -1158,26 +1181,34 @@ module Raptor
     # @return [void]
     #
     # @rbs (Integer id, ConnectionIO io) -> void
-    def update_monitor(id, io)
+    def update_interests(id, io)
       socket = @id_to_socket[id]
       return unless socket && io
 
-      read = io.reading || io.wait == :read
-      write = io.wait == :write
-      interests = if read && write
-        :rw
-      elsif read
-        :r
-      elsif write
-        :w
-      end
+      events = 0
+      events |= IO::READABLE if io.reading || io.wait == :read
+      events |= IO::WRITABLE if io.wait == :write
+      wait_for_io(socket, events)
+    end
 
-      if io.monitor
-        io.monitor.interests = interests
-      elsif interests
-        io.monitor = @selector.register(socket, interests)
-        io.monitor.value = socket
+    # Waits for a connection's next readable or writable event.
+    #
+    # @rbs (TCPSocket socket, Integer events) -> void
+    def wait_for_io(socket, events)
+      waiter = @waiters[socket]
+      return if waiter && waiter[1] == events
+
+      deregister(socket)
+      return if events.zero?
+
+      fiber = Fiber.new do
+        readiness = @selector.io_wait(Fiber.current, socket, events)
+        @ready << [socket, readiness] if readiness
+      ensure
+        @waiters.delete(socket)
       end
+      @waiters[socket] = [fiber, events]
+      fiber.transfer
     end
 
     # Starts or refreshes one connection's non-blocking write deadline.
@@ -1210,19 +1241,15 @@ module Raptor
     # Removes a socket from selector tracking.
     #
     # @param socket [TCPSocket] socket to deregister
-    # @param io [ConnectionIO, nil] connection I/O state
     # @return [void]
     #
-    # @rbs (TCPSocket socket, ConnectionIO? io) -> void
-    def deregister(socket, io)
-      return unless io&.monitor || @selector.registered?(socket)
-
-      @selector.deregister(socket)
-      io.monitor = nil if io
-    rescue IOError
+    # @rbs (TCPSocket socket) -> void
+    def deregister(socket)
+      waiter = @waiters.delete(socket)
+      waiter[0].transfer if waiter
     end
 
-    # Registers a socket with the NIO selector and sets up timeout tracking.
+    # Registers a socket for readiness and sets up timeout tracking.
     #
     # @param socket [TCPSocket] the socket to register
     # @return [void]
@@ -1235,9 +1262,9 @@ module Raptor
       if state[:protocol] == :http2
         io = @id_to_io[state[:id]]
         io.reading = true
-        update_monitor(state[:id], io)
+        update_interests(state[:id], io)
       else
-        @selector.register(socket, :r).value = socket
+        wait_for_io(socket, IO::READABLE)
       end
 
       now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -1301,17 +1328,17 @@ module Raptor
     # Dispatches readable and writable events without allowing application
     # threads to take ownership of HTTP/2 sockets.
     #
-    # @param monitor [NIO::Monitor] ready selector monitor
+    # @param socket [TCPSocket] ready client socket
+    # @param events [Integer] readiness events
     # @return [void]
     #
-    # @rbs (NIO::Monitor monitor) -> void
-    def handle_monitor(monitor)
-      socket = monitor.value
+    # @rbs (TCPSocket socket, Integer events) -> void
+    def handle_ready(socket, events)
       state = @socket_to_state[socket]
       return unless state
 
       if state[:detached]
-        handle_http1_detached_monitor(monitor, state[:id])
+        handle_http1_detached_ready(socket, events, state[:id])
         return
       end
 
@@ -1325,7 +1352,7 @@ module Raptor
       return unless io
 
       wait = io.wait
-      if (wait == :read && monitor.readable?) || (wait == :write && monitor.writable?)
+      if (wait == :read && events.anybits?(IO::READABLE)) || (wait == :write && events.anybits?(IO::WRITABLE))
         flush_output(id, io)
         return unless @id_to_socket.key?(id)
         return if io.wait == :read
@@ -1333,40 +1360,43 @@ module Raptor
         flush_http2_detached_bodies(id) unless io.detached.empty?
       end
 
-      return unless io.reading && monitor.readable?
+      return unless io.reading && events.anybits?(IO::READABLE)
 
       io.reading = false
-      update_monitor(id, io)
+      update_interests(id, io)
       client = @id_to_timeout.delete(id)
       @timeouts.delete!(client) if client
       read_and_queue_for_parse(socket, state)
+    ensure
+      io = @id_to_io[state[:id]] if state
+      update_interests(state[:id], io) if io
     end
 
     # Handles readiness for an HTTP/1.x detached response.
     #
-    # @param monitor [NIO::Monitor] ready selector monitor
+    # @param socket [TCPSocket] ready client socket
+    # @param events [Integer] readiness events
     # @param id [Integer] unique connection identifier
     # @return [void]
     #
-    # @rbs (NIO::Monitor monitor, Integer id) -> void
-    def handle_http1_detached_monitor(monitor, id)
-      socket = monitor.value
+    # @rbs (TCPSocket socket, Integer events, Integer id) -> void
+    def handle_http1_detached_ready(socket, events, id)
       io = @id_to_io[id]
       return unless io.is_a?(Http1IO)
 
       wait = io.wait
-      if (wait == :read && monitor.readable?) || (wait == :write && monitor.writable?)
+      if (wait == :read && events.anybits?(IO::READABLE)) || (wait == :write && events.anybits?(IO::WRITABLE))
         flush_output(id, io)
         return unless @id_to_io.key?(id)
 
         flush_http1_detached_body(id) unless io.wait
       end
 
-      return unless io.reading && monitor.readable?
+      return unless io.reading && events.anybits?(IO::READABLE)
 
       io.input << socket.read_nonblock(CHUNK_SIZE)
       io.reading = false
-      update_monitor(id, io)
+      update_interests(id, io)
     rescue IO::WaitReadable
     rescue IO::WaitWritable
       wait_for_write(id, io, :write)
@@ -1382,7 +1412,7 @@ module Raptor
     #
     # @rbs (TCPSocket socket) -> void
     def wakeup!(socket)
-      @selector.deregister(socket)
+      deregister(socket)
       state = @socket_to_state[socket]
       client = @id_to_timeout.delete(state[:id])
       @timeouts.delete!(client) if client
@@ -1433,7 +1463,7 @@ module Raptor
         socket.read_nonblock(CHUNK_SIZE)
       rescue IO::WaitReadable
         @queue << socket
-        @selector.wakeup
+        wakeup
         return
       rescue EOFError, IOError, SystemCallError, OpenSSL::SSL::SSLError
         cleanup(socket)
@@ -1461,7 +1491,7 @@ module Raptor
     def cleanup(socket)
       state = @socket_to_state.delete(socket)
       io = @id_to_io.delete(state[:id])
-      deregister(socket, io)
+      deregister(socket)
       @id_to_socket.delete(state[:id])
       @id_to_writer.delete(state[:id])
       @id_to_flow_control.delete(state[:id])&.close

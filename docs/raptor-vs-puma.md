@@ -16,7 +16,7 @@ This guide compares their architecture and relates it to the [current README ben
 | Protocol processing | App threads and reactor share the worker's GVL | Eager parsing inline, separate protocol Ractors on the pipeline path |
 | Pool coordination | Mutex and condition variables | Lock-free work queue with idle-thread parking |
 | Pool growth | Adds threads when queued work exceeds waiting capacity | Adds threads when queued work and blocking time justify growth |
-| Idle and partial connections | `nio4r` reactor | `nio4r` reactor |
+| Idle and partial connections | `nio4r` reactor | `io-event` reactor |
 | Cluster dispatch | Shared listeners with load-sensitive accept delay | Shared listeners, plus load-aware BPF dispatch on supported Linux TCP bindings |
 | HTTP/2 | Not implemented | Native parsing, HPACK and stream flow control |
 | Worker monitoring | Pipe messages | Shared-memory stats |
@@ -129,7 +129,7 @@ flowchart TB
     subgraph Worker["Raptor worker process, one of N"]
         SRV["Server thread<br/>IO.select + accept_nonblock<br/>polls for pool capacity"]
 
-        RCT["Reactor thread<br/>NIO::Selector<br/>read_nonblock 64KB<br/>Red-Black-Tree timeouts"]
+        RCT["Reactor thread<br/>io-event selector<br/>read_nonblock 64KB<br/>Red-Black-Tree timeouts"]
 
         subgraph RP1["HTTP/1.1 RactorPool"]
             RW1["Pipeline Ractor 1<br/>HTTP/1.x parser<br/>chunked decode"]
@@ -210,6 +210,8 @@ Puma's cluster accept delay backs off according to worker load. On supported Lin
 ### Connection tracking
 
 Both reactors keep idle and partial connections off application threads. Puma tracks deadlines in a sorted array. Raptor uses a red-black tree for logarithmic insertion and removal of individual deadlines. Updating a connection's deadline does not require scanning the other connections.
+
+Raptor uses `io-event` readiness fibers only on its reactor thread. It does not install a Fiber scheduler or change how the application runs.
 
 ### Responses and streaming
 

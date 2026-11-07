@@ -5,8 +5,6 @@ require "test_helper"
 require "json"
 require "tmpdir"
 
-require "nio"
-
 module Raptor
   class TestIntegrationCluster < IntegrationTestCase
     parallelize_me!
@@ -638,7 +636,7 @@ module Raptor
       server_port = cluster.instance_variable_get(:@server_port)
 
       cluster_pid = fork do
-        NIO::Selector.prepend(Module.new do
+        IO::Event::Selector.default.prepend(Module.new do
           define_method(:select) do |*args, &block|
             Thread.current[:_test_select_count] = (Thread.current[:_test_select_count] || 0) + 1
             raise "injected reactor failure" if Thread.current[:_test_select_count] == 1

@@ -640,7 +640,7 @@ with no hard maximum. You don't have to choose one fixed thread count.</big>
 
 Slow clients, half-sent requests, and idle keep-alive connections aren't ready to be read yet. The reactor watches all of them at once.
 
-<big>Like Puma, it uses [`nio4r`](https://github.com/socketry/nio4r), backed by `epoll` on Linux
+<big>It uses [`io-event`](https://github.com/socketry/io-event), backed by `epoll` on Linux
 and `kqueue` on macOS.</big>
 
 <big>The HTTP/1.1 defaults are 30 seconds for the first bytes,

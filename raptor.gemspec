@@ -28,7 +28,7 @@ Gem::Specification.new do |spec|
   spec.extensions = ["ext/raptor_http/extconf.rb", "ext/raptor_http2/extconf.rb", "ext/raptor_native/extconf.rb"]
 
   spec.add_dependency "rack", ">= 3.2.0"
-  spec.add_dependency "nio4r"
+  spec.add_dependency "io-event"
   spec.add_dependency "atomic-ruby"
   spec.add_dependency "concurrent-ruby"
   spec.add_dependency "ractor-pool"

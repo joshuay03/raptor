@@ -56,8 +56,6 @@ module Raptor
 
       attr_accessor closing: bool
 
-      attr_accessor monitor: NIO::Monitor?
-
       attr_accessor timeout: TimeoutClient?
 
       attr_reader output: Array[String]
@@ -131,13 +129,17 @@ module Raptor
       def empty?: () -> bool
     end
 
-    @io_applied: AtomicConditionVariable
-
     @io_queue: AtomicQueue
 
     @queue: Queue[TCPSocket]
 
-    @selector: NIO::Selector
+    @ready: Array[[ TCPSocket, Integer ]]
+
+    @waiters: Hash[TCPSocket, [ Fiber, Integer ]]
+
+    @wakeup: Fiber?
+
+    @selector: untyped
 
     @http2_keepalive_timeout: Integer
 
@@ -158,6 +160,8 @@ module Raptor
     @http1_ractor_pool: RactorPool
 
     @http1: Http1
+
+    @io_applied: AtomicConditionVariable
 
     @timeouts: RedBlackTree[TimeoutClient]
 
@@ -422,6 +426,11 @@ module Raptor
 
     private
 
+    # Wakes the event loop, including work queued before it starts waiting.
+    #
+    # @rbs () -> void
+    def wakeup: () -> void
+
     # Returns whether shutdown has no registrations or writes left to drain.
     #
     # @return [Boolean]
@@ -603,7 +612,12 @@ module Raptor
     # @return [void]
     #
     # @rbs (Integer id, ConnectionIO io) -> void
-    def update_monitor: (Integer id, ConnectionIO io) -> void
+    def update_interests: (Integer id, ConnectionIO io) -> void
+
+    # Waits for a connection's next readable or writable event.
+    #
+    # @rbs (TCPSocket socket, Integer events) -> void
+    def wait_for_io: (TCPSocket socket, Integer events) -> void
 
     # Starts or refreshes one connection's non-blocking write deadline.
     #
@@ -625,13 +639,12 @@ module Raptor
     # Removes a socket from selector tracking.
     #
     # @param socket [TCPSocket] socket to deregister
-    # @param io [ConnectionIO, nil] connection I/O state
     # @return [void]
     #
-    # @rbs (TCPSocket socket, ConnectionIO? io) -> void
-    def deregister: (TCPSocket socket, ConnectionIO? io) -> void
+    # @rbs (TCPSocket socket) -> void
+    def deregister: (TCPSocket socket) -> void
 
-    # Registers a socket with the NIO selector and sets up timeout tracking.
+    # Registers a socket for readiness and sets up timeout tracking.
     #
     # @param socket [TCPSocket] the socket to register
     # @return [void]
@@ -661,20 +674,22 @@ module Raptor
     # Dispatches readable and writable events without allowing application
     # threads to take ownership of HTTP/2 sockets.
     #
-    # @param monitor [NIO::Monitor] ready selector monitor
+    # @param socket [TCPSocket] ready client socket
+    # @param events [Integer] readiness events
     # @return [void]
     #
-    # @rbs (NIO::Monitor monitor) -> void
-    def handle_monitor: (NIO::Monitor monitor) -> void
+    # @rbs (TCPSocket socket, Integer events) -> void
+    def handle_ready: (TCPSocket socket, Integer events) -> void
 
     # Handles readiness for an HTTP/1.x detached response.
     #
-    # @param monitor [NIO::Monitor] ready selector monitor
+    # @param socket [TCPSocket] ready client socket
+    # @param events [Integer] readiness events
     # @param id [Integer] unique connection identifier
     # @return [void]
     #
-    # @rbs (NIO::Monitor monitor, Integer id) -> void
-    def handle_http1_detached_monitor: (NIO::Monitor monitor, Integer id) -> void
+    # @rbs (TCPSocket socket, Integer events, Integer id) -> void
+    def handle_http1_detached_ready: (TCPSocket socket, Integer events, Integer id) -> void
 
     # Deregisters a readable socket and resumes its idle keep-alive
     # connection or queues its bytes for parsing.

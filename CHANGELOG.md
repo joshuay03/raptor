@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Replace nio4r with io-event for reactor I/O readiness without changing application threading
+
 ## [0.24.0] - 2026-11-08
 
 - Honour `connection.max_body_size` for HTTP/2 request bodies without closing other streams
