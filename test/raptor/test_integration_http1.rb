@@ -394,10 +394,25 @@ module Raptor
 
     def test_enumerable_body
       with_server("enumerable_body.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
+        Net::HTTP.start(uri.host, uri.port) do |http|
+          closed_before = http.get("/closed").body.to_i
+          response = http.get("/")
 
-        assert_equal 200, response.code.to_i
-        assert_equal "Chunk by chunk", response.body
+          assert_equal 200, response.code.to_i
+          assert_equal "Chunk by chunk", response.body
+          assert_equal closed_before + 1, http.get("/closed").body.to_i
+        end
+      end
+    end
+
+    def test_callable_only_body
+      with_server("enumerable_body.ru") do |uri|
+        response = Timeout.timeout(5) do
+          raw_request(uri, "GET /stream HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        end
+
+        assert_match(%r{\AHTTP/1.1 200 OK}, response)
+        assert_equal "Streamed body", response.split("\r\n\r\n", 2).last
       end
     end
 

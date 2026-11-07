@@ -1180,7 +1180,7 @@ module Raptor
     #
     # @rbs (TCPSocket socket, String response, Hash[String, String | Array[String]] headers, untyped body, String http_version) -> void
     def write_full_response(socket, response, headers, body, http_version)
-      if body.respond_to?(:call)
+      if body.respond_to?(:call) && !body.respond_to?(:each)
         HttpParser.format_headers(response, headers)
         response << "\r\n"
         socket_write(socket, response)
