@@ -177,6 +177,13 @@ working directory. Pass <code>-c PATH</code> to point at a specific file.</p>
 <p>By default each worker adds threads beyond <code>threads</code> only while queued requests are waiting on blocking work such as
 database or network calls. It stops adding them once Ruby execution becomes the bottleneck, and the extra threads
 retire when the queue is idle. Set <code>max_threads</code> to cap this growth, or set it to <code>threads</code> for a fixed pool.</p>
+<h3 id="Request_bodies">Request bodies</h3>
+<p>Raptor buffers each complete request body before calling the app. For HTTP/1, <code>connection.max_body_size</code> limits the
+body size in bytes and defaults to unlimited. Bodies larger than <code>connection.body_spool_threshold</code> are then copied
+to a tempfile for <code>rack.input</code>. Spooling happens after receipt, so it does not bound peak receive memory.</p>
+<p>HTTP/2 currently keeps request bodies in memory and does not apply those two options. For public deployments, enforce
+body-size and concurrent-upload limits at a reverse proxy, including for HTTP/2. Enable proxy request buffering to
+shield workers from slow uploads, and set a finite <code>connection.max_body_size</code> for HTTP/1 as an additional safeguard.</p>
 <h2 id="Plugins">Plugins</h2>
 <p>Plugins start in the master process and can register lifecycle hooks that run in workers. Use them for metrics
 exporters, probes, or other integrations. Enable them in your config with <code>plugins: [:stats_logger]</code>.</p>
@@ -253,7 +260,8 @@ A hot restart starts a new master with the original command line and the same li
 to configuration, dependencies, or Raptor itself.</p>
 <h2 id="systemd">systemd</h2>
 <p>Raptor supports socket activation and <code>sd_notify</code>, so it works with <code>Type=notify</code> units. When the socket unit is
-active, Raptor serves the listening sockets systemd passes in place of <code>binds</code>.</p>
+active, Raptor serves the listening sockets systemd passes in place of <code>binds</code>. Raptor sends <code>READY=1</code> after all
+workers have finished booting, including their <code>before_worker_boot</code> hooks.</p>
 <pre class="code ini"><code class="ini"># /etc/systemd/system/myapp.socket
 [Socket]
 ListenStream=0.0.0.0:9292
@@ -964,7 +972,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sat Nov  7 10:13:09 2026 by
+  Generated on Sat Nov  7 10:27:56 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
