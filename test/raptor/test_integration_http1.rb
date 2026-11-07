@@ -628,6 +628,37 @@ module Raptor
       end
     end
 
+    def test_connection_close_token_prevents_pipeline_dispatch
+      @options[:app] = proc { |env| [200, {}, [env[Rack::PATH_INFO]]] }
+      with_server do |uri|
+        ["HTTP/1.1", "HTTP/1.0"].each do |protocol|
+          ["keep-alive, close", "ClOsE,\tkeep-alive", "keep-alive\r\nConnection: close"].each do |value|
+            request = "GET /first #{protocol}\r\nHost: localhost\r\nConnection: #{value}\r\n\r\n" \
+              "GET /second #{protocol}\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+            response = Timeout.timeout(5) { raw_request(uri, request) }
+
+            assert_equal 1, response.scan("200 OK").length
+            assert_includes response, "/first"
+            refute_includes response, "/second"
+            assert_includes response, "connection: close"
+          end
+        end
+      end
+    end
+
+    def test_connection_keepalive_token_does_not_confuse_close_substrings
+      with_server do |uri|
+        ["HTTP/1.1", "HTTP/1.0"].each do |protocol|
+          request = "GET / #{protocol}\r\nHost: localhost\r\nConnection: x-close,\tKeEp-AlIvE \r\n\r\n" \
+            "GET / #{protocol}\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+          response = Timeout.timeout(5) { raw_request(uri, request) }
+
+          assert_equal 2, response.scan("200 OK").length
+          assert_includes response, "connection: keep-alive"
+        end
+      end
+    end
+
     def test_first_data_timeout_returns_408
       @options[:connection] = @options[:connection].merge(first_data_timeout: 1)
 

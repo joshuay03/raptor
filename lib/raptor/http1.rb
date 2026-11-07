@@ -934,13 +934,10 @@ module Raptor
     def keep_alive?(env, request_count)
       return false if request_count >= @max_keepalive_requests
 
-      connection_header = env[HTTP_CONNECTION]
+      connection_tokens = env[HTTP_CONNECTION].to_s.downcase.split(",").map(&:strip)
+      return false if connection_tokens.include?(CONNECTION_CLOSE)
 
-      if env[Rack::SERVER_PROTOCOL] == HTTP_11
-        !connection_header&.casecmp?(CONNECTION_CLOSE)
-      else
-        connection_header&.casecmp?(CONNECTION_KEEPALIVE) || false
-      end
+      env[Rack::SERVER_PROTOCOL] == HTTP_11 || connection_tokens.include?(CONNECTION_KEEPALIVE)
     end
 
     # Sends an HTTP 103 Early Hints response, skipping any entries with

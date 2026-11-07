@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Honour HTTP/1 Connection token lists, with close taking precedence over keep-alive
 - Run worker boot hooks before starting application threads, parsers, and request handling
 - Close HTTP/2 response bodies when writing fails or a stream is cancelled
 - Bound HTTP/1 chunk size lines and trailers, including incomplete metadata
