@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-08
+
 - Honour `connection.max_body_size` for HTTP/2 request bodies without closing other streams
 - Wait for all current workers to boot before notifying systemd that Raptor is ready
 - Prefer each over call for HTTP/1 Rack response bodies that implement both
