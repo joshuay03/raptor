@@ -114,12 +114,20 @@ module Raptor
       end
     end
 
-    def test_http_version_present
+    def test_version_header_is_independent_of_server_protocol
       with_server("http_version.ru") do |uri|
-        response = Net::HTTP.get_response(uri)
+        Net::HTTP.start(uri.host, uri.port) do |http|
+          request = Net::HTTP::Get.new(uri)
+          request["Version"] = "8.1.1"
+          response = http.request(request)
 
-        assert_equal 200, response.code.to_i
-        assert_equal "HTTP/1.1", response.body
+          assert_equal 200, response.code.to_i
+          assert_equal "HTTP/1.1|8.1.1", response.body
+
+          response = http.get("/")
+          assert_equal 200, response.code.to_i
+          assert_equal "HTTP/1.1|absent", response.body
+        end
       end
     end
 

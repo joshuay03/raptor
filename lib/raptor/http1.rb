@@ -855,7 +855,6 @@ module Raptor
       end
 
       env[Http::REMOTE_ADDR] = remote_addr
-      env[Http::HTTP_VERSION] = env[Rack::SERVER_PROTOCOL]
 
       behind_tls_proxy = (url_scheme == Server::HTTP_SCHEME) && forwarded_https?(env)
       env[Rack::RACK_URL_SCHEME] = behind_tls_proxy ? Server::HTTPS_SCHEME : url_scheme

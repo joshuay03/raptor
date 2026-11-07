@@ -1354,7 +1354,6 @@ module Raptor
 
       env[Http::REMOTE_ADDR] = remote_addr
       env[Http::SERVER_SOFTWARE] = Http::SERVER_SOFTWARE_VALUE
-      env[Http::HTTP_VERSION] = SERVER_PROTOCOL
       env[RESPONSE_TRAILERS] = {}
 
       populate_server_name_and_port(env)

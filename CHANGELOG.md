@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Preserve request Version headers instead of replacing them with the HTTP protocol
 - Trim leading tabs as optional HTTP/1 header whitespace
 - Honour HTTP/1 Connection token lists, with close taking precedence over keep-alive
 - Run worker boot hooks before starting application threads, parsers, and request handling

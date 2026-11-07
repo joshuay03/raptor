@@ -100,13 +100,14 @@ module Raptor
       end
     end
 
-    def test_http_version_present
+    def test_version_header_is_independent_of_server_protocol
       with_http2_server("http_version.ru") do |port|
-        responses = http2_get(port, "/")
+        [{ "version" => "8.1.1" }, {}].each do |headers|
+          response = http2_request(port, "GET", "/", headers: headers).first
 
-        assert_equal 1, responses.size
-        assert_equal "200", responses[0][:status]
-        assert_equal "HTTP/2", responses[0][:body]
+          assert_equal "200", response[:status]
+          assert_equal "HTTP/2|#{headers.fetch("version", "absent")}", response[:body]
+        end
       end
     end
 
