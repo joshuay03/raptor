@@ -455,7 +455,7 @@ module Raptor
     # updated connection state along with any outgoing protocol frames and
     # completed stream requests.
     #
-    # @param data [Hash] the connection state including buffer and HPACK table
+    # @param data [Hash] the connection state including buffer, HPACK table and body-size limit
     # @return [Hash] updated state with outgoing_frames and completed_requests
     #
     # @rbs (Hash[Symbol, untyped] data) -> Hash[Symbol, untyped]
@@ -474,6 +474,7 @@ module Raptor
       preface_received = data[:http2_preface_received] || false
       last_client_stream_id = data[:http2_last_client_stream_id] || 0
       pending_headers = data[:http2_pending_headers]
+      max_body_size = data[:max_body_size]
       goaway_error = nil
 
       unless preface_received
@@ -586,12 +587,29 @@ module Raptor
           stream = streams[stream_id]
           next unless stream
 
+          if stream[:too_large]
+            streams.delete(stream_id) if frame[:flags].anybits?(FLAG_END_STREAM)
+            next
+          end
+
+          body = stream[:body] || ""
+          if max_body_size && body.bytesize + chunk.bytesize > max_body_size
+            headers = parser.encode_headers([[":status", "413"], ["content-length", "0"]])
+            outgoing_frames << parser.build_frame(:headers, FLAG_END_HEADERS | FLAG_END_STREAM, stream_id, headers)
+            if frame[:flags].anybits?(FLAG_END_STREAM)
+              streams.delete(stream_id)
+            else
+              streams[stream_id] = { too_large: true }
+            end
+            next
+          end
+
           stream_window_used = (stream[:window_used] || 0) + frame[:length]
           if stream_window_used >= DEFAULT_WINDOW_SIZE / 2 && frame[:flags].nobits?(FLAG_END_STREAM)
             outgoing_frames << parser.build_frame(:window_update, 0, stream_id, [stream_window_used].pack("N"))
             stream_window_used = 0
           end
-          stream = stream.merge(body: (stream[:body] || "") + chunk, window_used: stream_window_used)
+          stream = stream.merge(body: body + chunk, window_used: stream_window_used)
 
           if frame[:flags].anybits?(FLAG_END_STREAM)
             stream_headers = stream[:headers] || []
@@ -714,11 +732,13 @@ module Raptor
         outgoing_frames << parser.build_frame(:rst_stream, 0, stream_id, [ERROR_PROTOCOL_ERROR].pack("N"))
       elsif trailers
         stream = streams.delete(stream_id)
-        completed_requests << {
-          stream_id: stream_id,
-          headers: stream[:headers],
-          body: stream[:body] || ""
-        }
+        unless stream[:too_large]
+          completed_requests << {
+            stream_id: stream_id,
+            headers: stream[:headers],
+            body: stream[:body] || ""
+          }
+        end
       else
         streams, completed_requests = finalize_headers(streams, completed_requests, stream_id, decoded_headers, end_stream)
       end
@@ -783,6 +803,7 @@ module Raptor
         id: data[:id],
         protocol: :http2,
         buffer: buffer || "",
+        max_body_size: data[:max_body_size],
         hpack_table: hpack_table,
         http2_streams: streams,
         http2_window: connection_window,
@@ -806,6 +827,7 @@ module Raptor
     # @rbs @app: ^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped]
     # @rbs @server_port_string: String
     # @rbs @write_timeout: Integer
+    # @rbs @max_body_size: Integer?
     # @rbs @access_log_io: IO?
     # @rbs @clean_thread_locals: bool
     # @rbs @clean_fiber_locals: bool
@@ -819,6 +841,7 @@ module Raptor
     # @param server_port [Integer] port number used to populate SERVER_PORT in the Rack env
     # @param connection_options [Hash] per-connection settings shared across protocols
     # @option connection_options [Integer] :write_timeout per-write socket timeout in seconds
+    # @option connection_options [Integer, nil] :max_body_size maximum request body size in bytes
     # @param http2_options [Hash] HTTP/2-specific settings
     # @option http2_options [Integer] :max_concurrent_streams maximum HTTP/2 concurrent streams per connection
     # @param access_log_io [IO, nil] IO to write Common Log Format access entries to, or nil to disable
@@ -832,6 +855,7 @@ module Raptor
       @app = app
       @server_port_string = server_port.to_s.freeze
       @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
+      @max_body_size = connection_options[:max_body_size]
       @access_log_io = access_log_io
       @clean_thread_locals = clean_thread_locals
       @clean_fiber_locals = clean_fiber_locals
@@ -902,6 +926,7 @@ module Raptor
       initial_state = {
         id: id,
         protocol: :http2,
+        max_body_size: @max_body_size,
         remote_addr: remote_addr,
         url_scheme: url_scheme
       }

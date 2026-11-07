@@ -300,6 +300,8 @@ The published run uses development Ruby, not the minimum supported Ruby version.
 
 Raptor's cluster-only model also carries process and coordination costs in a small container. Direct HTTP/2 and detached streaming are useful only when the deployment or application uses them. A synthetic fifteen-second run does not establish long-term stability, memory behavior, overload recovery or production readiness.
 
+Request bodies are fully buffered before the app runs. Both protocols apply `connection.max_body_size`, which defaults to unlimited. HTTP/1 copies larger bodies to a tempfile after receipt, which does not bound peak receive memory. HTTP/2 keeps accepted bodies in memory. Public deployments should set a finite body-size limit and enforce concurrent-upload limits at a reverse proxy, with request buffering for slow uploads.
+
 Try Raptor with your thread-safe Rack application, especially if direct HTTP/2 or detached streaming would be useful. Measure throughput, latency, CPU, memory and failures alongside the server you use today.
 
 Include Falcon when the application and its dependencies work well with fiber scheduling, especially for concurrent I/O or long-lived connections. Choose from measurements of your application and your operational constraints, not one benchmark leaderboard.

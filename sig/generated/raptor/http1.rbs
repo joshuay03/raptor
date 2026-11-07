@@ -406,7 +406,8 @@ module Raptor
 
     # Builds the `rack.input` IO object for the request body. Returns an
     # in-memory StringIO for bodies up to the spool threshold, or a Tempfile
-    # for larger bodies to bound per-worker memory.
+    # for larger bodies. The complete body is already buffered at this point,
+    # so spooling does not bound peak receive memory.
     #
     # @param body [String, nil] decoded request body
     # @return [IO] an IO-like object positioned at the start of the body

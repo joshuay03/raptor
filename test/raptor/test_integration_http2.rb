@@ -121,6 +121,48 @@ module Raptor
       end
     end
 
+    def test_max_body_size_rejects_uploads_without_closing_the_connection
+      @options[:connection] = @options[:connection].merge(max_body_size: 5)
+
+      with_http2_server("rack_input.ru") do |port|
+        socket = connect_http2(port)
+        conn = HTTP2::Client.new
+        conn.on(:frame) { |bytes| socket.write(bytes) }
+
+        [
+          ["abcde", true, "200"],
+          ["abcdef", false, "413"],
+          ["abcdef", true, "413"],
+          ["xyz", true, "200"]
+        ].each do |body, end_stream, status|
+          stream = conn.new_stream
+          response = { body: +"" }
+          stream.on(:headers) { |headers| response[:status] = headers.to_h[":status"] }
+          stream.on(:data) { |chunk| response[:body] << chunk }
+          stream.on(:close) { response[:closed] = true }
+          stream.headers({
+            ":method" => "POST",
+            ":path" => "/",
+            ":scheme" => "https",
+            ":authority" => "localhost"
+          }, end_stream: false)
+          stream.data(body.byteslice(0, 3), end_stream: false)
+          stream.data(body.byteslice(3..), end_stream: end_stream)
+
+          Timeout.timeout(5) { conn << socket.readpartial(65_536) until response[:status] }
+
+          assert_equal status, response[:status]
+
+          stream.data("", end_stream: true) unless end_stream
+          Timeout.timeout(5) { conn << socket.readpartial(65_536) until response[:closed] }
+
+          assert_equal status == "200" ? body : "", response[:body]
+        end
+      ensure
+        socket&.close
+      end
+    end
+
     def test_response_headers
       with_http2_server do |port|
         responses = http2_get(port, "/")

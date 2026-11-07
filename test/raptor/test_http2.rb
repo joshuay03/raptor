@@ -52,11 +52,37 @@ module Raptor
       headers = parser.build_frame(:headers, Http2::FLAG_END_HEADERS | Http2::FLAG_PADDED | Http2::FLAG_PRIORITY, 1, "\x03#{priority}#{encoded}\x00\x00\x00")
       data = parser.build_frame(:data, Http2::FLAG_END_STREAM | Http2::FLAG_PADDED, 1, "\x02body\x00\x00")
 
-      result = process_frames_with(headers + data)
+      result = process_frames_with(headers + data, max_body_size: 4)
 
       refute result[:close_connection]
       assert_equal [":method", ":path", ":scheme", ":authority"], result[:completed_requests].first[:headers].map(&:first)
       assert_equal "body", result[:completed_requests].first[:body]
+    end
+
+    def test_process_frames_limits_body_size_across_batches_without_blocking_other_streams
+      parser = Http2Parser.new
+      headers = headers_frame(stream_id: 1, end_stream: false)
+      initial = process_frames_with(headers + parser.build_frame(:data, 0, 1, "bo"), max_body_size: 4)
+
+      accepted = Http2.process_frames(initial.merge(buffer: parser.build_frame(:data, Http2::FLAG_END_STREAM, 1, "dy")))
+
+      assert_equal "body", accepted[:completed_requests].first[:body]
+
+      rejected = Http2.process_frames(initial.merge(buffer: parser.build_frame(:data, 0, 1, "dy!")))
+
+      assert_empty rejected[:completed_requests]
+      assert_includes decode_header_blocks(rejected[:outgoing_frames]).flatten(1), [":status", "413"]
+      assert_nil rejected[:http2_streams][1][:body]
+
+      remaining = parser.build_frame(:data, 0, 1, "x" * 16_000) * 3
+      remaining << trailers_frame(stream_id: 1, headers: [["checksum", "ignored"]])
+      remaining << headers_frame(stream_id: 3)
+      result = Http2.process_frames(rejected.merge(buffer: remaining))
+
+      refute result[:close_connection]
+      assert_equal [3], result[:completed_requests].map { |request| request[:stream_id] }
+      assert_equal [[0, 48_005]], window_updates_sent(result)
+      assert_empty result[:http2_streams]
     end
 
     def test_process_frames_rejects_padding_longer_than_frame
@@ -723,10 +749,11 @@ module Raptor
       frames
     end
 
-    def process_frames_with(frame_bytes)
+    def process_frames_with(frame_bytes, max_body_size: nil)
       Http2.process_frames(
         id: 1,
         buffer: Http2Parser.connection_preface + frame_bytes,
+        max_body_size: max_body_size,
         remote_addr: "127.0.0.1",
         url_scheme: "https",
         protocol: :http2
