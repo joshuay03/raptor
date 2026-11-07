@@ -57,6 +57,19 @@ module Raptor
       end
     end
 
+    def test_hyphenated_headers_win_over_underscore_aliases
+      @options[:app] = proc { |env| [200, {}, [env["HTTP_X_AUTH_TOKEN"]]] }
+      with_http2_server do |port|
+        headers = { "x_auth_token" => "untrusted", "x-auth-token" => "trusted" }
+        [headers, headers.to_a.reverse.to_h].each do |fields|
+          response = http2_request(port, "GET", "/", headers: fields).first
+
+          assert_equal "200", response[:status]
+          assert_equal "trusted", response[:body]
+        end
+      end
+    end
+
     def test_request_method
       with_http2_server("request_method.ru") do |port|
         responses = http2_request(port, "POST", "/", body: "data")
@@ -228,7 +241,7 @@ module Raptor
       http2_request(port, "GET", path, ssl: ssl)
     end
 
-    def http2_request(port, method, path, body: nil, ssl: true)
+    def http2_request(port, method, path, body: nil, ssl: true, headers: {})
       responses = []
 
       socket = connect_http2(port, ssl: ssl)
@@ -257,7 +270,7 @@ module Raptor
         ":path" => path,
         ":scheme" => ssl ? "https" : "http",
         ":authority" => "localhost:#{port}"
-      }
+      }.merge(headers)
 
       if body
         stream.headers(request_headers, end_stream: false)

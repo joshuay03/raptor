@@ -175,6 +175,21 @@ module Raptor
       end
     end
 
+    def test_forwarded_proto_ignores_underscore_alias_on_keepalive_connections
+      with_server("forwarded_proto.ru") do |uri|
+        fields = ["X_Forwarded_Proto: http", "X-Forwarded-Proto: https"]
+        requests = [fields, fields.reverse].each_with_index.map do |headers, index|
+          close = index == 1 ? "Connection: close\r\n" : ""
+          "GET / HTTP/1.1\r\nHost: example.com\r\n#{headers.join("\r\n")}\r\n#{close}\r\n"
+        end
+        response = raw_request(uri, requests.join)
+
+        assert_equal 2, response.scan("HTTP/1.1 200 OK").length
+        assert_equal 2, response.scan("https|443").length
+        refute_includes response, "http|80"
+      end
+    end
+
     def test_x_forwarded_scheme_promotes_to_https
       with_server("forwarded_proto.ru") do |uri|
         response = Net::HTTP.start(uri.host, uri.port) do |http|
@@ -784,6 +799,21 @@ module Raptor
         )
 
         assert_match(/400 Bad Request/, response)
+      end
+    end
+
+    def test_framing_aliases_are_rejected_before_100_continue
+      with_server do |uri|
+        ["Content_Length: 1", "Transfer_Encoding: chunked"].each do |alias_header|
+          ["", "Content-Length: 1\r\n"].each do |canonical|
+            request = "POST / HTTP/1.1\r\nHost: example.com\r\n#{canonical}#{alias_header}\r\nExpect: 100-continue\r\n\r\n"
+            response = Timeout.timeout(5) { raw_request(uri, request) }
+
+            assert_match(%r{\AHTTP/1.1 400 Bad Request}, response)
+            refute_includes response, "100 Continue"
+            refute_includes response, "200 OK"
+          end
+        end
       end
     end
 

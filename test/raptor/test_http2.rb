@@ -400,6 +400,13 @@ module Raptor
       assert_equal "text/html, application/json", env["HTTP_ACCEPT"]
     end
 
+    def test_build_rack_env_prefers_hyphenated_headers_over_underscore_aliases
+      headers = [["x-auth-token", "trusted"], ["x_auth_token", "untrusted"], ["x-auth-token", "second"]]
+      assert_equal "trusted, second", build_rack_env(headers)["HTTP_X_AUTH_TOKEN"]
+      assert_equal "second, trusted", build_rack_env(headers.reverse)["HTTP_X_AUTH_TOKEN"]
+      assert_equal "legacy", build_rack_env([["x_auth_token", "legacy"]])["HTTP_X_AUTH_TOKEN"]
+    end
+
     def test_build_rack_env_defaults_server_name_for_empty_authority
       env = build_rack_env(authority: "")
 

@@ -34,6 +34,7 @@ typedef struct {
   int64_t content_len;
   unsigned int flags;
   VALUE request;
+  VALUE underscored_headers;
   // Scratch space for the env key: "HTTP_" prefix + field name + NUL.
   char buf[MAX_FIELD_NAME + 6];
 } raptor_parser;
@@ -125,13 +126,6 @@ static VALUE intern_field(const char *buf, size_t len) {
   return rb_enc_interned_str(buf, len, rb_utf8_encoding());
 }
 
-static inline void upcase_header_char(char *c) {
-  if (*c >= 'a' && *c <= 'z')
-    *c &= ~0x20;
-  else if (*c == '-')
-    *c = '_';
-}
-
 static int contains_chunked(const char *value, long len) {
   static const char chunked[] = "chunked";
   static const long chunked_len = sizeof(chunked) - 1;
@@ -157,6 +151,65 @@ static int64_t parse_content_length(const char *value, long len) {
     content_len = content_len * 10 + digit;
   }
   return content_len;
+}
+
+static void parse_header(raptor_parser *parser, const char *field, const char *value, size_t value_len) {
+  size_t field_len = parser->field_len;
+  if (field_len == 0 || field_len > MAX_FIELD_NAME)
+    rb_raise(eHttpParserError, "invalid field name length");
+  if (value_len > MAX_FIELD_VALUE)
+    rb_raise(eHttpParserError, "field value too long");
+
+  int underscored = 0;
+  char *normalized = parser->buf + 5;
+  for (size_t i = 0; i < field_len; i++) {
+    char c = field[i];
+    if (c == '_') underscored = 1;
+    normalized[i] = c == '-' ? '_' : (c >= 'a' && c <= 'z' ? c & ~0x20 : c);
+  }
+  int content_length = field_len == 14 && memcmp(normalized, "CONTENT_LENGTH", 14) == 0;
+  int content_type = field_len == 12 && memcmp(normalized, "CONTENT_TYPE", 12) == 0;
+  int transfer_encoding = field_len == 17 && memcmp(normalized, "TRANSFER_ENCODING", 17) == 0;
+  if (underscored && (content_length || transfer_encoding))
+    rb_raise(eHttpParserError, "invalid framing header name");
+
+  size_t key_len = field_len;
+  if (content_length || content_type) {
+    memmove(parser->buf, normalized, field_len);
+  } else {
+    memcpy(parser->buf, "HTTP_", 5);
+    key_len += 5;
+  }
+  VALUE key = intern_field(parser->buf, key_len);
+  VALUE existing = rb_hash_aref(parser->request, key);
+  int existing_underscored = !NIL_P(parser->underscored_headers) &&
+                            RTEST(rb_hash_aref(parser->underscored_headers, key));
+  // Canonical names win in either order; true duplicates still merge.
+  if (underscored) {
+    if (!NIL_P(existing) && !existing_underscored) return;
+    if (NIL_P(parser->underscored_headers)) parser->underscored_headers = rb_hash_new();
+    rb_hash_aset(parser->underscored_headers, key, Qtrue);
+  } else if (existing_underscored) {
+    existing = Qnil;
+    rb_hash_delete(parser->underscored_headers, key);
+  }
+
+  while (value_len > 0 && (value[value_len - 1] == ' ' || value[value_len - 1] == '\t'))
+    value_len--;
+  if (content_length) {
+    parser->content_len = parse_content_length(value, (long)value_len);
+    if (parser->content_len > 0) parser->flags |= FLAG_HAS_BODY;
+  } else if (transfer_encoding && contains_chunked(value, (long)value_len)) {
+    parser->flags |= FLAG_CHUNKED | FLAG_HAS_BODY;
+    parser->content_len = 0;
+  }
+
+  if (!NIL_P(existing)) {
+    rb_str_cat(existing, ", ", 2);
+    rb_str_cat(existing, value, (long)value_len);
+  } else {
+    rb_hash_aset(parser->request, key, rb_str_new(value, (long)value_len));
+  }
 }
 
 static const int raptor_parser_start = 1;
@@ -385,122 +438,12 @@ tr18:
 tr26:
 	{ MARK(mark, p); }
 	{
-    if (parser->field_len == 0 || parser->field_len > MAX_FIELD_NAME)
-      rb_raise(eHttpParserError, "invalid field name length");
-
-    size_t value_len = LEN(mark, p);
-    if (value_len > MAX_FIELD_VALUE)
-      rb_raise(eHttpParserError, "field value too long");
-
-    const char *field_ptr = PTR_TO(field_start);
-
-    int needs_http_prefix = 1;
-    if (parser->field_len == 14 && memcmp(field_ptr, "CONTENT_LENGTH", 14) == 0)
-      needs_http_prefix = 0;
-    else if (parser->field_len == 12 && memcmp(field_ptr, "CONTENT_TYPE", 12) == 0)
-      needs_http_prefix = 0;
-
-    size_t key_len;
-    if (needs_http_prefix) {
-      memcpy(parser->buf, "HTTP_", 5);
-      memcpy(parser->buf + 5, field_ptr, parser->field_len);
-      key_len = 5 + parser->field_len;
-      parser->buf[key_len] = '\0';
-    } else {
-      memcpy(parser->buf, field_ptr, parser->field_len);
-      key_len = parser->field_len;
-      parser->buf[key_len] = '\0';
-    }
-
-    VALUE key = intern_field(parser->buf, key_len);
-    VALUE value = rb_str_new(PTR_TO(mark), value_len);
-
-    char *value_ptr = RSTRING_PTR(value);
-    long value_real_len = RSTRING_LEN(value);
-    while (value_real_len > 0 && (value_ptr[value_real_len - 1] == ' ' ||
-                                    value_ptr[value_real_len - 1] == '\t'))
-      value_real_len--;
-    rb_str_set_len(value, value_real_len);
-
-    if (!needs_http_prefix && parser->field_len == 14) {
-      parser->content_len = parse_content_length(value_ptr, value_real_len);
-      if (parser->content_len > 0)
-        parser->flags |= FLAG_HAS_BODY;
-    } else if (needs_http_prefix && parser->field_len == 17 &&
-               memcmp(field_ptr, "TRANSFER_ENCODING", 17) == 0) {
-      if (contains_chunked(value_ptr, value_real_len)) {
-        parser->flags |= FLAG_CHUNKED | FLAG_HAS_BODY;
-        parser->content_len = 0;
-      }
-    }
-
-    VALUE existing = rb_hash_aref(parser->request, key);
-    if (!NIL_P(existing)) {
-      rb_str_cat(existing, ", ", 2);
-      rb_str_append(existing, value);
-    } else {
-      rb_hash_aset(parser->request, key, value);
-    }
+    parse_header(parser, PTR_TO(field_start), PTR_TO(mark), LEN(mark, p));
   }
 	goto st14;
 tr29:
 	{
-    if (parser->field_len == 0 || parser->field_len > MAX_FIELD_NAME)
-      rb_raise(eHttpParserError, "invalid field name length");
-
-    size_t value_len = LEN(mark, p);
-    if (value_len > MAX_FIELD_VALUE)
-      rb_raise(eHttpParserError, "field value too long");
-
-    const char *field_ptr = PTR_TO(field_start);
-
-    int needs_http_prefix = 1;
-    if (parser->field_len == 14 && memcmp(field_ptr, "CONTENT_LENGTH", 14) == 0)
-      needs_http_prefix = 0;
-    else if (parser->field_len == 12 && memcmp(field_ptr, "CONTENT_TYPE", 12) == 0)
-      needs_http_prefix = 0;
-
-    size_t key_len;
-    if (needs_http_prefix) {
-      memcpy(parser->buf, "HTTP_", 5);
-      memcpy(parser->buf + 5, field_ptr, parser->field_len);
-      key_len = 5 + parser->field_len;
-      parser->buf[key_len] = '\0';
-    } else {
-      memcpy(parser->buf, field_ptr, parser->field_len);
-      key_len = parser->field_len;
-      parser->buf[key_len] = '\0';
-    }
-
-    VALUE key = intern_field(parser->buf, key_len);
-    VALUE value = rb_str_new(PTR_TO(mark), value_len);
-
-    char *value_ptr = RSTRING_PTR(value);
-    long value_real_len = RSTRING_LEN(value);
-    while (value_real_len > 0 && (value_ptr[value_real_len - 1] == ' ' ||
-                                    value_ptr[value_real_len - 1] == '\t'))
-      value_real_len--;
-    rb_str_set_len(value, value_real_len);
-
-    if (!needs_http_prefix && parser->field_len == 14) {
-      parser->content_len = parse_content_length(value_ptr, value_real_len);
-      if (parser->content_len > 0)
-        parser->flags |= FLAG_HAS_BODY;
-    } else if (needs_http_prefix && parser->field_len == 17 &&
-               memcmp(field_ptr, "TRANSFER_ENCODING", 17) == 0) {
-      if (contains_chunked(value_ptr, value_real_len)) {
-        parser->flags |= FLAG_CHUNKED | FLAG_HAS_BODY;
-        parser->content_len = 0;
-      }
-    }
-
-    VALUE existing = rb_hash_aref(parser->request, key);
-    if (!NIL_P(existing)) {
-      rb_str_cat(existing, ", ", 2);
-      rb_str_append(existing, value);
-    } else {
-      rb_hash_aset(parser->request, key, value);
-    }
+    parse_header(parser, PTR_TO(field_start), PTR_TO(mark), LEN(mark, p));
   }
 	goto st14;
 st14:
@@ -560,10 +503,8 @@ case 46:
 	goto st0;
 tr21:
 	{ MARK(field_start, p); }
-	{ upcase_header_char((char *)p); }
 	goto st17;
 tr23:
-	{ upcase_header_char((char *)p); }
 	goto st17;
 st17:
 	if ( ++p == pe )
@@ -1219,11 +1160,13 @@ static void raptor_parser_init(raptor_parser *parser) {
   parser->content_len = 0;
   parser->flags = 0;
   parser->request = Qnil;
+  parser->underscored_headers = Qnil;
 }
 
 static void parser_mark(void *ptr) {
   raptor_parser *parser = ptr;
   rb_gc_mark(parser->request);
+  rb_gc_mark(parser->underscored_headers);
 }
 
 static size_t parser_memsize(const void *ptr) {

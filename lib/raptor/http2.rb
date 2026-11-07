@@ -1298,6 +1298,7 @@ module Raptor
     # @rbs (Array[[String, String]] headers, String body, TCPSocket | OpenSSL::SSL::SSLSocket socket, Writer writer, FlowControl flow_control, Integer stream_id, remote_addr: String) -> Hash[String, untyped]
     def build_rack_env(headers, body, socket, writer, flow_control, stream_id, remote_addr:)
       env = {}
+      underscored_headers = nil
 
       headers.each do |name, value|
         if name.start_with?(":")
@@ -1316,6 +1317,13 @@ module Raptor
           env[Http::CONTENT_LENGTH] = value
         else
           rack_key = "HTTP_#{name.upcase.tr("-", "_")}"
+          if name.include?("_")
+            next if env.key?(rack_key) && !underscored_headers&.key?(rack_key)
+
+            (underscored_headers ||= {})[rack_key] = true
+          elsif underscored_headers&.delete(rack_key)
+            env.delete(rack_key)
+          end
           if (existing = env[rack_key])
             separator = rack_key == Rack::HTTP_COOKIE ? "; " : ", "
             env[rack_key] = "#{existing}#{separator}#{value}"

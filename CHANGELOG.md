@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Prefer hyphenated request headers over underscore aliases and reject HTTP/1 framing aliases
 - Add plugins with lifecycle hooks, cluster stats, and managed background threads
 
 ## [0.23.0] - 2026-10-18

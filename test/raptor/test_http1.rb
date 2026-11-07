@@ -18,6 +18,19 @@ module Raptor
       assert_equal pipelined, parsed[:parse_data][:pipelined]
     end
 
+    def test_parse_preserves_header_identity_when_reparsing_fragments
+      request = "GET / HTTP/1.1\r\nHost: example.com\r\nX-Auth-Token: trusted\r\nX_Auth_Token: untrusted\r\n\r\n"
+      (1...request.bytesize).each do |split|
+        partial = Http1.parse({ buffer: request.byteslice(0, split) }, {}, nil)
+        refute partial[:complete]
+
+        parsed = Http1.parse(partial.merge(buffer: partial[:buffer] + request.byteslice(split..)), {}, nil)
+        assert parsed[:complete]
+        refute parsed[:malformed]
+        assert_equal "trusted", parsed[:env]["HTTP_X_AUTH_TOKEN"]
+      end
+    end
+
     def test_eager_keepalive_requeues_when_work_is_waiting
       handler = Http1.allocate
       handler.instance_variable_set(:@running, AtomicBoolean.new(true))

@@ -8,6 +8,32 @@ module Raptor
   class TestHttpParser < TestCase
     parallelize_me!
 
+    def test_header_normalization_preserves_raw_names_and_prefers_hyphens
+      fields = ["X_Auth_Token: untrusted", "x-auth-token: trusted", "X-Auth-Token: second"]
+      [fields, fields.reverse].each do |headers|
+        request = "GET / HTTP/1.1\r\nHost: example.com\r\n#{headers.join("\r\n")}\r\n\r\n"
+        original = request.dup
+        env = {}
+        HttpParser.new.execute(env, request, 0)
+
+        expected = headers.first == fields.first ? "trusted, second" : "second, trusted"
+        assert_equal expected, env["HTTP_X_AUTH_TOKEN"]
+        assert_equal original, request
+      end
+
+      env = {}
+      HttpParser.new.execute(env, "GET / HTTP/1.0\r\nX_Auth_Token: legacy\r\n\r\n", 0)
+      assert_equal "legacy", env["HTTP_X_AUTH_TOKEN"]
+    end
+
+    def test_rejects_underscore_framing_aliases
+      ["Content_Length: 1", "Transfer_Encoding: chunked"].each do |header|
+        assert_raises(HttpParserError) do
+          HttpParser.new.execute({}, "POST / HTTP/1.1\r\nHost: x\r\n#{header}\r\n\r\n", 0)
+        end
+      end
+    end
+
     def test_decode_chunked_decodes_single_chunk
       decoded, state = HttpParser.decode_chunked("5\r\nhello\r\n0\r\n\r\n")
 
