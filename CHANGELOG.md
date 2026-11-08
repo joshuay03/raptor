@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-08
+
 - Replace nio4r with io-event for reactor I/O readiness without changing application threading
 
 ## [0.24.0] - 2026-11-08
