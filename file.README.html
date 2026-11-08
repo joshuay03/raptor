@@ -124,14 +124,17 @@ Add this to your system test setup, alongside your browser driver configuration:
 <span class='id identifier rubyid_require'>require</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>rackup/handler/raptor</span><span class='tstring_end'>&quot;</span></span>
 
 <span class='const'>Capybara</span><span class='period'>.</span><span class='id identifier rubyid_register_server'>register_server</span> <span class='symbol'>:raptor</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='id identifier rubyid_port'>port</span><span class='comma'>,</span> <span class='id identifier rubyid_host'>host</span><span class='op'>|</span>
-  <span class='const'><span class='object_link'><a href="Rackup.html" title="Rackup (module)">Rackup</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Rackup/Handler.html" title="Rackup::Handler (module)">Handler</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Rackup/Handler/Raptor.html" title="Rackup::Handler::Raptor (module)">Raptor</a></span></span><span class='period'>.</span><span class='id identifier rubyid_run'><span class='object_link'><a href="Rackup/Handler/Raptor.html#run-class_method" title="Rackup::Handler::Raptor.run (method)">run</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='label'>Host:</span> <span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='label'>Port:</span> <span class='id identifier rubyid_port'>port</span><span class='comma'>,</span> <span class='label'>Workers:</span> <span class='int'>0</span><span class='rparen'>)</span>
+  <span class='const'><span class='object_link'><a href="Rackup.html" title="Rackup (module)">Rackup</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Rackup/Handler.html" title="Rackup::Handler (module)">Handler</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="Rackup/Handler/Raptor.html" title="Rackup::Handler::Raptor (module)">Raptor</a></span></span><span class='period'>.</span><span class='id identifier rubyid_run'><span class='object_link'><a href="Rackup/Handler/Raptor.html#run-class_method" title="Rackup::Handler::Raptor.run (method)">run</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='label'>Host:</span> <span class='id identifier rubyid_host'>host</span><span class='comma'>,</span> <span class='label'>Port:</span> <span class='id identifier rubyid_port'>port</span><span class='comma'>,</span> <span class='label'>Workers:</span> <span class='int'>0</span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_server'>server</span><span class='op'>|</span>
+    <span class='id identifier rubyid_at_exit'>at_exit</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span> <span class='rbrace'>}</span>
+  <span class='kw'>end</span>
 <span class='kw'>end</span>
 <span class='const'>Capybara</span><span class='period'>.</span><span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='symbol'>:raptor</span>
 </code></pre>
+<p>The exit hook shuts the server down before Ruby tears down its background threads.</p>
 <p>For other in-process uses, <code>require &quot;raptor/embedded&quot;</code> and call <code>Raptor::Embedded.new(app, host: &quot;127.0.0.1&quot;, port: 0)</code>.
 <code>start</code> returns when serving is ready, <code>port</code> reports the bound port, <code>shutdown</code> drains requests and releases resources,
-and <code>join</code> waits for termination. The embedded server leaves signal handlers and process-wide configuration to its
-caller. Cluster plugins and process lifecycle hooks do not run in this mode.</p>
+and <code>join</code> waits for termination. Call <code>shutdown</code> before process exit. The embedded server leaves signal handlers and
+process-wide configuration to its caller. Cluster plugins and process lifecycle hooks do not run in this mode.</p>
 <h2 id="Configuration">Configuration</h2>
 <p>Raptor reads options from a Ruby config file, environment variables, and command line flags, in increasing order of
 precedence. Run <code>bundle exec raptor --help</code> for the full flag list.</p>
@@ -979,7 +982,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sun Nov  8 04:36:55 2026 by
+  Generated on Sun Nov  8 04:42:22 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
