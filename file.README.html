@@ -281,7 +281,7 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 <p>Set <code>control_url</code> to a Unix socket URL such as <code>unix:///tmp/raptor-control.sock</code> to serve the same stats over
 <code>GET /stats</code>.</p>
 <h2 id="_Micro__Benchmarks">(Micro) Benchmarks</h2>
-<p>Raptor 0.24.0 vs Puma 8.0.2 vs Falcon 0.57.0. Each case has 3 fresh-process samples, interleaved in seeded shuffled
+<p>Raptor 0.25.0 vs Puma 8.0.2 vs Falcon 0.57.0. Each case has 3 fresh-process samples, interleaved in seeded shuffled
 rounds. Each sample warms up for 3s and measures for 15s. Metrics are independent medians. ± is (max − min) / 2 /
 median, not a confidence interval. Failure counts below each table sum all samples, so a failed run cannot disappear in
 a median. Throughput counts successful ordinary requests only.</p>
@@ -320,67 +320,67 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <td>Raptor</td>
 <td>Fixed (3)</td>
 <td>-</td>
-<td>3.32k ±0.2%</td>
+<td>3.38k ±1.3%</td>
 <td>-</td>
-<td>50.10</td>
+<td>46.70</td>
 <td>-</td>
-<td>2.387</td>
-<td>364.0</td>
+<td>2.409</td>
+<td>364.5</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
 <td>-</td>
-<td>8.10k ±0.3%</td>
+<td>8.22k ±0.5%</td>
 <td>-</td>
-<td>22.45</td>
+<td>21.80</td>
 <td>-</td>
-<td>0.514</td>
-<td>340.8</td>
+<td>0.491</td>
+<td>333.6</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
 <td>Fixed (3)</td>
-<td>1.55k ±0.9%</td>
-<td>53.4% lower</td>
-<td>121.78</td>
-<td>143.1% higher</td>
-<td>0.737</td>
-<td>283.8</td>
+<td>1.54k ±2.4%</td>
+<td>54.4% lower</td>
+<td>116.59</td>
+<td>149.7% higher</td>
+<td>0.950</td>
+<td>288.9</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
 <td>Scaling (3–16)</td>
-<td>8.13k ±0.7%</td>
-<td>0.4% higher</td>
-<td>22.41</td>
-<td>0.1% lower</td>
-<td>0.481</td>
-<td>341.2</td>
+<td>8.15k ±0.8%</td>
+<td>0.9% lower</td>
+<td>22.33</td>
+<td>2.4% higher</td>
+<td>0.478</td>
+<td>338.7</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Fixed (3)</td>
-<td>10.65k ±4.1%</td>
-<td>220.8% higher</td>
-<td>16.18</td>
-<td>67.7% lower</td>
-<td>0.450</td>
-<td>425.5</td>
+<td>10.80k ±3.9%</td>
+<td>219.4% higher</td>
+<td>15.80</td>
+<td>66.2% lower</td>
+<td>0.475</td>
+<td>441.3</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Scaling (3–16)</td>
-<td>10.65k ±4.1%</td>
-<td>31.5% higher</td>
-<td>16.18</td>
-<td>27.9% lower</td>
-<td>0.450</td>
-<td>425.5</td>
+<td>10.80k ±3.9%</td>
+<td>31.4% higher</td>
+<td>15.80</td>
+<td>27.5% lower</td>
+<td>0.475</td>
+<td>441.3</td>
 </tr>
 </tbody>
 </table>
@@ -404,100 +404,100 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <td>Raptor</td>
 <td>Fixed (3)</td>
 <td>-</td>
-<td>3.01k ±8.2%</td>
+<td>3.37k ±2.2%</td>
 <td>-</td>
-<td>56.38</td>
+<td>36.44</td>
 <td>-</td>
-<td>2.306</td>
-<td>365.0</td>
+<td>2.447</td>
+<td>369.4</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
 <td>-</td>
-<td>7.55k ±0.6%</td>
+<td>7.55k ±0.8%</td>
 <td>-</td>
-<td>24.18</td>
+<td>24.09</td>
 <td>-</td>
-<td>0.500</td>
-<td>363.7</td>
+<td>0.489</td>
+<td>358.1</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Fixed (16)</td>
 <td>-</td>
-<td>7.56k ±0.7%</td>
+<td>7.71k ±0.5%</td>
 <td>-</td>
-<td>24.16</td>
+<td>23.38</td>
 <td>-</td>
-<td>0.468</td>
-<td>367.8</td>
+<td>0.467</td>
+<td>356.5</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
 <td>Fixed (3)</td>
-<td>1.49k ±0.2%</td>
-<td>50.4% lower</td>
-<td>105.33</td>
-<td>86.8% higher</td>
-<td>0.784</td>
-<td>290.7</td>
+<td>1.49k ±1.5%</td>
+<td>55.8% lower</td>
+<td>106.33</td>
+<td>191.8% higher</td>
+<td>0.961</td>
+<td>297.0</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
 <td>Scaling (3–16)</td>
-<td>7.63k ±0.9%</td>
-<td>1.1% higher</td>
-<td>23.89</td>
+<td>7.43k ±0.5%</td>
+<td>1.6% lower</td>
+<td>24.42</td>
+<td>1.4% higher</td>
+<td>0.441</td>
+<td>340.0</td>
+</tr>
+<tr>
+<td>Puma</td>
+<td>Fixed (16)</td>
+<td>Fixed (16)</td>
+<td>7.64k ±0.5%</td>
+<td>0.9% lower</td>
+<td>23.83</td>
+<td>1.9% higher</td>
+<td>0.457</td>
+<td>345.0</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Fixed (3)</td>
+<td>7.64k ±0.5%</td>
+<td>126.9% higher</td>
+<td>23.81</td>
+<td>34.7% lower</td>
+<td>0.407</td>
+<td>363.2</td>
+</tr>
+<tr>
+<td>Falcon</td>
+<td>Fibers</td>
+<td>Scaling (3–16)</td>
+<td>7.64k ±0.5%</td>
+<td>1.2% higher</td>
+<td>23.81</td>
 <td>1.2% lower</td>
-<td>0.466</td>
-<td>329.9</td>
-</tr>
-<tr>
-<td>Puma</td>
-<td>Fixed (16)</td>
-<td>Fixed (16)</td>
-<td>7.73k ±0.5%</td>
-<td>2.2% higher</td>
-<td>23.55</td>
-<td>2.5% lower</td>
-<td>0.461</td>
-<td>332.3</td>
-</tr>
-<tr>
-<td>Falcon</td>
-<td>Fibers</td>
-<td>Fixed (3)</td>
-<td>7.54k ±1.8%</td>
-<td>150.8% higher</td>
-<td>24.40</td>
-<td>56.7% lower</td>
-<td>0.373</td>
-<td>357.4</td>
-</tr>
-<tr>
-<td>Falcon</td>
-<td>Fibers</td>
-<td>Scaling (3–16)</td>
-<td>7.54k ±1.8%</td>
-<td>0.1% lower</td>
-<td>24.40</td>
-<td>0.9% higher</td>
-<td>0.373</td>
-<td>357.4</td>
+<td>0.407</td>
+<td>363.2</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Fixed (16)</td>
-<td>7.54k ±1.8%</td>
-<td>0.2% lower</td>
-<td>24.40</td>
-<td>1.0% higher</td>
-<td>0.373</td>
-<td>357.4</td>
+<td>7.64k ±0.5%</td>
+<td>0.9% lower</td>
+<td>23.81</td>
+<td>1.8% higher</td>
+<td>0.407</td>
+<td>363.2</td>
 </tr>
 </tbody>
 </table>
@@ -521,45 +521,45 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <td>Raptor</td>
 <td>Fixed (3)</td>
 <td>-</td>
-<td>1.60k ±6.4%</td>
+<td>1.61k ±0.6%</td>
 <td>-</td>
-<td>119.04</td>
+<td>112.38</td>
 <td>-</td>
-<td>0.779</td>
-<td>418.0</td>
+<td>0.900</td>
+<td>458.9</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
 <td>-</td>
-<td>7.98k ±9.9%</td>
+<td>8.01k ±22.9%</td>
 <td>-</td>
-<td>23.38</td>
+<td>25.32</td>
 <td>-</td>
-<td>0.565</td>
-<td>894.4</td>
+<td>0.571</td>
+<td>847.3</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Fixed (3)</td>
-<td>7.18k ±1.3%</td>
-<td>348.7% higher</td>
-<td>26.29</td>
-<td>77.9% lower</td>
-<td>0.438</td>
-<td>515.8</td>
+<td>7.51k ±13.3%</td>
+<td>365.3% higher</td>
+<td>26.55</td>
+<td>76.4% lower</td>
+<td>0.450</td>
+<td>511.9</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Scaling (3–16)</td>
-<td>7.18k ±1.3%</td>
-<td>10.0% lower</td>
-<td>26.29</td>
-<td>12.4% higher</td>
-<td>0.438</td>
-<td>515.8</td>
+<td>7.51k ±13.3%</td>
+<td>6.2% lower</td>
+<td>26.55</td>
+<td>4.9% higher</td>
+<td>0.450</td>
+<td>511.9</td>
 </tr>
 </tbody>
 </table>
@@ -583,67 +583,67 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <td>Raptor</td>
 <td>Fixed (3)</td>
 <td>-</td>
-<td>3.13k ±0.3%</td>
+<td>3.38k ±1.4%</td>
 <td>-</td>
-<td>72.60</td>
+<td>68.20</td>
 <td>-</td>
-<td>2.673</td>
-<td>526.0</td>
+<td>2.550</td>
+<td>506.3</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
 <td>-</td>
-<td>3.22k ±2.0%</td>
+<td>3.30k ±1.4%</td>
 <td>-</td>
-<td>68.49</td>
+<td>66.39</td>
 <td>-</td>
-<td>2.546</td>
-<td>520.0</td>
+<td>2.562</td>
+<td>529.9</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
 <td>Fixed (3)</td>
-<td>2.98k ±0.7%</td>
-<td>4.8% lower</td>
-<td>62.70</td>
-<td>13.6% lower</td>
-<td>2.615</td>
-<td>474.7</td>
-</tr>
-<tr>
-<td>Puma</td>
-<td>Scaling (3–16)</td>
-<td>Scaling (3–16)</td>
-<td>2.64k ±3.2%</td>
-<td>17.9% lower</td>
-<td>59.81</td>
-<td>12.7% lower</td>
+<td>3.18k ±1.3%</td>
+<td>6.1% lower</td>
+<td>57.02</td>
+<td>16.4% lower</td>
 <td>2.522</td>
-<td>567.4</td>
+<td>459.7</td>
+</tr>
+<tr>
+<td>Puma</td>
+<td>Scaling (3–16)</td>
+<td>Scaling (3–16)</td>
+<td>3.14k ±5.1%</td>
+<td>4.7% lower</td>
+<td>49.96</td>
+<td>24.8% lower</td>
+<td>2.260</td>
+<td>455.4</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Fixed (3)</td>
-<td>3.65k ±7.0%</td>
-<td>16.4% higher</td>
-<td>46.10</td>
-<td>36.5% lower</td>
-<td>2.311</td>
-<td>389.2</td>
+<td>3.35k ±8.9%</td>
+<td>0.9% lower</td>
+<td>49.46</td>
+<td>27.5% lower</td>
+<td>2.570</td>
+<td>411.8</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Scaling (3–16)</td>
-<td>3.65k ±7.0%</td>
-<td>13.3% higher</td>
-<td>46.10</td>
-<td>32.7% lower</td>
-<td>2.311</td>
-<td>389.2</td>
+<td>3.35k ±8.9%</td>
+<td>1.6% higher</td>
+<td>49.46</td>
+<td>25.5% lower</td>
+<td>2.570</td>
+<td>411.8</td>
 </tr>
 </tbody>
 </table>
@@ -667,67 +667,67 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <td>Raptor</td>
 <td>Fixed (3)</td>
 <td>-</td>
-<td>2.88k ±1.6%</td>
+<td>2.93k ±6.5%</td>
 <td>-</td>
-<td>57.40</td>
+<td>57.30</td>
 <td>-</td>
-<td>2.721</td>
-<td>515.4</td>
+<td>2.746</td>
+<td>498.2</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
 <td>-</td>
-<td>2.81k ±3.8%</td>
+<td>3.01k ±2.0%</td>
 <td>-</td>
-<td>56.14</td>
+<td>52.68</td>
 <td>-</td>
-<td>2.721</td>
-<td>528.2</td>
+<td>2.624</td>
+<td>511.1</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
 <td>Fixed (3)</td>
-<td>3.24k ±0.7%</td>
-<td>12.3% higher</td>
-<td>60.73</td>
-<td>5.8% higher</td>
-<td>2.449</td>
-<td>406.4</td>
+<td>3.34k ±5.9%</td>
+<td>14.0% higher</td>
+<td>53.58</td>
+<td>6.5% lower</td>
+<td>2.450</td>
+<td>405.1</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
 <td>Scaling (3–16)</td>
-<td>2.71k ±3.6%</td>
-<td>3.3% lower</td>
-<td>70.56</td>
-<td>25.7% higher</td>
-<td>2.459</td>
-<td>487.6</td>
+<td>2.80k ±1.8%</td>
+<td>7.0% lower</td>
+<td>68.80</td>
+<td>30.6% higher</td>
+<td>2.339</td>
+<td>496.5</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Fixed (3)</td>
-<td>3.62k ±1.0%</td>
-<td>25.8% higher</td>
-<td>62.03</td>
-<td>8.1% higher</td>
-<td>2.369</td>
-<td>542.0</td>
+<td>2.85k ±6.1%</td>
+<td>3.0% lower</td>
+<td>77.73</td>
+<td>35.7% higher</td>
+<td>3.068</td>
+<td>545.8</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Scaling (3–16)</td>
-<td>3.62k ±1.0%</td>
-<td>29.1% higher</td>
-<td>62.03</td>
-<td>10.5% higher</td>
-<td>2.369</td>
-<td>542.0</td>
+<td>2.85k ±6.1%</td>
+<td>5.4% lower</td>
+<td>77.73</td>
+<td>47.6% higher</td>
+<td>3.068</td>
+<td>545.8</td>
 </tr>
 </tbody>
 </table>
@@ -751,45 +751,45 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <td>Raptor</td>
 <td>Fixed (3)</td>
 <td>-</td>
-<td>3.12k ±1.3%</td>
+<td>3.16k ±2.9%</td>
 <td>-</td>
-<td>65.66</td>
+<td>69.17</td>
 <td>-</td>
-<td>2.439</td>
-<td>587.6</td>
+<td>2.443</td>
+<td>600.0</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
 <td>-</td>
-<td>3.15k ±0.4%</td>
+<td>3.17k ±0.6%</td>
 <td>-</td>
-<td>74.95</td>
+<td>69.60</td>
 <td>-</td>
-<td>2.344</td>
-<td>609.0</td>
+<td>2.431</td>
+<td>588.3</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Fixed (3)</td>
-<td>3.49k ±20.7%</td>
-<td>11.7% higher</td>
-<td>120.58</td>
-<td>83.6% higher</td>
-<td>2.309</td>
-<td>536.3</td>
+<td>2.95k ±31.0%</td>
+<td>6.8% lower</td>
+<td>144.32</td>
+<td>108.6% higher</td>
+<td>2.578</td>
+<td>573.3</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Scaling (3–16)</td>
-<td>3.49k ±20.7%</td>
-<td>10.7% higher</td>
-<td>120.58</td>
-<td>60.9% higher</td>
-<td>2.309</td>
-<td>536.3</td>
+<td>2.95k ±31.0%</td>
+<td>6.8% lower</td>
+<td>144.32</td>
+<td>107.4% higher</td>
+<td>2.578</td>
+<td>573.3</td>
 </tr>
 </tbody>
 </table>
@@ -813,34 +813,34 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
 <td>-</td>
-<td>96.13k ±0.8%</td>
+<td>96.90k ±1.2%</td>
 <td>-</td>
-<td>3.68</td>
+<td>3.57</td>
 <td>-</td>
-<td>0.048</td>
-<td>512.3</td>
+<td>0.051</td>
+<td>555.6</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
 <td>Scaling (3–16)</td>
-<td>83.26k ±0.0%</td>
-<td>13.4% lower</td>
-<td>3.94</td>
-<td>7.3% higher</td>
-<td>0.055</td>
-<td>1344.6</td>
+<td>89.50k ±0.7%</td>
+<td>7.6% lower</td>
+<td>3.70</td>
+<td>3.6% higher</td>
+<td>0.053</td>
+<td>1432.2</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Scaling (3–16)</td>
-<td>98.30k ±0.5%</td>
-<td>2.3% higher</td>
+<td>105.30k ±6.3%</td>
+<td>8.7% higher</td>
 <td>3.89</td>
-<td>5.7% higher</td>
-<td>0.051</td>
-<td>471.5</td>
+<td>8.8% higher</td>
+<td>0.050</td>
+<td>575.3</td>
 </tr>
 </tbody>
 </table>
@@ -864,85 +864,85 @@ accounting for shared pages instead of counting them fully in every worker.</p>
 <td>Raptor</td>
 <td>Fixed (3)</td>
 <td>-</td>
-<td>3.01k ±4.9%</td>
+<td>3.44k ±1.4%</td>
 <td>-</td>
-<td>51.22</td>
+<td>34.32</td>
 <td>-</td>
-<td>2.286</td>
-<td>369.6</td>
+<td>2.456</td>
+<td>375.6</td>
 </tr>
 <tr>
 <td>Raptor</td>
 <td>Scaling (3–16)</td>
 <td>-</td>
-<td>7.49k ±0.8%</td>
+<td>7.63k ±0.4%</td>
 <td>-</td>
-<td>24.39</td>
+<td>23.66</td>
 <td>-</td>
-<td>0.488</td>
-<td>372.7</td>
+<td>0.486</td>
+<td>373.4</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Fixed (3)</td>
 <td>Fixed (3)</td>
-<td>0.39k ±13.8%</td>
-<td>87.0% lower</td>
-<td>314.80</td>
-<td>514.6% higher</td>
-<td>1.250</td>
-<td>282.9</td>
+<td>0.35k ±4.4%</td>
+<td>89.8% lower</td>
+<td>321.58</td>
+<td>837.0% higher</td>
+<td>1.707</td>
+<td>263.2</td>
 </tr>
 <tr>
 <td>Puma</td>
 <td>Scaling (3–16)</td>
 <td>Scaling (3–16)</td>
-<td>7.51k ±0.4%</td>
-<td>0.4% higher</td>
-<td>24.23</td>
-<td>0.6% lower</td>
-<td>0.464</td>
-<td>336.3</td>
+<td>7.41k ±2.0%</td>
+<td>2.9% lower</td>
+<td>24.47</td>
+<td>3.4% higher</td>
+<td>0.444</td>
+<td>337.1</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Fixed (3)</td>
-<td>7.57k ±4.4%</td>
-<td>151.9% higher</td>
-<td>24.04</td>
-<td>53.1% lower</td>
-<td>0.375</td>
-<td>355.5</td>
+<td>7.69k ±0.4%</td>
+<td>123.4% higher</td>
+<td>23.84</td>
+<td>30.5% lower</td>
+<td>0.418</td>
+<td>347.6</td>
 </tr>
 <tr>
 <td>Falcon</td>
 <td>Fibers</td>
 <td>Scaling (3–16)</td>
-<td>7.57k ±4.4%</td>
-<td>1.2% higher</td>
-<td>24.04</td>
-<td>1.4% lower</td>
-<td>0.375</td>
-<td>355.5</td>
+<td>7.69k ±0.4%</td>
+<td>0.8% higher</td>
+<td>23.84</td>
+<td>0.7% higher</td>
+<td>0.418</td>
+<td>347.6</td>
 </tr>
 <tr>
 <td>Raptor (enum)</td>
 <td>Fixed (3)</td>
 <td>-</td>
-<td>0.88k ±0.3%</td>
+<td>0.88k ±3.0%</td>
 <td>-</td>
-<td>63.76</td>
+<td>59.02</td>
 <td>-</td>
-<td>7.972</td>
-<td>362.6</td>
+<td>8.450</td>
+<td>346.6</td>
 </tr>
 </tbody>
 </table>
-<p>Puma, Fixed (3) had 28 timeouts, 1 stalled stream across all samples.</p>
-<p>Raptor (enum), Fixed (3) had 29 timeouts across all samples.</p>
+<p>Puma, Fixed (3) had 68 timeouts, 1 stalled stream across all samples.</p>
+<p>Raptor (enum), Fixed (3) had 60 timeouts, 1 stalled stream across all samples.</p>
 <blockquote>
-<p>ruby 4.1.0dev (2026-10-27T15:28:18Z HEAD 33ac6afea7) +YJIT +PRISM [aarch64-linux]
+<p>ruby 4.1.0dev (2026-11-07T16:07:23Z HEAD e67e4a6960) +YJIT +PRISM [aarch64-linux]
 10 workers, 120 HTTP/1.1 client connections, 40 HTTP/2 connections × 3 streams.</p>
 </blockquote>
 <p>Run <a href="bin/benchmark">bin/benchmark</a> to reproduce.</p>
@@ -964,7 +964,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Sat Nov  7 23:38:58 2026 by
+  Generated on Sun Nov  8 00:32:25 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
