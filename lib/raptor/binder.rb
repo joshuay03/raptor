@@ -176,12 +176,18 @@ module Raptor
     #
     # @rbs () -> void
     def parse
-      @uri_listeners = @bind_uris.to_h do |bind_uri|
+      @listeners = []
+      @uri_listeners = {}
+      @bind_uris.each do |bind_uri|
         uri = URI.parse(bind_uri)
         filenos = @inherited_fds[bind_uri]
-        [bind_uri, filenos ? restore_listeners(uri, filenos) : create_listeners(uri)]
+        listeners = filenos ? restore_listeners(uri, filenos) : create_listeners(uri)
+        @uri_listeners[bind_uri] = listeners
+        @listeners.concat(listeners)
       end
-      @listeners = @uri_listeners.values.flatten
+    rescue
+      close
+      raise
     end
 
     # Creates fresh listeners for the given URI.
@@ -241,7 +247,9 @@ module Raptor
     # @rbs (String? host, Integer? port) -> Array[TCPServer]
     def create_tcp_listeners(host, port)
       if host == "localhost"
-        return loopback_addresses.flat_map { |address| create_tcp_listeners(address, port) }
+        listeners = []
+        loopback_addresses.each { |address| listeners.concat(create_tcp_listeners(address, port)) }
+        return listeners
       end
 
       host = host[1..-2] if host&.start_with?("[")
@@ -258,6 +266,10 @@ module Raptor
       tcp_server = TCPServer.for_fd(socket.fileno)
       socket.autoclose = false
       [tcp_server]
+    rescue
+      listeners&.each(&:close)
+      socket&.close
+      raise
     end
 
     # Creates a Unix domain server socket at the given path. Removes stale
@@ -306,8 +318,8 @@ module Raptor
     #
     # @rbs (String? host, Integer? port, Hash[String, String] ssl_params) -> Array[SslListener]
     def create_ssl_listeners(host, port, ssl_params)
-      tcp_servers = create_tcp_listeners(host, port)
       ssl_context = build_ssl_context(ssl_params)
+      tcp_servers = create_tcp_listeners(host, port)
       tcp_servers.map { |tcp_server| SslListener.new(tcp_server: tcp_server, ssl_context: ssl_context) }
     end
 

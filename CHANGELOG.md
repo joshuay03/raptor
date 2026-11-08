@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Add in-process Rack serving
+
 ## [0.25.0] - 2026-11-08
 
 - Replace nio4r with io-event for reactor I/O readiness without changing application threading

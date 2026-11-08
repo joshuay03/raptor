@@ -13,6 +13,11 @@ gem "minitest"
 gem "rackup"
 gem "http-2"
 
+gem "rails"
+gem "sqlite3"
+gem "capybara"
+gem "cuprite"
+
 gem "puma"
 gem "falcon"
 

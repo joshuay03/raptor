@@ -18,6 +18,17 @@ steps:
           - bundle install
           - bundle exec rake ci
 
+      - label: ":rails: Rails system tests"
+        image: "ruby:4.0"
+        env:
+          BROWSER_PATH: /usr/bin/chromium
+        commands:
+          - ruby -v
+          - apt-get update && apt-get install -y chromium
+          - bundle install
+          - bundle exec rails --version
+          - bundle exec rake test:rails
+
       - label: ":ruby: Ruby 4.0 +GC.stress"
         image: "ruby:4.0"
         env:
@@ -88,7 +99,7 @@ steps:
           queue: macos
         commands:
           - brew install --quiet ruby@4.0
-          - export PATH="$(brew --prefix ruby@4.0)/bin:$PATH"
+          - export PATH="$(brew --prefix ruby@4.0)/bin:$$PATH"
           - bundle config set --local path .bundle
           - ruby -v
           - bundle install
@@ -101,11 +112,26 @@ steps:
           RUBY_YJIT_ENABLE: "1"
         commands:
           - brew install --quiet ruby@4.0
-          - export PATH="$(brew --prefix ruby@4.0)/bin:$PATH"
+          - export PATH="$(brew --prefix ruby@4.0)/bin:$$PATH"
           - bundle config set --local path .bundle
           - ruby -v
           - bundle install
           - bundle exec rake ci
+
+      - label: ":rails: Rails system tests"
+        agents:
+          queue: macos
+        env:
+          BROWSER_PATH: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+        commands:
+          - brew install --quiet ruby@4.0
+          - export PATH="$(brew --prefix ruby@4.0)/bin:$$PATH"
+          - test -x "$$BROWSER_PATH" || brew install --cask --quiet google-chrome
+          - bundle config set --local path .bundle
+          - ruby -v
+          - bundle install
+          - bundle exec rails --version
+          - bundle exec rake test:rails
 
       - label: ":ruby: Ruby 4.0 +GC.stress"
         agents:
@@ -114,7 +140,7 @@ steps:
           RUBY_GC_STRESS: "1"
         commands:
           - brew install --quiet ruby@4.0
-          - export PATH="$(brew --prefix ruby@4.0)/bin:$PATH"
+          - export PATH="$(brew --prefix ruby@4.0)/bin:$$PATH"
           - bundle config set --local path .bundle
           - ruby -v
           - bundle install
@@ -128,7 +154,7 @@ steps:
           RUBY_GC_STRESS: "1"
         commands:
           - brew install --quiet ruby@4.0
-          - export PATH="$(brew --prefix ruby@4.0)/bin:$PATH"
+          - export PATH="$(brew --prefix ruby@4.0)/bin:$$PATH"
           - bundle config set --local path .bundle
           - ruby -v
           - bundle install
@@ -141,7 +167,7 @@ steps:
         commands:
           - brew unlink ruby
           - brew install --HEAD --quiet ruby
-          - export PATH="$(brew --prefix ruby)/bin:$PATH"
+          - export PATH="$(brew --prefix ruby)/bin:$$PATH"
           - bundle config set --local path .bundle
           - ruby -v
           - bundle install
@@ -156,7 +182,7 @@ steps:
         commands:
           - brew unlink ruby
           - brew install --HEAD --quiet ruby
-          - export PATH="$(brew --prefix ruby)/bin:$PATH"
+          - export PATH="$(brew --prefix ruby)/bin:$$PATH"
           - bundle config set --local path .bundle
           - ruby -v
           - bundle install
@@ -171,7 +197,7 @@ steps:
         commands:
           - brew unlink ruby
           - brew install --HEAD --quiet ruby
-          - export PATH="$(brew --prefix ruby)/bin:$PATH"
+          - export PATH="$(brew --prefix ruby)/bin:$$PATH"
           - bundle config set --local path .bundle
           - ruby -v
           - bundle install
@@ -187,7 +213,7 @@ steps:
         commands:
           - brew unlink ruby
           - brew install --HEAD --quiet ruby
-          - export PATH="$(brew --prefix ruby)/bin:$PATH"
+          - export PATH="$(brew --prefix ruby)/bin:$$PATH"
           - bundle config set --local path .bundle
           - ruby -v
           - bundle install

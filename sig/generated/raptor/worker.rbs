@@ -1,0 +1,77 @@
+# Generated from lib/raptor/worker.rb with RBS::Inline
+
+module Raptor
+  # Runs the request-handling stack shared by forked and embedded servers.
+  class Worker
+    @server_thread: Thread?
+
+    @server: Server?
+
+    @reactor_thread: Thread?
+
+    @http2_ractor_pool: RactorPool?
+
+    @http1_ractor_pool: RactorPool?
+
+    @http2: Http2?
+
+    @http1: Http1?
+
+    @stopped: bool
+
+    @worker_index: Integer?
+
+    @access_log_io: IO?
+
+    @http2_ractors: Integer
+
+    @http1_ractors: Integer
+
+    @options: Hash[Symbol, untyped]
+
+    @port: Integer
+
+    @listeners: Array[TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener]
+
+    @app: untyped
+
+    attr_reader requests: Integer
+
+    attr_reader reactor: Reactor?
+
+    attr_reader thread_pool: AtomicThreadPool?
+
+    # Creates a serving stack using the supplied listeners and configuration.
+    #
+    # @rbs (untyped app, listeners: Array[TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener], port: Integer, options: Hash[Symbol, untyped], http1_ractors: Integer, http2_ractors: Integer, ?access_log_io: IO?, ?worker_index: Integer?) -> void
+    def initialize: (untyped app, listeners: Array[TCPServer | UNIXServer | Binder::SslListener | Binder::H2cListener], port: Integer, options: Hash[Symbol, untyped], http1_ractors: Integer, http2_ractors: Integer, ?access_log_io: IO?, ?worker_index: Integer?) -> void
+
+    # Starts the application pool, protocol parsers, reactor, and acceptor.
+    #
+    # @rbs () -> void
+    def start: () -> void
+
+    # Returns whether both serving threads are still running.
+    #
+    # @rbs () -> bool
+    def running?: () -> bool
+
+    # Waits until serving stops, propagating background thread failures.
+    #
+    # @rbs () -> void
+    def join: () -> void
+
+    # Drains requests and releases the serving threads and parser Ractors.
+    # A seed keeps its listeners open for the cluster to manage.
+    #
+    # @rbs (?close_listeners: bool) -> void
+    def shutdown: (?close_listeners: bool) -> void
+
+    private
+
+    # Waits for app work to finish within the configured drain timeout.
+    #
+    # @rbs () -> void
+    def drain_thread_pool: () -> void
+  end
+end

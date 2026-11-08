@@ -7,16 +7,16 @@ module Rackup
     module Raptor
       DEFAULT_OPTIONS: untyped
 
-      # Boots a Raptor cluster serving the given Rack application.
+      # Serves the given Rack application using the handler options.
       #
       # @param app [#call] the Rack application to serve
       # @param options [Hash] handler options provided by Rackup or the host
-      # @yield before the cluster starts running
-      # @yieldparam cluster [::Raptor::Cluster] the cluster instance
+      # @yield before the server starts running
+      # @yieldparam server [::Raptor::Cluster, ::Raptor::Embedded] the server instance
       # @return [void]
       #
-      # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, **untyped options) { (::Raptor::Cluster) -> void } -> void
-      def self.run: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, **untyped options) { (::Raptor::Cluster) -> void } -> void
+      # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, **untyped options) { (::Raptor::Cluster | ::Raptor::Embedded) -> void } -> void
+      def self.run: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, **untyped options) { (::Raptor::Cluster | ::Raptor::Embedded) -> void } -> void
 
       # Returns the handler-specific options surfaced by `rackup --help`.
       #
@@ -25,17 +25,17 @@ module Rackup
       # @rbs () -> Hash[String, String]
       def self.valid_options: () -> Hash[String, String]
 
-      # Builds a Raptor cluster options hash from Rack handler options.
+      # Builds Raptor server configuration from Rack handler options.
       #
       # Options not explicitly supplied by the user (per the `:user_supplied_options`
       # key) are treated as host-provided defaults.
       #
       # @param app [#call] the Rack application to serve
       # @param options [Hash] handler options provided by Rackup or the host
-      # @return [Hash{Symbol => untyped}] cluster configuration
+      # @return [Hash{Symbol => untyped}] server configuration
       #
       # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Hash[Symbol, untyped] options) -> Hash[Symbol, untyped]
-      def self.build_cluster_options: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Hash[Symbol, untyped] options) -> Hash[Symbol, untyped]
+      def self.build_options: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Hash[Symbol, untyped] options) -> Hash[Symbol, untyped]
     end
   end
 end

@@ -4,24 +4,19 @@
 require "json"
 require "time"
 
-require "atomic-ruby/atomic_thread_pool"
 require "concurrent/utility/processor_counter"
 require "rack/builder"
-require "ractor-pool"
 
 require_relative "binder"
 require_relative "control_server"
-require_relative "http1"
-require_relative "http2"
 require_relative "log"
 require_relative "plugin"
 require_relative "raptor_native"
-require_relative "reactor"
 require_relative "reuseport_bpf"
-require_relative "server"
 require_relative "stats"
 require_relative "systemd"
 require_relative "version"
+require_relative "worker"
 
 module Raptor
   # Forks and supervises worker processes. Handles graceful shutdown on
@@ -73,19 +68,13 @@ module Raptor
       (cores.to_f / worker_count).round.clamp(1, HTTP2_RACTOR_COUNT_CAP)
     end
 
-    # @rbs @drain_accept_queue: bool
     # @rbs @worker_count: Integer
     # @rbs @http1_ractor_count: Integer
     # @rbs @http2_ractor_count: Integer
     # @rbs @thread_count: Integer
     # @rbs @max_thread_count: (Integer | Float)?
     # @rbs @cpu_affinity: bool
-    # @rbs @clean_thread_locals: bool
-    # @rbs @clean_fiber_locals: bool
     # @rbs @environment: String
-    # @rbs @connection_options: Hash[Symbol, untyped]
-    # @rbs @http1_options: Hash[Symbol, untyped]
-    # @rbs @http2_options: Hash[Symbol, untyped]
     # @rbs @worker_boot_timeout: Integer
     # @rbs @worker_timeout: Integer
     # @rbs @worker_drain_timeout: Integer
@@ -103,7 +92,6 @@ module Raptor
     # @rbs @access_log_io: IO?
     # @rbs @launch_command: String?
     # @rbs @launch_argv: Array[String]?
-    # @rbs @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
     # @rbs @binder: Binder
     # @rbs @server_port: Integer
     # @rbs @app: untyped
@@ -178,19 +166,13 @@ module Raptor
     def initialize(options)
       @options = options = options.dup
       @plugins = []
-      @drain_accept_queue = options[:drain_accept_queue]
       @worker_count = options[:workers]
       @http1_ractor_count = options[:http1][:ractors] || self.class.default_http1_ractor_count(@worker_count)
       @http2_ractor_count = options[:http2][:ractors] || self.class.default_http2_ractor_count(@worker_count)
       @thread_count = options[:threads]
       @max_thread_count = options[:max_threads]
       @cpu_affinity = options[:cpu_affinity]
-      @clean_thread_locals = options[:clean_thread_locals]
-      @clean_fiber_locals = options[:clean_fiber_locals]
       @environment = options[:environment] || ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
-      @connection_options = options[:connection]
-      @http1_options = options[:http1]
-      @http2_options = options[:http2]
       @worker_boot_timeout = options[:worker_boot_timeout]
       @worker_timeout = options[:worker_timeout]
       @worker_drain_timeout = options[:worker_drain_timeout]
@@ -208,7 +190,6 @@ module Raptor
       @access_log_io = nil
       @launch_command = options[:launch_command]
       @launch_argv = options[:launch_argv]
-      @on_error = options[:on_error]
 
       Dir.chdir(options[:chdir]) if options[:chdir]
 
@@ -850,7 +831,6 @@ module Raptor
       CPU.pin(index) if @cpu_affinity && CPU.count >= @worker_count
 
       started_at = Process.clock_gettime(Process::CLOCK_REALTIME)
-      request_count = 0
 
       @stats.write(
         index,
@@ -867,70 +847,6 @@ module Raptor
 
       @before_worker_boot.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index) }
 
-      reactor = nil
-
-      counting_app = ->(env) {
-        request_count += 1
-        @app.call(env)
-      }
-      thread_pool = AtomicThreadPool.new(size: @thread_count, max_size: @max_thread_count)
-      http1 = Http1.new(
-        counting_app,
-        @server_port,
-        connection_options: @connection_options,
-        http1_options: @http1_options,
-        access_log_io: @access_log_io,
-        clean_thread_locals: @clean_thread_locals,
-        clean_fiber_locals: @clean_fiber_locals,
-        on_error: @on_error
-      )
-      http2 = Http2.new(
-        counting_app,
-        @server_port,
-        connection_options: @connection_options,
-        http2_options: @http2_options,
-        access_log_io: @access_log_io,
-        clean_thread_locals: @clean_thread_locals,
-        clean_fiber_locals: @clean_fiber_locals,
-        on_error: @on_error
-      )
-      http1_ractor_pool = RactorPool.new(
-        size: @http1_ractor_count,
-        worker: http1.parser_worker,
-        name: "HTTP/1.1"
-      ) do |parsed_result|
-        begin
-          http1.handle_parsed_request(parsed_result, reactor, thread_pool)
-        rescue => error
-          Log.rescued_error(error)
-        end
-      end
-
-      http2_ractor_pool = if @binder.http2?
-        RactorPool.new(
-          size: @http2_ractor_count,
-          worker: http2.parser_worker,
-          name: "HTTP/2"
-        ) do |parsed_result|
-          begin
-            http2.handle_parsed_request(parsed_result, reactor, thread_pool)
-          rescue => error
-            Log.rescued_error(error)
-          end
-        end
-      end
-
-      reactor = Reactor.new(
-        http1,
-        http1_ractor_pool,
-        http2_ractor_pool,
-        thread_pool,
-        connection_options: @connection_options,
-        http1_options: @http1_options,
-        http2_options: @http2_options
-      )
-      reactor_thread = reactor.run
-
       bpf_listeners = if @bpf_active
         ReuseportBPF.enable_load_reporting(index)
         ReuseportBPF.create_worker_listeners(index, @binder.socket_backlog)
@@ -938,17 +854,17 @@ module Raptor
         []
       end
 
-      server = Server.new(
-        reactor,
-        thread_pool,
-        http1,
-        http2,
-        connection_options: @connection_options,
-        drain_accept_queue: @drain_accept_queue,
+      worker = Worker.new(
+        @app,
         listeners: bpf_listeners + @binder.listeners,
+        port: @server_port,
+        options: @options,
+        http1_ractors: @http1_ractor_count,
+        http2_ractors: @http2_ractor_count,
+        access_log_io: @access_log_io,
         worker_index: (index if @bpf_active)
       )
-      server_thread = server.run
+      worker.start
 
       Log.info "Worker #{index} booted"
 
@@ -960,10 +876,10 @@ module Raptor
             index,
             pid: Process.pid,
             phase: phase,
-            requests: request_count,
-            backlog: reactor.backlog,
-            busy_threads: thread_pool.active_count,
-            thread_capacity: thread_pool.size,
+            requests: worker.requests,
+            backlog: worker.reactor.backlog,
+            busy_threads: worker.thread_pool.active_count,
+            thread_capacity: worker.thread_pool.size,
             started_at: started_at,
             last_checkin: Process.clock_gettime(Process::CLOCK_REALTIME),
             booted: true
@@ -975,30 +891,20 @@ module Raptor
       end
 
       until shutdown_requested || promote_to_seed
-        break unless server_thread.alive? && reactor_thread.alive?
+        break unless worker.running?
 
         sleep 0.5
       end
 
       if promote_to_seed
         @before_refork.each(&:call)
-        server.stop_accepting
       else
         @before_worker_shutdown.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index) }
-        server.shutdown
       end
 
-      server_thread.join
+      worker.shutdown(close_listeners: !promote_to_seed)
       # A seed never accepts again, and the workers it forks bind their own.
       bpf_listeners.each(&:close) if promote_to_seed
-      http1.shutdown
-      http2.shutdown(reactor)
-      reactor.drain_detached_bodies(@worker_drain_timeout)
-      drain_thread_pool(thread_pool)
-      reactor.shutdown
-      reactor_thread.join
-      http1_ractor_pool.shutdown
-      http2_ractor_pool&.shutdown
       stats_thread.join
 
       run_seed_loop(index) if promote_to_seed
@@ -1039,27 +945,6 @@ module Raptor
         Process.wait(intermediate_pid)
       end
     rescue Errno::EPIPE, IOError
-    end
-
-    # Shuts down the worker's application thread pool, force-killing the
-    # underlying threads if in-flight requests have not finished within
-    # `worker_drain_timeout` seconds.
-    #
-    # @param thread_pool [AtomicThreadPool] the worker's thread pool
-    # @return [void]
-    #
-    # @rbs (AtomicThreadPool thread_pool) -> void
-    def drain_thread_pool(thread_pool)
-      drain_thread = Thread.new do
-        Thread.current.name = "Thread Pool Drain"
-
-        thread_pool.shutdown
-      end
-      return if drain_thread.join(@worker_drain_timeout)
-
-      Log.warn "Force-killing in-flight app threads after #{@worker_drain_timeout}s drain timeout"
-      thread_pool.instance_variable_get(:@threads).each(&:kill)
-      drain_thread.join
     end
 
     # Returns a human-readable description of how a process exited.

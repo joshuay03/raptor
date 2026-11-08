@@ -3,8 +3,8 @@
 require "test_helper"
 
 require "concurrent/utility/processor_counter"
-
 require "rackup"
+
 require "rackup/handler/raptor"
 
 module Rackup
@@ -52,7 +52,7 @@ module Rackup
       def test_passes_app_through
         app = ->(_env) { [200, {}, ["ok"]] }
 
-        opts = Rackup::Handler::Raptor.send(:build_cluster_options, app, {})
+        opts = Rackup::Handler::Raptor.send(:build_options, app, {})
 
         assert_same app, opts[:app]
       end
@@ -207,7 +207,7 @@ module Rackup
       private
 
       def build(options = {})
-        Rackup::Handler::Raptor.send(:build_cluster_options, ->(_env) { [200, {}, []] }, options)
+        Rackup::Handler::Raptor.send(:build_options, ->(_env) { [200, {}, []] }, options)
       end
 
       def options_from_subprocess(environment, options = {})
@@ -216,7 +216,7 @@ module Rackup
           reader.close
           ENV.update(environment)
           result = begin
-            build(options).tap { |cluster_options| cluster_options.delete(:app) }
+            build(options).tap { |configuration| configuration.delete(:app) }
           rescue => error
             error
           end

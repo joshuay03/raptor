@@ -76,6 +76,30 @@ Also works with `rackup` and `rails server`:
 Rails apps using `SOLID_QUEUE_IN_PUMA` run jobs through `config/puma.rb`, which Raptor does not load. Run `bin/jobs` as
 a separately supervised process or container instead.
 
+### Rails system tests
+
+Use Raptor as Capybara's server without forking, so Rails can share transactional test data with browser requests.
+Add this to your system test setup, alongside your browser driver configuration:
+
+```ruby
+require "rackup"
+require "rackup/handler/raptor"
+
+Capybara.register_server :raptor do |app, port, host|
+  Rackup::Handler::Raptor.run(app, Host: host, Port: port, Workers: 0) do |server|
+    at_exit { server.shutdown }
+  end
+end
+Capybara.server = :raptor
+```
+
+The exit hook shuts the server down before Ruby tears down its background threads.
+
+For other in-process uses, `require "raptor/embedded"` and call `Raptor::Embedded.new(app, host: "127.0.0.1", port: 0)`.
+`start` returns when serving is ready, `port` reports the bound port, `shutdown` drains requests and releases resources,
+and `join` waits for termination. Call `shutdown` before process exit. The embedded server leaves signal handlers and
+process-wide configuration to its caller. Cluster plugins and process lifecycle hooks do not run in this mode.
+
 ## Configuration
 
 Raptor reads options from a Ruby config file, environment variables, and command line flags, in increasing order of

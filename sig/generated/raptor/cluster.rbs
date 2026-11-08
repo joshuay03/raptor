@@ -44,10 +44,6 @@ module Raptor
     # @rbs (Integer worker_count, ?cores: Integer) -> Integer
     def self.default_http2_ractor_count: (Integer worker_count, ?cores: Integer) -> Integer
 
-    @stats_file: String?
-
-    @control_server: ControlServer?
-
     @pid_file: String?
 
     @stdout_file: String?
@@ -62,11 +58,17 @@ module Raptor
 
     @launch_argv: Array[String]?
 
-    @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
-
     @binder: Binder
 
+    @server_port: Integer
+
+    @app: untyped
+
     @plugins: Array[Plugin]
+
+    @control_server: ControlServer?
+
+    @stats_file: String?
 
     @before_refork: Array[Proc]
 
@@ -83,12 +85,6 @@ module Raptor
     @worker_timeout: Integer
 
     @worker_boot_timeout: Integer
-
-    @http2_options: Hash[Symbol, untyped]
-
-    @http1_options: Hash[Symbol, untyped]
-
-    @connection_options: Hash[Symbol, untyped]
 
     @bpf_active: bool
 
@@ -130,15 +126,7 @@ module Raptor
 
     @shutdown: bool
 
-    @app: untyped
-
-    @server_port: Integer
-
     @environment: String
-
-    @clean_fiber_locals: bool
-
-    @clean_thread_locals: bool
 
     @cpu_affinity: bool
 
@@ -151,8 +139,6 @@ module Raptor
     @http1_ractor_count: Integer
 
     @worker_count: Integer
-
-    @drain_accept_queue: bool
 
     # Returns the cluster configuration available to plugins.
     #
@@ -419,16 +405,6 @@ module Raptor
     #
     # @rbs (Integer index) -> void
     def run_seed_loop: (Integer index) -> void
-
-    # Shuts down the worker's application thread pool, force-killing the
-    # underlying threads if in-flight requests have not finished within
-    # `worker_drain_timeout` seconds.
-    #
-    # @param thread_pool [AtomicThreadPool] the worker's thread pool
-    # @return [void]
-    #
-    # @rbs (AtomicThreadPool thread_pool) -> void
-    def drain_thread_pool: (AtomicThreadPool thread_pool) -> void
 
     # Returns a human-readable description of how a process exited.
     #

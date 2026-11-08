@@ -263,12 +263,21 @@ module Raptor
     #
     # @rbs () -> Thread
     def run
-      Thread.new do
+      ready = AtomicConditionVariable.new
+      startup_error = nil
+      thread = Thread.new do
         Thread.current.name = "Reactor"
         @thread = Thread.current
-        selector = IO::Event::Selector.new(Fiber.current)
-        @wakeup = Fiber.new { loop { selector.transfer } }
-        @selector = selector
+        begin
+          selector = IO::Event::Selector.new(Fiber.current)
+          @wakeup = Fiber.new { loop { selector.transfer } }
+          @selector = selector
+        rescue => error
+          startup_error = error
+          ready.signal
+          next
+        end
+        ready.signal
 
         until stopped?
           begin
@@ -310,6 +319,14 @@ module Raptor
         @thread = nil
         @selector.close
       end
+
+      ready.wait { @selector || startup_error }
+      if startup_error
+        thread.join
+        raise startup_error
+      end
+
+      thread
     end
 
     # Adds a new client connection to the reactor.

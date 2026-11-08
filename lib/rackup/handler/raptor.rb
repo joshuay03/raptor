@@ -12,24 +12,31 @@ module Rackup
         Port: 9292
       }.freeze
 
-      # Boots a Raptor cluster serving the given Rack application.
+      # Serves the given Rack application using the handler options.
       #
       # @param app [#call] the Rack application to serve
       # @param options [Hash] handler options provided by Rackup or the host
-      # @yield before the cluster starts running
-      # @yieldparam cluster [::Raptor::Cluster] the cluster instance
+      # @yield before the server starts running
+      # @yieldparam server [::Raptor::Cluster, ::Raptor::Embedded] the server instance
       # @return [void]
       #
-      # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, **untyped options) { (::Raptor::Cluster) -> void } -> void
+      # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, **untyped options) { (::Raptor::Cluster | ::Raptor::Embedded) -> void } -> void
       def self.run(app, **options)
         require_relative "../../raptor/cli"
         require_relative "../../raptor/cluster"
+        require_relative "../../raptor/embedded"
 
-        cluster = ::Raptor::Cluster.new(build_cluster_options(app, options))
+        configuration = build_options(app, options)
+        server = if configuration[:workers].zero?
+          configuration.delete(:app)
+          ::Raptor::Embedded.new(app, **configuration)
+        else
+          ::Raptor::Cluster.new(configuration)
+        end
 
-        yield cluster if block_given?
+        yield server if block_given?
 
-        cluster.run
+        server.run
       end
 
       # Returns the handler-specific options surfaced by `rackup --help`.
@@ -41,24 +48,24 @@ module Rackup
         {
           "Host=HOST"      => "Hostname to listen on (default: #{DEFAULT_OPTIONS[:Host]})",
           "Port=PORT"      => "Port to listen on (default: #{DEFAULT_OPTIONS[:Port]})",
-          "Workers=NUM"    => "Number of worker processes (default: available processor count)",
+          "Workers=NUM"    => "Number of worker processes, or 0 for in-process serving (default: available processor count)",
           "Threads=NUM"    => "Number of threads per worker (default: 3)",
           "MaxThreads=NUM" => "Maximum threads per worker (`unlimited` for no limit; default: unlimited)",
           "Config=PATH"    => "Load additional configuration from PATH"
         }
       end
 
-      # Builds a Raptor cluster options hash from Rack handler options.
+      # Builds Raptor server configuration from Rack handler options.
       #
       # Options not explicitly supplied by the user (per the `:user_supplied_options`
       # key) are treated as host-provided defaults.
       #
       # @param app [#call] the Rack application to serve
       # @param options [Hash] handler options provided by Rackup or the host
-      # @return [Hash{Symbol => untyped}] cluster configuration
+      # @return [Hash{Symbol => untyped}] server configuration
       #
       # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Hash[Symbol, untyped] options) -> Hash[Symbol, untyped]
-      def self.build_cluster_options(app, options)
+      def self.build_options(app, options)
         defaults = DEFAULT_OPTIONS.dup
 
         if (user_supplied_options = options.delete(:user_supplied_options))
@@ -116,7 +123,7 @@ module Rackup
         result[:on_error] = config[:on_error] if config.key?(:on_error)
         config.merge(result)
       end
-      private_class_method :build_cluster_options
+      private_class_method :build_options
     end
 
     register :raptor, Raptor

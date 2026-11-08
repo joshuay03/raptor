@@ -175,10 +175,37 @@ module Raptor
     #
     # @rbs () -> void
     def run
-      @command == :stats ? run_stats : Cluster.run(@options)
+      if @command == :stats
+        run_stats
+      elsif @options[:workers].zero?
+        run_embedded
+      else
+        Cluster.run(@options)
+      end
     end
 
     private
+
+    # Serves in the CLI process until interrupted or terminated.
+    #
+    # @rbs () -> void
+    def run_embedded
+      require_relative "embedded"
+
+      $stdout.sync = true
+      $stderr.sync = true
+
+      Dir.chdir(@options[:chdir]) if @options[:chdir]
+      app = @options[:app] || Rack::Builder.parse_file(@options[:rackup])
+      server = Embedded.new(app, **@options, log: true).start
+      handlers = ["INT", "TERM"].to_h do |signal|
+        [signal, trap(signal) { Thread.new { server.shutdown } }]
+      end
+      server.join
+    ensure
+      server&.shutdown
+      handlers&.each { |signal, handler| trap(signal, handler) }
+    end
 
     # Reads and prints the stats file.
     #
@@ -282,7 +309,7 @@ module Raptor
           @options[:drain_accept_queue] = bool
         end
 
-        opts.on("-w", "--workers NUM", Integer, "Number of worker processes (default: #{DEFAULT_WORKER_COUNT})") do |num|
+        opts.on("-w", "--workers NUM", Integer, "Number of worker processes, or 0 for in-process serving (default: #{DEFAULT_WORKER_COUNT})") do |num|
           @options[:workers] = num
         end
 

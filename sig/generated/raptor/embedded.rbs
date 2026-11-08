@@ -1,0 +1,68 @@
+# Generated from lib/raptor/embedded.rb with RBS::Inline
+
+module Raptor
+  # Serves an existing Rack application in the caller's process without
+  # installing signal handlers or changing process-wide configuration.
+  class Embedded
+    @worker: Worker?
+
+    @binder: Binder?
+
+    @stopped: bool
+
+    @started: bool
+
+    @lifecycle_available: AtomicConditionVariable
+
+    @lifecycle_owner: Atom
+
+    @log: bool
+
+    @binds: Array[String]
+
+    @options: Hash[Symbol, untyped]
+
+    @app: untyped
+
+    attr_reader port: Integer
+
+    attr_reader addresses: Array[String]
+
+    # Creates an in-process server. A port of zero selects an available port.
+    # Thread and protocol options follow the regular server configuration.
+    # Set log to report startup information.
+    #
+    # @rbs (untyped app, ?host: String, ?port: Integer, ?log: bool, **untyped options) -> void
+    def initialize: (untyped app, ?host: String, ?port: Integer, ?log: bool, **untyped options) -> void
+
+    # Starts serving and returns once the request-handling stack is ready.
+    # Startup errors are raised in the calling thread.
+    #
+    # @rbs () -> Embedded
+    def start: () -> Embedded
+
+    # Starts serving and waits until shutdown.
+    #
+    # @rbs () -> void
+    def run: () -> void
+
+    # Drains requests and closes the server's sockets, threads, and Ractors.
+    # Calling shutdown more than once has no effect.
+    #
+    # @rbs () -> void
+    def shutdown: () -> void
+
+    # Waits for termination and propagates serving thread failures.
+    #
+    # @rbs () -> void
+    def join: () -> void
+
+    private
+
+    # @rbs () -> void
+    def log_initialization: () -> void
+
+    # @rbs () { () -> untyped } -> untyped
+    def with_lifecycle: () { () -> untyped } -> untyped
+  end
+end

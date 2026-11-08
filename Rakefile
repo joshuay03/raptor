@@ -20,6 +20,13 @@ Rake::ExtensionTask.new("raptor_native", GEMSPEC) do |ext|
   ext.lib_dir = "lib/raptor"
 end
 
+namespace :test do
+  desc "Run Rails system tests"
+  task rails: :compile do
+    ruby "-Itest", "test/system/rails.rb"
+  end
+end
+
 namespace :bpf do
   task :compile do
     if RUBY_PLATFORM.include?("linux")
@@ -41,6 +48,6 @@ namespace :rbs do
   end
 end
 
-task default: %i[clobber compile bpf:compile rbs:generate test]
-task build: %i[clobber compile rbs:generate]
-task ci: %i[clobber compile test]
+task default: [:clobber, :compile, :"bpf:compile", :"rbs:generate", :test]
+task build: [:clobber, :compile, :"rbs:generate"]
+task ci: [:clobber, :compile, :test]
