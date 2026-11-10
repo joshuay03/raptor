@@ -124,6 +124,33 @@ installing signal handlers or changing process-wide configuration.</p>
       <li class="public ">
   <span class="summary_signature">
     
+      <a href="#addresses-instance_method" title="#addresses (instance method)">#<strong>addresses</strong>  &#x21d2; Array[String] </a>
+    
+
+    
+  </span>
+  
+  
+  
+    
+      <span class="note title readonly">readonly</span>
+    
+    
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>: <a href="String">Array</a>.</p></div></span>
+  
+</li>
+
+    
+      <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#port-instance_method" title="#port (instance method)">#<strong>port</strong>  &#x21d2; Integer </a>
     
 
@@ -379,7 +406,6 @@ Thread and protocol options follow the regular server configuration.</p>
       <pre class="lines">
 
 
-31
 32
 33
 34
@@ -392,14 +418,17 @@ Thread and protocol options follow the regular server configuration.</p>
 41
 42
 43
-44</pre>
+44
+45
+46</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 31</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 32</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='label'>host:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>127.0.0.1</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>port:</span> <span class='int'>0</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
   <span class='ivar'>@app</span> <span class='op'>=</span> <span class='id identifier rubyid_app'>app</span>
   <span class='ivar'>@port</span> <span class='op'>=</span> <span class='id identifier rubyid_port'>port</span>
+  <span class='ivar'>@addresses</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
   <span class='ivar'>@options</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="CLI.html" title="Raptor::CLI (class)">CLI</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="CLI.html#DEFAULT_OPTIONS-constant" title="Raptor::CLI::DEFAULT_OPTIONS (constant)">DEFAULT_OPTIONS</a></span></span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
   <span class='const'><span class='object_link'><a href="CLI.html" title="Raptor::CLI (class)">CLI</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="CLI.html#NESTED_OPTION_KEYS-constant" title="Raptor::CLI::NESTED_OPTION_KEYS (constant)">NESTED_OPTION_KEYS</a></span></span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_key'>key</span><span class='op'>|</span>
     <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='id identifier rubyid_key'>key</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="CLI.html" title="Raptor::CLI (class)">CLI</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="CLI.html#DEFAULT_OPTIONS-constant" title="Raptor::CLI::DEFAULT_OPTIONS (constant)">DEFAULT_OPTIONS</a></span></span><span class='lbracket'>[</span><span class='id identifier rubyid_key'>key</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='id identifier rubyid_key'>key</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='lbrace'>{</span><span class='rbrace'>}</span><span class='rparen'>)</span>
@@ -424,7 +453,61 @@ Thread and protocol options follow the regular server configuration.</p>
       
       <span id=""></span>
       <div class="method_details first">
-  <h3 class="signature first" id="port-instance_method">
+  <h3 class="signature first" id="addresses-instance_method">
+  
+    #<strong>addresses</strong>  &#x21d2; <tt>Array[String]</tt>  <span class="extras">(readonly)</span>
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p>: <a href="String">Array</a></p>
+
+  </div>
+</div>
+<div class="tags">
+  
+<p class="tag_title">Returns:</p>
+<ul class="return">
+  
+    <li>
+      
+      
+        <span class='type'>(<tt>Array[String]</tt>)</span>
+      
+      
+      
+    </li>
+  
+</ul>
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+26
+27
+28</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 26</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_addresses'>addresses</span>
+  <span class='ivar'>@addresses</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      
+      <span id=""></span>
+      <div class="method_details ">
+  <h3 class="signature " id="port-instance_method">
   
     #<strong>port</strong>  &#x21d2; <tt>Integer</tt>  <span class="extras">(readonly)</span>
   
@@ -506,17 +589,17 @@ Thread and protocol options follow the regular server configuration.</p>
       <pre class="lines">
 
 
-104
-105
-106
 107
 108
 109
 110
-111</pre>
+111
+112
+113
+114</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 104</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 107</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_join'>join</span>
   <span class='id identifier rubyid_worker'>worker</span> <span class='op'>=</span> <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='lbrace'>{</span> <span class='ivar'>@worker</span> <span class='rbrace'>}</span>
@@ -555,13 +638,13 @@ Thread and protocol options follow the regular server configuration.</p>
       <pre class="lines">
 
 
-79
-80
-81
-82</pre>
+82
+83
+84
+85</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 79</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 82</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
   <span class='id identifier rubyid_start'>start</span>
@@ -597,9 +680,6 @@ Calling shutdown more than once has no effect.</p>
       <pre class="lines">
 
 
-88
-89
-90
 91
 92
 93
@@ -608,10 +688,13 @@ Calling shutdown more than once has no effect.</p>
 96
 97
 98
-99</pre>
+99
+100
+101
+102</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 88</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 91</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='kw'>do</span>
@@ -668,8 +751,6 @@ Startup errors are raised in the calling thread.</p>
       <pre class="lines">
 
 
-50
-51
 52
 53
 54
@@ -692,10 +773,13 @@ Startup errors are raised in the calling thread.</p>
 71
 72
 73
-74</pre>
+74
+75
+76
+77</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 50</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 52</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start'>start</span>
   <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='kw'>do</span>
@@ -705,6 +789,7 @@ Startup errors are raised in the calling thread.</p>
     <span class='kw'>begin</span>
       <span class='ivar'>@binder</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Binder.html" title="Raptor::Binder (class)">Binder</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Binder.html#initialize-instance_method" title="Raptor::Binder#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@binds</span><span class='comma'>,</span> <span class='label'>socket_backlog:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:socket_backlog</span><span class='rbracket'>]</span><span class='rparen'>)</span>
       <span class='ivar'>@port</span> <span class='op'>=</span> <span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_server_port'>server_port</span>
+      <span class='ivar'>@addresses</span> <span class='op'>=</span> <span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_addresses'>addresses</span>
       <span class='ivar'>@worker</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Worker.html" title="Raptor::Worker (class)">Worker</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Worker.html#initialize-instance_method" title="Raptor::Worker#initialize (method)">new</a></span></span><span class='lparen'>(</span>
         <span class='ivar'>@app</span><span class='comma'>,</span>
         <span class='label'>listeners:</span> <span class='ivar'>@binder</span><span class='period'>.</span><span class='id identifier rubyid_listeners'>listeners</span><span class='comma'>,</span>
@@ -790,9 +875,6 @@ Startup errors are raised in the calling thread.</p>
       <pre class="lines">
 
 
-116
-117
-118
 119
 120
 121
@@ -801,10 +883,13 @@ Startup errors are raised in the calling thread.</p>
 124
 125
 126
-127</pre>
+127
+128
+129
+130</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 116</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 119</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span>
   <span class='id identifier rubyid_thread'>thread</span> <span class='op'>=</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_current'>current</span>
@@ -828,7 +913,7 @@ Startup errors are raised in the calling thread.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Nov 10 07:19:25 2026 by
+  Generated on Tue Nov 10 07:27:42 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>

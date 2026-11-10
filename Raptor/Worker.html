@@ -706,21 +706,21 @@
       <pre class="lines">
 
 
-181
-182
-183
-184
-185
-186
 187
 188
 189
 190
 191
-192</pre>
+192
+193
+194
+195
+196
+197
+198</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 181</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 187</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_drain_thread_pool'>drain_thread_pool</span>
   <span class='id identifier rubyid_drain_thread'>drain_thread</span> <span class='op'>=</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span>
@@ -896,7 +896,13 @@ A seed keeps its listeners open for the cluster to manage.</p>
 171
 172
 173
-174</pre>
+174
+175
+176
+177
+178
+179
+180</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 154</span>
@@ -905,22 +911,28 @@ A seed keeps its listeners open for the cluster to manage.</p>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@stopped</span>
 
   <span class='ivar'>@stopped</span> <span class='op'>=</span> <span class='kw'>true</span>
-  <span class='kw'>if</span> <span class='id identifier rubyid_close_listeners'>close_listeners</span>
-    <span class='ivar'>@server</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
-  <span class='kw'>else</span>
-    <span class='ivar'>@server</span><span class='op'>&amp;.</span><span class='id identifier rubyid_stop_accepting'>stop_accepting</span>
+  <span class='kw'>begin</span>
+    <span class='kw'>if</span> <span class='id identifier rubyid_close_listeners'>close_listeners</span>
+      <span class='ivar'>@server</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+    <span class='kw'>else</span>
+      <span class='ivar'>@server</span><span class='op'>&amp;.</span><span class='id identifier rubyid_stop_accepting'>stop_accepting</span>
+    <span class='kw'>end</span>
+    <span class='ivar'>@server_thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_join'>join</span>
+  <span class='kw'>ensure</span>
+    <span class='ivar'>@http1</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+    <span class='kw'>if</span> <span class='ivar'>@reactor_thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_alive?'>alive?</span>
+      <span class='ivar'>@http2</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span><span class='lparen'>(</span><span class='ivar'>@reactor</span><span class='rparen'>)</span>
+      <span class='ivar'>@reactor</span><span class='period'>.</span><span class='id identifier rubyid_drain_detached_bodies'>drain_detached_bodies</span><span class='lparen'>(</span><span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:worker_drain_timeout</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+    <span class='kw'>end</span>
+    <span class='id identifier rubyid_drain_thread_pool'>drain_thread_pool</span> <span class='kw'>if</span> <span class='ivar'>@thread_pool</span>
+    <span class='ivar'>@reactor</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+    <span class='kw'>begin</span>
+      <span class='ivar'>@reactor_thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_join'>join</span>
+    <span class='kw'>ensure</span>
+      <span class='ivar'>@http1_ractor_pool</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+      <span class='ivar'>@http2_ractor_pool</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+    <span class='kw'>end</span>
   <span class='kw'>end</span>
-  <span class='ivar'>@server_thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_join'>join</span>
-  <span class='ivar'>@http1</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
-  <span class='kw'>if</span> <span class='ivar'>@reactor_thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_alive?'>alive?</span>
-    <span class='ivar'>@http2</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span><span class='lparen'>(</span><span class='ivar'>@reactor</span><span class='rparen'>)</span>
-    <span class='ivar'>@reactor</span><span class='period'>.</span><span class='id identifier rubyid_drain_detached_bodies'>drain_detached_bodies</span><span class='lparen'>(</span><span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:worker_drain_timeout</span><span class='rbracket'>]</span><span class='rparen'>)</span>
-  <span class='kw'>end</span>
-  <span class='id identifier rubyid_drain_thread_pool'>drain_thread_pool</span> <span class='kw'>if</span> <span class='ivar'>@thread_pool</span>
-  <span class='ivar'>@reactor</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
-  <span class='ivar'>@reactor_thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_join'>join</span>
-  <span class='ivar'>@http1_ractor_pool</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
-  <span class='ivar'>@http2_ractor_pool</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -1119,7 +1131,7 @@ A seed keeps its listeners open for the cluster to manage.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Nov 10 07:19:24 2026 by
+  Generated on Tue Nov 10 07:27:41 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
