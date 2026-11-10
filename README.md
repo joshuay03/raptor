@@ -150,6 +150,7 @@ working directory. Pass `-c PATH` to point at a specific file.
   before_fork: [],
   before_worker_boot: [],
   before_worker_shutdown: [],
+  after_worker_drain: [],
   before_refork: [],
   plugins: [],
   stats_file: "tmp/raptor.json",
@@ -191,21 +192,9 @@ Raptor::Plugin.create(:stats_logger) do
 end
 ```
 
-For an existing class, inherit from `Raptor::Plugin` and register it with
-`Raptor::Plugin.register(:stats_logger, MyStatsLogger)` instead.
-
-`start(cluster)` runs once before the initial workers fork. `cluster.options` exposes configuration, including
-plugin-specific keys. Append callbacks to its `before_fork`, `before_worker_boot`, `before_worker_shutdown`, and
-`before_refork` arrays during startup. If your plugin opens a listener, close the worker's inherited copy with
-`cluster.options[:before_worker_boot] << proc { @listener.close }` so only the master serves it.
-
-`cluster.stats` returns per-worker snapshots. `cluster.stats_hash` returns the same aggregate structure as `GET /stats`,
-including boot status, busy threads, capacity, backlog, and request counts. Both remain available while workers drain.
-
-Override `stop` to close listeners and flush exporters. Raptor calls it after workers exit, in reverse plugin order,
-then stops and joins threads created with `in_background`. These callbacks also run before hot restart and when startup
-fails, so `stop` must handle partially initialized resources. Worker replacement and phased restart keep the same
-master plugin instances running.
+`cluster.options` exposes configuration and lifecycle hooks. `cluster.stats` and `cluster.stats_hash` provide worker
+and aggregate statistics. Override `stop` to release plugin resources after workers exit, including during hot restart.
+See the [API documentation](https://joshuay03.github.io/raptor/Raptor/Plugin.html) for lifecycle details.
 
 ## Bindings
 

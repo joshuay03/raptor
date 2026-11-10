@@ -82,6 +82,7 @@ module Raptor
     # @rbs @before_fork: Array[Proc]
     # @rbs @before_worker_boot: Array[Proc]
     # @rbs @before_worker_shutdown: Array[Proc]
+    # @rbs @after_worker_drain: Array[Proc]
     # @rbs @before_refork: Array[Proc]
     # @rbs @stats_file: String?
     # @rbs @control_server: ControlServer?
@@ -149,6 +150,7 @@ module Raptor
     # @option options [Array<Proc>] :before_fork procs called in the master before every worker fork
     # @option options [Array<Proc>] :before_worker_boot procs called with the worker index before it begins serving
     # @option options [Array<Proc>] :before_worker_shutdown procs called with the worker index before its graceful shutdown
+    # @option options [Array<Proc>] :after_worker_drain procs called with the worker index after draining, before exit or seed promotion
     # @option options [Array<Proc>] :before_refork procs called in a worker before it transitions to a seed
     # @option options [Array<String, Symbol>] :plugins plugins to load and start in order
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
@@ -180,6 +182,7 @@ module Raptor
       @before_fork = options[:before_fork] = Array(options[:before_fork]).dup
       @before_worker_boot = options[:before_worker_boot] = Array(options[:before_worker_boot]).dup
       @before_worker_shutdown = options[:before_worker_shutdown] = Array(options[:before_worker_shutdown]).dup
+      @after_worker_drain = options[:after_worker_drain] = Array(options[:after_worker_drain]).dup
       @before_refork = options[:before_refork] = Array(options[:before_refork]).dup
       @stats_file = options[:stats_file]
       @control_server = ControlServer.new(options[:control_url]) { stats_hash } if options[:control_url]
@@ -903,6 +906,7 @@ module Raptor
       end
 
       worker.shutdown(close_listeners: !promote_to_seed)
+      @after_worker_drain.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index) }
       # A seed never accepts again, and the workers it forks bind their own.
       bpf_listeners.each(&:close) if promote_to_seed
       stats_thread.join

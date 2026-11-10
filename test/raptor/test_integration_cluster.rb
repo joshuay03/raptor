@@ -574,6 +574,14 @@ module Raptor
       File.delete(marker_path) rescue nil
     end
 
+    def test_after_worker_drain_hooks_wait_for_response_cleanup
+      [false, true].each { |detached| assert_worker_drain_order(detached: detached) }
+    end
+
+    def test_after_worker_drain_hooks_run_after_the_drain_timeout
+      [false, true].each { |detached| assert_worker_drain_order(detached: detached, timeout: true) }
+    end
+
     def test_before_refork_hooks_run_in_the_worker_being_promoted_to_seed
       skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Subreaper.enable
 
@@ -687,6 +695,80 @@ module Raptor
     end
 
     private
+
+    def assert_worker_drain_order(detached:, timeout: false)
+      events, report = IO.pipe
+      release, resume = IO.pipe
+      @options[:worker_drain_timeout] = timeout ? 1 : 5
+      @options[:worker_shutdown_timeout] = 15
+      @options[:before_worker_shutdown] = [proc { report.puts "before" }]
+      @options[:after_worker_drain] = [
+        proc { |index| report.puts "after:#{index}:#{Process.pid}" },
+        proc { report.puts "flushed" }
+      ]
+      @options[:app] = ->(env) do
+        next [200, {}, ["ok"]] unless env["PATH_INFO"] == "/hold"
+
+        body = if detached
+          DetachedBody.new.tap do |stream|
+            stream.on_open { report.puts "opened" }
+            stream.on_close { report.puts "closed" }
+          end
+        else
+          Object.new.tap do |stream|
+            stream.define_singleton_method(:each) do |&block|
+              report.puts "opened"
+              release.read(1)
+              block.call("finished")
+            end
+            stream.define_singleton_method(:close) { report.puts "closed" }
+          end
+        end
+        if detached && !timeout
+          Thread.new do
+            release.read(1)
+            body.try_write("finished")
+            body.close
+          end
+        end
+
+        [200, {}, body]
+      end
+
+      cluster = without_output { Cluster.new(@options) }
+      port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork do
+        events.close
+        resume.close
+        without_output { cluster.run }
+      end
+      report.close
+      release.close
+      cluster.instance_variable_get(:@binder).close
+      wait_for_server(port)
+      client = TCPSocket.new("127.0.0.1", port)
+      client.write("GET /hold HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+
+      Timeout.timeout(15) do
+        assert_equal "opened\n", events.readline
+        Process.kill("TERM", cluster_pid)
+        assert_equal "before\n", events.readline
+        refute events.wait_readable(0.2)
+        resume.write("r") unless timeout
+        assert_equal "closed\n", events.readline
+        worker_pid = cluster.stats.first[:pid]
+        assert_equal "after:0:#{worker_pid}\n", events.readline
+        assert_equal "flushed\n", events.readline
+        assert_predicate Process.waitpid2(cluster_pid).last, :success?
+        cluster_pid = nil
+      end
+      assert_includes client.read, "finished" unless timeout
+    ensure
+      resume&.close
+      client&.close
+      stop_cluster(cluster_pid)
+      [events, report, release].each { |io| io&.close unless io&.closed? }
+    end
 
     def with_systemd_boot_barriers
       directory = Dir.mktmpdir("raptor-ready-", "/tmp")

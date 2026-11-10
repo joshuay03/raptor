@@ -69,6 +69,7 @@ module Raptor
       before_fork: [].freeze,
       before_worker_boot: [].freeze,
       before_worker_shutdown: [].freeze,
+      after_worker_drain: [].freeze,
       before_refork: [].freeze,
       plugins: [].freeze,
       stats_file: "tmp/raptor.json",
