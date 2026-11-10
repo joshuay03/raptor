@@ -693,6 +693,8 @@ Set log to report startup information.</p>
       <pre class="lines">
 
 
+155
+156
 157
 158
 159
@@ -708,12 +710,10 @@ Set log to report startup information.</p>
 169
 170
 171
-172
-173
-174</pre>
+172</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 157</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 155</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_join'>join</span>
   <span class='id identifier rubyid_started'>started</span> <span class='op'>=</span> <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='lbrace'>{</span> <span class='ivar'>@started</span> <span class='rbrace'>}</span>
@@ -762,6 +762,8 @@ Set log to report startup information.</p>
       <pre class="lines">
 
 
+190
+191
 192
 193
 194
@@ -779,12 +781,10 @@ Set log to report startup information.</p>
 206
 207
 208
-209
-210
-211</pre>
+209</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 192</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 190</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_log_initialization'>log_initialization</span>
   <span class='id identifier rubyid_environment'>environment</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:environment</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>RAILS_ENV</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>RACK_ENV</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>development</span><span class='tstring_end'>&quot;</span></span>
@@ -825,10 +825,8 @@ Set log to report startup information.</p>
     <p>Drains serving work while retaining the bound listeners for resume.
 Connections may queue, but requests are not served while paused.
 Existing keep-alive connections close. Repeated pauses have no effect.</p>
-<p>For master-owned listeners, pause before direct worker forks and resume
-in the parent afterwards. Close inherited listeners before worker boot
-hooks that may block, and call shutdown from the plugin's stop callback.
-Seed-driven forks need no master pause because their listeners are already closed.</p>
+<p>Pause before master forks and resume in the parent. Close the inherited
+instance before other worker boot hooks, and shut down when the plugin stops.</p>
 
   </div>
 </div>
@@ -867,6 +865,8 @@ Seed-driven forks need no master pause because their listeners are already close
       <pre class="lines">
 
 
+98
+99
 100
 101
 102
@@ -880,12 +880,10 @@ Seed-driven forks need no master pause because their listeners are already close
 110
 111
 112
-113
-114
-115</pre>
+113</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 100</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 98</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_pause'>pause</span>
   <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='kw'>do</span>
@@ -946,6 +944,8 @@ Shutdown remains terminal. Startup failures release the listeners and propagate.
       <pre class="lines">
 
 
+119
+120
 121
 122
 123
@@ -958,12 +958,10 @@ Shutdown remains terminal. Startup failures release the listeners and propagate.
 130
 131
 132
-133
-134
-135</pre>
+133</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 121</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 119</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_resume'>resume</span>
   <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='kw'>do</span>
@@ -1051,6 +1049,8 @@ Calling shutdown more than once has no effect.</p>
       <pre class="lines">
 
 
+139
+140
 141
 142
 143
@@ -1060,12 +1060,10 @@ Calling shutdown more than once has no effect.</p>
 147
 148
 149
-150
-151
-152</pre>
+150</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 141</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 139</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='kw'>do</span>
@@ -1195,6 +1193,8 @@ Startup errors are raised in the calling thread.</p>
       <pre class="lines">
 
 
+177
+178
 179
 180
 181
@@ -1203,12 +1203,10 @@ Startup errors are raised in the calling thread.</p>
 184
 185
 186
-187
-188
-189</pre>
+187</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 179</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 177</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start_worker'>start_worker</span>
   <span class='ivar'>@worker</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Worker.html" title="Raptor::Worker (class)">Worker</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Worker.html#initialize-instance_method" title="Raptor::Worker#initialize (method)">new</a></span></span><span class='lparen'>(</span>
@@ -1289,6 +1287,8 @@ Startup errors are raised in the calling thread.</p>
       <pre class="lines">
 
 
+212
+213
 214
 215
 216
@@ -1298,12 +1298,10 @@ Startup errors are raised in the calling thread.</p>
 220
 221
 222
-223
-224
-225</pre>
+223</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 214</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 212</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span>
   <span class='id identifier rubyid_thread'>thread</span> <span class='op'>=</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_current'>current</span>
@@ -1327,7 +1325,7 @@ Startup errors are raised in the calling thread.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Nov 10 23:33:53 2026 by
+  Generated on Tue Nov 10 23:49:57 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
