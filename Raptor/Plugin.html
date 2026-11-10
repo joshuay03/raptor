@@ -642,17 +642,17 @@ threads after calling <code>stop</code>; use <code>ensure</code> in the block fo
       <pre class="lines">
 
 
-72
 73
 74
 75
 76
 77
 78
-79</pre>
+79
+80</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 72</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 73</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_in_background'>in_background</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='id identifier rubyid_block'>block</span><span class='rparen'>)</span>
   <span class='ivar'>@threads</span> <span class='op'>||=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
@@ -691,7 +691,6 @@ threads after calling <code>stop</code>; use <code>ensure</code> in the block fo
       <pre class="lines">
 
 
-84
 85
 86
 87
@@ -703,10 +702,11 @@ threads after calling <code>stop</code>; use <code>ensure</code> in the block fo
 93
 94
 95
-96</pre>
+96
+97</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 84</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 85</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_stop'>stop</span>
@@ -738,7 +738,8 @@ threads after calling <code>stop</code>; use <code>ensure</code> in the block fo
 </h3><div class="docstring">
   <div class="discussion">
     <p class="note returns_void">This method returns an undefined value.</p><p>Starts in the master before workers fork. Override to open resources
-and append callbacks to the cluster's lifecycle hook arrays.</p>
+and append callbacks to the cluster's lifecycle hook arrays.
+See <span class='object_link'><a href="Cluster.html#initialize-instance_method" title="Raptor::Cluster#initialize (method)">Cluster#initialize</a></span> for hooks and <span class='object_link'><a href="Embedded.html#pause-instance_method" title="Raptor::Embedded#pause (method)">Embedded#pause</a></span> for fork-safe Rack listeners.</p>
 
   </div>
 </div>
@@ -766,11 +767,11 @@ and append callbacks to the cluster's lifecycle hook arrays.</p>
       <pre class="lines">
 
 
-58
-59</pre>
+59
+60</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 58</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 59</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start'>start</span><span class='lparen'>(</span><span class='id identifier rubyid_cluster'>cluster</span><span class='rparen'>)</span>
 <span class='kw'>end</span></pre>
@@ -804,11 +805,11 @@ Also called if startup fails, so resources may be only partly opened.</p>
       <pre class="lines">
 
 
-65
-66</pre>
+66
+67</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 65</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/plugin.rb', line 66</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stop'>stop</span>
 <span class='kw'>end</span></pre>
@@ -822,7 +823,7 @@ Also called if startup fails, so resources may be only partly opened.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Nov 10 23:19:54 2026 by
+  Generated on Tue Nov 10 23:28:36 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
