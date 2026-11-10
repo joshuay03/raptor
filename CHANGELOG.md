@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add `after_worker_exit` hooks
 - Add `after_worker_drain` hooks
 
 ## [0.26.0] - 2026-11-10

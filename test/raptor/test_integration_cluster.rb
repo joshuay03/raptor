@@ -612,6 +612,131 @@ module Raptor
       File.delete(marker_path) rescue nil
     end
 
+    def test_after_worker_exit_hooks_report_reaped_workers_before_replacement
+      events, report = IO.pipe
+      @options[:after_worker_exit] = [proc do |index, pid, status|
+        alive = begin
+          Process.kill(0, pid)
+          true
+        rescue Errno::ESRCH
+          false
+        end
+        report.puts JSON.generate(
+          master: Process.pid, index: index, pid: pid, alive: alive,
+          exitstatus: status.exitstatus, termsig: status.termsig
+        )
+      end]
+      @options[:before_worker_boot] = [proc { report.puts "boot:#{Process.pid}" }]
+      cluster = without_output { Cluster.new(@options) }
+      port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork do
+        events.close
+        without_output { cluster.run }
+      end
+      report.close
+      cluster.instance_variable_get(:@binder).close
+      wait_for_server(port)
+
+      Timeout.timeout(15) do
+        worker_pid = events.readline.split(":").last.to_i
+        ["KILL", "TERM"].each do |signal|
+          Process.kill(signal, worker_pid)
+          event = JSON.parse(events.readline, symbolize_names: true)
+
+          assert_equal cluster_pid, event[:master]
+          assert_equal 0, event[:index]
+          assert_equal worker_pid, event[:pid]
+          refute event[:alive]
+          assert_equal(signal == "KILL" ? { exitstatus: nil, termsig: Signal.list[signal] } :
+            { exitstatus: 0, termsig: nil }, event.slice(:exitstatus, :termsig))
+
+          boot = events.readline
+          assert_match(/\Aboot:\d+\n\z/, boot)
+          worker_pid = boot.split(":").last.to_i
+          refute_equal event[:pid], worker_pid
+          wait_for_server(port)
+        end
+
+        Process.kill("TERM", cluster_pid)
+        event = JSON.parse(events.readline, symbolize_names: true)
+        assert_equal worker_pid, event[:pid]
+        assert_equal 0, event[:exitstatus]
+        assert_predicate Process.waitpid2(cluster_pid).last, :success?
+        cluster_pid = nil
+        assert_nil events.gets
+      end
+    ensure
+      stop_cluster(cluster_pid)
+      [events, report].each { |io| io&.close unless io&.closed? }
+    end
+
+    def test_after_worker_exit_hooks_report_workers_killed_at_the_shutdown_timeout
+      events, report = IO.pipe
+      @options[:worker_shutdown_timeout] = 1
+      @options[:before_worker_shutdown] = [proc { sleep }]
+      @options[:after_worker_drain] = [proc { report.puts "drained" }]
+      @options[:after_worker_exit] = [proc do |index, pid, status|
+        report.puts "#{index}:#{pid}:#{status.termsig}"
+      end]
+      cluster = without_output { Cluster.new(@options) }
+      port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork do
+        events.close
+        without_output { cluster.run }
+      end
+      report.close
+      cluster.instance_variable_get(:@binder).close
+      wait_for_server(port)
+      worker_pid = wait_until { cluster.stats.first[:pid] if cluster.stats.first[:booted] }
+
+      Process.kill("TERM", cluster_pid)
+      Timeout.timeout(10) do
+        assert_equal "0:#{worker_pid}:#{Signal.list["KILL"]}\n", events.readline
+        assert_predicate Process.waitpid2(cluster_pid).last, :success?
+        cluster_pid = nil
+        assert_nil events.gets
+      end
+    ensure
+      stop_cluster(cluster_pid)
+      [events, report].each { |io| io&.close unless io&.closed? }
+    end
+
+    def test_after_worker_exit_hooks_wait_for_a_promoted_seed_to_exit
+      skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Subreaper.enable
+
+      events, report = IO.pipe
+      @options[:refork_after] = 10_000
+      @options[:before_refork] = [proc { report.puts "seed:#{Process.pid}" }]
+      @options[:after_worker_exit] = [proc { |_, pid, _| report.puts "exit:#{pid}" }]
+      cluster = without_output { Cluster.new(@options) }
+      port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork do
+        events.close
+        without_output { cluster.run }
+      end
+      report.close
+      cluster.instance_variable_get(:@binder).close
+      wait_for_server(port)
+      original_pid = wait_until { cluster.stats.first[:pid] if cluster.stats.first[:booted] }
+
+      Process.kill("URG", cluster_pid)
+      Timeout.timeout(15) do
+        assert_equal "seed:#{original_pid}\n", events.readline
+        wait_until { cluster.stats.first[:pid] != original_pid && cluster.stats.first[:booted] }
+        replacement_pid = cluster.stats.first[:pid]
+        refute events.wait_readable(0.2)
+        assert_equal "Hello, World!", Net::HTTP.get(URI("http://127.0.0.1:#{port}/"))
+
+        Process.kill("TERM", cluster_pid)
+        assert_predicate Process.waitpid2(cluster_pid).last, :success?
+        cluster_pid = nil
+        assert_equal ["exit:#{original_pid}\n", "exit:#{replacement_pid}\n"].sort, events.readlines.sort
+      end
+    ensure
+      stop_cluster(cluster_pid)
+      [events, report].each { |io| io&.close unless io&.closed? }
+    end
+
     def test_server_thread_survives_reset_connections
       cluster = without_output { Cluster.new(@options) }
       server_port = cluster.instance_variable_get(:@server_port)

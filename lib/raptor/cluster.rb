@@ -83,6 +83,7 @@ module Raptor
     # @rbs @before_worker_boot: Array[Proc]
     # @rbs @before_worker_shutdown: Array[Proc]
     # @rbs @after_worker_drain: Array[Proc]
+    # @rbs @after_worker_exit: Array[Proc]
     # @rbs @before_refork: Array[Proc]
     # @rbs @stats_file: String?
     # @rbs @control_server: ControlServer?
@@ -98,6 +99,7 @@ module Raptor
     # @rbs @app: untyped
     # @rbs @shutdown: bool
     # @rbs @workers: Hash[Integer, Integer]
+    # @rbs @worker_indices: Hash[Integer, Integer]
     # @rbs @timed_out: Set[Integer]
     # @rbs @stats: Stats
     # @rbs @started_at: Float
@@ -151,6 +153,7 @@ module Raptor
     # @option options [Array<Proc>] :before_worker_boot procs called with the worker index before it begins serving
     # @option options [Array<Proc>] :before_worker_shutdown procs called with the worker index before its graceful shutdown
     # @option options [Array<Proc>] :after_worker_drain procs called with the worker index after draining, before exit or seed promotion
+    # @option options [Array<Proc>] :after_worker_exit procs called in the master after reaping, with the worker index, pid, and Process::Status
     # @option options [Array<Proc>] :before_refork procs called in a worker before it transitions to a seed
     # @option options [Array<String, Symbol>] :plugins plugins to load and start in order
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
@@ -183,6 +186,7 @@ module Raptor
       @before_worker_boot = options[:before_worker_boot] = Array(options[:before_worker_boot]).dup
       @before_worker_shutdown = options[:before_worker_shutdown] = Array(options[:before_worker_shutdown]).dup
       @after_worker_drain = options[:after_worker_drain] = Array(options[:after_worker_drain]).dup
+      @after_worker_exit = options[:after_worker_exit] = Array(options[:after_worker_exit]).dup
       @before_refork = options[:before_refork] = Array(options[:before_refork]).dup
       @stats_file = options[:stats_file]
       @control_server = ControlServer.new(options[:control_url]) { stats_hash } if options[:control_url]
@@ -211,6 +215,7 @@ module Raptor
 
       @shutdown = false
       @workers = {}
+      @worker_indices = {}
       @timed_out = Set.new
       @stats = Stats.new(@worker_count)
       @started_at = Process.clock_gettime(Process::CLOCK_REALTIME)
@@ -441,6 +446,7 @@ module Raptor
         pid = spawn_worker_via_seed(index)
         if pid
           @workers[index] = pid
+          @worker_indices[pid] = index
           return
         end
         Log.warn "Seed (#{@seed_pid}) failed to fork worker #{index}, falling back to direct fork"
@@ -450,6 +456,7 @@ module Raptor
       @before_fork.each(&:call)
       pid = fork { run_worker(index, @phase) }
       @workers[index] = pid
+      @worker_indices[pid] = index
     end
 
     # Asks the seed to fork a new worker at the given index, returning the
@@ -514,19 +521,20 @@ module Raptor
     #
     # @rbs (Integer pid, Process::Status status) -> void
     def reap_pid(pid, status)
+      index = @worker_indices.delete(pid)
+      return unless index
+
+      active = @workers[index] == pid
       if pid == @seed_pid
         Log.info "Seed (#{pid}) exited, #{exit_description(status)}"
         @seed_pid = nil
-        return
       end
 
-      index = @workers.key(pid)
-      return unless index
-
-      @workers.delete(index)
+      @workers.delete(index) if active
       @timed_out.delete(pid)
+      @after_worker_exit.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index, pid, status) }
 
-      unless @shutdown
+      if active && !@shutdown
         Log.warn "Restarting worker #{index} (#{pid}), #{exit_description(status)}"
         spawn_worker(index)
       end
@@ -658,7 +666,11 @@ module Raptor
       pids = @workers.values + [@seed_pid].compact
       Log.warn "Force-killing #{pids.size} process(es) after #{@worker_shutdown_timeout}s"
       pids.each { |pid| Process.kill("KILL", pid) rescue nil }
-      pids.each { |pid| Process.wait(pid) rescue nil }
+      pids.each do |pid|
+        _, status = Process.wait2(pid)
+        reap_pid(pid, status)
+      rescue Errno::ECHILD
+      end
     end
 
     # Kills workers that have stopped checking in. A booted worker that

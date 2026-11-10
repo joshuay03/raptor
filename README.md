@@ -151,6 +151,7 @@ working directory. Pass `-c PATH` to point at a specific file.
   before_worker_boot: [],
   before_worker_shutdown: [],
   after_worker_drain: [],
+  after_worker_exit: [],
   before_refork: [],
   plugins: [],
   stats_file: "tmp/raptor.json",
