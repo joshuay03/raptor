@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-10
+
 - Add in-process Rack serving
 
 ## [0.25.0] - 2026-11-08
