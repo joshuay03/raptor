@@ -4,23 +4,23 @@
 
 ## [0.25.0] - 2026-11-08
 
-- Replace nio4r with io-event for reactor I/O readiness without changing application threading
+- Use `io-event` for reactor I/O readiness
 
 ## [0.24.0] - 2026-11-08
 
-- Honour `connection.max_body_size` for HTTP/2 request bodies without closing other streams
-- Wait for all current workers to boot before notifying systemd that Raptor is ready
-- Prefer each over call for HTTP/1 Rack response bodies that implement both
-- Reject empty HTTP/1 Content-Length values and unsupported transfer codings before reading request bodies
-- Preserve request Version headers instead of replacing them with the HTTP protocol
-- Trim leading tabs as optional HTTP/1 header whitespace
-- Honour HTTP/1 Connection token lists, with close taking precedence over keep-alive
-- Run worker boot hooks before starting application threads, parsers, and request handling
-- Close HTTP/2 response bodies when writing fails or a stream is cancelled
-- Bound HTTP/1 chunk size lines and trailers, including incomplete metadata
-- Reject invalid CRLF delimiters after HTTP/1 chunk payloads
-- Prefer hyphenated request headers over underscore aliases and reject HTTP/1 framing aliases
-- Add plugins with lifecycle hooks, cluster stats, and managed background threads
+- Enforce request body limits on HTTP/2 streams
+- Notify systemd only after every current worker boots
+- Prefer enumerable Rack bodies over callable streaming
+- Reject empty request lengths and unsupported transfer codings
+- Preserve `Version` request headers in the Rack environment
+- Trim optional leading tabs from HTTP/1 header values
+- Honour HTTP/1 `Connection` token lists
+- Complete worker boot hooks before starting request handling
+- Close HTTP/2 response bodies when writing fails
+- Bound HTTP/1 chunk size lines and trailers
+- Validate HTTP/1 chunk payload delimiters
+- Preserve request header identity during Rack normalization
+- Add plugins
 
 ## [0.23.0] - 2026-10-18
 
@@ -34,13 +34,13 @@
 - Apply HTTP/2 initial window changes to responses waiting for flow control
 - Default `SERVER_NAME` for HTTP/2 requests without a host name
 - Join repeated HTTP/2 request headers instead of keeping only the last
-- Ignore HTTP/2 DATA frames for streams that already closed
+- Ignore HTTP/2 `DATA` frames for streams that already closed
 - Credit each HTTP/2 stream window for the data that stream receives
-- Strip padding from HTTP/2 DATA and HEADERS frames
+- Strip padding from HTTP/2 `DATA` and `HEADERS` frames
 - Encode and decode long HTTP/2 header strings without overflowing the stack
 - Limit HTTP/2 request header lists to 112 KiB
 - Reject HTTP/2 frames larger than the maximum frame size
-- Send GOAWAY when an HTTP/2 frame fails to decode
+- Send `GOAWAY` when an HTTP/2 frame fails to decode
 - Keep pipelined HTTP/1.1 requests out of the previous request's body
 - Process chunked requests on kept-alive HTTP/1.1 connections without waiting for more data
 - Validate request framing on kept-alive HTTP/1.1 connections
@@ -99,12 +99,12 @@
 - Close connected control socket clients during shutdown
 - Skip TCP corking when `writev(2)` emits a response in one call
 - Return idle HTTP/1.1 keep-alive connections to the reactor without waiting
-- Increase the HTTP/1.1 keep-alive request limit to 1,000 and requeue the connection when other work is waiting
-- Add a read-only `/stats` control socket
-- Pass the worker index to worker boot and shutdown hooks
-- Add `RAPTOR_WORKERS`, `RAPTOR_THREADS`, and `RAPTOR_MAX_THREADS`
+- Increase HTTP/1.1 keep-alive request limit
+- Expose cluster stats over a control socket
+- Pass worker indexes to lifecycle hooks
+- Add worker and thread environment variables
 - Make worker CPU affinity opt-in
-- Add request-local thread and Fiber cleanup options
+- Clean request-local state between requests
 
 ## [0.19.0] - 2026-08-29
 
@@ -175,7 +175,7 @@
 ## [0.10.0] - 2026-07-07
 
 - Memoize the server port string for the Rack env
-- Parse the Host header without regex
+- Parse the `Host` header without regex
 - Apply `TCP_NODELAY` on the listener rather than each accepted socket
 - Buffer chunked body writes up to 512KB before flushing
 - Add `QUERY_STRING` to the Rack env template
@@ -190,7 +190,7 @@
 - Batch response header and body writes into a single `writev(2)` syscall
 - Close the binder as the last step of graceful shutdown
 - Lower the backpressure floor for tighter load balancing on small pools
-- Add load-aware `SO_REUSEPORT` routing on Linux via an attached BPF program
+- Add load-aware `SO_REUSEPORT` routing via an attached BPF program
 - Reuse per-thread read buffers across HTTP/1.1 requests
 - Preserve the first `--bind` when it equals the default
 
@@ -237,7 +237,7 @@
 
 - Load `raptor.rb` or `config/raptor.rb` by default when no config path is supplied
 - Honour the peer's HTTP/2 flow-control windows when sending `DATA` frames
-- Assemble HEADERS across `CONTINUATION` frames
+- Assemble `HEADERS` across `CONTINUATION` frames
 - Validate HTTP/2 stream IDs and emit `GOAWAY` on protocol errors
 - Offload TLS handshakes to the thread pool to keep the server thread responsive
 - Exit eager keep-alive loops on cluster shutdown
