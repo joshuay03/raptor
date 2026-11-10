@@ -1361,6 +1361,17 @@ unexpectedly or stop checking in.</p>
         </li>
       
         <li>
+          <span class="name">:after_worker_exit</span>
+          <span class="type">(<tt>Array&lt;Proc&gt;</tt>)</span>
+          <span class="default">
+            
+          </span>
+          
+            &mdash; <div class='inline'><p>procs called in the master with the worker index, pid, and exit status after reaping</p></div>
+          
+        </li>
+      
+        <li>
           <span class="name">:before_refork</span>
           <span class="type">(<tt>Array&lt;Proc&gt;</tt>)</span>
           <span class="default">
@@ -1491,9 +1502,6 @@ unexpectedly or stop checking in.</p>
       <pre class="lines">
 
 
-168
-169
-170
 171
 172
 173
@@ -1551,10 +1559,15 @@ unexpectedly or stop checking in.</p>
 225
 226
 227
-228</pre>
+228
+229
+230
+231
+232
+233</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 168</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 171</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
   <span class='ivar'>@options</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
@@ -1574,6 +1587,7 @@ unexpectedly or stop checking in.</p>
   <span class='ivar'>@before_worker_boot</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:before_worker_boot</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Array</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:before_worker_boot</span><span class='rbracket'>]</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
   <span class='ivar'>@before_worker_shutdown</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:before_worker_shutdown</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Array</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:before_worker_shutdown</span><span class='rbracket'>]</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
   <span class='ivar'>@after_worker_drain</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:after_worker_drain</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Array</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:after_worker_drain</span><span class='rbracket'>]</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
+  <span class='ivar'>@after_worker_exit</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:after_worker_exit</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Array</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:after_worker_exit</span><span class='rbracket'>]</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
   <span class='ivar'>@before_refork</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:before_refork</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Array</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:before_refork</span><span class='rbracket'>]</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_dup'>dup</span>
   <span class='ivar'>@stats_file</span> <span class='op'>=</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:stats_file</span><span class='rbracket'>]</span>
   <span class='ivar'>@control_server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="ControlServer.html" title="Raptor::ControlServer (class)">ControlServer</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="ControlServer.html#initialize-instance_method" title="Raptor::ControlServer#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:control_url</span><span class='rbracket'>]</span><span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_stats_hash'>stats_hash</span> <span class='rbrace'>}</span> <span class='kw'>if</span> <span class='id identifier rubyid_options'>options</span><span class='lbracket'>[</span><span class='symbol'>:control_url</span><span class='rbracket'>]</span>
@@ -1602,6 +1616,7 @@ unexpectedly or stop checking in.</p>
 
   <span class='ivar'>@shutdown</span> <span class='op'>=</span> <span class='kw'>false</span>
   <span class='ivar'>@workers</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
+  <span class='ivar'>@worker_indices</span> <span class='op'>=</span> <span class='lbrace'>{</span><span class='rbrace'>}</span>
   <span class='ivar'>@timed_out</span> <span class='op'>=</span> <span class='const'>Set</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span>
   <span class='ivar'>@stats</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Stats.html" title="Raptor::Stats (class)">Stats</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Stats.html#initialize-instance_method" title="Raptor::Stats#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='ivar'>@worker_count</span><span class='rparen'>)</span>
   <span class='ivar'>@started_at</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_REALTIME</span><span class='rparen'>)</span>
@@ -1666,12 +1681,12 @@ unexpectedly or stop checking in.</p>
       <pre class="lines">
 
 
-124
-125
-126</pre>
+126
+127
+128</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 124</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 126</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_options'>options</span>
   <span class='ivar'>@options</span>
@@ -1981,14 +1996,6 @@ refork was requested via <code>SIGURG</code>.</p>
       <pre class="lines">
 
 
-542
-543
-544
-545
-546
-547
-548
-549
 550
 551
 552
@@ -1997,10 +2004,18 @@ refork was requested via <code>SIGURG</code>.</p>
 555
 556
 557
-558</pre>
+558
+559
+560
+561
+562
+563
+564
+565
+566</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 542</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 550</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_check_refork_trigger'>check_refork_trigger</span>
   <span class='id identifier rubyid_candidate'>candidate</span> <span class='op'>=</span> <span class='id identifier rubyid_pick_refork_candidate'>pick_refork_candidate</span>
@@ -2082,18 +2097,18 @@ refork was requested via <code>SIGURG</code>.</p>
       <pre class="lines">
 
 
-960
-961
-962
-963
-964
-965
-966
-967
-968</pre>
+972
+973
+974
+975
+976
+977
+978
+979
+980</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 960</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 972</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_exit_description'>exit_description</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_status'>status</span><span class='period'>.</span><span class='id identifier rubyid_exited?'>exited?</span>
@@ -2150,19 +2165,19 @@ it was promoted, returning the slot index it filled.</p>
       <pre class="lines">
 
 
-768
-769
-770
-771
-772
-773
-774
-775
-776
-777</pre>
+780
+781
+782
+783
+784
+785
+786
+787
+788
+789</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 768</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 780</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_fill_vacated_seed_slot'>fill_vacated_seed_slot</span>
   <span class='id identifier rubyid_index'>index</span> <span class='op'>=</span> <span class='ivar'>@seed_vacated_index</span>
@@ -2204,18 +2219,6 @@ and bind addresses.</p>
       <pre class="lines">
 
 
-985
-986
-987
-988
-989
-990
-991
-992
-993
-994
-995
-996
 997
 998
 999
@@ -2228,10 +2231,22 @@ and bind addresses.</p>
 1006
 1007
 1008
-1009</pre>
+1009
+1010
+1011
+1012
+1013
+1014
+1015
+1016
+1017
+1018
+1019
+1020
+1021</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 985</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 997</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_log_initialization'>log_initialization</span>
   <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Cluster initializing:</span><span class='tstring_end'>&quot;</span></span>
@@ -2320,19 +2335,19 @@ else falls back to an empty array (feature disabled).</p>
       <pre class="lines">
 
 
-421
-422
-423
-424
-425
 426
 427
 428
 429
-430</pre>
+430
+431
+432
+433
+434
+435</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 421</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 426</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_normalize_refork_thresholds'>normalize_refork_thresholds</span><span class='lparen'>(</span><span class='id identifier rubyid_value'>value</span><span class='rparen'>)</span>
   <span class='kw'>case</span> <span class='id identifier rubyid_value'>value</span>
@@ -2420,17 +2435,17 @@ Returns an empty hash when the FD count doesn't match the bind count.</p>
       <pre class="lines">
 
 
-404
-405
-406
-407
-408
 409
 410
-411</pre>
+411
+412
+413
+414
+415
+416</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 404</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 409</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_pair_systemd_fds'>pair_systemd_fds</span><span class='lparen'>(</span><span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='comma'>,</span> <span class='id identifier rubyid_filenos'>filenos</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_bind_uris'>bind_uris</span><span class='period'>.</span><span class='id identifier rubyid_length'>length</span> <span class='op'>!=</span> <span class='id identifier rubyid_filenos'>filenos</span><span class='period'>.</span><span class='id identifier rubyid_length'>length</span>
@@ -2471,18 +2486,6 @@ connections continue to be served across the swap.</p>
       <pre class="lines">
 
 
-786
-787
-788
-789
-790
-791
-792
-793
-794
-795
-796
-797
 798
 799
 800
@@ -2494,10 +2497,22 @@ connections continue to be served across the swap.</p>
 806
 807
 808
-809</pre>
+809
+810
+811
+812
+813
+814
+815
+816
+817
+818
+819
+820
+821</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 786</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 798</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_perform_hot_restart'>perform_hot_restart</span>
   <span class='ivar'>@hot_restart_requested</span> <span class='op'>=</span> <span class='kw'>false</span>
@@ -2553,18 +2568,6 @@ worker to boot before moving on to the next.</p>
       <pre class="lines">
 
 
-700
-701
-702
-703
-704
-705
-706
-707
-708
-709
-710
-711
 712
 713
 714
@@ -2588,10 +2591,22 @@ worker to boot before moving on to the next.</p>
 732
 733
 734
-735</pre>
+735
+736
+737
+738
+739
+740
+741
+742
+743
+744
+745
+746
+747</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 700</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 712</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_perform_phased_restart'>perform_phased_restart</span>
   <span class='ivar'>@phased_restart_requested</span> <span class='op'>=</span> <span class='kw'>false</span>
@@ -2673,23 +2688,23 @@ no worker qualifies.</p>
       <pre class="lines">
 
 
-567
-568
-569
-570
-571
-572
-573
-574
 575
 576
 577
 578
 579
-580</pre>
+580
+581
+582
+583
+584
+585
+586
+587
+588</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 567</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 575</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_pick_refork_candidate'>pick_refork_candidate</span>
   <span class='id identifier rubyid_best_index'>best_index</span> <span class='op'>=</span> <span class='kw'>nil</span>
@@ -2768,17 +2783,17 @@ no worker qualifies.</p>
       <pre class="lines">
 
 
-480
-481
-482
-483
-484
-485
-486
-487</pre>
+487
+488
+489
+490
+491
+492
+493
+494</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 480</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 487</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_pid_alive?'>pid_alive?</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span>
   <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_kill'>kill</span><span class='lparen'>(</span><span class='int'>0</span><span class='comma'>,</span> <span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span>
@@ -2818,18 +2833,18 @@ Non-blocking.</p>
       <pre class="lines">
 
 
-631
-632
-633
-634
-635
-636
-637
-638
-639</pre>
+639
+640
+641
+642
+643
+644
+645
+646
+647</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 631</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 639</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_poll_seed_ready'>poll_seed_ready</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@resp_r</span> <span class='op'>&amp;&amp;</span> <span class='ivar'>@seed_pid</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='ivar'>@seed_ready</span>
@@ -2888,22 +2903,22 @@ queueing a phased refork for the remaining workers.</p>
       <pre class="lines">
 
 
-589
-590
-591
-592
-593
-594
-595
-596
 597
 598
 599
 600
-601</pre>
+601
+602
+603
+604
+605
+606
+607
+608
+609</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 589</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 597</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_promote_worker_to_seed'>promote_worker_to_seed</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_pid'>pid</span> <span class='op'>=</span> <span class='ivar'>@workers</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='rbracket'>]</span>
@@ -2980,13 +2995,6 @@ is shutting down. Clears the seed reference when the seed exits.</p>
       <pre class="lines">
 
 
-516
-517
-518
-519
-520
-521
-522
 523
 524
 525
@@ -2997,25 +3005,34 @@ is shutting down. Clears the seed reference when the seed exits.</p>
 530
 531
 532
-533</pre>
+533
+534
+535
+536
+537
+538
+539
+540
+541</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 516</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 523</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reap_pid'>reap_pid</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_index'>index</span> <span class='op'>=</span> <span class='ivar'>@worker_indices</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span>
+  <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_index'>index</span>
+
+  <span class='id identifier rubyid_active'>active</span> <span class='op'>=</span> <span class='ivar'>@workers</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='rbracket'>]</span> <span class='op'>==</span> <span class='id identifier rubyid_pid'>pid</span>
   <span class='kw'>if</span> <span class='id identifier rubyid_pid'>pid</span> <span class='op'>==</span> <span class='ivar'>@seed_pid</span>
     <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Seed (</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>) exited, </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_exit_description'>exit_description</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
     <span class='ivar'>@seed_pid</span> <span class='op'>=</span> <span class='kw'>nil</span>
-    <span class='kw'>return</span>
   <span class='kw'>end</span>
 
-  <span class='id identifier rubyid_index'>index</span> <span class='op'>=</span> <span class='ivar'>@workers</span><span class='period'>.</span><span class='id identifier rubyid_key'>key</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span>
-  <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_index'>index</span>
-
-  <span class='ivar'>@workers</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
+  <span class='ivar'>@workers</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='id identifier rubyid_active'>active</span>
   <span class='ivar'>@timed_out</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span>
+  <span class='ivar'>@after_worker_exit</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_hook'>hook</span><span class='op'>|</span> <span class='id identifier rubyid_hook'>hook</span><span class='period'>.</span><span class='id identifier rubyid_parameters'>parameters</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span> <span class='op'>?</span> <span class='id identifier rubyid_hook'>hook</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span> <span class='op'>:</span> <span class='id identifier rubyid_hook'>hook</span><span class='period'>.</span><span class='id identifier rubyid_call'>call</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
 
-  <span class='kw'>unless</span> <span class='ivar'>@shutdown</span>
+  <span class='kw'>if</span> <span class='id identifier rubyid_active'>active</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='ivar'>@shutdown</span>
     <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_warn'><span class='object_link'><a href="Log.html#warn-class_method" title="Raptor::Log.warn (method)">warn</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Restarting worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'> (</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>), </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_exit_description'>exit_description</span><span class='lparen'>(</span><span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
     <span class='id identifier rubyid_spawn_worker'>spawn_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
   <span class='kw'>end</span>
@@ -3066,21 +3083,21 @@ unless the cluster is shutting down.</p>
       <pre class="lines">
 
 
-495
-496
-497
-498
-499
-500
-501
 502
 503
 504
 505
-506</pre>
+506
+507
+508
+509
+510
+511
+512
+513</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 495</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 502</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reap_workers'>reap_workers</span>
   <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
@@ -3124,18 +3141,18 @@ paths. No-op for any stream whose target path is nil.</p>
       <pre class="lines">
 
 
-1017
-1018
-1019
-1020
-1021
-1022
-1023
-1024
-1025</pre>
+1029
+1030
+1031
+1032
+1033
+1034
+1035
+1036
+1037</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 1017</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 1029</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reopen_logs'>reopen_logs</span>
   <span class='gvar'>$stdout</span><span class='period'>.</span><span class='id identifier rubyid_reopen'>reopen</span><span class='lparen'>(</span><span class='ivar'>@stdout_file</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>a</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_sync'>sync</span> <span class='op'>=</span> <span class='kw'>true</span> <span class='kw'>if</span> <span class='ivar'>@stdout_file</span>
@@ -3176,13 +3193,13 @@ they reopen their own inherited file descriptors.</p>
       <pre class="lines">
 
 
-1033
-1034
-1035
-1036</pre>
+1045
+1046
+1047
+1048</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 1033</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 1045</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_reopen_logs_and_signal_workers'>reopen_logs_and_signal_workers</span>
   <span class='id identifier rubyid_reopen_logs'>reopen_logs</span>
@@ -3219,23 +3236,23 @@ keep serving.</p>
       <pre class="lines">
 
 
-610
-611
-612
-613
-614
-615
-616
-617
 618
 619
 620
 621
 622
-623</pre>
+623
+624
+625
+626
+627
+628
+629
+630
+631</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 610</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 618</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_retire_current_seed'>retire_current_seed</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@seed_pid</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_pid_alive?'>pid_alive?</span><span class='lparen'>(</span><span class='ivar'>@seed_pid</span><span class='rparen'>)</span>
@@ -3280,11 +3297,6 @@ keep serving.</p>
       <pre class="lines">
 
 
-235
-236
-237
-238
-239
 240
 241
 242
@@ -3362,10 +3374,15 @@ keep serving.</p>
 314
 315
 316
-317</pre>
+317
+318
+319
+320
+321
+322</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 235</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 240</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
   <span class='gvar'>$stdout</span><span class='period'>.</span><span class='id identifier rubyid_sync'>sync</span> <span class='op'>=</span> <span class='kw'>true</span>
@@ -3498,18 +3515,6 @@ slot index the master asks for.</p>
       <pre class="lines">
 
 
-924
-925
-926
-927
-928
-929
-930
-931
-932
-933
-934
-935
 936
 937
 938
@@ -3526,10 +3531,22 @@ slot index the master asks for.</p>
 949
 950
 951
-952</pre>
+952
+953
+954
+955
+956
+957
+958
+959
+960
+961
+962
+963
+964</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 924</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 936</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run_seed_loop'>run_seed_loop</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
   <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'> promoted to seed</span><span class='tstring_end'>&quot;</span></span>
@@ -3624,18 +3641,6 @@ master's request.</p>
       <pre class="lines">
 
 
-821
-822
-823
-824
-825
-826
-827
-828
-829
-830
-831
-832
 833
 834
 835
@@ -3718,10 +3723,22 @@ master's request.</p>
 912
 913
 914
-915</pre>
+915
+916
+917
+918
+919
+920
+921
+922
+923
+924
+925
+926
+927</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 821</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 833</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run_worker'>run_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='id identifier rubyid_phase'>phase</span><span class='rparen'>)</span>
   <span class='ivar'>@fork_w</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span> <span class='kw'>if</span> <span class='ivar'>@fork_w</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='ivar'>@fork_w</span><span class='period'>.</span><span class='id identifier rubyid_closed?'>closed?</span>
@@ -3847,12 +3864,12 @@ master's request.</p>
       <pre class="lines">
 
 
-975
-976
-977</pre>
+987
+988
+989</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 975</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 987</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='ivar'>@shutdown</span> <span class='op'>=</span> <span class='kw'>true</span>
@@ -3905,11 +3922,6 @@ forking from the seed when one is active and off the master otherwise.</p>
       <pre class="lines">
 
 
-439
-440
-441
-442
-443
 444
 445
 446
@@ -3919,16 +3931,24 @@ forking from the seed when one is active and off the master otherwise.</p>
 450
 451
 452
-453</pre>
+453
+454
+455
+456
+457
+458
+459
+460</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 439</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 444</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_spawn_worker'>spawn_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
   <span class='kw'>if</span> <span class='ivar'>@seed_pid</span> <span class='op'>&amp;&amp;</span> <span class='id identifier rubyid_pid_alive?'>pid_alive?</span><span class='lparen'>(</span><span class='ivar'>@seed_pid</span><span class='rparen'>)</span>
     <span class='id identifier rubyid_pid'>pid</span> <span class='op'>=</span> <span class='id identifier rubyid_spawn_worker_via_seed'>spawn_worker_via_seed</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
     <span class='kw'>if</span> <span class='id identifier rubyid_pid'>pid</span>
       <span class='ivar'>@workers</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_pid'>pid</span>
+      <span class='ivar'>@worker_indices</span><span class='lbracket'>[</span><span class='id identifier rubyid_pid'>pid</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_index'>index</span>
       <span class='kw'>return</span>
     <span class='kw'>end</span>
     <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_warn'><span class='object_link'><a href="Log.html#warn-class_method" title="Raptor::Log.warn (method)">warn</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Seed (</span><span class='embexpr_beg'>#{</span><span class='ivar'>@seed_pid</span><span class='embexpr_end'>}</span><span class='tstring_content'>) failed to fork worker </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_index'>index</span><span class='embexpr_end'>}</span><span class='tstring_content'>, falling back to direct fork</span><span class='tstring_end'>&quot;</span></span>
@@ -3938,6 +3958,7 @@ forking from the seed when one is active and off the master otherwise.</p>
   <span class='ivar'>@before_fork</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span><span class='lparen'>(</span><span class='op'>&amp;</span><span class='symbol'>:call</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_pid'>pid</span> <span class='op'>=</span> <span class='id identifier rubyid_fork'>fork</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_run_worker'>run_worker</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='ivar'>@phase</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
   <span class='ivar'>@workers</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_pid'>pid</span>
+  <span class='ivar'>@worker_indices</span><span class='lbracket'>[</span><span class='id identifier rubyid_pid'>pid</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_index'>index</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -4003,20 +4024,20 @@ child pid, or nil when the seed doesn't respond in time.</p>
       <pre class="lines">
 
 
-462
-463
-464
-465
-466
-467
-468
 469
 470
 471
-472</pre>
+472
+473
+474
+475
+476
+477
+478
+479</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 462</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 469</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_spawn_worker_via_seed'>spawn_worker_via_seed</span><span class='lparen'>(</span><span class='id identifier rubyid_index'>index</span><span class='rparen'>)</span>
   <span class='ivar'>@fork_w</span><span class='period'>.</span><span class='id identifier rubyid_write'>write</span><span class='lparen'>(</span><span class='lbracket'>[</span><span class='id identifier rubyid_index'>index</span><span class='comma'>,</span> <span class='ivar'>@phase</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_pack'>pack</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>LL</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='rparen'>)</span>
@@ -4076,12 +4097,12 @@ child pid, or nil when the seed doesn't respond in time.</p>
       <pre class="lines">
 
 
-326
-327
-328</pre>
+331
+332
+333</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 326</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 331</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stats'>stats</span>
   <span class='ivar'>@stats</span><span class='period'>.</span><span class='id identifier rubyid_all'>all</span>
@@ -4133,11 +4154,6 @@ running so utilization reflects the capacity available at that moment.</p>
       <pre class="lines">
 
 
-337
-338
-339
-340
-341
 342
 343
 344
@@ -4168,10 +4184,15 @@ running so utilization reflects the capacity available at that moment.</p>
 369
 370
 371
-372</pre>
+372
+373
+374
+375
+376
+377</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 337</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 342</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stats_hash'>stats_hash</span>
   <span class='id identifier rubyid_worker_stats'>worker_stats</span> <span class='op'>=</span> <span class='ivar'>@stats</span><span class='period'>.</span><span class='id identifier rubyid_all'>all</span>
@@ -4238,19 +4259,19 @@ running so utilization reflects the capacity available at that moment.</p>
       <pre class="lines">
 
 
-379
-380
-381
-382
-383
 384
 385
 386
 387
-388</pre>
+388
+389
+390
+391
+392
+393</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 379</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 384</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stop_plugins'>stop_plugins</span>
   <span class='kw'>until</span> <span class='ivar'>@plugins</span><span class='period'>.</span><span class='id identifier rubyid_empty?'>empty?</span>
@@ -4292,14 +4313,6 @@ from TERM to KILL if any fail to exit within <code>worker_shutdown_timeout</code
       <pre class="lines">
 
 
-647
-648
-649
-650
-651
-652
-653
-654
 655
 656
 657
@@ -4307,10 +4320,22 @@ from TERM to KILL if any fail to exit within <code>worker_shutdown_timeout</code
 659
 660
 661
-662</pre>
+662
+663
+664
+665
+666
+667
+668
+669
+670
+671
+672
+673
+674</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 647</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 655</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stop_workers'>stop_workers</span>
   <span class='ivar'>@workers</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_pid'>pid</span><span class='op'>|</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_kill'>kill</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>TERM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span> <span class='rbrace'>}</span>
@@ -4326,7 +4351,11 @@ from TERM to KILL if any fail to exit within <code>worker_shutdown_timeout</code
   <span class='id identifier rubyid_pids'>pids</span> <span class='op'>=</span> <span class='ivar'>@workers</span><span class='period'>.</span><span class='id identifier rubyid_values'>values</span> <span class='op'>+</span> <span class='lbracket'>[</span><span class='ivar'>@seed_pid</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_compact'>compact</span>
   <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_warn'><span class='object_link'><a href="Log.html#warn-class_method" title="Raptor::Log.warn (method)">warn</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Force-killing </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_pids'>pids</span><span class='period'>.</span><span class='id identifier rubyid_size'>size</span><span class='embexpr_end'>}</span><span class='tstring_content'> process(es) after </span><span class='embexpr_beg'>#{</span><span class='ivar'>@worker_shutdown_timeout</span><span class='embexpr_end'>}</span><span class='tstring_content'>s</span><span class='tstring_end'>&quot;</span></span>
   <span class='id identifier rubyid_pids'>pids</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_pid'>pid</span><span class='op'>|</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_kill'>kill</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>KILL</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span> <span class='rbrace'>}</span>
-  <span class='id identifier rubyid_pids'>pids</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_pid'>pid</span><span class='op'>|</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_wait'>wait</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span> <span class='rbrace'>}</span>
+  <span class='id identifier rubyid_pids'>pids</span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_pid'>pid</span><span class='op'>|</span>
+    <span class='id identifier rubyid__'>_</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_wait2'>wait2</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='rparen'>)</span>
+    <span class='id identifier rubyid_reap_pid'>reap_pid</span><span class='lparen'>(</span><span class='id identifier rubyid_pid'>pid</span><span class='comma'>,</span> <span class='id identifier rubyid_status'>status</span><span class='rparen'>)</span>
+  <span class='kw'>rescue</span> <span class='const'>Errno</span><span class='op'>::</span><span class='const'>ECHILD</span>
+  <span class='kw'>end</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -4361,18 +4390,6 @@ workers are then restarted by <code>reap_workers</code>.</p>
       <pre class="lines">
 
 
-673
-674
-675
-676
-677
-678
-679
-680
-681
-682
-683
-684
 685
 686
 687
@@ -4380,10 +4397,22 @@ workers are then restarted by <code>reap_workers</code>.</p>
 689
 690
 691
-692</pre>
+692
+693
+694
+695
+696
+697
+698
+699
+700
+701
+702
+703
+704</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 673</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 685</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_timeout_hung_workers'>timeout_hung_workers</span>
   <span class='id identifier rubyid_now'>now</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_clock_gettime'>clock_gettime</span><span class='lparen'>(</span><span class='const'>Process</span><span class='op'>::</span><span class='const'>CLOCK_REALTIME</span><span class='rparen'>)</span>
@@ -4462,12 +4491,12 @@ workers are then restarted by <code>reap_workers</code>.</p>
       <pre class="lines">
 
 
-391
-392
-393</pre>
+396
+397
+398</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 391</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 396</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_timestamp'>timestamp</span><span class='lparen'>(</span><span class='id identifier rubyid_time'>time</span><span class='rparen'>)</span>
   <span class='const'>Time</span><span class='period'>.</span><span class='id identifier rubyid_at'>at</span><span class='lparen'>(</span><span class='id identifier rubyid_time'>time</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_utc'>utc</span><span class='period'>.</span><span class='id identifier rubyid_iso8601'>iso8601</span><span class='lparen'>(</span><span class='int'>6</span><span class='rparen'>)</span>
@@ -4503,26 +4532,26 @@ being promoted.</p>
       <pre class="lines">
 
 
-744
-745
-746
-747
-748
-749
-750
-751
-752
-753
-754
-755
 756
 757
 758
 759
-760</pre>
+760
+761
+762
+763
+764
+765
+766
+767
+768
+769
+770
+771
+772</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 744</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 756</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_wait_for_seed_ready'>wait_for_seed_ready</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@seed_pid</span> <span class='op'>&amp;&amp;</span> <span class='op'>!</span><span class='ivar'>@seed_ready</span>
@@ -4570,18 +4599,18 @@ being promoted.</p>
       <pre class="lines">
 
 
-1043
-1044
-1045
-1046
-1047
-1048
-1049
-1050
-1051</pre>
+1055
+1056
+1057
+1058
+1059
+1060
+1061
+1062
+1063</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 1043</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cluster.rb', line 1055</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_write_stats_file_loop'>write_stats_file_loop</span>
   <span class='id identifier rubyid_loop'>loop</span> <span class='kw'>do</span>
@@ -4602,7 +4631,7 @@ being promoted.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Nov 10 23:14:07 2026 by
+  Generated on Tue Nov 10 23:19:54 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>

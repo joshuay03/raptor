@@ -182,6 +182,7 @@ working directory. Pass <code>-c PATH</code> to point at a specific file.</p>
   <span class='label'>before_worker_boot:</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span>
   <span class='label'>before_worker_shutdown:</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span>
   <span class='label'>after_worker_drain:</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span>
+  <span class='label'>after_worker_exit:</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span>
   <span class='label'>before_refork:</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span>
   <span class='label'>plugins:</span> <span class='lbracket'>[</span><span class='rbracket'>]</span><span class='comma'>,</span>
   <span class='label'>stats_file:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>tmp/raptor.json</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span>
@@ -219,7 +220,8 @@ an application-local plugin before returning the config hash.</p>
 <code>Raptor::Plugin.register(:stats_logger, MyStatsLogger)</code> instead.</p>
 <p><code>start(cluster)</code> runs once before the initial workers fork. <code>cluster.options</code> exposes configuration, including
 plugin-specific keys. Append callbacks to its <code>before_fork</code>, <code>before_worker_boot</code>, <code>before_worker_shutdown</code>,
-<code>after_worker_drain</code>, and <code>before_refork</code> arrays during startup. If your plugin opens a listener, close the worker's inherited copy with
+<code>after_worker_drain</code>, <code>after_worker_exit</code>, and <code>before_refork</code> arrays during startup. If your plugin opens a listener,
+close the worker's inherited copy with
 <code>cluster.options[:before_worker_boot] &lt;&lt; proc { @listener.close }</code> so only the master serves it.</p>
 <p><code>before_worker_shutdown</code> runs before draining. Use <code>after_worker_drain</code> to flush and close application resources once
 request handling has stopped. Both run in the worker and accept its index, or no arguments. Post-drain callbacks run
@@ -227,6 +229,10 @@ after application threads, streaming responses, and detached close callbacks fin
 termination at the drain timeout. They also run when a worker drains to become a refork seed. They do not wait for
 unmanaged application threads, and cannot be guaranteed after a crash, <code>SIGKILL</code>, or the master shutdown timeout.
 Existing pre-drain hooks keep their ordering; applications using <code>at_exit</code> for post-drain cleanup can use this hook instead.</p>
+<p><code>after_worker_exit</code> runs once in the master after reaping a worker, before its replacement is forked. It receives
+<code>index, pid, status</code> (<code>Process::Status</code>), or no arguments. Use it to remove resources owned by the exited process without
+polling worker PIDs. It covers graceful exits, crashes, forced termination, and the eventual exit of a promoted seed;
+promotion itself is not an exit. Callbacks run while the master is alive to reap its children, including cluster shutdown.</p>
 <p><code>cluster.stats</code> returns per-worker snapshots. <code>cluster.stats_hash</code> returns the same aggregate structure as <code>GET /stats</code>,
 including boot status, busy threads, capacity, backlog, and request counts. Both remain available while workers drain.</p>
 <p>Override <code>stop</code> to close listeners and flush exporters. Raptor calls it after workers exit, in reverse plugin order,
@@ -989,7 +995,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Tue Nov 10 23:14:05 2026 by
+  Generated on Tue Nov 10 23:19:52 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
