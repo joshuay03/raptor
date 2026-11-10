@@ -528,6 +528,28 @@ settings.</p>
         <li class="public ">
   <span class="summary_signature">
     
+      <a href="#run_embedded-instance_method" title="#run_embedded (instance method)">#<strong>run_embedded</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'><p>Serves in the CLI process until interrupted or terminated.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
       <a href="#run_stats-instance_method" title="#run_stats (instance method)">#<strong>run_stats</strong>  &#x21d2; void </a>
     
 
@@ -1045,21 +1067,21 @@ same as in a regular script.</p>
       <pre class="lines">
 
 
-232
-233
-234
-235
-236
-237
-238
-239
-240
-241
-242
-243</pre>
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 232</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 256</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_apply_config_file'>apply_config_file</span><span class='lparen'>(</span><span class='id identifier rubyid_path'>path</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='id identifier rubyid_path'>path</span>
@@ -1103,14 +1125,14 @@ options are parsed afterwards and take precedence.</p>
       <pre class="lines">
 
 
-251
-252
-253
-254
-255</pre>
+275
+276
+277
+278
+279</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 251</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 275</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_apply_environment'>apply_environment</span>
   <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:workers</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='const'>Integer</span><span class='lparen'>(</span><span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>RAPTOR_WORKERS</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span><span class='comma'>,</span> <span class='int'>10</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>RAPTOR_WORKERS</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span>
@@ -1162,30 +1184,6 @@ options are parsed afterwards and take precedence.</p>
       <pre class="lines">
 
 
-262
-263
-264
-265
-266
-267
-268
-269
-270
-271
-272
-273
-274
-275
-276
-277
-278
-279
-280
-281
-282
-283
-284
-285
 286
 287
 288
@@ -1319,10 +1317,34 @@ options are parsed afterwards and take precedence.</p>
 416
 417
 418
-419</pre>
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 262</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 286</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_create_parser'>create_parser</span>
   <span class='id identifier rubyid_cli_binds'>cli_binds</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
@@ -1347,7 +1369,7 @@ options are parsed afterwards and take precedence.</p>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:drain_accept_queue</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_bool'>bool</span>
     <span class='kw'>end</span>
 
-    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-w</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--workers NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of worker processes (default: </span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="#DEFAULT_WORKER_COUNT-constant" title="Raptor::CLI::DEFAULT_WORKER_COUNT (constant)">DEFAULT_WORKER_COUNT</a></span></span><span class='embexpr_end'>}</span><span class='tstring_content'>)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
+    <span class='id identifier rubyid_opts'>opts</span><span class='period'>.</span><span class='id identifier rubyid_on'>on</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>-w</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>--workers NUM</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='const'>Integer</span><span class='comma'>,</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Number of worker processes, or 0 for in-process serving (default: </span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="#DEFAULT_WORKER_COUNT-constant" title="Raptor::CLI::DEFAULT_WORKER_COUNT (constant)">DEFAULT_WORKER_COUNT</a></span></span><span class='embexpr_end'>}</span><span class='tstring_content'>)</span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_num'>num</span><span class='op'>|</span>
       <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:workers</span><span class='rbracket'>]</span> <span class='op'>=</span> <span class='id identifier rubyid_num'>num</span>
     <span class='kw'>end</span>
 
@@ -1547,18 +1569,18 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
       <pre class="lines">
 
 
-216
-217
-218
-219
-220
-221
-222
-223
-224</pre>
+240
+241
+242
+243
+244
+245
+246
+247
+248</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 216</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 240</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_extract_config_path'>extract_config_path</span><span class='lparen'>(</span><span class='id identifier rubyid_argv'>argv</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_argv'>argv</span><span class='period'>.</span><span class='id identifier rubyid_each_with_index'>each_with_index</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_arg'>arg</span><span class='comma'>,</span> <span class='id identifier rubyid_index'>index</span><span class='op'>|</span>
@@ -1600,13 +1622,86 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 
 177
 178
-179</pre>
+179
+180
+181
+182
+183
+184
+185</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 177</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
-  <span class='ivar'>@command</span> <span class='op'>==</span> <span class='symbol'>:stats</span> <span class='op'>?</span> <span class='id identifier rubyid_run_stats'>run_stats</span> <span class='op'>:</span> <span class='const'><span class='object_link'><a href="Cluster.html" title="Raptor::Cluster (class)">Cluster</a></span></span><span class='period'>.</span><span class='id identifier rubyid_run'><span class='object_link'><a href="Cluster.html#run-class_method" title="Raptor::Cluster.run (method)">run</a></span></span><span class='lparen'>(</span><span class='ivar'>@options</span><span class='rparen'>)</span>
+  <span class='kw'>if</span> <span class='ivar'>@command</span> <span class='op'>==</span> <span class='symbol'>:stats</span>
+    <span class='id identifier rubyid_run_stats'>run_stats</span>
+  <span class='kw'>elsif</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:workers</span><span class='rbracket'>]</span><span class='period'>.</span><span class='id identifier rubyid_zero?'>zero?</span>
+    <span class='id identifier rubyid_run_embedded'>run_embedded</span>
+  <span class='kw'>else</span>
+    <span class='const'><span class='object_link'><a href="Cluster.html" title="Raptor::Cluster (class)">Cluster</a></span></span><span class='period'>.</span><span class='id identifier rubyid_run'><span class='object_link'><a href="Cluster.html#run-class_method" title="Raptor::Cluster.run (method)">run</a></span></span><span class='lparen'>(</span><span class='ivar'>@options</span><span class='rparen'>)</span>
+  <span class='kw'>end</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="run_embedded-instance_method">
+  
+    #<strong>run_embedded</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p><p>Serves in the CLI process until interrupted or terminated.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 192</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_run_embedded'>run_embedded</span>
+  <span class='id identifier rubyid_require_relative'>require_relative</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>embedded</span><span class='tstring_end'>&quot;</span></span>
+
+  <span class='const'>Dir</span><span class='period'>.</span><span class='id identifier rubyid_chdir'>chdir</span><span class='lparen'>(</span><span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:chdir</span><span class='rbracket'>]</span><span class='rparen'>)</span> <span class='kw'>if</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:chdir</span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_app'>app</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:app</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'>Rack</span><span class='op'>::</span><span class='const'>Builder</span><span class='period'>.</span><span class='id identifier rubyid_parse_file'>parse_file</span><span class='lparen'>(</span><span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:rackup</span><span class='rbracket'>]</span><span class='rparen'>)</span>
+  <span class='id identifier rubyid_server'>server</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Embedded.html" title="Raptor::Embedded (class)">Embedded</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Embedded.html#initialize-instance_method" title="Raptor::Embedded#initialize (method)">new</a></span></span><span class='lparen'>(</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='op'>**</span><span class='ivar'>@options</span><span class='rparen'>)</span><span class='period'>.</span><span class='id identifier rubyid_start'><span class='object_link'><a href="Embedded.html#start-instance_method" title="Raptor::Embedded#start (method)">start</a></span></span>
+  <span class='id identifier rubyid_handlers'>handlers</span> <span class='op'>=</span> <span class='qwords_beg'>%w[</span><span class='tstring_content'>INT</span><span class='words_sep'> </span><span class='tstring_content'>TERM</span><span class='tstring_end'>]</span></span><span class='period'>.</span><span class='id identifier rubyid_to_h'>to_h</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_signal'>signal</span><span class='op'>|</span>
+    <span class='lbracket'>[</span><span class='id identifier rubyid_signal'>signal</span><span class='comma'>,</span> <span class='id identifier rubyid_trap'>trap</span><span class='lparen'>(</span><span class='id identifier rubyid_signal'>signal</span><span class='rparen'>)</span> <span class='lbrace'>{</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='lbrace'>{</span> <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_shutdown'>shutdown</span> <span class='rbrace'>}</span> <span class='rbrace'>}</span><span class='rbracket'>]</span>
+  <span class='kw'>end</span>
+  <span class='id identifier rubyid_server'>server</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
+<span class='kw'>ensure</span>
+  <span class='id identifier rubyid_server'>server</span><span class='op'>&amp;.</span><span class='id identifier rubyid_shutdown'>shutdown</span>
+  <span class='id identifier rubyid_handlers'>handlers</span><span class='op'>&amp;.</span><span class='id identifier rubyid_each'>each</span> <span class='lbrace'>{</span> <span class='op'>|</span><span class='id identifier rubyid_signal'>signal</span><span class='comma'>,</span> <span class='id identifier rubyid_handler'>handler</span><span class='op'>|</span> <span class='id identifier rubyid_trap'>trap</span><span class='lparen'>(</span><span class='id identifier rubyid_signal'>signal</span><span class='comma'>,</span> <span class='id identifier rubyid_handler'>handler</span><span class='rparen'>)</span> <span class='rbrace'>}</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -1637,28 +1732,28 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
       <pre class="lines">
 
 
-188
-189
-190
-191
-192
-193
-194
-195
-196
-197
-198
-199
-200
-201
-202
-203
-204
-205
-206</pre>
+212
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 188</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/cli.rb', line 212</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run_stats'>run_stats</span>
   <span class='id identifier rubyid_stats_file'>stats_file</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:stats_file</span><span class='rbracket'>]</span>
@@ -1689,7 +1784,7 @@ all four OptionParser-accepted forms (<code>-c PATH</code>, <code>-cPATH</code>,
 </div>
 
       <div id="footer">
-  Generated on Tue Nov 10 06:57:51 2026 by
+  Generated on Tue Nov 10 07:05:53 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
