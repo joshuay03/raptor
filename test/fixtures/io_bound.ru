@@ -12,5 +12,6 @@ run proc { |_env|
     sleep wait
     JSON.generate(100.times.map { |index| { id: index, name: "row-#{index}", score: index * 1.5 } })
   end
+
   [200, { "content-type" => "application/json" }, [RESPONSE]]
 }

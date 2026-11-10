@@ -10,5 +10,6 @@ run proc { |_env|
       stream.close(trailers: { "x-stream-status" => "complete" })
     end
   end
+
   [200, { "content-type" => "text/plain" }, body]
 }

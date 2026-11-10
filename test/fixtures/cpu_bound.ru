@@ -14,5 +14,6 @@ run proc { |env|
     items = chunk[:count].times.map { |index| { id: index, name: "item-#{index}", value: index * 3.14, rendered: "ITEM-#{index}" } }
     JSON.generate(items: items)
   end
+
   [200, { "content-type" => "application/json" }, [RESPONSE]]
 }

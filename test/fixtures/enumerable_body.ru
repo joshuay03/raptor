@@ -24,5 +24,6 @@ run proc { |env|
   else
     body.new
   end
+
   [200, { "content-type" => "text/plain" }, response_body]
 }

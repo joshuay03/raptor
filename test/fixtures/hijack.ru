@@ -5,5 +5,6 @@ run proc { |_env|
     socket.write("hijacked body")
     socket.close
   }
+
   [200, { "content-length" => "13", Rack::RACK_HIJACK => hijack }, []]
 }
