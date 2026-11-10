@@ -191,7 +191,7 @@ installing signal handlers or changing process-wide configuration.</p>
         <li class="public ">
   <span class="summary_signature">
     
-      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(app, host: &quot;127.0.0.1&quot;, port: 0, **options)  &#x21d2; Embedded </a>
+      <a href="#initialize-instance_method" title="#initialize (instance method)">#<strong>initialize</strong>(app, host: &quot;127.0.0.1&quot;, port: 0, log: false, **options)  &#x21d2; Embedded </a>
     
 
     
@@ -230,6 +230,28 @@ installing signal handlers or changing process-wide configuration.</p>
 
   
     <span class="summary_desc"><div class='inline'><p>Waits for termination and propagates serving thread failures.</p></div></span>
+  
+</li>
+
+      
+        <li class="public ">
+  <span class="summary_signature">
+    
+      <a href="#log_initialization-instance_method" title="#log_initialization (instance method)">#<strong>log_initialization</strong>  &#x21d2; void </a>
+    
+
+    
+  </span>
+  
+  
+  
+  
+  
+  
+  
+
+  
+    <span class="summary_desc"><div class='inline'></div></span>
   
 </li>
 
@@ -332,7 +354,7 @@ installing signal handlers or changing process-wide configuration.</p>
     <div class="method_details first">
   <h3 class="signature first" id="initialize-instance_method">
   
-    #<strong>initialize</strong>(app, host: &quot;127.0.0.1&quot;, port: 0, **options)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Embedded (class)">Embedded</a></span></tt> 
+    #<strong>initialize</strong>(app, host: &quot;127.0.0.1&quot;, port: 0, log: false, **options)  &#x21d2; <tt><span class='object_link'><a href="" title="Raptor::Embedded (class)">Embedded</a></span></tt> 
   
 
   
@@ -341,7 +363,8 @@ installing signal handlers or changing process-wide configuration.</p>
 </h3><div class="docstring">
   <div class="discussion">
     <p>Creates an in-process server. A port of zero selects an available port.
-Thread and protocol options follow the regular server configuration.</p>
+Thread and protocol options follow the regular server configuration.
+Set log to report startup information.</p>
 
   </div>
 </div>
@@ -388,6 +411,19 @@ Thread and protocol options follow the regular server configuration.</p>
   
     <li>
       
+        <span class='name'>log:</span>
+      
+      
+        <span class='type'>(<tt>Boolean</tt>)</span>
+      
+      
+        <em class="default">(defaults to: <tt>false</tt>)</em>
+      
+      
+    </li>
+  
+    <li>
+      
         <span class='name'>options</span>
       
       
@@ -406,8 +442,6 @@ Thread and protocol options follow the regular server configuration.</p>
       <pre class="lines">
 
 
-32
-33
 34
 35
 36
@@ -420,14 +454,18 @@ Thread and protocol options follow the regular server configuration.</p>
 43
 44
 45
-46</pre>
+46
+47
+48
+49</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 32</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 34</span>
 
-<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='label'>host:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>127.0.0.1</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>port:</span> <span class='int'>0</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
+<span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_app'>app</span><span class='comma'>,</span> <span class='label'>host:</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>127.0.0.1</span><span class='tstring_end'>&quot;</span></span><span class='comma'>,</span> <span class='label'>port:</span> <span class='int'>0</span><span class='comma'>,</span> <span class='label'>log:</span> <span class='kw'>false</span><span class='comma'>,</span> <span class='op'>**</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
   <span class='ivar'>@app</span> <span class='op'>=</span> <span class='id identifier rubyid_app'>app</span>
   <span class='ivar'>@port</span> <span class='op'>=</span> <span class='id identifier rubyid_port'>port</span>
+  <span class='ivar'>@log</span> <span class='op'>=</span> <span class='id identifier rubyid_log'>log</span>
   <span class='ivar'>@addresses</span> <span class='op'>=</span> <span class='lbracket'>[</span><span class='rbracket'>]</span>
   <span class='ivar'>@options</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="CLI.html" title="Raptor::CLI (class)">CLI</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="CLI.html#DEFAULT_OPTIONS-constant" title="Raptor::CLI::DEFAULT_OPTIONS (constant)">DEFAULT_OPTIONS</a></span></span><span class='period'>.</span><span class='id identifier rubyid_merge'>merge</span><span class='lparen'>(</span><span class='id identifier rubyid_options'>options</span><span class='rparen'>)</span>
   <span class='const'><span class='object_link'><a href="CLI.html" title="Raptor::CLI (class)">CLI</a></span></span><span class='op'>::</span><span class='const'><span class='object_link'><a href="CLI.html#NESTED_OPTION_KEYS-constant" title="Raptor::CLI::NESTED_OPTION_KEYS (constant)">NESTED_OPTION_KEYS</a></span></span><span class='period'>.</span><span class='id identifier rubyid_each'>each</span> <span class='kw'>do</span> <span class='op'>|</span><span class='id identifier rubyid_key'>key</span><span class='op'>|</span>
@@ -489,12 +527,12 @@ Thread and protocol options follow the regular server configuration.</p>
       <pre class="lines">
 
 
-26
 27
-28</pre>
+28
+29</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 26</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 27</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_addresses'>addresses</span>
   <span class='ivar'>@addresses</span>
@@ -543,12 +581,12 @@ Thread and protocol options follow the regular server configuration.</p>
       <pre class="lines">
 
 
-25
 26
-27</pre>
+27
+28</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 25</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 26</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_port'>port</span>
   <span class='ivar'>@port</span>
@@ -589,17 +627,17 @@ Thread and protocol options follow the regular server configuration.</p>
       <pre class="lines">
 
 
-107
-108
-109
-110
-111
 112
 113
-114</pre>
+114
+115
+116
+117
+118
+119</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 107</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 112</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_join'>join</span>
   <span class='id identifier rubyid_worker'>worker</span> <span class='op'>=</span> <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='lbrace'>{</span> <span class='ivar'>@worker</span> <span class='rbrace'>}</span>
@@ -608,6 +646,79 @@ Thread and protocol options follow the regular server configuration.</p>
   <span class='id identifier rubyid_worker'>worker</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span>
 <span class='kw'>ensure</span>
   <span class='id identifier rubyid_shutdown'>shutdown</span> <span class='kw'>if</span> <span class='id identifier rubyid_worker'>worker</span>
+<span class='kw'>end</span></pre>
+    </td>
+  </tr>
+</table>
+</div>
+    
+      <div class="method_details ">
+  <h3 class="signature " id="log_initialization-instance_method">
+  
+    #<strong>log_initialization</strong>  &#x21d2; <tt>void</tt> 
+  
+
+  
+
+  
+</h3><div class="docstring">
+  <div class="discussion">
+    <p class="note returns_void">This method returns an undefined value.</p>
+
+  </div>
+</div>
+<div class="tags">
+  
+
+</div><table class="source_code">
+  <tr>
+    <td>
+      <pre class="lines">
+
+
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143</pre>
+    </td>
+    <td>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 124</span>
+
+<span class='kw'>def</span> <span class='id identifier rubyid_log_initialization'>log_initialization</span>
+  <span class='id identifier rubyid_environment'>environment</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:environment</span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>RAILS_ENV</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='const'>ENV</span><span class='lbracket'>[</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>RACK_ENV</span><span class='tstring_end'>&quot;</span></span><span class='rbracket'>]</span> <span class='op'>||</span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>development</span><span class='tstring_end'>&quot;</span></span>
+  <span class='id identifier rubyid_thread_count'>thread_count</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:threads</span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_max_threads'>max_threads</span> <span class='op'>=</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:max_threads</span><span class='rbracket'>]</span>
+  <span class='id identifier rubyid_thread_limit'>thread_limit</span> <span class='op'>=</span> <span class='kw'>if</span> <span class='id identifier rubyid_max_threads'>max_threads</span> <span class='op'>==</span> <span class='const'>Float</span><span class='op'>::</span><span class='const'>INFINITY</span>
+    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'> (scaling, no limit)</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>elsif</span> <span class='id identifier rubyid_max_threads'>max_threads</span> <span class='op'>&gt;</span> <span class='id identifier rubyid_thread_count'>thread_count</span>
+    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'> (scaling up to </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_max_threads'>max_threads</span><span class='embexpr_end'>}</span><span class='tstring_content'>)</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>else</span>
+    <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_end'>&quot;</span></span>
+  <span class='kw'>end</span>
+
+  <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>Server initializing:</span><span class='tstring_end'>&quot;</span></span>
+  <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>├─ Version: </span><span class='embexpr_beg'>#{</span><span class='const'><span class='object_link'><a href="../Raptor.html#VERSION-constant" title="Raptor::VERSION (constant)">VERSION</a></span></span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>├─ Ruby Version: </span><span class='embexpr_beg'>#{</span><span class='const'>RUBY_DESCRIPTION</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>├─ Environment: </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_environment'>environment</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>├─ PID: </span><span class='embexpr_beg'>#{</span><span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>├─ </span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_thread_count'>thread_count</span><span class='embexpr_end'>}</span><span class='tstring_content'> worker thread</span><span class='embexpr_beg'>#{</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>s</span><span class='tstring_end'>&quot;</span></span> <span class='kw'>if</span> <span class='id identifier rubyid_thread_count'>thread_count</span> <span class='op'>&gt;</span> <span class='int'>1</span><span class='embexpr_end'>}</span><span class='embexpr_beg'>#{</span><span class='id identifier rubyid_thread_limit'>thread_limit</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
+  <span class='const'><span class='object_link'><a href="Log.html" title="Raptor::Log (module)">Log</a></span></span><span class='period'>.</span><span class='id identifier rubyid_info'><span class='object_link'><a href="Log.html#info-class_method" title="Raptor::Log.info (method)">info</a></span></span> <span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>└─ Listening on </span><span class='embexpr_beg'>#{</span><span class='ivar'>@addresses</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='tstring'><span class='tstring_beg'>&quot;</span><span class='tstring_content'>, </span><span class='tstring_end'>&quot;</span></span><span class='rparen'>)</span><span class='embexpr_end'>}</span><span class='tstring_end'>&quot;</span></span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -638,13 +749,13 @@ Thread and protocol options follow the regular server configuration.</p>
       <pre class="lines">
 
 
-82
-83
-84
-85</pre>
+87
+88
+89
+90</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 82</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 87</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_run'>run</span>
   <span class='id identifier rubyid_start'>start</span>
@@ -680,21 +791,21 @@ Calling shutdown more than once has no effect.</p>
       <pre class="lines">
 
 
-91
-92
-93
-94
-95
 96
 97
 98
 99
 100
 101
-102</pre>
+102
+103
+104
+105
+106
+107</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 91</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 96</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='kw'>do</span>
@@ -751,9 +862,6 @@ Startup errors are raised in the calling thread.</p>
       <pre class="lines">
 
 
-52
-53
-54
 55
 56
 57
@@ -776,10 +884,15 @@ Startup errors are raised in the calling thread.</p>
 74
 75
 76
-77</pre>
+77
+78
+79
+80
+81
+82</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 52</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 55</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start'>start</span>
   <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span> <span class='kw'>do</span>
@@ -804,7 +917,9 @@ Startup errors are raised in the calling thread.</p>
       <span class='ivar'>@binder</span><span class='op'>&amp;.</span><span class='id identifier rubyid_close'>close</span>
       <span class='id identifier rubyid_raise'>raise</span>
     <span class='kw'>end</span>
+    <span class='id identifier rubyid_log_initialization'>log_initialization</span> <span class='kw'>if</span> <span class='ivar'>@log</span>
   <span class='kw'>end</span>
+
   <span class='kw'>self</span>
 <span class='kw'>end</span></pre>
     </td>
@@ -875,21 +990,21 @@ Startup errors are raised in the calling thread.</p>
       <pre class="lines">
 
 
-119
-120
-121
-122
-123
-124
-125
-126
-127
-128
-129
-130</pre>
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 119</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/embedded.rb', line 146</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_with_lifecycle'>with_lifecycle</span>
   <span class='id identifier rubyid_thread'>thread</span> <span class='op'>=</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_current'>current</span>
@@ -913,7 +1028,7 @@ Startup errors are raised in the calling thread.</p>
 </div>
 
       <div id="footer">
-  Generated on Tue Nov 10 07:39:59 2026 by
+  Generated on Tue Nov 10 07:45:20 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
