@@ -43,6 +43,61 @@ module Raptor
       assert_equal "ok", Net::HTTP.get(URI("http://127.0.0.1:#{@server.port}/"))
     end
 
+    def test_pause_drains_requests_and_preserves_the_listener_across_resumes
+      entered = AtomicCountDownLatch.new(1)
+      release = AtomicCountDownLatch.new(1)
+      app = ->(env) do
+        if env["PATH_INFO"] == "/hold"
+          entered.count_down
+          release.wait
+        end
+
+        [200, {}, ["#{Process.pid}: ok"]]
+      end
+      @server = Embedded.new(app, http1: { ractors: 1 }).start
+      port = @server.port
+      addresses = @server.addresses
+      client = nil
+      joiner = Thread.new { @server.join }
+      request = Thread.new { Net::HTTP.get(URI("http://127.0.0.1:#{port}/hold")) }
+      Timeout.timeout(5) { entered.wait }
+      pausing = Thread.new { @server.pause }
+      wait_until { pausing.stop? }
+
+      assert_predicate pausing, :alive?
+      release.count_down
+      assert_equal "#{Process.pid}: ok", Timeout.timeout(5) { request.value }
+      assert_same @server, Timeout.timeout(5) { pausing.value }
+
+      2.times do
+        assert_same @server, @server.pause
+        assert_equal port, @server.port
+        assert_equal addresses, @server.addresses
+        assert_predicate joiner, :alive?
+        assert_raises(Errno::EADDRINUSE) { TCPServer.new("127.0.0.1", port) }
+
+        client = TCPSocket.new("127.0.0.1", port)
+        client.write("GET / HTTP/1.0\r\n\r\n")
+        refute client.wait_readable(0.1)
+        assert_same @server, @server.resume
+        assert_same @server, @server.resume
+        assert_includes Timeout.timeout(5) { client.read }, "#{Process.pid}: ok"
+        client.close
+        @server.pause
+      end
+
+      @server.shutdown
+      Timeout.timeout(5) { joiner.value }
+      assert_raises(ThreadError) { @server.resume }
+      assert_raises(ThreadError) { @server.pause }
+      TCPServer.open("127.0.0.1", port) { |listener| assert_equal port, listener.addr[1] }
+    ensure
+      release.count_down if release && release.count.positive?
+      client&.close
+      @server&.shutdown
+      [request, pausing, joiner].each { |thread| thread&.join(5) }
+    end
+
     def test_cli_serves_in_process_and_shuts_down_on_signals
       Tempfile.create(["raptor_embedded", ".ru"]) do |app|
         app.write('run ->(_env) { [200, {}, [Process.pid.to_s]] }')
@@ -187,36 +242,39 @@ module Raptor
     end
 
     def test_reactor_startup_failure_is_returned_to_the_caller
-      reader, writer = IO.pipe
-      pid = fork do
-        reader.close
-        ENV["IO_EVENT_SELECTOR"] = "MissingSelector"
-        result = Timeout.timeout(5) do
-          threads = Thread.list
-          ractor_count = Ractor.count
-          server = Embedded.new(->(_env) { [200, {}, []] })
-          begin
-            server.start
-            nil
-          rescue NameError => error
-            TCPServer.open("127.0.0.1", server.port) do
-              [error.name, (Thread.list - threads).count(&:alive?), Ractor.count - ractor_count]
+      [:start, :resume].each do |operation|
+        reader, writer = IO.pipe
+        pid = fork do
+          reader.close
+          result = Timeout.timeout(5) do
+            threads = Thread.list
+            ractor_count = Ractor.count
+            server = Embedded.new(->(_env) { [200, {}, []] })
+            server.start.pause if operation == :resume
+            ENV["IO_EVENT_SELECTOR"] = "MissingSelector"
+            begin
+              server.public_send(operation)
+              nil
+            rescue NameError => error
+              TCPServer.open("127.0.0.1", server.port) do
+                [error.name, (Thread.list - threads).count(&:alive?), Ractor.count - ractor_count]
+              end
             end
           end
+          Marshal.dump(result, writer)
+          writer.close
+          exit!(0)
         end
-        Marshal.dump(result, writer)
         writer.close
-        exit!(0)
-      end
-      writer.close
 
-      assert_equal [:MissingSelector, 0, 0], Timeout.timeout(10) { Marshal.load(reader) }
-      Process.wait(pid)
-      assert_predicate $?, :success?
-    ensure
-      reader&.close
-      writer&.close
-      stop_cluster(pid)
+        assert_equal [:MissingSelector, 0, 0], Timeout.timeout(10) { Marshal.load(reader) }
+        Process.wait(pid)
+        assert_predicate $?, :success?
+      ensure
+        reader&.close
+        writer&.close
+        stop_cluster(pid)
+      end
     end
 
     def test_serving_failure_releases_resources_and_is_returned_to_the_caller

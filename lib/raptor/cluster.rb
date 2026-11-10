@@ -80,6 +80,7 @@ module Raptor
     # @rbs @worker_drain_timeout: Integer
     # @rbs @worker_shutdown_timeout: Integer
     # @rbs @before_fork: Array[Proc]
+    # @rbs @after_fork: Array[Proc]
     # @rbs @before_worker_boot: Array[Proc]
     # @rbs @before_worker_shutdown: Array[Proc]
     # @rbs @after_worker_drain: Array[Proc]
@@ -149,7 +150,8 @@ module Raptor
     # @option options [Integer] :worker_drain_timeout seconds a worker waits for in-flight requests during shutdown before force-killing app threads
     # @option options [Integer] :worker_shutdown_timeout seconds to wait for graceful worker exit before force-killing
     # @option options [Integer, Array<Integer>, nil] :refork_after request-count threshold(s) at which a warm worker is promoted to a fork source for phased refork; nil or 0 disables. Requires `PR_SET_CHILD_SUBREAPER` (Linux)
-    # @option options [Array<Proc>] :before_fork procs called in the master before every worker fork
+    # @option options [Array<Proc>] :before_fork procs called in the master before each direct worker fork, not seed forks
+    # @option options [Array<Proc>] :after_fork procs called in the master after each direct fork attempt, including failures
     # @option options [Array<Proc>] :before_worker_boot procs called with the worker index before it begins serving
     # @option options [Array<Proc>] :before_worker_shutdown procs called with the worker index before its graceful shutdown
     # @option options [Array<Proc>] :after_worker_drain procs called with the worker index after draining, before exit or seed promotion
@@ -183,6 +185,7 @@ module Raptor
       @worker_drain_timeout = options[:worker_drain_timeout]
       @worker_shutdown_timeout = options[:worker_shutdown_timeout]
       @before_fork = options[:before_fork] = Array(options[:before_fork]).dup
+      @after_fork = options[:after_fork] = Array(options[:after_fork]).dup
       @before_worker_boot = options[:before_worker_boot] = Array(options[:before_worker_boot]).dup
       @before_worker_shutdown = options[:before_worker_shutdown] = Array(options[:before_worker_shutdown]).dup
       @after_worker_drain = options[:after_worker_drain] = Array(options[:after_worker_drain]).dup
@@ -453,10 +456,27 @@ module Raptor
         @seed_pid = nil
       end
 
-      @before_fork.each(&:call)
-      pid = fork { run_worker(index, @phase) }
-      @workers[index] = pid
-      @worker_indices[pid] = index
+      master_pid = Process.pid
+      begin
+        @before_fork.each(&:call)
+        pid = fork { run_worker(index, @phase) }
+        @workers[index] = pid
+        @worker_indices[pid] = index
+      ensure
+        if Process.pid == master_pid
+          error = $!
+          @after_fork.each do |hook|
+            hook.call
+          rescue => hook_error
+            if error
+              Log.rescued_error(hook_error)
+            else
+              error = hook_error
+            end
+          end
+          raise error if error
+        end
+      end
     end
 
     # Asks the seed to fork a new worker at the given index, returning the

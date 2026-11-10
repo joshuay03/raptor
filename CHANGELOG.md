@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Support master-owned Rack listeners across worker forks
 - Add `after_worker_exit` hooks
 - Add `after_worker_drain` hooks
 

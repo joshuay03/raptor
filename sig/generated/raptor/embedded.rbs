@@ -46,18 +46,43 @@ module Raptor
     # @rbs () -> void
     def run: () -> void
 
+    # Drains serving work while retaining the bound listeners for resume.
+    # Connections may queue, but requests are not served while paused.
+    # Existing keep-alive connections close. Repeated pauses have no effect.
+    #
+    # Pause before master forks and resume in the parent. Close the inherited
+    # instance before other worker boot hooks, and shut down when the plugin stops.
+    #
+    # @example From a plugin's start callback
+    #   @server = Raptor::Embedded.new(app, port: 9293).start
+    #   cluster.options[:before_fork] << proc { @server.pause }
+    #   cluster.options[:after_fork] << proc { @server.resume }
+    #   cluster.options[:before_worker_boot].unshift(proc { @server.shutdown })
+    #
+    # @rbs () -> Embedded
+    def pause: () -> Embedded
+
+    # Resumes serving on the retained listeners. Has no effect while running.
+    # Shutdown remains terminal. Startup failures release the listeners and propagate.
+    #
+    # @rbs () -> Embedded
+    def resume: () -> Embedded
+
     # Drains requests and closes the server's sockets, threads, and Ractors.
     # Calling shutdown more than once has no effect.
     #
     # @rbs () -> void
     def shutdown: () -> void
 
-    # Waits for termination and propagates serving thread failures.
+    # Waits across pauses until termination and propagates serving failures.
     #
     # @rbs () -> void
     def join: () -> void
 
     private
+
+    # @rbs () -> void
+    def start_worker: () -> void
 
     # @rbs () -> void
     def log_initialization: () -> void

@@ -5,6 +5,8 @@ require "test_helper"
 require "json"
 require "tmpdir"
 
+require "raptor/embedded"
+
 module Raptor
   class TestIntegrationCluster < IntegrationTestCase
     parallelize_me!
@@ -471,6 +473,53 @@ module Raptor
     ensure
       stop_cluster(cluster_pid)
       File.delete(marker_path) rescue nil
+    end
+
+    def test_after_fork_hooks_restore_parent_resources_when_forking_fails
+      [:before, :fork, :after].each do |failure|
+        events, report = IO.pipe
+        cluster_pid = fork do
+          events.close
+          cluster = without_output { Cluster.new(@options) }
+          server = Embedded.new(->(_env) { [200, {}, [Process.pid.to_s]] }).start
+          cluster.options[:before_fork] << proc do
+            server.pause
+            raise "before failed" if failure == :before
+          end
+          if failure == :fork
+            cluster.define_singleton_method(:fork) { |&_| raise Errno::EAGAIN, "fork failed" }
+          end
+          cluster.options[:after_fork] << proc { raise "after failed" } if failure == :after
+          cluster.options[:after_fork] << proc do
+            server.resume
+            response = Net::HTTP.get(URI("http://127.0.0.1:#{server.port}/"))
+            report.puts "#{Process.pid}:#{response}"
+          end
+          cluster.options[:before_worker_boot] << proc { server.shutdown }
+
+          without_output do
+            cluster.run
+          rescue => error
+            report.puts error.message
+          ensure
+            server.shutdown
+          end
+          report.close
+          exit!(0)
+        end
+        report.close
+
+        Timeout.timeout(10) do
+          assert_equal "#{cluster_pid}:#{cluster_pid}\n", events.readline
+          assert_includes events.readline, "#{failure} failed"
+          assert_predicate Process.waitpid2(cluster_pid).last, :success?
+          cluster_pid = nil
+          assert_nil events.gets
+        end
+      ensure
+        stop_cluster(cluster_pid)
+        [events, report].each { |io| io&.close unless io&.closed? }
+      end
     end
 
     def test_before_worker_boot_hooks_block_requests_on_initial_boot_and_crash_replacement

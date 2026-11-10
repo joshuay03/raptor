@@ -67,6 +67,7 @@ module Raptor
       worker_shutdown_timeout: 30,
       refork_after: (RUBY_PLATFORM.include?("linux") ? 1000 : nil),
       before_fork: [].freeze,
+      after_fork: [].freeze,
       before_worker_boot: [].freeze,
       before_worker_shutdown: [].freeze,
       after_worker_drain: [].freeze,

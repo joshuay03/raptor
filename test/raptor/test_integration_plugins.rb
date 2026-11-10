@@ -126,24 +126,106 @@ module Raptor
       listener&.close
     end
 
+    def test_embedded_listener_serves_the_master_across_forks_and_saturated_workers
+      start_cluster(plugin: :fixture_rack_listener, workers: 2, before_worker_boot: <<~RUBY)
+        [proc do
+          File.write(#{File.join(@directory, "booting").inspect}, "")
+          sleep 0.01 until File.exist?(#{@release_path.inspect})
+        end]
+      RUBY
+      wait_until { File.exist?(File.join(@directory, "booting")) }
+      initial = wait_until { plugin_stats rescue nil }
+      assert_equal @cluster_pid, initial[:pid]
+      assert_equal 0, initial.dig(:stats, :booted_workers)
+      File.write(@release_path, "")
+      ready = wait_for_ready
+      original_pids = ready.dig(:stats, :worker_status).map { |worker| worker[:pid] }
+
+      assert_equal 2, events.count { |event| event[:event] == "paused" }
+      assert_equal 2, events.count { |event| event[:event] == "resumed" }
+      assert_app_response
+
+      File.unlink(@release_path)
+      requests = Array.new(8) do
+        Thread.new { raw_unix_request(@app_path, "GET /hold HTTP/1.0\r\n\r\n") }
+      end
+      busy = wait_until do
+        data = plugin_stats
+        data if data.dig(:stats, :worker_status).all? { |worker| worker.dig(:last_status, :busy_threads) == 1 }
+      end
+      assert_equal @cluster_pid, busy[:pid]
+      File.write(@release_path, "")
+      requests.each { |request| assert_match(/200 OK/, Timeout.timeout(5) { request.value }) }
+
+      Process.kill("KILL", original_pids.first)
+      replacement = wait_for_ready(except: original_pids.first)
+      assert_equal @cluster_pid, replacement[:pid]
+      Process.kill("USR1", @cluster_pid)
+      wait_until do
+        data = plugin_stats
+        pids = data.dig(:stats, :worker_status).map { |worker| worker[:pid] }
+        data if data.dig(:stats, :booted_workers) == 2 && (pids & original_pids).empty?
+      rescue Errno::ECONNRESET, EOFError
+        false
+      end
+      assert_app_response
+
+      stop_cluster(@cluster_pid)
+      @cluster_pid = nil
+      lifecycle = events.select { |event| ["paused", "resumed"].include?(event[:event]) }
+      assert_equal ["paused", "resumed"] * 5, lifecycle.map { |event| event[:event] }
+      assert_equal 1, lifecycle.map { |event| event[:pid] }.uniq.length
+      assert_equal 1, events.count { |event| event[:event] == "start" }
+      assert_equal 1, events.count { |event| event[:event] == "stop" }
+      refute_path_exists @socket_path
+      UNIXServer.open(@socket_path) { |listener| assert_kind_of UNIXServer, listener }
+    ensure
+      File.write(@release_path, "")
+      requests&.each { |request| request.join(5) }
+    end
+
+    def test_embedded_listener_remains_available_during_seed_reforks
+      skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Subreaper.enable
+
+      start_cluster(plugin: :fixture_rack_listener, refork_after: 10_000)
+      initial = wait_for_ready
+      original_pid = initial.dig(:stats, :worker_status, 0, :pid)
+      Process.kill("URG", @cluster_pid)
+      replacement = wait_for_ready(except: original_pid)
+
+      assert_equal @cluster_pid, replacement[:pid]
+      Process.kill("KILL", replacement.dig(:stats, :worker_status, 0, :pid))
+      wait_for_ready(except: replacement.dig(:stats, :worker_status, 0, :pid))
+      assert_app_response
+      assert_equal 1, events.count { |event| event[:event] == "paused" }
+      assert_equal 1, events.count { |event| event[:event] == "resumed" }
+
+      stop_cluster(@cluster_pid)
+      @cluster_pid = nil
+      refute_path_exists @socket_path
+    end
+
     private
 
-    def start_cluster(before_worker_boot: "[]", settings: {}, control_url: nil)
+    def start_cluster(before_worker_boot: "[]", settings: {}, control_url: nil,
+      plugin: :fixture_listener, workers: 1, refork_after: nil)
+      @plugin = plugin
+      @worker_count = workers
       config_path = File.join(@directory, "raptor.rb")
       plugin_settings = { socket: @socket_path, events: @events_path }.merge(settings)
       File.write(config_path, <<~RUBY)
         $LOAD_PATH.unshift(#{fixture_path("plugins").inspect})
         {
           binds: [#{"unix://#{@app_path}".inspect}],
-          workers: 1,
+          workers: #{workers},
           threads: 1,
           max_threads: 1,
           http1: { ractors: 1 },
-          refork_after: nil,
+          refork_after: #{refork_after.inspect},
           stats_file: nil,
           control_url: #{control_url.inspect},
           pid_file: #{File.join(@directory, "raptor.pid").inspect},
-          plugins: [:fixture_listener],
+          plugins: [#{plugin.inspect}],
           plugin_test: #{plugin_settings.inspect},
           before_worker_boot: #{before_worker_boot.chomp},
           app: ->(env) do
@@ -162,7 +244,14 @@ module Raptor
 
     def plugin_stats
       Timeout.timeout(3) do
-        UNIXSocket.open(@socket_path) { |socket| JSON.parse(socket.readline, symbolize_names: true) }
+        if @plugin == :fixture_rack_listener
+          response = raw_unix_request(@socket_path, "GET / HTTP/1.0\r\n\r\n")
+          raise EOFError if response.empty?
+
+          JSON.parse(response.split("\r\n\r\n", 2).last, symbolize_names: true)
+        else
+          UNIXSocket.open(@socket_path) { |socket| JSON.parse(socket.readline, symbolize_names: true) }
+        end
       end
     end
 
@@ -170,7 +259,7 @@ module Raptor
       wait_until(timeout: 15) do
         data = plugin_stats
         worker = data.dig(:stats, :worker_status, 0)
-        data if worker && worker[:booted] && worker[:pid] != except
+        data if worker && worker[:booted] && worker[:pid] != except && data.dig(:stats, :booted_workers) == @worker_count
       rescue Errno::ENOENT, Errno::ECONNREFUSED, Errno::ECONNRESET, EOFError
         false
       end

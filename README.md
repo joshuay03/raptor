@@ -148,6 +148,7 @@ working directory. Pass `-c PATH` to point at a specific file.
   worker_shutdown_timeout: 30,
   refork_after: 1000, # `nil` on non-Linux
   before_fork: [],
+  after_fork: [],
   before_worker_boot: [],
   before_worker_shutdown: [],
   after_worker_drain: [],

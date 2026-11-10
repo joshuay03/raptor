@@ -53,6 +53,7 @@ module Raptor
 
     # Starts in the master before workers fork. Override to open resources
     # and append callbacks to the cluster's lifecycle hook arrays.
+    # See {Cluster#initialize} for hooks and {Embedded#pause} for fork-safe Rack listeners.
     #
     # @rbs (Cluster cluster) -> void
     def start(cluster)
