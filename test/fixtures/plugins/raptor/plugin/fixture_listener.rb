@@ -18,7 +18,7 @@ Raptor::Plugin.create(:fixture_listener) do
     end
     cluster.options[:before_worker_shutdown] << proc { |index| record("worker_stop", index) }
 
-    in_background do
+    @thread = in_background do
       record("background_started")
       loop do
         client = @listener.accept
@@ -39,6 +39,7 @@ Raptor::Plugin.create(:fixture_listener) do
   def stop
     record("stop", @cluster.stats.length)
     @listener&.close
+    @thread&.join
     File.unlink(@settings.fetch(:socket))
     raise "plugin shutdown failed" if @settings[:fail_stop]
   end
