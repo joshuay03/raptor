@@ -37,7 +37,7 @@ run proc { |_env| [200, { "content-type" => "text/plain" }, ["Hello, World!"]] }
 ```
 > bundle exec raptor -w 10 -t 3 hello_world.ru
 [Raptor 39704|Main|Main] Cluster initializing:
-[Raptor 39704|Main|Main] ├─ Version: 0.26.0
+[Raptor 39704|Main|Main] ├─ Version: 0.27.0
 [Raptor 39704|Main|Main] ├─ Ruby Version: ruby 4.0.9 (2026-10-23 revision 3e93b23afc) +YJIT +PRISM [arm64-darwin25]
 [Raptor 39704|Main|Main] ├─ Environment: development
 [Raptor 39704|Main|Main] ├─ Master PID: 39704
@@ -265,7 +265,7 @@ Set `control_url` to a Unix socket URL such as `unix:///tmp/raptor-control.sock`
 
 ## (Micro) Benchmarks
 
-Raptor 0.26.0 vs Puma 8.0.2 vs Falcon 0.57.0. Each case has 3 fresh-process samples, interleaved in seeded shuffled
+Raptor 0.27.0 vs Puma 8.0.2 vs Falcon 0.57.0. Each case has 3 fresh-process samples, interleaved in seeded shuffled
 rounds. Each sample warms up for 3s and measures for 15s. Metrics are independent medians. ± is (max − min) / 2 /
 median, not a confidence interval. Failure counts below each table sum all samples, so a failed run cannot disappear in
 a median. Throughput counts successful ordinary requests only.
@@ -293,90 +293,90 @@ accounting for shared pages instead of counting them fully in every worker.
 
 | Server | Mode           | Raptor baseline | req/s        | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
 | ------ | -------------- | --------------- | ------------ | --------------- | ------ | ------------- | ---------- | ------- |
-| Raptor | Fixed (3)      | -               | 3.39k ±0.6%  | -               | 46.17  | -             | 2.434      | 337.1   |
-| Raptor | Scaling (3–16) | -               | 8.18k ±1.3%  | -               | 22.19  | -             | 0.467      | 325.6   |
-| Puma   | Fixed (3)      | Fixed (3)       | 1.52k ±1.1%  | 55.2% lower     | 117.49 | 154.5% higher | 0.996      | 272.0   |
-| Puma   | Scaling (3–16) | Scaling (3–16)  | 8.14k ±1.3%  | 0.4% lower      | 22.37  | 0.8% higher   | 0.473      | 318.8   |
-| Falcon | Fibers         | Fixed (3)       | 10.99k ±1.2% | 224.1% higher   | 15.60  | 66.2% lower   | 0.440      | 447.2   |
-| Falcon | Fibers         | Scaling (3–16)  | 10.99k ±1.2% | 34.3% higher    | 15.60  | 29.7% lower   | 0.440      | 447.2   |
+| Raptor | Fixed (3)      | -               | 3.35k ±1.2%  | -               | 49.00  | -             | 2.421      | 337.8   |
+| Raptor | Scaling (3–16) | -               | 8.21k ±0.6%  | -               | 22.09  | -             | 0.468      | 323.6   |
+| Puma   | Fixed (3)      | Fixed (3)       | 1.53k ±0.7%  | 54.4% lower     | 120.94 | 146.8% higher | 0.969      | 272.0   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 8.15k ±0.5%  | 0.7% lower      | 22.23  | 0.6% higher   | 0.467      | 319.5   |
+| Falcon | Fibers         | Fixed (3)       | 11.07k ±0.5% | 230.3% higher   | 15.44  | 68.5% lower   | 0.439      | 446.6   |
+| Falcon | Fibers         | Scaling (3–16)  | 11.07k ±0.5% | 34.8% higher    | 15.44  | 30.1% lower   | 0.439      | 446.6   |
 
 ### IO over HTTP/1.1 keep-alive
 
 | Server | Mode           | Raptor baseline | req/s       | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
 | ------ | -------------- | --------------- | ----------- | --------------- | ------ | ------------- | ---------- | ------- |
-| Raptor | Fixed (3)      | -               | 3.37k ±1.8% | -               | 37.11  | -             | 2.460      | 353.2   |
-| Raptor | Scaling (3–16) | -               | 7.39k ±1.7% | -               | 24.53  | -             | 0.470      | 344.9   |
-| Raptor | Fixed (16)     | -               | 7.49k ±1.6% | -               | 24.24  | -             | 0.455      | 341.6   |
-| Puma   | Fixed (3)      | Fixed (3)       | 1.48k ±0.2% | 56.2% lower     | 106.41 | 186.8% higher | 0.979      | 282.1   |
-| Puma   | Scaling (3–16) | Scaling (3–16)  | 7.58k ±1.1% | 2.5% higher     | 24.00  | 2.2% lower    | 0.435      | 310.5   |
-| Puma   | Fixed (16)     | Fixed (16)      | 7.59k ±0.9% | 1.4% higher     | 23.97  | 1.1% lower    | 0.437      | 316.5   |
-| Falcon | Fibers         | Fixed (3)       | 7.31k ±1.5% | 116.9% higher   | 24.86  | 33.0% lower   | 0.380      | 336.6   |
-| Falcon | Fibers         | Scaling (3–16)  | 7.31k ±1.5% | 1.1% lower      | 24.86  | 1.4% higher   | 0.380      | 336.6   |
-| Falcon | Fibers         | Fixed (16)      | 7.31k ±1.5% | 2.3% lower      | 24.86  | 2.6% higher   | 0.380      | 336.6   |
+| Raptor | Fixed (3)      | -               | 3.09k ±6.5% | -               | 51.42  | -             | 2.346      | 348.9   |
+| Raptor | Scaling (3–16) | -               | 7.39k ±0.6% | -               | 24.67  | -             | 0.465      | 344.2   |
+| Raptor | Fixed (16)     | -               | 7.48k ±0.5% | -               | 24.30  | -             | 0.453      | 344.1   |
+| Puma   | Fixed (3)      | Fixed (3)       | 1.49k ±0.4% | 51.7% lower     | 100.59 | 95.6% higher  | 1.009      | 282.5   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 7.39k ±0.4% | 0.0% higher     | 24.58  | 0.4% lower    | 0.434      | 310.0   |
+| Puma   | Fixed (16)     | Fixed (16)      | 7.52k ±0.4% | 0.5% higher     | 24.16  | 0.6% lower    | 0.428      | 316.3   |
+| Falcon | Fibers         | Fixed (3)       | 7.34k ±2.1% | 137.4% higher   | 24.78  | 51.8% lower   | 0.382      | 329.6   |
+| Falcon | Fibers         | Scaling (3–16)  | 7.34k ±2.1% | 0.7% lower      | 24.78  | 0.4% higher   | 0.382      | 329.6   |
+| Falcon | Fibers         | Fixed (16)      | 7.34k ±2.1% | 1.9% lower      | 24.78  | 2.0% higher   | 0.382      | 329.6   |
 
 ### IO over HTTP/2
 
-| Server | Mode           | Raptor baseline | req/s        | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
-| ------ | -------------- | --------------- | ------------ | --------------- | ------ | ------------- | ---------- | ------- |
-| Raptor | Fixed (3)      | -               | 1.61k ±4.7%  | -               | 120.85 | -             | 0.815      | 399.9   |
-| Raptor | Scaling (3–16) | -               | 6.80k ±22.8% | -               | 40.32  | -             | 0.580      | 912.4   |
-| Falcon | Fibers         | Fixed (3)       | 7.12k ±3.5%  | 342.8% higher   | 26.17  | 78.3% lower   | 0.432      | 539.7   |
-| Falcon | Fibers         | Scaling (3–16)  | 7.12k ±3.5%  | 4.7% higher     | 26.17  | 35.1% lower   | 0.432      | 539.7   |
+| Server | Mode           | Raptor baseline | req/s       | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
+| ------ | -------------- | --------------- | ----------- | --------------- | ------ | ------------- | ---------- | ------- |
+| Raptor | Fixed (3)      | -               | 1.61k ±0.3% | -               | 131.78 | -             | 0.901      | 410.2   |
+| Raptor | Scaling (3–16) | -               | 7.24k ±8.6% | -               | 30.21  | -             | 0.563      | 940.4   |
+| Falcon | Fibers         | Fixed (3)       | 7.82k ±1.7% | 386.4% higher   | 25.75  | 80.5% lower   | 0.426      | 526.6   |
+| Falcon | Fibers         | Scaling (3–16)  | 7.82k ±1.7% | 8.0% higher     | 25.75  | 14.7% lower   | 0.426      | 526.6   |
 
 ### CPU over HTTP/1.1
 
 | Server | Mode           | Raptor baseline | req/s       | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
 | ------ | -------------- | --------------- | ----------- | --------------- | ------ | ------------- | ---------- | ------- |
-| Raptor | Fixed (3)      | -               | 3.43k ±1.1% | -               | 67.46  | -             | 2.507      | 509.4   |
-| Raptor | Scaling (3–16) | -               | 3.26k ±2.5% | -               | 70.51  | -             | 2.572      | 499.6   |
-| Puma   | Fixed (3)      | Fixed (3)       | 3.21k ±3.5% | 6.3% lower      | 56.00  | 17.0% lower   | 2.454      | 441.3   |
-| Puma   | Scaling (3–16) | Scaling (3–16)  | 3.15k ±2.3% | 3.4% lower      | 49.26  | 30.1% lower   | 2.186      | 431.0   |
-| Falcon | Fibers         | Fixed (3)       | 3.36k ±4.2% | 2.1% lower      | 48.20  | 28.5% lower   | 2.555      | 435.8   |
-| Falcon | Fibers         | Scaling (3–16)  | 3.36k ±4.2% | 3.0% higher     | 48.20  | 31.6% lower   | 2.555      | 435.8   |
+| Raptor | Fixed (3)      | -               | 3.40k ±1.5% | -               | 66.74  | -             | 2.519      | 511.8   |
+| Raptor | Scaling (3–16) | -               | 3.45k ±3.9% | -               | 62.67  | -             | 2.389      | 504.6   |
+| Puma   | Fixed (3)      | Fixed (3)       | 3.24k ±0.9% | 4.7% lower      | 57.00  | 14.6% lower   | 2.457      | 444.5   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 3.09k ±2.7% | 10.4% lower     | 49.54  | 21.0% lower   | 2.182      | 437.4   |
+| Falcon | Fibers         | Fixed (3)       | 3.53k ±0.8% | 3.8% higher     | 47.04  | 29.5% lower   | 2.430      | 432.3   |
+| Falcon | Fibers         | Scaling (3–16)  | 3.53k ±0.8% | 2.2% higher     | 47.04  | 24.9% lower   | 2.430      | 432.3   |
 
 ### CPU over HTTP/1.1 keep-alive
 
 | Server | Mode           | Raptor baseline | req/s       | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
 | ------ | -------------- | --------------- | ----------- | --------------- | ------ | ------------- | ---------- | ------- |
-| Raptor | Fixed (3)      | -               | 3.10k ±5.2% | -               | 54.76  | -             | 2.560      | 484.4   |
-| Raptor | Scaling (3–16) | -               | 2.97k ±1.2% | -               | 49.64  | -             | 2.553      | 505.3   |
-| Puma   | Fixed (3)      | Fixed (3)       | 3.52k ±6.1% | 13.7% higher    | 51.14  | 6.6% lower    | 2.299      | 384.4   |
-| Puma   | Scaling (3–16) | Scaling (3–16)  | 2.90k ±4.2% | 2.3% lower      | 65.73  | 32.4% higher  | 2.283      | 472.5   |
-| Falcon | Fibers         | Fixed (3)       | 3.17k ±1.9% | 2.4% higher     | 69.58  | 27.1% higher  | 2.766      | 536.5   |
-| Falcon | Fibers         | Scaling (3–16)  | 3.17k ±1.9% | 6.7% higher     | 69.58  | 40.2% higher  | 2.766      | 536.5   |
+| Raptor | Fixed (3)      | -               | 3.12k ±0.3% | -               | 50.35  | -             | 2.534      | 483.3   |
+| Raptor | Scaling (3–16) | -               | 2.99k ±2.1% | -               | 50.79  | -             | 2.532      | 502.5   |
+| Puma   | Fixed (3)      | Fixed (3)       | 3.49k ±6.5% | 11.7% higher    | 51.75  | 2.8% higher   | 2.319      | 383.4   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 3.00k ±3.8% | 0.5% higher     | 64.39  | 26.8% higher  | 2.224      | 470.8   |
+| Falcon | Fibers         | Fixed (3)       | 3.17k ±0.2% | 1.7% higher     | 67.10  | 33.3% higher  | 2.763      | 529.6   |
+| Falcon | Fibers         | Scaling (3–16)  | 3.17k ±0.2% | 6.1% higher     | 67.10  | 32.1% higher  | 2.763      | 529.6   |
 
 ### CPU over HTTP/2
 
 | Server | Mode           | Raptor baseline | req/s        | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
 | ------ | -------------- | --------------- | ------------ | --------------- | ------ | ------------- | ---------- | ------- |
-| Raptor | Fixed (3)      | -               | 3.26k ±2.1%  | -               | 71.84  | -             | 2.329      | 573.4   |
-| Raptor | Scaling (3–16) | -               | 3.25k ±2.6%  | -               | 69.37  | -             | 2.383      | 590.6   |
-| Falcon | Fibers         | Fixed (3)       | 2.02k ±11.2% | 37.9% lower     | 176.57 | 145.8% higher | 2.405      | 559.2   |
-| Falcon | Fibers         | Scaling (3–16)  | 2.02k ±11.2% | 37.9% lower     | 176.57 | 154.5% higher | 2.405      | 559.2   |
+| Raptor | Fixed (3)      | -               | 3.32k ±3.7%  | -               | 70.25  | -             | 2.374      | 583.2   |
+| Raptor | Scaling (3–16) | -               | 3.31k ±0.9%  | -               | 60.05  | -             | 2.347      | 562.3   |
+| Falcon | Fibers         | Fixed (3)       | 2.36k ±18.9% | 29.0% lower     | 127.17 | 81.0% higher  | 2.399      | 561.8   |
+| Falcon | Fibers         | Scaling (3–16)  | 2.36k ±18.9% | 28.8% lower     | 127.17 | 111.8% higher | 2.399      | 561.8   |
 
 ### 64 KiB body over HTTP/1.1 keep-alive
 
 | Server | Mode           | Raptor baseline | req/s         | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
 | ------ | -------------- | --------------- | ------------- | --------------- | ------ | ------------- | ---------- | ------- |
-| Raptor | Scaling (3–16) | -               | 94.58k ±2.0%  | -               | 3.77   | -             | 0.052      | 507.6   |
-| Puma   | Scaling (3–16) | Scaling (3–16)  | 88.40k ±2.1%  | 6.5% lower      | 3.66   | 2.9% lower    | 0.054      | 1237.4  |
-| Falcon | Fibers         | Scaling (3–16)  | 103.33k ±5.0% | 9.2% higher     | 3.89   | 3.2% higher   | 0.051      | 344.7   |
+| Raptor | Scaling (3–16) | -               | 94.57k ±1.5%  | -               | 3.70   | -             | 0.051      | 592.0   |
+| Puma   | Scaling (3–16) | Scaling (3–16)  | 88.51k ±0.7%  | 6.4% lower      | 3.67   | 0.6% lower    | 0.054      | 1201.7  |
+| Falcon | Fibers         | Scaling (3–16)  | 103.00k ±5.1% | 8.9% higher     | 3.84   | 3.9% higher   | 0.051      | 341.1   |
 
 ### IO + SSE (native) over HTTP/1.1 keep-alive
 
 | Server        | Mode           | Raptor baseline | req/s       | vs Raptor req/s | p95 ms | vs Raptor p95 | CPU ms/req | PSS MiB |
 | ------------- | -------------- | --------------- | ----------- | --------------- | ------ | ------------- | ---------- | ------- |
-| Raptor        | Fixed (3)      | -               | 3.24k ±1.6% | -               | 44.69  | -             | 2.396      | 355.6   |
-| Raptor        | Scaling (3–16) | -               | 7.39k ±0.8% | -               | 24.47  | -             | 0.468      | 346.4   |
-| Puma          | Fixed (3)      | Fixed (3)       | 0.35k ±4.5% | 89.3% lower     | 316.86 | 609.1% higher | 1.764      | 243.6   |
-| Puma          | Scaling (3–16) | Scaling (3–16)  | 7.38k ±4.3% | 0.2% lower      | 24.61  | 0.6% higher   | 0.440      | 311.3   |
-| Falcon        | Fibers         | Fixed (3)       | 7.32k ±1.0% | 125.8% higher   | 24.83  | 44.4% lower   | 0.383      | 354.4   |
-| Falcon        | Fibers         | Scaling (3–16)  | 7.32k ±1.0% | 1.0% lower      | 24.83  | 1.5% higher   | 0.383      | 354.4   |
-| Raptor (enum) | Fixed (3)      | -               | 0.97k ±4.8% | -               | 56.38  | -             | 7.624      | 324.4   |
+| Raptor        | Fixed (3)      | -               | 2.74k ±6.2% | -               | 59.25  | -             | 2.298      | 341.5   |
+| Raptor        | Scaling (3–16) | -               | 7.41k ±1.2% | -               | 24.53  | -             | 0.471      | 345.4   |
+| Puma          | Fixed (3)      | Fixed (3)       | 0.34k ±5.4% | 87.5% lower     | 361.94 | 510.8% higher | 1.715      | 263.9   |
+| Puma          | Scaling (3–16) | Scaling (3–16)  | 7.34k ±1.0% | 1.0% lower      | 24.70  | 0.7% higher   | 0.430      | 310.9   |
+| Falcon        | Fibers         | Fixed (3)       | 7.30k ±1.0% | 165.9% higher   | 24.88  | 58.0% lower   | 0.379      | 356.6   |
+| Falcon        | Fibers         | Scaling (3–16)  | 7.30k ±1.0% | 1.6% lower      | 24.88  | 1.5% higher   | 0.379      | 356.6   |
+| Raptor (enum) | Fixed (3)      | -               | 0.88k ±0.3% | -               | 66.74  | -             | 8.142      | 382.6   |
 
-Puma, Fixed (3) had 68 timeouts, 1 stalled stream across all samples.
+Puma, Fixed (3) had 37 timeouts, 1 stalled stream across all samples.
 
-Raptor (enum), Fixed (3) had 21 timeouts, 2 stalled streams across all samples.
+Raptor (enum), Fixed (3) had 16 timeouts across all samples.
 
 > ruby 4.1.0dev (2026-11-10T00:02:04Z HEAD 7a07e456e4) +YJIT +PRISM [aarch64-linux]
 > 10 workers, 120 HTTP/1.1 client connections, 40 HTTP/2 connections × 3 streams.

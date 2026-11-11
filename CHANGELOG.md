@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-10
+
 - Support master-owned Rack listeners across worker forks
 - Add `after_worker_exit` hooks
 - Add `after_worker_drain` hooks
