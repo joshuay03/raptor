@@ -74,6 +74,8 @@ module Raptor
       after_worker_drain: [].freeze,
       after_worker_exit: [].freeze,
       before_refork: [].freeze,
+      before_seed_fork: [].freeze,
+      after_seed_fork: [].freeze,
       plugins: [].freeze,
       stats_file: "tmp/raptor.json",
       control_url: nil,

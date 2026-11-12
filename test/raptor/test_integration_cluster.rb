@@ -748,6 +748,74 @@ module Raptor
       File.delete(marker_path) rescue nil
     end
 
+    def test_seed_fork_hooks_quiesce_and_restore_seed_owned_listeners
+      skip "PR_SET_CHILD_SUBREAPER not available on this platform" unless Subreaper.enable
+
+      events, report = IO.pipe
+      auxiliary = nil
+      promoting = false
+      @options[:refork_after] = 10_000
+      @options[:before_refork] = [proc { promoting = true }]
+      @options[:before_worker_boot] = [proc do
+        auxiliary&.shutdown
+        auxiliary = nil
+        promoting = false
+      end]
+      @options[:after_worker_drain] = [proc do
+        if promoting
+          auxiliary = Embedded.new(->(_env) { [200, {}, [Process.pid.to_s]] }, http1: { ractors: 1 }).start
+          report.puts "ready:#{Process.pid}:#{auxiliary.port}"
+        end
+      end]
+      @options[:before_seed_fork] = [proc do
+        auxiliary.pause
+        report.puts "paused:#{Process.pid}"
+      end]
+      @options[:after_seed_fork] = [proc do
+        auxiliary.resume
+        report.puts "resumed:#{Process.pid}"
+      end]
+      cluster = without_output { Cluster.new(@options) }
+      port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork do
+        events.close
+        without_output { cluster.run }
+      end
+      report.close
+      cluster.instance_variable_get(:@binder).close
+      wait_for_server(port)
+      original = wait_until { cluster.stats.first[:pid] if cluster.stats.first[:booted] }
+      Process.kill("URG", cluster_pid)
+
+      Timeout.timeout(20) do
+        event, seed_pid, auxiliary_port = events.readline.strip.split(":")
+        assert_equal "ready", event
+        assert_equal original, seed_pid.to_i
+        previous_worker = original
+        2.times do |generation|
+          assert_equal "paused:#{original}\n", events.readline
+          assert_equal "resumed:#{original}\n", events.readline
+          worker = wait_until do
+            data = cluster.stats.first
+            data[:pid] if data[:booted] && data[:pid] != previous_worker
+          end
+          previous_worker = worker
+          wait_for_server(port)
+          assert_equal original.to_s, Net::HTTP.get(URI("http://127.0.0.1:#{auxiliary_port}/"))
+          Process.kill("KILL", worker) if generation.zero?
+        end
+
+        Process.kill("TERM", cluster_pid)
+        assert_predicate Process.waitpid2(cluster_pid).last, :success?
+        cluster_pid = nil
+        assert_nil events.gets
+        TCPServer.open("127.0.0.1", auxiliary_port.to_i) { |listener| assert_equal auxiliary_port.to_i, listener.addr[1] }
+      end
+    ensure
+      stop_cluster(cluster_pid)
+      [events, report].each { |io| io&.close unless io&.closed? }
+    end
+
     def test_after_worker_exit_hooks_report_reaped_workers_before_replacement
       events, report = IO.pipe
       @options[:after_worker_exit] = [proc do |index, pid, status|

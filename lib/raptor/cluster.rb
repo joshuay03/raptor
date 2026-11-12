@@ -87,6 +87,8 @@ module Raptor
     # @rbs @after_worker_drain: Array[Proc]
     # @rbs @after_worker_exit: Array[Proc]
     # @rbs @before_refork: Array[Proc]
+    # @rbs @before_seed_fork: Array[Proc]
+    # @rbs @after_seed_fork: Array[Proc]
     # @rbs @stats_file: String?
     # @rbs @control_server: ControlServer?
     # @rbs @pid_file: String?
@@ -159,6 +161,8 @@ module Raptor
     # @option options [Array<Proc>] :after_worker_drain procs called with the worker index after draining, before exit or seed promotion
     # @option options [Array<Proc>] :after_worker_exit procs called in the master after reaping, with the worker index, pid, and Process::Status
     # @option options [Array<Proc>] :before_refork procs called in a worker before it transitions to a seed
+    # @option options [Array<Proc>] :before_seed_fork procs called in the seed before forking replacement workers
+    # @option options [Array<Proc>] :after_seed_fork procs called in the seed after each fork attempt, including failures
     # @option options [Array<String, Symbol>] :plugins plugins to load and start in order
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :control_url `unix://` URL serving cluster stats, or nil to disable
@@ -194,6 +198,8 @@ module Raptor
       @after_worker_drain = options[:after_worker_drain] = Array(options[:after_worker_drain]).dup
       @after_worker_exit = options[:after_worker_exit] = Array(options[:after_worker_exit]).dup
       @before_refork = options[:before_refork] = Array(options[:before_refork]).dup
+      @before_seed_fork = options[:before_seed_fork] = Array(options[:before_seed_fork]).dup
+      @after_seed_fork = options[:after_seed_fork] = Array(options[:after_seed_fork]).dup
       @stats_file = options[:stats_file]
       @control_server = ControlServer.new(options[:control_url]) { stats_hash } if options[:control_url]
       @pid_file = options[:pid_file]
@@ -459,16 +465,25 @@ module Raptor
         @seed_pid = nil
       end
 
-      master_pid = Process.pid
-      begin
-        @before_fork.each(&:call)
+      with_fork_hooks(@before_fork, @after_fork) do
         pid = fork { run_worker(index, @phase) }
         @workers[index] = pid
         @worker_indices[pid] = index
+      end
+    end
+
+    # Restores resources in the forking process, even if a hook or fork fails.
+    #
+    # @rbs (Array[Proc] before, Array[Proc] after) { () -> untyped } -> untyped
+    def with_fork_hooks(before, after)
+      owner_pid = Process.pid
+      begin
+        before.each(&:call)
+        yield
       ensure
-        if Process.pid == master_pid
+        if Process.pid == owner_pid
           error = $!
-          @after_fork.each do |hook|
+          after.each do |hook|
             hook.call
           rescue => hook_error
             if error
@@ -977,12 +992,14 @@ module Raptor
         # Forks through a short-lived intermediate process so the worker
         # reparents to the subreaper master, which supervises and reaps it
         # like a worker it forked itself.
-        intermediate_pid = fork do
-          pid = fork { run_worker(slot_index, child_phase) }
-          @resp_w.write([pid].pack("L")) rescue nil
-          exit!
+        with_fork_hooks(@before_seed_fork, @after_seed_fork) do
+          intermediate_pid = fork do
+            pid = fork { run_worker(slot_index, child_phase) }
+            @resp_w.write([pid].pack("L")) rescue nil
+            exit!
+          end
+          Process.wait(intermediate_pid)
         end
-        Process.wait(intermediate_pid)
       end
     rescue Errno::EPIPE, IOError
     end

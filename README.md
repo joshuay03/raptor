@@ -155,6 +155,8 @@ working directory. Pass `-c PATH` to point at a specific file.
   after_worker_drain: [],
   after_worker_exit: [],
   before_refork: [],
+  before_seed_fork: [],
+  after_seed_fork: [],
   plugins: [],
   stats_file: "tmp/raptor.json",
   control_url: nil,

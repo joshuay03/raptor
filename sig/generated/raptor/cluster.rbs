@@ -44,6 +44,8 @@ module Raptor
     # @rbs (Integer worker_count, ?cores: Integer) -> Integer
     def self.default_http2_ractor_count: (Integer worker_count, ?cores: Integer) -> Integer
 
+    @stats_file: String?
+
     @control_server: ControlServer?
 
     @pid_file: String?
@@ -64,9 +66,11 @@ module Raptor
 
     @server_port: Integer
 
-    @app: untyped
+    @plugins: Array[Plugin]
 
-    @stats_file: String?
+    @after_seed_fork: Array[Proc]
+
+    @before_seed_fork: Array[Proc]
 
     @before_refork: Array[Proc]
 
@@ -85,10 +89,6 @@ module Raptor
     @before_fork: Array[Proc]
 
     @worker_shutdown_timeout: Integer
-
-    @worker_drain_timeout: Integer
-
-    @plugins: Array[Plugin]
 
     @bpf_active: bool
 
@@ -131,6 +131,10 @@ module Raptor
     @workers: Hash[Integer, Integer]
 
     @shutdown: bool
+
+    @app: untyped
+
+    @worker_drain_timeout: Integer
 
     @worker_timeout: Integer
 
@@ -187,6 +191,8 @@ module Raptor
     # @option options [Array<Proc>] :after_worker_drain procs called with the worker index after draining, before exit or seed promotion
     # @option options [Array<Proc>] :after_worker_exit procs called in the master after reaping, with the worker index, pid, and Process::Status
     # @option options [Array<Proc>] :before_refork procs called in a worker before it transitions to a seed
+    # @option options [Array<Proc>] :before_seed_fork procs called in the seed before forking replacement workers
+    # @option options [Array<Proc>] :after_seed_fork procs called in the seed after each fork attempt, including failures
     # @option options [Array<String, Symbol>] :plugins plugins to load and start in order
     # @option options [String, nil] :stats_file path to write per-worker stats JSON, or nil to disable
     # @option options [String, nil] :control_url `unix://` URL serving cluster stats, or nil to disable
@@ -266,6 +272,11 @@ module Raptor
     #
     # @rbs (Integer index) -> void
     def spawn_worker: (Integer index) -> void
+
+    # Restores resources in the forking process, even if a hook or fork fails.
+    #
+    # @rbs (Array[Proc] before, Array[Proc] after) { () -> untyped } -> untyped
+    def with_fork_hooks: (Array[Proc] before, Array[Proc] after) { () -> untyped } -> untyped
 
     # Asks the seed to fork a new worker at the given index, returning the
     # child pid, or nil when the seed doesn't respond in time.
