@@ -10,6 +10,7 @@ require "rack"
 
 require_relative "detached_body"
 require_relative "http"
+require_relative "log"
 require_relative "raptor_http"
 require_relative "server"
 require_relative "thread_locals"
@@ -218,6 +219,7 @@ module Raptor
     # @rbs @clean_thread_locals: bool
     # @rbs @clean_fiber_locals: bool
     # @rbs @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
+    # @rbs @error_response: Proc?
     # @rbs @running: AtomicBoolean
     # @rbs @env_template: Hash[String, untyped]
 
@@ -235,10 +237,11 @@ module Raptor
     # @param clean_thread_locals [Boolean] whether to clear application thread locals after each request
     # @param clean_fiber_locals [Boolean] whether to process each request in a fresh Fiber
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
+    # @param error_response [Proc, nil] callback returning a Rack response for (env, exception, suggested_status)
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?) -> void
-    def initialize(app, server_port, connection_options: {}, http1_options: {}, access_log_io: nil, clean_thread_locals: true, clean_fiber_locals: false, on_error: nil)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http1_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?, ?error_response: Proc?) -> void
+    def initialize(app, server_port, connection_options: {}, http1_options: {}, access_log_io: nil, clean_thread_locals: true, clean_fiber_locals: false, on_error: nil, error_response: nil)
       @app = app
       @server_port_string = server_port.to_s.freeze
       @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
@@ -249,6 +252,7 @@ module Raptor
       @clean_thread_locals = clean_thread_locals
       @clean_fiber_locals = clean_fiber_locals
       @on_error = on_error
+      @error_response = error_response
       @running = AtomicBoolean.new(true)
       @env_template = {
         Rack::RACK_VERSION => Rack::VERSION,
@@ -729,6 +733,7 @@ module Raptor
         keep_alive && !hijacked && !detached
       rescue => error
         keep_alive = false
+        hijacked ||= rack_env && rack_env[RACK_HIJACKED]
         handle_app_error(socket, rack_env, status, headers, error, response_started: response_started, hijacked: hijacked)
       ensure
         rack_input = rack_env && rack_env[Rack::RACK_INPUT]
@@ -740,10 +745,8 @@ module Raptor
       end
     end
 
-    # Handles an exception raised while processing a request. Fires the
-    # `rack.response_finished` callbacks with the error, writes a 500
-    # response when no bytes have gone to the socket yet, and routes the
-    # exception through the configured `on_error` handler (or re-raises).
+    # Finishes the failed request, writes a fallback when output has not
+    # started, and reports the original exception through `on_error` or re-raises.
     #
     # @param socket [TCPSocket] the client socket
     # @param rack_env [Hash, nil] the Rack environment, if it was built
@@ -757,7 +760,20 @@ module Raptor
     # @rbs (TCPSocket socket, Hash[String, untyped]? rack_env, untyped status, Hash[String, String | Array[String]]? headers, Exception error, response_started: bool, hijacked: bool) -> void
     def handle_app_error(socket, rack_env, status, headers, error, response_started:, hijacked:)
       Http.call_response_finished(rack_env, status, headers, error)
-      socket.write(INTERNAL_SERVER_ERROR_RESPONSE) rescue nil unless response_started || hijacked
+      unless response_started || hijacked
+        begin
+          response = @error_response&.call(rack_env, error, 500)
+          if response
+            write_response(socket, rack_env || {}, *response) { response_started = true }
+          else
+            response_started = true
+            socket.write(INTERNAL_SERVER_ERROR_RESPONSE)
+          end
+        rescue => fallback_error
+          Log.rescued_error(fallback_error)
+          socket.write(INTERNAL_SERVER_ERROR_RESPONSE) rescue nil unless response_started
+        end
+      end
 
       if @on_error
         @on_error.call(rack_env, error) rescue nil
@@ -1025,9 +1041,10 @@ module Raptor
     # @param headers [Hash] response headers from the Rack application
     # @param body [Object] response body (array, enumerable, file, or callable)
     # @param keep_alive [Boolean] whether to send a keep-alive connection header
+    # @yield before writing response output
     # @return [void]
     #
-    # @rbs (TCPSocket socket, Hash[String, untyped] env, Integer status, Hash[String, String | Array[String]] headers, untyped body, ?keep_alive: bool) -> void
+    # @rbs (TCPSocket socket, Hash[String, untyped] env, Integer status, Hash[String, String | Array[String]] headers, untyped body, ?keep_alive: bool) ?{ () -> void } -> void
     def write_response(socket, env, status, headers, body, keep_alive: false)
       validate_status(status)
       response_hijack = headers.is_a?(Hash) ? headers.delete(Rack::RACK_HIJACK) : nil
@@ -1044,6 +1061,7 @@ module Raptor
 
       corked = !keep_alive && !body.respond_to?(:to_ary) && !no_body && !response_hijack
       cork_socket(socket) if corked
+      yield if block_given?
 
       if response_hijack
         write_hijacked_response(socket, response, headers, response_hijack)

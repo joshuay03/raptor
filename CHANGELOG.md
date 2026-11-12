@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Add configurable error responses
 - Add bundled `statsd` plugin
 - Add seed-side fork lifecycle hooks
 - Add live worker statistics and `after_worker_boot` hooks

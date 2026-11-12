@@ -397,6 +397,8 @@ module Raptor
 
     @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
 
+    @error_response: Proc?
+
     @running: AtomicBoolean
 
     @initial_settings_frame: String
@@ -414,10 +416,11 @@ module Raptor
     # @param clean_thread_locals [Boolean] whether to clear application thread locals after each request
     # @param clean_fiber_locals [Boolean] whether to process each request in a fresh Fiber
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
+    # @param error_response [Proc, nil] callback returning a Rack response for (env, exception, suggested_status)
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?) -> void
-    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?) -> void
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?, ?error_response: Proc?) -> void
+    def initialize: (^(Hash[String, untyped]) -> [ Integer, Hash[String, String | Array[String]], untyped ] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?, ?error_response: Proc?) -> void
 
     # Returns a Ractor-safe proc that parses HTTP/2 frames from the
     # state hash's buffered bytes.

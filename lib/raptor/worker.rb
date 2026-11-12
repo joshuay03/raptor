@@ -67,7 +67,8 @@ module Raptor
         access_log_io: @access_log_io,
         clean_thread_locals: @options[:clean_thread_locals],
         clean_fiber_locals: @options[:clean_fiber_locals],
-        on_error: @options[:on_error]
+        on_error: @options[:on_error],
+        error_response: @options[:error_response]
       )
       @http2 = Http2.new(
         counting_app,
@@ -77,7 +78,8 @@ module Raptor
         access_log_io: @access_log_io,
         clean_thread_locals: @options[:clean_thread_locals],
         clean_fiber_locals: @options[:clean_fiber_locals],
-        on_error: @options[:on_error]
+        on_error: @options[:on_error],
+        error_response: @options[:error_response]
       )
       @http1_ractor_pool = RactorPool.new(
         size: @http1_ractors,
