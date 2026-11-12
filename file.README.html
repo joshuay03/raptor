@@ -201,6 +201,9 @@ working directory. Pass <code>-c PATH</code> to point at a specific file.</p>
 <p>By default each worker adds threads beyond <code>threads</code> only while queued requests are waiting on blocking work such as
 database or network calls. It stops adding them once Ruby execution becomes the bottleneck, and the extra threads
 retire when the queue is idle. Set <code>max_threads</code> to cap this growth, or set it to <code>threads</code> for a fixed pool.</p>
+<p>Set <code>error_response</code> to a callback receiving <code>(env, exception, suggested_status)</code> and returning a Rack response to
+customize application error pages. <code>on_error</code> still reports the exception. Parser errors, committed responses and
+hijacked connections are not replaced.</p>
 <h2 id="Plugins">Plugins</h2>
 <p>Plugins start in the master process and can register lifecycle hooks that run in workers. Use them for metrics
 exporters, probes, or other integrations. Enable them in your config with <code>plugins: [:stats_logger]</code>.</p>
@@ -988,7 +991,7 @@ be a safe, welcoming space for collaboration, and contributors are expected to a
 follow the <a href="https://github.com/joshuay03/raptor/blob/main/CODE_OF_CONDUCT.md">code of conduct</a>.</p></div></div>
 
       <div id="footer">
-  Generated on Thu Nov 12 00:30:03 2026 by
+  Generated on Thu Nov 12 00:34:41 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>

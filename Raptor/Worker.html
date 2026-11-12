@@ -750,8 +750,6 @@
       <pre class="lines">
 
 
-217
-218
 219
 220
 221
@@ -761,10 +759,12 @@
 225
 226
 227
-228</pre>
+228
+229
+230</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 217</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 219</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_drain_thread_pool'>drain_thread_pool</span>
   <span class='id identifier rubyid_drain_thread'>drain_thread</span> <span class='op'>=</span> <span class='const'>Thread</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span> <span class='kw'>do</span>
@@ -821,14 +821,14 @@ Idle keep-alive connections and sockets owned by hijacking apps do not count.</p
       <pre class="lines">
 
 
-165
-166
 167
 168
-169</pre>
+169
+170
+171</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 165</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 167</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_idle?'>idle?</span>
   <span class='id identifier rubyid_status'>status</span> <span class='op'>=</span> <span class='id identifier rubyid_stats'>stats</span>
@@ -864,14 +864,14 @@ Idle keep-alive connections and sockets owned by hijacking apps do not count.</p
       <pre class="lines">
 
 
-174
-175
 176
 177
-178</pre>
+178
+179
+180</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 174</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 176</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_join'>join</span>
   <span class='ivar'>@server_thread</span><span class='period'>.</span><span class='id identifier rubyid_join'>join</span><span class='lparen'>(</span><span class='float'>0.1</span><span class='rparen'>)</span> <span class='kw'>while</span> <span class='id identifier rubyid_running?'>running?</span>
@@ -920,12 +920,12 @@ Idle keep-alive connections and sockets owned by hijacking apps do not count.</p
       <pre class="lines">
 
 
-137
-138
-139</pre>
+139
+140
+141</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 137</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 139</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_running?'>running?</span>
   <span class='op'>!</span><span class='op'>!</span><span class='lparen'>(</span><span class='ivar'>@server_thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_alive?'>alive?</span> <span class='op'>&amp;&amp;</span> <span class='ivar'>@reactor_thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_alive?'>alive?</span><span class='rparen'>)</span>
@@ -977,8 +977,6 @@ A seed keeps its listeners open for the cluster to manage.</p>
       <pre class="lines">
 
 
-184
-185
 186
 187
 188
@@ -1003,10 +1001,12 @@ A seed keeps its listeners open for the cluster to manage.</p>
 207
 208
 209
-210</pre>
+210
+211
+212</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 184</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 186</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span><span class='lparen'>(</span><span class='label'>close_listeners:</span> <span class='kw'>true</span><span class='rparen'>)</span>
   <span class='kw'>return</span> <span class='kw'>if</span> <span class='ivar'>@stopped</span>
@@ -1140,7 +1140,9 @@ A seed keeps its listeners open for the cluster to manage.</p>
 129
 130
 131
-132</pre>
+132
+133
+134</pre>
     </td>
     <td>
       <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 56</span>
@@ -1159,7 +1161,8 @@ A seed keeps its listeners open for the cluster to manage.</p>
     <span class='label'>access_log_io:</span> <span class='ivar'>@access_log_io</span><span class='comma'>,</span>
     <span class='label'>clean_thread_locals:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:clean_thread_locals</span><span class='rbracket'>]</span><span class='comma'>,</span>
     <span class='label'>clean_fiber_locals:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:clean_fiber_locals</span><span class='rbracket'>]</span><span class='comma'>,</span>
-    <span class='label'>on_error:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:on_error</span><span class='rbracket'>]</span>
+    <span class='label'>on_error:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:on_error</span><span class='rbracket'>]</span><span class='comma'>,</span>
+    <span class='label'>error_response:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:error_response</span><span class='rbracket'>]</span>
   <span class='rparen'>)</span>
   <span class='ivar'>@http2</span> <span class='op'>=</span> <span class='const'><span class='object_link'><a href="Http2.html" title="Raptor::Http2 (class)">Http2</a></span></span><span class='period'>.</span><span class='id identifier rubyid_new'><span class='object_link'><a href="Http2.html#initialize-instance_method" title="Raptor::Http2#initialize (method)">new</a></span></span><span class='lparen'>(</span>
     <span class='id identifier rubyid_counting_app'>counting_app</span><span class='comma'>,</span>
@@ -1169,7 +1172,8 @@ A seed keeps its listeners open for the cluster to manage.</p>
     <span class='label'>access_log_io:</span> <span class='ivar'>@access_log_io</span><span class='comma'>,</span>
     <span class='label'>clean_thread_locals:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:clean_thread_locals</span><span class='rbracket'>]</span><span class='comma'>,</span>
     <span class='label'>clean_fiber_locals:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:clean_fiber_locals</span><span class='rbracket'>]</span><span class='comma'>,</span>
-    <span class='label'>on_error:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:on_error</span><span class='rbracket'>]</span>
+    <span class='label'>on_error:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:on_error</span><span class='rbracket'>]</span><span class='comma'>,</span>
+    <span class='label'>error_response:</span> <span class='ivar'>@options</span><span class='lbracket'>[</span><span class='symbol'>:error_response</span><span class='rbracket'>]</span>
   <span class='rparen'>)</span>
   <span class='ivar'>@http1_ractor_pool</span> <span class='op'>=</span> <span class='const'>RactorPool</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span>
     <span class='label'>size:</span> <span class='ivar'>@http1_ractors</span><span class='comma'>,</span>
@@ -1265,8 +1269,6 @@ Counts are observations, not a barrier against new requests.</p>
       <pre class="lines">
 
 
-145
-146
 147
 148
 149
@@ -1279,10 +1281,12 @@ Counts are observations, not a barrier against new requests.</p>
 156
 157
 158
-159</pre>
+159
+160
+161</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 145</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/worker.rb', line 147</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_stats'>stats</span>
   <span class='id identifier rubyid_queued'>queued</span> <span class='op'>=</span> <span class='ivar'>@thread_pool</span><span class='period'>.</span><span class='id identifier rubyid_queue_size'>queue_size</span>
@@ -1309,7 +1313,7 @@ Counts are observations, not a barrier against new requests.</p>
 </div>
 
       <div id="footer">
-  Generated on Thu Nov 12 00:30:05 2026 by
+  Generated on Thu Nov 12 00:34:42 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.9).
 </div>
