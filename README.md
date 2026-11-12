@@ -266,6 +266,19 @@ Worker 1 (phase 0): pid=91351, requests=1199, busy=1/3, backlog=0, booted, last_
 Set `control_url` to a Unix socket URL such as `unix:///tmp/raptor-control.sock` to serve the same stats over
 `GET /stats`.
 
+The bundled `statsd` plugin exports aggregate gauges and a `requests` counter without additional dependencies.
+Enable it in your configuration file.
+
+```ruby
+{
+  plugins: [:statsd],
+  statsd: { host: "127.0.0.1", port: 8125, interval: 2, namespace: "raptor", tags: [] }
+}
+```
+
+Use `socket_path` instead of `host` and `port` for Unix datagrams. Delivery is best effort, based on sampled worker
+statistics. The exporter handles worker forks and restart cleanup automatically.
+
 ## (Micro) Benchmarks
 
 Raptor 0.27.0 vs Puma 8.0.2 vs Falcon 0.57.0. Each case has 3 fresh-process samples, interleaved in seeded shuffled
