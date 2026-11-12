@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "tempfile"
 require "time"
 
 require "concurrent/utility/processor_counter"
@@ -1090,14 +1091,19 @@ module Raptor
       @workers.values.each { |pid| Process.kill("HUP", pid) rescue nil }
     end
 
-    # Writes the stats file on a 1-second interval until shutdown.
+    # Publishes complete stats snapshots on a 1-second interval until shutdown.
     #
     # @return [void]
     #
     # @rbs () -> void
     def write_stats_file_loop
       loop do
-        File.write(@stats_file, JSON.generate({ master_pid: Process.pid, workers: @stats.all }))
+        Tempfile.create([".raptor-stats-", ".json"], File.dirname(@stats_file)) do |file|
+          file.chmod(File.exist?(@stats_file) ? File.stat(@stats_file).mode & 0o777 : 0o666 & ~File.umask)
+          file.write(JSON.generate({ master_pid: Process.pid, workers: @stats.all }))
+          file.close
+          File.rename(file.path, @stats_file)
+        end
         break if @shutdown
 
         sleep 1

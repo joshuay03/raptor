@@ -72,9 +72,10 @@ module Raptor
       File.delete(pid_path) rescue nil
     end
 
-    def test_stats_file_written_after_startup
+    def test_stats_file_publishes_complete_snapshots
       stats_path = "/tmp/raptor_test_stats_#{Process.pid}.json"
       File.delete(stats_path) rescue nil
+      File.write(stats_path, JSON.generate(workers: [{ booted: false }]), perm: 0o640)
       @options[:stats_file] = stats_path
 
       with_server do
@@ -88,6 +89,19 @@ module Raptor
         assert_operator data[:master_pid], :>, 0
         assert_equal 1, data[:workers].length
         assert data[:workers].first[:booted]
+
+        File.open(stats_path) do |snapshot|
+          published = snapshot.read
+          previous = JSON.parse(published, symbolize_names: true)
+          wait_until do
+            current = JSON.parse(File.read(stats_path), symbolize_names: true)
+            current[:workers].first[:last_checkin] > previous[:workers].first[:last_checkin]
+          end
+
+          snapshot.rewind
+          assert_equal published, snapshot.read
+          assert_equal 0o640, File.stat(stats_path).mode & 0o777
+        end
       end
     ensure
       File.delete(stats_path) rescue nil

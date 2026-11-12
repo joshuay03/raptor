@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Publish stats files atomically
 - Add configurable error responses
 - Add bundled `statsd` plugin
 - Add seed-side fork lifecycle hooks
