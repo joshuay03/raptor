@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Add live worker statistics and `after_worker_boot` hooks
+
 ## [0.27.0] - 2026-11-10
 
 - Support master-owned Rack listeners across worker forks

@@ -138,6 +138,36 @@ module Raptor
       !!(@server_thread&.alive? && @reactor_thread&.alive?)
     end
 
+    # Returns live pool statistics and the number of detached responses.
+    # Counts are observations, not a barrier against new requests.
+    #
+    # @rbs () -> Hash[Symbol, Integer]
+    def stats
+      queued = @thread_pool.queue_size
+      busy = @thread_pool.active_count
+      capacity = @thread_pool.size
+
+      {
+        backlog: queued,
+        busy_threads: busy,
+        running: capacity,
+        pool_capacity: [capacity - busy - queued, 0].max,
+        max_threads: capacity,
+        requests_count: @requests,
+        detached_responses: @reactor.detached_responses
+      }
+    end
+
+    # Returns whether no app work is queued or running and no detached response remains.
+    # Idle keep-alive connections and sockets owned by hijacking apps do not count.
+    #
+    # @rbs () -> bool
+    def idle?
+      status = stats
+
+      status[:backlog].zero? && status[:busy_threads].zero? && status[:detached_responses].zero?
+    end
+
     # Waits until serving stops, propagating background thread failures.
     #
     # @rbs () -> void

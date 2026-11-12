@@ -150,6 +150,7 @@ working directory. Pass `-c PATH` to point at a specific file.
   before_fork: [],
   after_fork: [],
   before_worker_boot: [],
+  after_worker_boot: [],
   before_worker_shutdown: [],
   after_worker_drain: [],
   after_worker_exit: [],

@@ -56,6 +56,18 @@ module Raptor
     # @rbs () -> bool
     def running?: () -> bool
 
+    # Returns live pool statistics and the number of detached responses.
+    # Counts are observations, not a barrier against new requests.
+    #
+    # @rbs () -> Hash[Symbol, Integer]
+    def stats: () -> Hash[Symbol, Integer]
+
+    # Returns whether no app work is queued or running and no detached response remains.
+    # Idle keep-alive connections and sockets owned by hijacking apps do not count.
+    #
+    # @rbs () -> bool
+    def idle?: () -> bool
+
     # Waits until serving stops, propagating background thread failures.
     #
     # @rbs () -> void

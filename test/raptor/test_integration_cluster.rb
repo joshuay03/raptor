@@ -623,6 +623,93 @@ module Raptor
       File.delete(marker_path) rescue nil
     end
 
+    def test_worker_local_statistics_distinguish_queued_work_and_detached_responses
+      commands, command = IO.pipe
+      snapshots, snapshot = IO.pipe
+      entered, enter = IO.pipe
+      release, resume = IO.pipe
+      detached = DetachedBody.new
+      @options[:threads] = @options[:max_threads] = 1
+      @options[:after_worker_boot] = [proc do |index, worker|
+        Thread.new do
+          while (operation = commands.read(1)) && !operation.empty?
+            detached.close if operation == "c"
+            snapshot.puts JSON.generate(index: index, pid: Process.pid, idle: worker.idle?, stats: worker.stats)
+          end
+        end
+      end]
+      @options[:app] = ->(env) do
+        if env["PATH_INFO"] == "/hold"
+          enter.puts "entered"
+          release.read(1)
+        elsif env["PATH_INFO"] == "/detached"
+          next [200, {}, detached]
+        end
+
+        [200, {}, ["ok"]]
+      end
+      cluster = without_output { Cluster.new(@options) }
+      port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork do
+        [command, snapshots, entered, resume].each(&:close)
+        without_output { cluster.run }
+      end
+      [commands, snapshot, enter, release].each(&:close)
+      cluster.instance_variable_get(:@binder).close
+      read_stats = ->(operation = "s") do
+        command.write(operation)
+        JSON.parse(Timeout.timeout(5) { snapshots.readline }, symbolize_names: true)
+      end
+      wait_for_server(port)
+      initial = wait_until do
+        data = read_stats.call
+        data if data[:idle]
+      end
+
+      assert_equal 0, initial[:index]
+      refute_equal Process.pid, initial[:pid]
+      assert_equal 1, initial.dig(:stats, :pool_capacity)
+
+      clients = Array.new(2) { TCPSocket.new("127.0.0.1", port) }
+      clients.first.write("GET /hold HTTP/1.0\r\n\r\n")
+      assert_equal "entered\n", Timeout.timeout(5) { entered.readline }
+      clients.last.write("GET /hold HTTP/1.0\r\n\r\n")
+      busy = wait_until do
+        data = read_stats.call
+        data if data.dig(:stats, :backlog) == 1
+      end
+
+      refute busy[:idle]
+      assert_equal 1, busy.dig(:stats, :busy_threads)
+      assert_equal 0, busy.dig(:stats, :pool_capacity)
+      resume.write("r")
+      assert_includes Timeout.timeout(5) { clients.first.read }, "ok"
+      assert_equal "entered\n", Timeout.timeout(5) { entered.readline }
+      refute read_stats.call[:idle]
+      resume.write("r")
+      assert_includes Timeout.timeout(5) { clients.last.read }, "ok"
+      wait_until { read_stats.call[:idle] }
+
+      stream = TCPSocket.new("127.0.0.1", port)
+      stream.write("GET /detached HTTP/1.0\r\n\r\n")
+      streaming = wait_until do
+        data = read_stats.call
+        data if data.dig(:stats, :detached_responses) == 1 && data.dig(:stats, :busy_threads).zero?
+      end
+      refute streaming[:idle]
+      assert_equal 0, streaming.dig(:stats, :backlog)
+      read_stats.call("c")
+      assert_includes Timeout.timeout(5) { stream.read }, "200 OK"
+      wait_until { read_stats.call[:idle] }
+    ensure
+      resume&.close unless resume&.closed?
+      command&.close unless command&.closed?
+      clients&.each(&:close)
+      stream&.close
+      stop_cluster(cluster_pid)
+      [commands, snapshots, snapshot, entered, enter, release].each { |io| io&.close unless io&.closed? }
+    end
+
     def test_after_worker_drain_hooks_wait_for_response_cleanup
       [false, true].each { |detached| assert_worker_drain_order(detached: detached) }
     end

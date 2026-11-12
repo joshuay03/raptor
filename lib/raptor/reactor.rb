@@ -683,6 +683,13 @@ module Raptor
       @thread_pool.queue_size + @thread_pool.active_count
     end
 
+    # Returns the number of server-managed detached response streams.
+    #
+    # @rbs () -> Integer
+    def detached_responses
+      @detached_count.value
+    end
+
     private
 
     # Wakes the event loop, including work queued before it starts waiting.

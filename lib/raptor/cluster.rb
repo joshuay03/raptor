@@ -82,6 +82,7 @@ module Raptor
     # @rbs @before_fork: Array[Proc]
     # @rbs @after_fork: Array[Proc]
     # @rbs @before_worker_boot: Array[Proc]
+    # @rbs @after_worker_boot: Array[Proc]
     # @rbs @before_worker_shutdown: Array[Proc]
     # @rbs @after_worker_drain: Array[Proc]
     # @rbs @after_worker_exit: Array[Proc]
@@ -153,6 +154,7 @@ module Raptor
     # @option options [Array<Proc>] :before_fork procs called in the master before each direct worker fork, not seed forks
     # @option options [Array<Proc>] :after_fork procs called in the master after each direct fork attempt, including failures
     # @option options [Array<Proc>] :before_worker_boot procs called with the worker index before it begins serving
+    # @option options [Array<Proc>] :after_worker_boot procs called in the worker with its index and live Worker handle after startup
     # @option options [Array<Proc>] :before_worker_shutdown procs called with the worker index before its graceful shutdown
     # @option options [Array<Proc>] :after_worker_drain procs called with the worker index after draining, before exit or seed promotion
     # @option options [Array<Proc>] :after_worker_exit procs called in the master after reaping, with the worker index, pid, and Process::Status
@@ -187,6 +189,7 @@ module Raptor
       @before_fork = options[:before_fork] = Array(options[:before_fork]).dup
       @after_fork = options[:after_fork] = Array(options[:after_fork]).dup
       @before_worker_boot = options[:before_worker_boot] = Array(options[:before_worker_boot]).dup
+      @after_worker_boot = options[:after_worker_boot] = Array(options[:after_worker_boot]).dup
       @before_worker_shutdown = options[:before_worker_shutdown] = Array(options[:before_worker_shutdown]).dup
       @after_worker_drain = options[:after_worker_drain] = Array(options[:after_worker_drain]).dup
       @after_worker_exit = options[:after_worker_exit] = Array(options[:after_worker_exit]).dup
@@ -900,6 +903,7 @@ module Raptor
         worker_index: (index if @bpf_active)
       )
       worker.start
+      @after_worker_boot.each { |hook| hook.parameters.empty? ? hook.call : hook.call(index, worker) }
 
       Log.info "Worker #{index} booted"
 
