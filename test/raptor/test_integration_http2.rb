@@ -123,6 +123,7 @@ module Raptor
 
     def test_max_body_size_rejects_uploads_without_closing_the_connection
       @options[:connection] = @options[:connection].merge(max_body_size: 5)
+      @options[:error_response] = proc { [599, {}, ["replacement"]] }
 
       with_http2_server("rack_input.ru") do |port|
         socket = connect_http2(port)
@@ -183,6 +184,55 @@ module Raptor
       end
     end
 
+    def test_error_response_customizes_response_and_preserves_on_error
+      reader, writer = IO.pipe
+      @options[:on_error] = proc { |env, error| writer.puts "#{env[Rack::PATH_INFO]} #{error.message}" }
+      @options[:error_response] = proc do |env, error, status|
+        [503, { "content-type" => "text/plain" }, ["#{env[Rack::PATH_INFO]} #{status} #{error.message}"]]
+      end
+      with_http2_server("error_500.ru") do |port|
+        response = http2_get(port, "/").first
+
+        assert_equal "503", response[:status]
+        assert_equal "text/plain", response[:headers]["content-type"]
+        assert_equal "/ 500 something went wrong", response[:body]
+        assert_equal "/ something went wrong\n", Timeout.timeout(5) { reader.gets }
+        assert_equal "", http2_request(port, "HEAD", "/").first[:body]
+      end
+    ensure
+      reader&.close
+      writer&.close
+    end
+
+    def test_error_response_failure_or_nil_retains_default_response
+      @options[:on_error] = proc {}
+      @options[:error_response] = proc do |env, _error, _status|
+        case env[Rack::PATH_INFO]
+        when "/raises" then raise "fallback failed"
+        when "/invalid" then [500, nil, []]
+        when "/stream"
+          body = proc do |stream|
+            stream.write("partial")
+            raise "fallback stream failed"
+          end
+          [503, {}, body]
+        end
+      end
+      with_http2_server("error_500.ru") do |port|
+        ["/nil", "/raises", "/invalid"].each do |path|
+          response = http2_get(port, path).first
+
+          assert_equal "500", response[:status]
+          assert_equal "", response[:body]
+        end
+
+        responses = http2_get(port, "/stream")
+        assert_equal 1, responses.length
+        assert_equal "503", responses.first[:status]
+        assert_equal "partial", responses.first[:body]
+      end
+    end
+
     def test_body_failure_closes_before_response_finished
       reader, writer = IO.pipe
       body = Object.new
@@ -192,6 +242,7 @@ module Raptor
       end
       body.define_singleton_method(:close) { writer.puts "closed" }
       @options[:on_error] = proc {}
+      @options[:error_response] = proc { [599, {}, ["replacement"]] }
       @options[:app] = proc do |env|
         env[Rack::RACK_RESPONSE_FINISHED] << proc { |_env, _status, _headers, error| writer.puts "finished #{error.message}" }
         [200, {}, body]

@@ -173,6 +173,10 @@ By default each worker adds threads beyond `threads` only while queued requests 
 database or network calls. It stops adding them once Ruby execution becomes the bottleneck, and the extra threads
 retire when the queue is idle. Set `max_threads` to cap this growth, or set it to `threads` for a fixed pool.
 
+Set `error_response` to a callback receiving `(env, exception, suggested_status)` and returning a Rack response to
+customize application error pages. `on_error` still reports the exception. Parser errors, committed responses and
+hijacked connections are not replaced.
+
 ## Plugins
 
 Plugins start in the master process and can register lifecycle hooks that run in workers. Use them for metrics

@@ -173,6 +173,8 @@ module Raptor
     # @option options [String, nil] :launch_command path of the program to re-exec on hot restart, or nil to disable
     # @option options [Array<String>, nil] :launch_argv command-line arguments for the hot-restart exec, or nil to disable
     # @option options [#call, nil] :on_error callback invoked with (env, exception) when the Rack app raises
+    # @option options [Proc, nil] :error_response callback returning a Rack response for (env, exception, suggested_status)
+    #   before output starts. Nil or callback failure retains the empty 500. Parser errors and hijacked connections are excluded.
     # @return [void]
     #
     # @rbs (Hash[Symbol, untyped] options) -> void

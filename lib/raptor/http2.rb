@@ -832,6 +832,7 @@ module Raptor
     # @rbs @clean_thread_locals: bool
     # @rbs @clean_fiber_locals: bool
     # @rbs @on_error: (^(Hash[String, untyped]?, Exception) -> void)?
+    # @rbs @error_response: Proc?
     # @rbs @running: AtomicBoolean
     # @rbs @initial_settings_frame: String
 
@@ -848,10 +849,11 @@ module Raptor
     # @param clean_thread_locals [Boolean] whether to clear application thread locals after each request
     # @param clean_fiber_locals [Boolean] whether to process each request in a fresh Fiber
     # @param on_error [#call, nil] callback invoked with (env, exception) when the Rack app raises
+    # @param error_response [Proc, nil] callback returning a Rack response for (env, exception, suggested_status)
     # @return [void]
     #
-    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?) -> void
-    def initialize(app, server_port, connection_options: {}, http2_options: {}, access_log_io: nil, clean_thread_locals: true, clean_fiber_locals: false, on_error: nil)
+    # @rbs (^(Hash[String, untyped]) -> [Integer, Hash[String, String | Array[String]], untyped] app, Integer server_port, ?connection_options: Hash[Symbol, untyped], ?http2_options: Hash[Symbol, untyped], ?access_log_io: IO?, ?clean_thread_locals: bool, ?clean_fiber_locals: bool, ?on_error: (^(Hash[String, untyped]?, Exception) -> void)?, ?error_response: Proc?) -> void
+    def initialize(app, server_port, connection_options: {}, http2_options: {}, access_log_io: nil, clean_thread_locals: true, clean_fiber_locals: false, on_error: nil, error_response: nil)
       @app = app
       @server_port_string = server_port.to_s.freeze
       @write_timeout = connection_options[:write_timeout] || Http::WRITE_TIMEOUT
@@ -860,6 +862,7 @@ module Raptor
       @clean_thread_locals = clean_thread_locals
       @clean_fiber_locals = clean_fiber_locals
       @on_error = on_error
+      @error_response = error_response
       @running = AtomicBoolean.new(true)
 
       parser = Http2Parser.new
@@ -1174,7 +1177,25 @@ module Raptor
       if response_started
         write_reset_stream(socket, writer, stream_id, ERROR_INTERNAL_ERROR)
       else
-        write_error_response(socket, writer, stream_id)
+        begin
+          response = @error_response&.call(env, error, 500)
+          if response
+            status, response_headers, response_body = response
+            write_response(
+              socket, writer, flow_control, stream_id, status, response_headers, response_body,
+              trailers: {}, request_method: env && env[Rack::REQUEST_METHOD]
+            ) { response_started = true }
+          else
+            write_error_response(socket, writer, stream_id)
+          end
+        rescue => fallback_error
+          Log.rescued_error(fallback_error)
+          if response_started
+            write_reset_stream(socket, writer, stream_id, ERROR_INTERNAL_ERROR)
+          else
+            write_error_response(socket, writer, stream_id)
+          end
+        end
       end
 
       if @on_error

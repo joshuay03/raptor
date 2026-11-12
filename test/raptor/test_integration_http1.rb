@@ -362,6 +362,7 @@ module Raptor
 
     def test_max_body_size_returns_413
       @options[:connection] = @options[:connection].merge(max_body_size: 5)
+      @options[:error_response] = proc { [599, {}, ["replacement"]] }
 
       with_server("rack_input.ru") do |uri|
         response = Net::HTTP.post(uri, "this body is well over five bytes")
@@ -710,18 +711,110 @@ module Raptor
       end
     end
 
-    def test_on_error_callback_invoked_on_app_error
+    def test_error_response_customizes_response_and_preserves_on_error
       reader, writer = IO.pipe
       @options[:on_error] = ->(env, error) { writer.puts("#{env[Rack::PATH_INFO]}:#{error.class}") }
+      @options[:error_response] = proc do |env, error, status|
+        [503, { "content-type" => "text/plain" }, ["#{env[Rack::PATH_INFO]} #{status} #{error.message}"]]
+      end
 
       with_server("error_500.ru") do |uri|
-        Net::HTTP.get_response(uri)
+        response = Net::HTTP.get_response(uri)
 
         result = Timeout.timeout(5) { reader.gets }
 
         assert_equal "/:RuntimeError\n", result
+        assert_equal "503", response.code
+        assert_equal "text/plain", response["content-type"]
+        assert_equal "/ 500 something went wrong", response.body
+        assert_nil Net::HTTP.start(uri.host, uri.port) { |http| http.head("/") }.body
       end
     ensure
+      reader&.close
+      writer&.close
+    end
+
+    def test_error_response_failure_or_nil_retains_default_response
+      @options[:error_response] = proc do |env, _error, _status|
+        case env[Rack::PATH_INFO]
+        when "/raises" then raise "fallback failed"
+        when "/invalid" then [500, nil, []]
+        when "/stream"
+          body = proc do |stream|
+            stream.write("partial")
+            raise "fallback stream failed"
+          end
+          [503, {}, body]
+        end
+      end
+
+      with_server("error_500.ru") do |uri|
+        ["/nil", "/raises", "/invalid"].each do |path|
+          response = Net::HTTP.get_response(URI.join(uri, path))
+
+          assert_equal "500", response.code
+          assert_equal "", response.body
+        end
+
+        response = raw_request(uri, "GET /stream HTTP/1.0\r\n\r\n")
+        assert_match(/503 Service Unavailable/, response)
+        assert_includes response, "partial"
+        assert_equal 1, response.scan("HTTP/1.0").length
+      end
+    end
+
+    def test_error_response_does_not_replace_streamed_output
+      body = Object.new
+      body.define_singleton_method(:call) do |stream|
+        stream.write("partial")
+        raise "stream failed"
+      end
+      @options[:app] = proc do |env|
+        env[Rack::PATH_INFO] == "/" ? [200, {}, ["ready"]] : [200, {}, body]
+      end
+      @options[:error_response] = proc { [599, {}, ["replacement"]] }
+      @options[:on_error] = proc {}
+
+      with_server do |uri|
+        response = raw_request(uri, "GET /stream HTTP/1.0\r\n\r\n")
+
+        assert_match(/200 OK/, response)
+        assert_includes response, "partial"
+        assert_equal 1, response.scan("HTTP/1.0").length
+        refute_includes response, "replacement"
+      end
+    end
+
+    def test_error_response_does_not_close_a_hijacked_connection
+      reader, writer = IO.pipe
+      hijacked = nil
+      socket = nil
+      @options[:threads] = @options[:max_threads] = 1
+      @options[:on_error] = proc { |_env, error| writer.puts error.message }
+      @options[:error_response] = proc { [599, {}, ["replacement"]] }
+      @options[:app] = proc do |env|
+        case env[Rack::PATH_INFO]
+        when "/hijack"
+          hijacked = env[Rack::RACK_HIJACK].call
+          raise "handoff failed"
+        when "/release"
+          hijacked.write("HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nowned")
+          hijacked.close
+          [200, {}, ["released"]]
+        else
+          [200, {}, ["ready"]]
+        end
+      end
+
+      with_server do |uri|
+        socket = TCPSocket.new(uri.host, uri.port)
+        socket.write("GET /hijack HTTP/1.0\r\n\r\n")
+        assert_equal "handoff failed\n", Timeout.timeout(5) { reader.gets }
+        assert_equal "released", Net::HTTP.get(URI.join(uri, "/release"))
+        assert_equal "HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nowned", Timeout.timeout(5) { socket.read }
+      end
+    ensure
+      socket&.close
       reader&.close
       writer&.close
     end
@@ -825,6 +918,8 @@ module Raptor
     end
 
     def test_missing_host_returns_400
+      @options[:error_response] = proc { [599, {}, ["replacement"]] }
+
       with_server do |uri|
         response = raw_request(
           uri,
@@ -881,6 +976,8 @@ module Raptor
     end
 
     def test_rejected_request_framing_closes_without_continue_or_pipeline_dispatch
+      @options[:error_response] = proc { [599, {}, ["replacement"]] }
+
       with_server("rack_input.ru") do |uri|
         {
           "Content-Length: " => 400,
