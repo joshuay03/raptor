@@ -205,10 +205,12 @@ module Raptor
     def ready_worker(except: nil)
       wait_until(timeout: 15) do
         response = raw_unix_request(@control_path, "GET /stats HTTP/1.0\r\n\r\n")
+        next if response.empty?
+
         stats = JSON.parse(response.split("\r\n\r\n", 2).last, symbolize_names: true)
         worker = stats.fetch(:worker_status).first
         worker if worker && worker[:booted] && worker[:pid] != except
-      rescue Errno::ENOENT, Errno::ECONNREFUSED, Errno::ECONNRESET, EOFError
+      rescue Errno::ENOENT, Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EPIPE, EOFError
         false
       end
     end
