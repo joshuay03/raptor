@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-25
+
 - Publish stats files atomically
 - Add configurable error responses
 - Add bundled `statsd` plugin
