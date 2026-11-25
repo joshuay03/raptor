@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-25
+
 - Share `worker_drain_timeout` across request draining phases
 - Close inherited control sockets in workers
 
