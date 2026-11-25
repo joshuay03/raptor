@@ -295,7 +295,7 @@
   
 
   
-    <span class="summary_desc"><div class='inline'><p>Stops serving and removes the socket.</p></div></span>
+    <span class="summary_desc"><div class='inline'><p>Stops serving and removes the socket path only in the binding process.</p></div></span>
   
 </li>
 
@@ -419,7 +419,6 @@
       <pre class="lines">
 
 
-31
 32
 33
 34
@@ -428,10 +427,12 @@
 37
 38
 39
-40</pre>
+40
+41
+42</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 31</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 32</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_initialize'>initialize</span><span class='lparen'>(</span><span class='id identifier rubyid_url'>url</span><span class='comma'>,</span> <span class='op'>&amp;</span><span class='id identifier rubyid_stats'>stats</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_uri'>uri</span> <span class='op'>=</span> <span class='const'>URI</span><span class='lparen'>(</span><span class='id identifier rubyid_url'>url</span><span class='rparen'>)</span>
@@ -440,6 +441,7 @@
   <span class='ivar'>@path</span> <span class='op'>=</span> <span class='id identifier rubyid_uri'>uri</span><span class='period'>.</span><span class='id identifier rubyid_path'>path</span>
   <span class='ivar'>@stats</span> <span class='op'>=</span> <span class='id identifier rubyid_stats'>stats</span>
   <span class='ivar'>@server</span> <span class='op'>=</span> <span class='kw'>nil</span>
+  <span class='ivar'>@owner_pid</span> <span class='op'>=</span> <span class='kw'>nil</span>
   <span class='ivar'>@client</span> <span class='op'>=</span> <span class='const'>Atom</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='kw'>nil</span><span class='rparen'>)</span>
   <span class='ivar'>@thread</span> <span class='op'>=</span> <span class='kw'>nil</span>
 <span class='kw'>end</span></pre>
@@ -479,17 +481,19 @@
       <pre class="lines">
 
 
-47
-48
 49
-50</pre>
+50
+51
+52
+53</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 47</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 49</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_bind'>bind</span>
   <span class='id identifier rubyid_remove_stale_socket'>remove_stale_socket</span>
   <span class='ivar'>@server</span> <span class='op'>=</span> <span class='const'>UNIXServer</span><span class='period'>.</span><span class='id identifier rubyid_new'>new</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span>
+  <span class='ivar'>@owner_pid</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -538,9 +542,6 @@
       <pre class="lines">
 
 
-135
-136
-137
 138
 139
 140
@@ -554,10 +555,13 @@
 148
 149
 150
-151</pre>
+151
+152
+153
+154</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 135</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 138</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_handle'>handle</span><span class='lparen'>(</span><span class='id identifier rubyid_client'>client</span><span class='rparen'>)</span>
   <span class='id identifier rubyid_request_line'>request_line</span> <span class='op'>=</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_gets'>gets</span>
@@ -621,19 +625,19 @@
       <pre class="lines">
 
 
-95
-96
-97
 98
 99
 100
 101
 102
 103
-104</pre>
+104
+105
+106
+107</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 95</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 98</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_remove_stale_socket'>remove_stale_socket</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_exist?'>exist?</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span>
@@ -674,9 +678,6 @@
       <pre class="lines">
 
 
-111
-112
-113
 114
 115
 116
@@ -690,10 +691,13 @@
 124
 125
 126
-127</pre>
+127
+128
+129
+130</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 111</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 114</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_serve'>serve</span>
   <span class='kw'>until</span> <span class='ivar'>@client</span><span class='period'>.</span><span class='id identifier rubyid_value'>value</span> <span class='op'>==</span> <span class='const'><span class='object_link'><a href="#SHUTDOWN-constant" title="Raptor::ControlServer::SHUTDOWN (constant)">SHUTDOWN</a></span></span>
@@ -728,7 +732,7 @@
   
 </h3><div class="docstring">
   <div class="discussion">
-    <p class="note returns_void">This method returns an undefined value.</p><p>Stops serving and removes the socket.</p>
+    <p class="note returns_void">This method returns an undefined value.</p><p>Stops serving and removes the socket path only in the binding process.</p>
 
   </div>
 </div>
@@ -741,9 +745,6 @@
       <pre class="lines">
 
 
-73
-74
-75
 76
 77
 78
@@ -753,10 +754,13 @@
 82
 83
 84
-85</pre>
+85
+86
+87
+88</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 73</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 76</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_shutdown'>shutdown</span>
   <span class='kw'>return</span> <span class='kw'>unless</span> <span class='ivar'>@server</span>
@@ -769,7 +773,7 @@
   <span class='ivar'>@server</span><span class='op'>&amp;.</span><span class='id identifier rubyid_close'>close</span>
   <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_close'>close</span> <span class='kw'>if</span> <span class='id identifier rubyid_client'>client</span><span class='period'>.</span><span class='id identifier rubyid_is_a?'>is_a?</span><span class='lparen'>(</span><span class='const'>UNIXSocket</span><span class='rparen'>)</span>
   <span class='ivar'>@thread</span><span class='op'>&amp;.</span><span class='id identifier rubyid_join'>join</span>
-  <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span>
+  <span class='const'>File</span><span class='period'>.</span><span class='id identifier rubyid_delete'>delete</span><span class='lparen'>(</span><span class='ivar'>@path</span><span class='rparen'>)</span> <span class='kw'>rescue</span> <span class='kw'>nil</span> <span class='kw'>if</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span> <span class='op'>==</span> <span class='ivar'>@owner_pid</span>
 <span class='kw'>end</span></pre>
     </td>
   </tr>
@@ -800,19 +804,19 @@
       <pre class="lines">
 
 
-57
-58
-59
 60
 61
 62
 63
 64
 65
-66</pre>
+66
+67
+68
+69</pre>
     </td>
     <td>
-      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 57</span>
+      <pre class="code"><span class="info file"># File 'lib/raptor/control_server.rb', line 60</span>
 
 <span class='kw'>def</span> <span class='id identifier rubyid_start'>start</span>
   <span class='id identifier rubyid_owner_pid'>owner_pid</span> <span class='op'>=</span> <span class='const'>Process</span><span class='period'>.</span><span class='id identifier rubyid_pid'>pid</span>
@@ -834,7 +838,7 @@
 </div>
 
       <div id="footer">
-  Generated on Wed Nov 25 05:55:51 2026 by
+  Generated on Wed Nov 25 06:21:01 2026 by
   <a href="https://yardoc.org" title="Yay! A Ruby Documentation Tool" target="_parent">yard</a>
   0.9.45 (ruby-4.0.10).
 </div>
