@@ -872,6 +872,7 @@ module Raptor
     #
     # @rbs (Integer index, Integer phase) -> void
     def run_worker(index, phase)
+      @control_server&.shutdown
       @fork_w.close if @fork_w && !@fork_w.closed?
       @resp_r.close if @resp_r && !@resp_r.closed?
 

@@ -11,6 +11,8 @@ module Raptor
 
     @server: UNIXServer?
 
+    @owner_pid: Integer?
+
     @client: Atom
 
     @thread: Thread?
@@ -40,7 +42,7 @@ module Raptor
     # @rbs () -> void
     def start: () -> void
 
-    # Stops serving and removes the socket.
+    # Stops serving and removes the socket path only in the binding process.
     #
     # @return [void]
     #

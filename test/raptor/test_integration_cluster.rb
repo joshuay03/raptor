@@ -161,6 +161,47 @@ module Raptor
       File.delete(socket_path) rescue nil
     end
 
+    def test_replacement_workers_do_not_retain_control_connections
+      socket_path = "/tmp/raptor_test_control_fork_#{Process.pid}_#{object_id}.sock"
+      @options[:control_url] = "unix://#{socket_path}"
+      events, report = IO.pipe
+      cluster = without_output { Cluster.new(@options) }
+      control = cluster.instance_variable_get(:@control_server)
+      forks = 0
+      cluster.options[:before_fork] << proc do
+        forks += 1
+        next if forks == 1
+
+        report.puts "fork"
+        wait_until { control.instance_variable_get(:@client).value }
+      end
+      cluster.options[:after_worker_boot] << proc { report.puts Process.pid }
+      cluster_pid = fork { without_output { cluster.run } }
+      cluster.instance_variable_get(:@binder).close
+
+      original_pid = Timeout.timeout(5) { Integer(events.gets) }
+      Process.kill("KILL", original_pid)
+      assert_equal "fork\n", Timeout.timeout(5) { events.gets }
+      client = UNIXSocket.new(socket_path)
+      client.write("GET /stats HTTP/1.0\r\n")
+      replacement_pid = Timeout.timeout(5) { Integer(events.gets) }
+      client.write("\r\n")
+      response = Timeout.timeout(2) { client.read }
+      stats = JSON.parse(response.split("\r\n\r\n", 2).last, symbolize_names: true)
+
+      refute_equal original_pid, replacement_pid
+      assert_equal replacement_pid, stats.dig(:worker_status, 0, :pid)
+      response = Timeout.timeout(2) { raw_unix_request(socket_path, "GET /stats HTTP/1.0\r\n\r\n") }
+      stats = JSON.parse(response.split("\r\n\r\n", 2).last, symbolize_names: true)
+      assert_equal replacement_pid, stats.dig(:worker_status, 0, :pid)
+    ensure
+      client&.close
+      stop_cluster(cluster_pid)
+      events&.close
+      report&.close
+      File.delete(socket_path) rescue nil
+    end
+
     def test_access_log_file_receives_clf_entries
       log_path = "/tmp/raptor_test_access_#{Process.pid}.log"
       File.delete(log_path) rescue nil

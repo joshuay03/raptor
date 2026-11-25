@@ -16,6 +16,7 @@ module Raptor
     # @rbs @path: String
     # @rbs @stats: ^() -> Hash[Symbol, untyped]
     # @rbs @server: UNIXServer?
+    # @rbs @owner_pid: Integer?
     # @rbs @client: Atom
     # @rbs @thread: Thread?
 
@@ -35,6 +36,7 @@ module Raptor
       @path = uri.path
       @stats = stats
       @server = nil
+      @owner_pid = nil
       @client = Atom.new(nil)
       @thread = nil
     end
@@ -47,6 +49,7 @@ module Raptor
     def bind
       remove_stale_socket
       @server = UNIXServer.new(@path)
+      @owner_pid = Process.pid
     end
 
     # Starts serving requests in a background thread.
@@ -65,7 +68,7 @@ module Raptor
       end
     end
 
-    # Stops serving and removes the socket.
+    # Stops serving and removes the socket path only in the binding process.
     #
     # @return [void]
     #
@@ -81,7 +84,7 @@ module Raptor
       @server&.close
       client.close if client.is_a?(UNIXSocket)
       @thread&.join
-      File.delete(@path) rescue nil
+      File.delete(@path) rescue nil if Process.pid == @owner_pid
     end
 
     private
