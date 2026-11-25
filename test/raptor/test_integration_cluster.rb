@@ -929,6 +929,68 @@ module Raptor
       [events, report].each { |io| io&.close unless io&.closed? }
     end
 
+    def test_mixed_requests_share_a_drain_deadline_and_leave_time_for_cleanup
+      events, report = IO.pipe
+      @options[:threads] = 2
+      @options[:max_threads] = 2
+      @options[:worker_drain_timeout] = 3
+      @options[:worker_shutdown_timeout] = 5
+      @options[:after_worker_drain] = [proc do
+        report.puts "drained"
+        sleep 0.5
+        report.puts "flushed"
+      end]
+      @options[:app] = ->(env) do
+        case env["PATH_INFO"]
+        when "/detached"
+          body = DetachedBody.new
+          body.on_open { report.puts "detached opened" }
+          body.on_close { report.puts "detached closed" }
+          [200, {}, body]
+        when "/hold"
+          begin
+            report.puts "request opened"
+            sleep
+          ensure
+            report.puts "request closed"
+          end
+        else
+          [200, {}, ["ok"]]
+        end
+      end
+      cluster = without_output { Cluster.new(@options) }
+      port = cluster.instance_variable_get(:@server_port)
+      cluster_pid = fork do
+        events.close
+        without_output { cluster.run }
+      end
+      report.close
+      cluster.instance_variable_get(:@binder).close
+      wait_for_server(port)
+      detached = TCPSocket.new("127.0.0.1", port)
+      request = TCPSocket.new("127.0.0.1", port)
+
+      Timeout.timeout(10) do
+        detached.write("GET /detached HTTP/1.0\r\n\r\n")
+        assert_equal "detached opened\n", events.readline
+        request.write("GET /hold HTTP/1.0\r\n\r\n")
+        assert_equal "request opened\n", events.readline
+        Process.kill("TERM", cluster_pid)
+
+        assert_equal "detached closed\n", events.readline
+        assert_equal "request closed\n", events.readline
+        assert_equal "drained\n", events.readline
+        assert_equal "flushed\n", events.readline
+        assert_predicate Process.waitpid2(cluster_pid).last, :success?
+        cluster_pid = nil
+      end
+    ensure
+      detached&.close
+      request&.close
+      stop_cluster(cluster_pid)
+      [events, report].each { |io| io&.close unless io&.closed? }
+    end
+
     def test_after_worker_exit_hooks_report_workers_killed_at_the_shutdown_timeout
       events, report = IO.pipe
       @options[:worker_shutdown_timeout] = 1

@@ -179,14 +179,16 @@ module Raptor
       @reactor_thread.value if @reactor_thread && !@reactor_thread.alive?
     end
 
-    # Drains requests and releases the serving threads and parser Ractors.
-    # A seed keeps its listeners open for the cluster to manage.
+    # Drains app work and detached responses within one shared timeout, then
+    # releases the serving threads and parser Ractors. A seed keeps its listeners open.
     #
     # @rbs (?close_listeners: bool) -> void
     def shutdown(close_listeners: true)
       return if @stopped
 
       @stopped = true
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @options[:worker_drain_timeout]
+
       begin
         if close_listeners
           @server&.shutdown
@@ -198,9 +200,9 @@ module Raptor
         @http1&.shutdown
         if @reactor_thread&.alive?
           @http2&.shutdown(@reactor)
-          @reactor.drain_detached_bodies(@options[:worker_drain_timeout])
+          @reactor.drain_detached_bodies(deadline)
         end
-        drain_thread_pool if @thread_pool
+        drain_thread_pool(deadline) if @thread_pool
         @reactor&.shutdown
         begin
           @reactor_thread&.join
@@ -213,16 +215,16 @@ module Raptor
 
     private
 
-    # Waits for app work to finish within the configured drain timeout.
+    # Waits for app work to finish within the shared drain deadline.
     #
-    # @rbs () -> void
-    def drain_thread_pool
+    # @rbs (Float deadline) -> void
+    def drain_thread_pool(deadline)
       drain_thread = Thread.new do
         Thread.current.name = "Thread Pool Drain"
 
         @thread_pool.shutdown
       end
-      return if drain_thread.join(@options[:worker_drain_timeout])
+      return if drain_thread.join([deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0].max)
 
       Log.warn "Force-killing in-flight app threads after #{@options[:worker_drain_timeout]}s drain timeout"
       @thread_pool.instance_variable_get(:@threads).each(&:kill)

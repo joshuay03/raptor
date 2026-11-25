@@ -573,23 +573,30 @@ module Raptor
       wakeup rescue nil
     end
 
-    # Waits for detached responses to finish, then cancels any that outlive
-    # the worker drain period.
+    # Waits for detached responses until the shared drain deadline, then cancels any still open.
     #
-    # @param timeout [Numeric] seconds to wait before cancelling open bodies
+    # @param deadline [Float] monotonic time at which request draining ends
     # @return [void]
     #
-    # @rbs (Numeric timeout) -> void
-    def drain_detached_bodies(timeout)
+    # @rbs (Float deadline) -> void
+    def drain_detached_bodies(deadline)
       barrier = AtomicBoolean.new(false)
       @io_queue << [:barrier, nil, barrier]
       wakeup rescue nil
       @io_applied.wait { barrier.true? }
 
-      Timeout.timeout(timeout) do
-        @detached_drained.wait { @detached_count.value.zero? }
+      remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      if remaining.positive?
+        begin
+          Timeout.timeout(remaining) do
+            @detached_drained.wait { @detached_count.value.zero? }
+          end
+
+          return
+        rescue Timeout::Error
+        end
       end
-    rescue Timeout::Error
+
       @io_queue << [:cancel_all]
       wakeup rescue nil
       @detached_drained.wait { @detached_count.value.zero? }

@@ -73,17 +73,17 @@ module Raptor
     # @rbs () -> void
     def join: () -> void
 
-    # Drains requests and releases the serving threads and parser Ractors.
-    # A seed keeps its listeners open for the cluster to manage.
+    # Drains app work and detached responses within one shared timeout, then
+    # releases the serving threads and parser Ractors. A seed keeps its listeners open.
     #
     # @rbs (?close_listeners: bool) -> void
     def shutdown: (?close_listeners: bool) -> void
 
     private
 
-    # Waits for app work to finish within the configured drain timeout.
+    # Waits for app work to finish within the shared drain deadline.
     #
-    # @rbs () -> void
-    def drain_thread_pool: () -> void
+    # @rbs (Float deadline) -> void
+    def drain_thread_pool: (Float deadline) -> void
   end
 end

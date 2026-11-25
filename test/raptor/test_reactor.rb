@@ -92,7 +92,7 @@ module Raptor
       body.on_close { |closed| reason = closed }
 
       assert reactor.attach_http1_body(socket, 1, body, http1_state, proc {})
-      reactor.drain_detached_bodies(0.01)
+      Timeout.timeout(1) { reactor.drain_detached_bodies(Process.clock_gettime(Process::CLOCK_MONOTONIC) + 0.01) }
       Timeout.timeout(1) { callbacks.pop.call }
 
       assert_equal :shutdown, reason
@@ -274,7 +274,7 @@ module Raptor
       socket&.close
     end
 
-    def test_http2_detached_body_shutdown
+    def test_http2_detached_body_shutdown_after_deadline
       callbacks = Queue.new
       reactor, reactor_thread, reader, socket = build_running_http2_reactor(callbacks)
       reason = nil
@@ -282,7 +282,7 @@ module Raptor
       body.on_close { |closed| reason = closed }
 
       assert reactor.attach_http2_body(1, 3, body, proc {})
-      reactor.drain_detached_bodies(0.01)
+      Timeout.timeout(1) { reactor.drain_detached_bodies(Process.clock_gettime(Process::CLOCK_MONOTONIC)) }
       Timeout.timeout(1) { callbacks.pop.call }
 
       assert_equal :shutdown, reason

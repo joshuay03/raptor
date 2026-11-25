@@ -359,14 +359,13 @@ module Raptor
     # @rbs (Integer id, Integer stream_id) -> void
     def cancel_http2_body: (Integer id, Integer stream_id) -> void
 
-    # Waits for detached responses to finish, then cancels any that outlive
-    # the worker drain period.
+    # Waits for detached responses until the shared drain deadline, then cancels any still open.
     #
-    # @param timeout [Numeric] seconds to wait before cancelling open bodies
+    # @param deadline [Float] monotonic time at which request draining ends
     # @return [void]
     #
-    # @rbs (Numeric timeout) -> void
-    def drain_detached_bodies: (Numeric timeout) -> void
+    # @rbs (Float deadline) -> void
+    def drain_detached_bodies: (Float deadline) -> void
 
     # Stores an HTTP/2 connection's socket, state, writer, and flow
     # controller in the reactor's per-connection maps.
